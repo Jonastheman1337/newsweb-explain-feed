@@ -1,12 +1,13 @@
-﻿# Norsk Newsweb Explain Feed (MVP)
+# Newsweb Aksjelive News Service
 
-Ny TypeScript-kodebase for privat, norsk forklaringsfeed av Newsweb-meldinger.
+News service that turns company notices from Newsweb into short news stories
+designed for publication in E24s Aksjelive service.
 
-## Hva denne MVP-en gjor
+## Hva denne tjenesten gjor
 - Poller `newsreader/list` hvert 20. sekund.
-- Henter detalj per ny melding via `newsreader/message`.
+- Henter detaljer for nye selskapsmeldinger via `newsreader/message`.
 - Lagrer radata i PostgreSQL.
-- Genererer korte Bokmal-notiser med valgt modellprovider (OpenAI eller Anthropic).
+- Genererer korte Bokmal-nyhetssaker tilpasset E24s Aksjelive-format.
 - Validerer output:
   - Gyldig schema
   - Ingen nye tall som ikke finnes i kilden

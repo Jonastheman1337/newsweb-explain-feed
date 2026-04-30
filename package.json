@@ -1,6 +1,7 @@
 {
   "name": "newsweb-explain-feed",
   "version": "0.1.0",
+  "description": "Short E24 Aksjelive-style news stories from company notices on Newsweb.",
   "private": true,
   "workspaces": [
     "apps/*",
