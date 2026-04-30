@@ -83,9 +83,7 @@ Frontend tilgjengelig via `http://localhost:8080`.
 
 ## Render deploy
 Repoet har en Render Blueprint i `render.yaml` som oppretter:
-- `newsweb-explain-web` (Next.js frontend)
-- `newsweb-explain-api` (Fastify API)
-- `newsweb-explain-worker` (polling/rewrite worker)
+- `newsweb-explain` (kombinert Next.js frontend, Fastify API og polling/rewrite worker)
 - `newsweb-explain-db` (Postgres)
 - `newsweb-explain-redis` (Render Key Value / Redis-kompatibel ko)
 
@@ -95,10 +93,9 @@ Oppsett:
 3. Fyll inn hemmelige variabler Render ber om:
 ```text
 ANTHROPIC_API_KEY
-MAGIC_LINK_BASE_URL=https://<web-service-url>/login
 SMTP_HOST / SMTP_USER / SMTP_PASS hvis magic links skal sendes som e-post
 ```
-4. API-tjenesten kjører `prisma migrate deploy` som pre-deploy command.
+4. Web-tjenesten kjører `prisma migrate deploy` som pre-deploy command.
 
 Etter forste deploy kan inviterte brukere legges til fra API-service shell:
 ```bash

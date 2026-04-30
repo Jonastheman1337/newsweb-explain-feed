@@ -6,19 +6,19 @@ services:
     maxmemoryPolicy: noeviction
 
   - type: web
-    name: newsweb-explain-api
+    name: newsweb-explain
     runtime: docker
-    dockerfilePath: ./apps/api/Dockerfile
+    dockerfilePath: ./Dockerfile.render
     plan: starter
     preDeployCommand: npm run prisma:migrate:deploy
-    healthCheckPath: /health
+    healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV
         value: production
-      - key: PORT
-        value: 4000
       - key: API_PORT
         value: 4000
+      - key: API_BASE_URL
+        value: http://127.0.0.1:4000
       - key: DATABASE_URL
         fromDatabase:
           name: newsweb-explain-db
@@ -33,37 +33,19 @@ services:
       - key: DEV_AUTH_BYPASS
         value: false
       - key: MAGIC_LINK_BASE_URL
-        sync: false
+        value: https://newsweb-explain.onrender.com/login
       - key: SMTP_HOST
-        sync: false
+        value: ""
       - key: SMTP_PORT
         value: 587
       - key: SMTP_USER
-        sync: false
+        value: ""
       - key: SMTP_PASS
-        sync: false
+        value: ""
       - key: SMTP_FROM
         value: noreply@example.com
       - key: ADMIN_API_KEY
         generateValue: true
-
-  - type: worker
-    name: newsweb-explain-worker
-    runtime: docker
-    dockerfilePath: ./apps/worker/Dockerfile
-    plan: starter
-    envVars:
-      - key: NODE_ENV
-        value: production
-      - key: DATABASE_URL
-        fromDatabase:
-          name: newsweb-explain-db
-          property: connectionString
-      - key: REDIS_URL
-        fromService:
-          type: keyvalue
-          name: newsweb-explain-redis
-          property: connectionString
       - key: ANTHROPIC_API_KEY
         sync: false
       - key: ANTHROPIC_MODEL
@@ -74,27 +56,6 @@ services:
         value: 20000
       - key: LATEST_BOOTSTRAP_COUNT
         value: 10
-
-  - type: web
-    name: newsweb-explain-web
-    runtime: docker
-    dockerfilePath: ./apps/web/Dockerfile
-    plan: starter
-    healthCheckPath: /api/health
-    envVars:
-      - key: NODE_ENV
-        value: production
-      - key: PORT
-        value: 3000
-      - key: API_HOSTPORT
-        fromService:
-          type: web
-          name: newsweb-explain-api
-          property: hostport
-      - key: ANTHROPIC_API_KEY
-        sync: false
-      - key: ANTHROPIC_MODEL
-        value: claude-sonnet-4-6
 
 databases:
   - name: newsweb-explain-db
