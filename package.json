@@ -1,0 +1,33 @@
+{
+  "name": "newsweb-explain-feed",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:deps": "docker compose -f infra/docker-compose.yml up -d postgres redis",
+    "dev:deps:down": "docker compose -f infra/docker-compose.yml stop postgres redis",
+    "dev": "npm run build -w packages/shared && npm run build -w packages/prompt-kit && concurrently --kill-others-on-fail \"npm run dev -w apps/api\" \"npm run dev -w apps/worker\" \"npm run dev -w apps/web\"",
+    "build": "npm run build -w packages/shared && npm run build -w packages/prompt-kit && npm run build -w apps/api && npm run build -w apps/worker && npm run build -w apps/web",
+    "typecheck": "npm run build -w packages/shared && npm run build -w packages/prompt-kit && npm run typecheck -w packages/shared && npm run typecheck -w packages/prompt-kit && npm run typecheck -w apps/api && npm run typecheck -w apps/worker && npm run typecheck -w apps/web",
+    "test": "npm run test -w packages/shared && npm run test -w packages/prompt-kit && npm run build -w packages/shared && npm run build -w packages/prompt-kit && npm run test -w apps/api && npm run test -w apps/worker",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate:dev": "prisma migrate dev",
+    "prisma:migrate:deploy": "prisma migrate deploy"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "concurrently": "^9.2.1",
+    "prisma": "^6.5.0",
+    "typescript": "^5.8.2"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.5.0"
+  },
+  "engines": {
+    "node": ">=22.0.0",
+    "npm": ">=11.0.0"
+  }
+}

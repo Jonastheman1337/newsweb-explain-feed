@@ -1,0 +1,152 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum RewriteStatus {
+  pending
+  published
+  needs_retry
+  failed
+  skipped
+}
+
+enum FeedVisibilityStatus {
+  published
+  hidden
+}
+
+enum JobStatus {
+  started
+  success
+  failed
+}
+
+model User {
+  id          String   @id @default(cuid())
+  email       String   @unique
+  createdAt   DateTime @default(now()) @map("created_at")
+  lastLoginAt DateTime? @map("last_login_at")
+
+  @@map("users")
+}
+
+model Invite {
+  id        String    @id @default(cuid())
+  email     String    @unique
+  tokenHash String?   @map("token_hash")
+  expiresAt DateTime? @map("expires_at")
+  acceptedAt DateTime? @map("accepted_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@map("invites")
+}
+
+model SourceNotice {
+  messageId      Int       @id @map("message_id")
+  newsId         Int       @map("news_id")
+  title          String
+  issuerName     String    @map("issuer_name")
+  issuerSign     String    @map("issuer_sign")
+  publishedAt    DateTime  @map("published_at")
+  categoriesJson Json      @map("categories_json")
+  marketsJson    Json      @map("markets_json")
+  bodyText       String    @map("body_text") @db.Text
+  hasAttachments Boolean   @map("has_attachments")
+  rawMessageJson Json      @map("raw_message_json")
+  ingestedAt     DateTime  @default(now()) @map("ingested_at")
+  rewrites       Rewrite[]
+  feedItem       FeedItem?
+  jobRuns        JobRun[]
+
+  @@index([publishedAt(sort: Desc)])
+  @@index([issuerSign])
+  @@index([categoriesJson], type: Gin)
+  @@map("source_notices")
+}
+
+model Rewrite {
+  id              String        @id @default(cuid())
+  messageId       Int           @map("message_id")
+  version         Int           @default(1)
+  lang            String
+  model           String
+  promptVersion   String        @map("prompt_version")
+  rewriteJson     Json          @map("rewrite_json")
+  validationJson  Json          @map("validation_json")
+  status          RewriteStatus
+  userInstruction String?       @map("user_instruction") @db.Text
+  generatedAt     DateTime      @default(now()) @map("generated_at")
+  sourceNotice    SourceNotice  @relation(fields: [messageId], references: [messageId], onDelete: Cascade)
+
+  @@unique([messageId, version])
+  @@index([status, generatedAt(sort: Desc)])
+  @@map("rewrites")
+}
+
+model FeedItem {
+  messageId        Int                 @id @map("message_id")
+  publishedAt      DateTime            @map("published_at")
+  visibilityStatus FeedVisibilityStatus @default(published) @map("visibility_status")
+  rankScore        Float               @default(0) @map("rank_score")
+  sourceNotice     SourceNotice        @relation(fields: [messageId], references: [messageId], onDelete: Cascade)
+
+  @@index([publishedAt(sort: Desc), visibilityStatus])
+  @@map("feed_items")
+}
+
+model JobRun {
+  id          String      @id @default(cuid())
+  jobType     String      @map("job_type")
+  messageId   Int?        @map("message_id")
+  status      JobStatus
+  startedAt   DateTime    @default(now()) @map("started_at")
+  finishedAt  DateTime?   @map("finished_at")
+  errorText   String?     @map("error_text") @db.Text
+  sourceNotice SourceNotice? @relation(fields: [messageId], references: [messageId], onDelete: SetNull)
+
+  @@index([jobType, startedAt(sort: Desc)])
+  @@map("job_runs")
+}
+
+model EditLog {
+  id              String   @id @default(cuid())
+  messageId       Int      @map("message_id")
+  originalTitle   String   @map("original_title")
+  originalBody    String   @map("original_body") @db.Text
+  editedTitle     String   @map("edited_title")
+  editedBody      String   @map("edited_body") @db.Text
+  hasEdits        Boolean  @map("has_edits")
+  copiedAt        DateTime @default(now()) @map("copied_at")
+
+  @@index([messageId, copiedAt(sort: Desc)])
+  @@map("edit_logs")
+}
+
+model Feedback {
+  id        String   @id @default(cuid())
+  messageId Int      @map("message_id")
+  version   Int?
+  text      String   @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([messageId, createdAt(sort: Desc)])
+  @@map("feedback")
+}
+
+model TitleSuggestionLog {
+  id              String   @id @default(cuid())
+  messageId       Int      @map("message_id")
+  currentTitle    String   @map("current_title")
+  suggestions     Json     @map("suggestions")
+  selectedTitle   String?  @map("selected_title")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@index([messageId, createdAt(sort: Desc)])
+  @@map("title_suggestion_logs")
+}
+
