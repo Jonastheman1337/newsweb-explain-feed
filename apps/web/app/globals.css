@@ -787,6 +787,10 @@ a {
     grid-template-columns: 1fr;
   }
 
+  .noticeContent {
+    position: static;
+  }
+
   .cardSplitGrid {
     grid-template-columns: 1fr;
   }
