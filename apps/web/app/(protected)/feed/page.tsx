@@ -1,8 +1,10 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { BackButton } from "../../../components/back-button";
 import { LiveFeedList } from "../../../components/live-feed-list";
 import { SearchableSelect } from "../../../components/searchable-select";
 import { getFeed, getMetaFilters } from "../../../lib/api";
+import { getSessionToken } from "../../../lib/session";
 
 type FeedData = Awaited<ReturnType<typeof getFeed>>;
 
@@ -31,6 +33,11 @@ function withParams(
 
 export default async function FeedPage({ searchParams }: FeedPageProps) {
   const params = await searchParams;
+  const token = await getSessionToken();
+  if (!token) {
+    redirect("/login");
+  }
+
   const normalized = {
     cursor: params.cursor || undefined,
     market: params.market || undefined,
@@ -48,8 +55,8 @@ export default async function FeedPage({ searchParams }: FeedPageProps) {
   };
 
   const [feedResult, filtersResult] = await Promise.allSettled([
-    getFeed(null, requestedQuery),
-    getMetaFilters(null)
+    getFeed(token, requestedQuery),
+    getMetaFilters(token)
   ]);
 
   let feedUnavailable = false;
@@ -62,7 +69,7 @@ export default async function FeedPage({ searchParams }: FeedPageProps) {
     feed = feedResult.value;
   } else if (requestedQuery.cursor) {
     try {
-      feed = await getFeed(null, { ...requestedQuery, cursor: undefined });
+      feed = await getFeed(token, { ...requestedQuery, cursor: undefined });
     } catch {
       feedUnavailable = true;
     }
@@ -77,7 +84,7 @@ export default async function FeedPage({ searchParams }: FeedPageProps) {
 
   if (!feedUnavailable && feed.items.length === 0 && requestedQuery.cursor) {
     try {
-      feed = await getFeed(null, {
+      feed = await getFeed(token, {
         ...requestedQuery,
         cursor: undefined
       });

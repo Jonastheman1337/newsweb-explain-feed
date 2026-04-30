@@ -7,6 +7,7 @@ import { ProcessingIndicator } from "../../../../components/processing-indicator
 import { RewriteTabs } from "../../../../components/rewrite-tabs";
 import { InstructionInput } from "../../../../components/instruction-input";
 import { SourceBodyText } from "../../../../components/source-body-text";
+import { getSessionToken } from "../../../../lib/session";
 
 type NoticePageProps = {
   params: Promise<{ messageId: string }>;
@@ -21,13 +22,18 @@ function formatOsloTime(isoString: string): string {
 }
 
 export default async function NoticePage({ params }: NoticePageProps) {
+  const token = await getSessionToken();
+  if (!token) {
+    redirect("/login");
+  }
+
   const { messageId } = await params;
   const id = Number(messageId);
   if (Number.isNaN(id)) {
     redirect("/feed");
   }
 
-  const notice = await getNotice(null, id).catch(() => {
+  const notice = await getNotice(token, id).catch(() => {
     redirect("/feed");
   });
 

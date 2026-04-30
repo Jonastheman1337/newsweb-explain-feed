@@ -33,7 +33,7 @@ services:
       - key: DEV_AUTH_BYPASS
         value: false
       - key: MAGIC_LINK_BASE_URL
-        value: https://autoweb.onrender.com/login
+        value: https://autoweb-f4dw.onrender.com/login
       - key: SMTP_HOST
         value: ""
       - key: SMTP_PORT
