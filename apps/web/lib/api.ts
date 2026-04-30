@@ -132,6 +132,28 @@ export async function requestMagicLink(email: string): Promise<{
   }>;
 }
 
+export async function loginWithPassword(username: string, password: string): Promise<{
+  sessionToken: string;
+  user: { id: string; username: string };
+}> {
+  const response = await fetch(createUrl("/auth/login"), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ username, password })
+  });
+
+  if (!response.ok) {
+    throw new Error("Innlogging feilet.");
+  }
+
+  return response.json() as Promise<{
+    sessionToken: string;
+    user: { id: string; username: string };
+  }>;
+}
+
 export async function verifyMagicLink(token: string): Promise<{
   sessionToken: string;
   user: { id: string; email: string };

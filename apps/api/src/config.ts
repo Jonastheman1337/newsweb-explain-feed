@@ -16,6 +16,8 @@ const configSchema = z.object({
   REDIS_URL: z.string().url(),
   SESSION_SECRET: z.string().min(1),
   DEV_AUTH_BYPASS: z.string().optional(),
+  LOGIN_USERNAME: z.string().min(1).optional(),
+  LOGIN_PASSWORD: z.string().min(1).optional(),
   MAGIC_LINK_BASE_URL: z.string().url(),
   ADMIN_API_KEY: z.string().min(8),
   SMTP_HOST: z.string().optional(),

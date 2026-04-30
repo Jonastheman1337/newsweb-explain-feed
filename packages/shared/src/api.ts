@@ -9,6 +9,11 @@ export const verifyMagicLinkInputSchema = z.object({
   token: z.string().min(20).max(200)
 });
 
+export const passwordLoginInputSchema = z.object({
+  username: z.string().min(1).max(80),
+  password: z.string().min(1).max(200)
+});
+
 export const feedQuerySchema = z.object({
   cursor: z.string().datetime().optional(),
   limit: z.coerce.number().int().min(1).max(60).default(30),

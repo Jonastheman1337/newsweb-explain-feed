@@ -1,4 +1,9 @@
-import { requestMagicLinkInputSchema, verifyMagicLinkInputSchema } from "@newsweb/shared";
+import { timingSafeEqual } from "node:crypto";
+import {
+  passwordLoginInputSchema,
+  requestMagicLinkInputSchema,
+  verifyMagicLinkInputSchema
+} from "@newsweb/shared";
 import { prisma } from "@newsweb/shared/db";
 import type { FastifyPluginAsync } from "fastify";
 import { createMagicToken, sha256 } from "../utils/hash.js";
@@ -17,7 +22,45 @@ function isLocalHostRequest(hostHeader?: string): boolean {
   );
 }
 
+function safeEqual(a: string, b: string): boolean {
+  const aBuffer = Buffer.from(a);
+  const bBuffer = Buffer.from(b);
+  return aBuffer.length === bBuffer.length && timingSafeEqual(aBuffer, bBuffer);
+}
+
 export const authRoutes: FastifyPluginAsync = async (fastify) => {
+  fastify.post("/auth/login", async (request, reply) => {
+    const body = passwordLoginInputSchema.parse(request.body);
+    const expectedUsername = fastify.config.LOGIN_USERNAME;
+    const expectedPassword = fastify.config.LOGIN_PASSWORD;
+
+    if (!expectedUsername || !expectedPassword) {
+      return reply.code(503).send({ message: "Passordinnlogging er ikke konfigurert." });
+    }
+
+    if (!safeEqual(body.username, expectedUsername) || !safeEqual(body.password, expectedPassword)) {
+      return reply.code(401).send({ message: "Ugyldig brukernavn eller passord." });
+    }
+
+    const sessionToken = await reply.jwtSign(
+      {
+        sub: `login:${expectedUsername}`,
+        username: expectedUsername
+      },
+      {
+        expiresIn: "7d"
+      }
+    );
+
+    return reply.send({
+      sessionToken,
+      user: {
+        id: expectedUsername,
+        username: expectedUsername
+      }
+    });
+  });
+
   fastify.post("/auth/request-magic-link", async (request, reply) => {
     const body = requestMagicLinkInputSchema.parse(request.body);
     const email = body.email.toLowerCase();
