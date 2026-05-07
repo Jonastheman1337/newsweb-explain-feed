@@ -14,7 +14,7 @@ import {
   EDITORIAL_WRITING_STYLE
 } from "./shared-editorial.js";
 
-export const PROMPT_VERSION = "v4.3.0";
+export const PROMPT_VERSION = "v4.4.0";
 
 export type PromptPayload = {
   messageId: number;
@@ -171,6 +171,18 @@ export function createUserPrompt(payload: PromptPayload): string {
   return parts.join("\n");
 }
 
+export function formatRewriteForRevisionPrompt(previousOutput: RewriteOutput): string {
+  return [
+    `title: ${previousOutput.title}`,
+    `lead: ${previousOutput.lead}`,
+    "body:",
+    ...previousOutput.body.map((p, i) => `  ${i + 1}. ${p}`),
+    `company_sentence: ${previousOutput.company_sentence}`,
+    `key_facts: ${previousOutput.key_facts.join("; ")}`,
+    `importance: ${previousOutput.importance}`
+  ].join("\n");
+}
+
 export function createRevisionUserPrompt(
   payload: PromptPayload,
   previousOutput: RewriteOutput,
@@ -188,25 +200,21 @@ export function createRevisionUserPrompt(
     `sourceBodyChars: ${payload.sourceBodyChars}`
   ].join("\n");
 
-  const formattedPrevious = [
-    `title: ${previousOutput.title}`,
-    `lead: ${previousOutput.lead}`,
-    "body:",
-    ...previousOutput.body.map((p, i) => `  ${i + 1}. ${p}`),
-    `company_sentence: ${previousOutput.company_sentence}`,
-    `key_facts: ${previousOutput.key_facts.join("; ")}`,
-    `importance: ${previousOutput.importance}`
-  ].join("\n");
+  const formattedPrevious = formatRewriteForRevisionPrompt(previousOutput);
 
   return [
     "Lag en revidert versjon av nyhetssaken under, basert pa instruksjonen.",
-    "VIKTIG: Behold alt som ikke er berort av instruksjonen. Ikke lag en ny sak fra bunnen — juster KUN det som er spesifikt nevnt.",
+    "VIKTIG: Instruksjonen er styrende. Hvis instruksjonen ber om ny vinkel, annet fokus, annen struktur, annen lengde eller stor omskriving, skal du endre alle berorte felt tydelig.",
+    "Behold bare tekst som fortsatt passer med instruksjonen. Ikke gjor tilfeldige smaendringer for variasjon.",
+    "Hvis instruksjonen er smal og konkret, endrer du bare det som trengs. Hvis instruksjonen er bred, kan du skrive om tittel, lead, body, key_facts, importance og source_spans sa mye som nodvendig.",
     "Lead + body maks 1000 tegn og maks 8 body-avsnitt. Disse grensene gjelder med mindre instruksjonen eksplisitt ber om lengre tekst.",
     "Hvis instruksjonen ber deg fokusere mer pa noe, kutt eller kort ned andre deler for a holde deg innenfor grensene. Prioriter, ikke utvid.",
     "Eksempler pa instruksjoner og forventet oppforsel:",
     "- 'Fjern dette fra teksten' → slett den aktuelle setningen/avsnittet, behold resten urort.",
     "- 'Gjor det kortere' → kort ned teksten, men behold alle hovednyheter og faktapunkter.",
     "- 'For komplisert' → forenkle spraket, men behold innholdet.",
+    "- 'Vinkle pa kontrakten, ikke resultatet' -> skriv om tittel, lead og rekkefolge slik at kontrakten blir hovedpoenget.",
+    "- 'Lag en helt ny versjon med mer dramatisk vinkel' -> bygg saken pa nytt innenfor kildedekningen.",
     "- 'Endre tittelen' → skriv ny tittel, behold lead og body urort.",
     "Returner HELE JSON-strukturen med alle felt, ogsa de som er uendret.",
     "Skriv sa enkelt at en videregaendeelev med interesse for finans forstar det.",

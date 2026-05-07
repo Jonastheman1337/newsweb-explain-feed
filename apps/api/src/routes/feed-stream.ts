@@ -41,8 +41,7 @@ export const feedStreamRoutes: FastifyPluginAsync = async (fastify) => {
               sourceNotice: {
                 include: {
                   rewrites: {
-                    orderBy: { generatedAt: "desc" },
-                    take: 1
+                    orderBy: { generatedAt: "desc" }
                   }
                 }
               }

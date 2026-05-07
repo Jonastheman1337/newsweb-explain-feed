@@ -96,8 +96,7 @@ export const feedRoutes: FastifyPluginAsync = async (fastify) => {
               rewrites: {
                 orderBy: {
                   generatedAt: "desc"
-                },
-                take: 1
+                }
               }
             }
           }

@@ -113,6 +113,46 @@ model JobRun {
   @@map("job_runs")
 }
 
+model GenerationRun {
+  id                  String       @id @default(cuid())
+  messageId           Int          @map("message_id")
+  version             Int?
+  jobId               String?      @map("job_id")
+  jobName             String?      @map("job_name")
+  reason              String
+  status              String
+  userInstruction     String?      @map("user_instruction") @db.Text
+  inputJson           Json?        @map("input_json")
+  previousRewriteJson Json?        @map("previous_rewrite_json")
+  outputJson          Json?        @map("output_json")
+  validationJson      Json?        @map("validation_json")
+  model               String?
+  promptVersion       String?      @map("prompt_version")
+  promptChars         Int?         @map("prompt_chars")
+  errorText           String?      @map("error_text") @db.Text
+  requestedAt         DateTime     @default(now()) @map("requested_at")
+  startedAt           DateTime?    @map("started_at")
+  finishedAt          DateTime?    @map("finished_at")
+
+  @@index([messageId, requestedAt(sort: Desc)])
+  @@index([jobId])
+  @@index([status, requestedAt(sort: Desc)])
+  @@map("generation_runs")
+}
+
+model UserActionEvent {
+  id          String   @id @default(cuid())
+  messageId   Int?     @map("message_id")
+  version     Int?
+  action      String
+  payloadJson Json?    @map("payload_json")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([messageId, createdAt(sort: Desc)])
+  @@index([action, createdAt(sort: Desc)])
+  @@map("user_action_events")
+}
+
 model EditLog {
   id              String   @id @default(cuid())
   messageId       Int      @map("message_id")
@@ -149,4 +189,3 @@ model TitleSuggestionLog {
   @@index([messageId, createdAt(sort: Desc)])
   @@map("title_suggestion_logs")
 }
-

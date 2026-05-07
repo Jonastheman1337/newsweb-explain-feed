@@ -1,11 +1,15 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import type { Prisma } from "@prisma/client";
+import { logPrisma } from "@newsweb/shared/db";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { getApiBaseUrl } from "../../../../../lib/api-base-url";
 import { SESSION_COOKIE } from "../../../../../lib/session-cookie";
 
 const API_BASE_URL = getApiBaseUrl();
+
+export const runtime = "nodejs";
 
 // Load env vars from monorepo root .env if not already in process.env
 let _envCache: Record<string, string> | null = null;
@@ -31,6 +35,26 @@ function loadEnvVar(name: string, fallback: string): string {
     }
   }
   return _envCache[name] ?? fallback;
+}
+
+function toJsonValue(value: unknown): Prisma.InputJsonValue {
+  return JSON.parse(JSON.stringify(value ?? null)) as Prisma.InputJsonValue;
+}
+
+async function updateGenerationRunFailure(runId: string | null, errorText: string) {
+  if (!runId) return;
+  try {
+    await logPrisma.generationRun.update({
+      where: { id: runId },
+      data: {
+        status: "failed",
+        errorText,
+        finishedAt: new Date()
+      }
+    });
+  } catch (error) {
+    console.error("[suggest-titles] failed to update generation log:", error);
+  }
 }
 
 export async function POST(
@@ -82,6 +106,54 @@ export async function POST(
     `Brødtekst: ${body}`
   ].join("\n");
 
+  let generationRunId: string | null = null;
+  const numericMessageId = Number(messageId);
+  const requestPayload = {
+    endpoint: "POST /api/notice/[messageId]/suggest-titles",
+    messageId: numericMessageId,
+    currentTitle,
+    lead,
+    body,
+    issuerName,
+    model: ANTHROPIC_MODEL,
+    prompt
+  };
+
+  try {
+    const generationRun = await logPrisma.generationRun.create({
+      data: {
+        messageId: numericMessageId,
+        reason: "title-suggestion",
+        status: "started",
+        inputJson: toJsonValue(requestPayload),
+        model: ANTHROPIC_MODEL,
+        promptVersion: "title-suggestions-v1",
+        promptChars: prompt.length,
+        startedAt: new Date()
+      }
+    });
+    generationRunId = generationRun.id;
+
+    try {
+      await logPrisma.userActionEvent.create({
+        data: {
+          messageId: numericMessageId,
+          action: "title_suggestion_generation_request",
+          payloadJson: toJsonValue({
+            generationRunId,
+            currentTitle,
+            issuerName
+          })
+        }
+      });
+    } catch (error) {
+      console.error("[suggest-titles] failed to write action event:", error);
+    }
+  } catch (error) {
+    console.error("[suggest-titles] failed to create generation log:", error);
+    return NextResponse.json({ message: "Logging failed" }, { status: 500 });
+  }
+
   try {
     const anthropicRes = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -104,6 +176,7 @@ export async function POST(
     if (!anthropicRes.ok) {
       const errText = await anthropicRes.text();
       console.error("[suggest-titles] Anthropic error:", errText);
+      await updateGenerationRunFailure(generationRunId, errText);
       return NextResponse.json({ message: "AI request failed" }, { status: 502 });
     }
 
@@ -113,13 +186,34 @@ export async function POST(
     // Extract JSON array from response
     const match = text.match(/\[[\s\S]*\]/);
     if (!match) {
+      await logPrisma.generationRun.update({
+        where: { id: generationRunId! },
+        data: {
+          status: "finished",
+          outputJson: toJsonValue({ rawText: text, titles: [] }),
+          finishedAt: new Date()
+        }
+      });
       return NextResponse.json({ titles: [] });
     }
 
     const titles: string[] = JSON.parse(match[0]);
-    return NextResponse.json({ titles: titles.slice(0, 5) });
+    const selectedTitles = titles.slice(0, 5);
+    await logPrisma.generationRun.update({
+      where: { id: generationRunId! },
+      data: {
+        status: "finished",
+        outputJson: toJsonValue({ rawText: text, titles: selectedTitles }),
+        finishedAt: new Date()
+      }
+    });
+    return NextResponse.json({ titles: selectedTitles });
   } catch (err) {
     console.error("[suggest-titles] Error:", err);
+    await updateGenerationRunFailure(
+      generationRunId,
+      err instanceof Error ? err.message : String(err)
+    );
     return NextResponse.json({ message: "Failed to generate titles" }, { status: 500 });
   }
 }

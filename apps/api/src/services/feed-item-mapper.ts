@@ -8,7 +8,10 @@ type FeedItemWithRelations = PrismaFeedItem & {
 };
 
 export function mapDbItemToFeedItem(item: FeedItemWithRelations): FeedItem | null {
-  const rewriteRecord = item.sourceNotice.rewrites[0];
+  const latestRewrite = item.sourceNotice.rewrites[0];
+  const rewriteRecord =
+    item.sourceNotice.rewrites.find((rewrite) => rewrite.status === "published") ??
+    latestRewrite;
 
   if (
     !rewriteRecord ||

@@ -23,6 +23,10 @@ services:
         fromDatabase:
           name: newsweb-explain-db
           property: connectionString
+      - key: GENERATION_LOG_DATABASE_URL
+        fromDatabase:
+          name: newsweb-explain-log-db
+          property: connectionString
       - key: REDIS_URL
         fromService:
           type: keyvalue
@@ -65,6 +69,12 @@ databases:
   - name: newsweb-explain-db
     databaseName: newsweb_explain
     user: newsweb
+    plan: free
+    postgresMajorVersion: "16"
+    ipAllowList: []
+  - name: newsweb-explain-log-db
+    databaseName: newsweb_generation_logs
+    user: newsweblog
     plan: free
     postgresMajorVersion: "16"
     ipAllowList: []

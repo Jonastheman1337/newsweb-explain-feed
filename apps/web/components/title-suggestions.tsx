@@ -43,16 +43,25 @@ export function useTitleSuggestions({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [open, close]);
 
-  function logSuggestions(suggestions: string[], selectedTitle?: string | null) {
+  function logSuggestions(
+    suggestions: string[],
+    action: "title_suggestion_request" | "title_suggestion_refresh" | "title_suggestion_select",
+    selectedTitle?: string | null
+  ) {
     fetch(`/api/notice/${messageId}/title-suggestion-log`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: JSON.stringify({ currentTitle, suggestions, selectedTitle: selectedTitle ?? null })
+      body: JSON.stringify({
+        currentTitle,
+        suggestions,
+        selectedTitle: selectedTitle ?? null,
+        action
+      })
     }).catch(() => { /* silent */ });
   }
 
-  async function fetchSuggestions() {
+  async function fetchSuggestions(action: "title_suggestion_request" | "title_suggestion_refresh" = "title_suggestion_request") {
     setLoading(true);
     setError(false);
     try {
@@ -65,7 +74,7 @@ export function useTitleSuggestions({
         const newTitles = data.titles ?? [];
         setTitles(newTitles);
         if (newTitles.length > 0) {
-          logSuggestions(newTitles);
+          logSuggestions(newTitles, action);
         }
       } else {
         setError(true);
@@ -85,12 +94,12 @@ export function useTitleSuggestions({
     setOpen(true);
     // Only fetch if we don't have suggestions yet
     if (titles.length === 0 && !error) {
-      fetchSuggestions();
+      fetchSuggestions("title_suggestion_request");
     }
   }
 
   function handleCommit(title: string) {
-    logSuggestions(titles, title);
+    logSuggestions(titles, "title_suggestion_select", title);
     onCommit(title);
     setOpen(false);
   }
@@ -143,7 +152,7 @@ export function useTitleSuggestions({
           ))}
           <button
             className="titleSuggestRefresh"
-            onClick={fetchSuggestions}
+            onClick={() => fetchSuggestions("title_suggestion_refresh")}
             onMouseEnter={() => onRevert()}
             disabled={loading}
             type="button"

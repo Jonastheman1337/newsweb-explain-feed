@@ -12,18 +12,21 @@ import {
   shouldSkipRewrite,
   type RewriteOutput
 } from "@newsweb/shared";
-import { prisma } from "@newsweb/shared/db";
+import { loadConfig } from "./config.js";
+import { logPrisma, prisma } from "@newsweb/shared/db";
 import type { Prisma } from "@prisma/client";
 import {
   PROMPT_VERSION,
   createDeveloperPrompt,
   createReportDeveloperPrompt,
+  createReportRevisionUserPrompt,
   createReportSystemPrompt,
   createReportUserPrompt,
   createRevisionUserPrompt,
   createSystemPrompt,
   createUserPrompt,
   createYearlyReportDeveloperPrompt,
+  createYearlyReportRevisionUserPrompt,
   createYearlyReportSystemPrompt,
   createYearlyReportUserPrompt,
   type PromptPayload,
@@ -32,7 +35,6 @@ import {
 } from "@newsweb/prompt-kit";
 import { Job, Queue, Worker } from "bullmq";
 import { Redis } from "ioredis";
-import { loadConfig } from "./config.js";
 import {
   buildAttributionCorrectionInstruction,
   findAttributionRisks
@@ -78,10 +80,15 @@ type RewriteJobData = {
   messageId: number;
   reason: "new-message" | "manual-reprocess";
   instruction?: string;
+  generationRunId?: string;
+  targetVersion?: number;
+  previousRewriteJson?: unknown;
 };
 
 type PublishJobData = {
   messageId: number;
+  version?: number;
+  generationRunId?: string;
 };
 
 const config = loadConfig();
@@ -91,6 +98,18 @@ const redisPub = new Redis(config.REDIS_URL, { maxRetriesPerRequest: null });
 const ingestQueue = new Queue<IngestJobData>(QUEUE_NAMES.ingest, { connection });
 const rewriteQueue = new Queue<RewriteJobData>(QUEUE_NAMES.rewrite, { connection });
 const publishQueue = new Queue<PublishJobData>(QUEUE_NAMES.publish, { connection });
+
+async function enqueuePublish(
+  messageId: number,
+  version: number,
+  generationRunId?: string
+): Promise<void> {
+  await publishQueue.add(
+    "publish-notice",
+    { messageId, version, generationRunId },
+    { removeOnComplete: 2000, removeOnFail: 2000 }
+  );
+}
 
 /**
  * The Newsweb API returns category strings with double-encoded UTF-8
@@ -305,12 +324,101 @@ async function withJobRun(
   }
 }
 
+function extractPromptChars(validationJson: Prisma.InputJsonValue): number | null {
+  if (
+    typeof validationJson === "object" &&
+    validationJson !== null &&
+    !Array.isArray(validationJson)
+  ) {
+    const promptChars = (validationJson as Record<string, unknown>).promptChars;
+    return typeof promptChars === "number" ? promptChars : null;
+  }
+  return null;
+}
+
+function extractRewriteErrorText(rewriteJson: Prisma.InputJsonValue): string | null {
+  if (
+    typeof rewriteJson === "object" &&
+    rewriteJson !== null &&
+    !Array.isArray(rewriteJson)
+  ) {
+    const message = (rewriteJson as Record<string, unknown>).message;
+    return typeof message === "string" ? message : null;
+  }
+  return null;
+}
+
+function generationInputJson(
+  payload: PromptPayload,
+  previousOutput?: RewriteOutput,
+  modelCalls: ModelCallLog[] = []
+): Prisma.InputJsonValue {
+  return {
+    sourcePayload: payload,
+    previousRewrite: previousOutput ?? null,
+    modelCalls
+  } as unknown as Prisma.InputJsonValue;
+}
+
+async function startGenerationRun(
+  job: Job<RewriteJobData>,
+  messageId: number,
+  version: number,
+  payload: PromptPayload,
+  previousOutput?: RewriteOutput
+): Promise<string> {
+  const data = {
+    version,
+    jobId: job.id != null ? String(job.id) : null,
+    jobName: job.name,
+    reason: job.data.reason,
+    status: "started",
+    userInstruction: job.data.instruction ?? null,
+    inputJson: generationInputJson(payload, previousOutput),
+    ...(previousOutput
+      ? {
+          previousRewriteJson:
+            previousOutput as unknown as Prisma.InputJsonValue
+        }
+      : {}),
+    model: config.ANTHROPIC_MODEL,
+    promptVersion: PROMPT_VERSION,
+    startedAt: new Date()
+  };
+
+  if (job.data.generationRunId) {
+    await logPrisma.generationRun.update({
+      where: { id: job.data.generationRunId },
+      data
+    });
+    return job.data.generationRunId;
+  }
+
+  const generationRun = await logPrisma.generationRun.create({
+    data: {
+      messageId,
+      requestedAt: new Date(),
+      ...data
+    }
+  });
+  return generationRun.id;
+}
+
 type JsonModelCallInput = {
   schemaName: string;
   schema: Record<string, unknown>;
   systemPrompt: string;
   developerPrompt: string;
   userPrompt: string;
+};
+
+type ModelCallLog = {
+  schemaName: string;
+  model: string;
+  systemPrompt: string;
+  developerPrompt: string;
+  userPrompt: string;
+  promptChars: number;
 };
 
 function clampRewriteArrays(raw: Record<string, unknown>): Record<string, unknown> {
@@ -332,8 +440,17 @@ async function callModelForJson({
 }: JsonModelCallInput): Promise<{
   content: string;
   promptChars: number;
+  modelCall: ModelCallLog;
 }> {
   const promptChars = systemPrompt.length + developerPrompt.length + userPrompt.length;
+  const modelCall: ModelCallLog = {
+    schemaName,
+    model: config.ANTHROPIC_MODEL,
+    systemPrompt,
+    developerPrompt,
+    userPrompt,
+    promptChars
+  };
 
   const anthropicResponse = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -388,7 +505,8 @@ async function callModelForJson({
 
   return {
     content: JSON.stringify(toolBlock.input),
-    promptChars
+    promptChars,
+    modelCall
   };
 }
 
@@ -451,6 +569,7 @@ async function callModelRewrite(
 ): Promise<{
   rewrite: RewriteOutput;
   promptChars: number;
+  modelCall: ModelCallLog;
 }> {
   const systemPrompt = createSystemPrompt();
   const developerPrompt = createDeveloperPrompt(JSON.stringify(rewriteOutputJsonSchema));
@@ -476,7 +595,8 @@ async function callModelRewrite(
 
   return {
     rewrite: rewriteOutputSchema.parse(clampRewriteArrays(JSON.parse(result.content))),
-    promptChars: result.promptChars
+    promptChars: result.promptChars,
+    modelCall: result.modelCall
   };
 }
 
@@ -547,18 +667,28 @@ async function callModelReferenceCheck(
 
 async function callModelReportRewrite(
   payload: ReportPromptPayload,
-  correctionInstruction?: string
+  revisionInstruction?: string,
+  previousOutput?: RewriteOutput
 ): Promise<{
   rewrite: RewriteOutput;
   promptChars: number;
+  modelCall: ModelCallLog;
 }> {
   const systemPrompt = createReportSystemPrompt();
   const developerPrompt = createReportDeveloperPrompt(
     JSON.stringify(rewriteOutputJsonSchema)
   );
-  let userPrompt = createReportUserPrompt(payload);
-  if (correctionInstruction) {
-    userPrompt += `\n\nKORRIGERING:\n${correctionInstruction}`;
+  let userPrompt: string;
+  if (revisionInstruction && previousOutput) {
+    userPrompt = createReportRevisionUserPrompt(
+      payload,
+      previousOutput,
+      revisionInstruction
+    );
+  } else if (revisionInstruction) {
+    userPrompt = `${createReportUserPrompt(payload)}\n\nKORRIGERINGSMODUS:\n${revisionInstruction}`;
+  } else {
+    userPrompt = createReportUserPrompt(payload);
   }
   const result = await callModelForJson({
     schemaName: "rewrite_output",
@@ -570,24 +700,35 @@ async function callModelReportRewrite(
 
   return {
     rewrite: rewriteOutputSchema.parse(clampRewriteArrays(JSON.parse(result.content))),
-    promptChars: result.promptChars
+    promptChars: result.promptChars,
+    modelCall: result.modelCall
   };
 }
 
 async function callModelYearlyReportRewrite(
   payload: YearlyReportPromptPayload,
-  correctionInstruction?: string
+  revisionInstruction?: string,
+  previousOutput?: RewriteOutput
 ): Promise<{
   rewrite: RewriteOutput;
   promptChars: number;
+  modelCall: ModelCallLog;
 }> {
   const systemPrompt = createYearlyReportSystemPrompt();
   const developerPrompt = createYearlyReportDeveloperPrompt(
     JSON.stringify(rewriteOutputJsonSchema)
   );
-  let userPrompt = createYearlyReportUserPrompt(payload);
-  if (correctionInstruction) {
-    userPrompt += `\n\nKORRIGERING:\n${correctionInstruction}`;
+  let userPrompt: string;
+  if (revisionInstruction && previousOutput) {
+    userPrompt = createYearlyReportRevisionUserPrompt(
+      payload,
+      previousOutput,
+      revisionInstruction
+    );
+  } else if (revisionInstruction) {
+    userPrompt = `${createYearlyReportUserPrompt(payload)}\n\nKORRIGERINGSMODUS:\n${revisionInstruction}`;
+  } else {
+    userPrompt = createYearlyReportUserPrompt(payload);
   }
   const result = await callModelForJson({
     schemaName: "rewrite_output",
@@ -599,9 +740,17 @@ async function callModelYearlyReportRewrite(
 
   return {
     rewrite: rewriteOutputSchema.parse(clampRewriteArrays(JSON.parse(result.content))),
-    promptChars: result.promptChars
+    promptChars: result.promptChars,
+    modelCall: result.modelCall
   };
 }
+
+type RewriteRevisionOptions = {
+  version?: number;
+  userInstruction?: string;
+  previousOutput?: RewriteOutput;
+  generationRunId?: string;
+};
 
 async function processReportRewrite(
   messageId: number,
@@ -618,7 +767,8 @@ async function processReportRewrite(
   },
   payload: PromptPayload,
   job: { opts: { attempts?: number }; attemptsMade: number },
-  reportContent: { text: string; pageCount: number; attachmentId: number }
+  reportContent: { text: string; pageCount: number; attachmentId: number },
+  revisionOptions: RewriteRevisionOptions = {}
 ): Promise<void> {
   const reportPayload: ReportPromptPayload = {
     ...payload,
@@ -639,9 +789,15 @@ async function processReportRewrite(
   let attributionCorrectionApplied = false;
   let attributionRiskCount = 0;
   let styleSanitization: ReturnType<typeof sanitizeRewriteStyle>["stats"] | null = null;
+  const modelCalls: ModelCallLog[] = [];
 
   try {
-    const initialDraftResult = await callModelReportRewrite(reportPayload);
+    const initialDraftResult = await callModelReportRewrite(
+      reportPayload,
+      revisionOptions.userInstruction,
+      revisionOptions.previousOutput
+    );
+    modelCalls.push(initialDraftResult.modelCall);
     promptChars += initialDraftResult.promptChars;
     hiddenDraft = initialDraftResult.rewrite;
     let rewrite = hiddenDraft;
@@ -666,10 +822,18 @@ async function processReportRewrite(
         initialReferenceCheck.coverage
       );
       if (correctionInstruction) {
+        const combinedCorrection = [
+          revisionOptions.userInstruction,
+          correctionInstruction
+        ]
+          .filter(Boolean)
+          .join("\n\n");
         const correctedResult = await callModelReportRewrite(
           reportPayload,
-          correctionInstruction
+          combinedCorrection,
+          rewrite
         );
+        modelCalls.push(correctedResult.modelCall);
         promptChars += correctedResult.promptChars;
         rewrite = correctedResult.rewrite;
         correctionApplied = true;
@@ -690,10 +854,18 @@ async function processReportRewrite(
     const attributionInstruction =
       buildAttributionCorrectionInstruction(attributionRisks);
     if (attributionInstruction) {
+      const combinedAttribution = [
+        revisionOptions.userInstruction,
+        attributionInstruction
+      ]
+        .filter(Boolean)
+        .join("\n\n");
       const correctedForAttribution = await callModelReportRewrite(
         reportPayload,
-        attributionInstruction
+        combinedAttribution,
+        rewrite
       );
+      modelCalls.push(correctedForAttribution.modelCall);
       promptChars += correctedForAttribution.promptChars;
       rewrite = correctedForAttribution.rewrite;
       attributionCorrectionApplied = true;
@@ -713,6 +885,14 @@ async function processReportRewrite(
 
     await upsertRewrite({
       messageId,
+      version: revisionOptions.version,
+      userInstruction: revisionOptions.userInstruction,
+      generationRunId: revisionOptions.generationRunId,
+      inputJson: generationInputJson(
+        reportPayload,
+        revisionOptions.previousOutput,
+        modelCalls
+      ),
       rewriteJson: rewrite,
       status: "pending",
       validationJson: {
@@ -777,10 +957,10 @@ async function processReportRewrite(
       } as Prisma.InputJsonValue
     });
 
-    await publishQueue.add(
-      "publish-notice",
-      { messageId },
-      { removeOnComplete: 2000, removeOnFail: 2000 }
+    await enqueuePublish(
+      messageId,
+      revisionOptions.version ?? 1,
+      revisionOptions.generationRunId
     );
   } catch (error) {
     const errorText = error instanceof Error ? error.message : String(error);
@@ -788,6 +968,14 @@ async function processReportRewrite(
     if (!finalAttempt) {
       await upsertRewrite({
         messageId,
+        version: revisionOptions.version,
+        userInstruction: revisionOptions.userInstruction,
+        generationRunId: revisionOptions.generationRunId,
+        inputJson: generationInputJson(
+          reportPayload,
+          revisionOptions.previousOutput,
+          modelCalls
+        ),
         rewriteJson: {
           errorCode: "REPORT_REWRITE_ATTEMPT_FAILED",
           message: errorText
@@ -806,6 +994,14 @@ async function processReportRewrite(
 
     await upsertRewrite({
       messageId,
+      version: revisionOptions.version,
+      userInstruction: revisionOptions.userInstruction,
+      generationRunId: revisionOptions.generationRunId,
+      inputJson: generationInputJson(
+        reportPayload,
+        revisionOptions.previousOutput,
+        modelCalls
+      ),
       rewriteJson: {
         errorCode: "REPORT_REWRITE_FAILED_FINAL",
         message: errorText
@@ -842,7 +1038,8 @@ async function processYearlyReportRewrite(
     remunerationText: string | null;
     pageCount: number;
     attachmentId: number;
-  }
+  },
+  revisionOptions: RewriteRevisionOptions = {}
 ): Promise<void> {
   const yearlyPayload: YearlyReportPromptPayload = {
     ...payload,
@@ -872,9 +1069,15 @@ async function processYearlyReportRewrite(
   let attributionCorrectionApplied = false;
   let attributionRiskCount = 0;
   let styleSanitization: ReturnType<typeof sanitizeRewriteStyle>["stats"] | null = null;
+  const modelCalls: ModelCallLog[] = [];
 
   try {
-    const initialDraftResult = await callModelYearlyReportRewrite(yearlyPayload);
+    const initialDraftResult = await callModelYearlyReportRewrite(
+      yearlyPayload,
+      revisionOptions.userInstruction,
+      revisionOptions.previousOutput
+    );
+    modelCalls.push(initialDraftResult.modelCall);
     promptChars += initialDraftResult.promptChars;
     hiddenDraft = initialDraftResult.rewrite;
     let rewrite = hiddenDraft;
@@ -899,10 +1102,18 @@ async function processYearlyReportRewrite(
         initialReferenceCheck.coverage
       );
       if (correctionInstruction) {
+        const combinedCorrection = [
+          revisionOptions.userInstruction,
+          correctionInstruction
+        ]
+          .filter(Boolean)
+          .join("\n\n");
         const correctedResult = await callModelYearlyReportRewrite(
           yearlyPayload,
-          correctionInstruction
+          combinedCorrection,
+          rewrite
         );
+        modelCalls.push(correctedResult.modelCall);
         promptChars += correctedResult.promptChars;
         rewrite = correctedResult.rewrite;
         correctionApplied = true;
@@ -923,10 +1134,18 @@ async function processYearlyReportRewrite(
     const attributionInstruction =
       buildAttributionCorrectionInstruction(attributionRisks);
     if (attributionInstruction) {
+      const combinedAttribution = [
+        revisionOptions.userInstruction,
+        attributionInstruction
+      ]
+        .filter(Boolean)
+        .join("\n\n");
       const correctedForAttribution = await callModelYearlyReportRewrite(
         yearlyPayload,
-        attributionInstruction
+        combinedAttribution,
+        rewrite
       );
+      modelCalls.push(correctedForAttribution.modelCall);
       promptChars += correctedForAttribution.promptChars;
       rewrite = correctedForAttribution.rewrite;
       attributionCorrectionApplied = true;
@@ -946,6 +1165,14 @@ async function processYearlyReportRewrite(
 
     await upsertRewrite({
       messageId,
+      version: revisionOptions.version,
+      userInstruction: revisionOptions.userInstruction,
+      generationRunId: revisionOptions.generationRunId,
+      inputJson: generationInputJson(
+        yearlyPayload,
+        revisionOptions.previousOutput,
+        modelCalls
+      ),
       rewriteJson: rewrite,
       status: "pending",
       validationJson: {
@@ -1012,10 +1239,10 @@ async function processYearlyReportRewrite(
       } as Prisma.InputJsonValue
     });
 
-    await publishQueue.add(
-      "publish-notice",
-      { messageId },
-      { removeOnComplete: 2000, removeOnFail: 2000 }
+    await enqueuePublish(
+      messageId,
+      revisionOptions.version ?? 1,
+      revisionOptions.generationRunId
     );
   } catch (error) {
     const errorText = error instanceof Error ? error.message : String(error);
@@ -1023,6 +1250,14 @@ async function processYearlyReportRewrite(
     if (!finalAttempt) {
       await upsertRewrite({
         messageId,
+        version: revisionOptions.version,
+        userInstruction: revisionOptions.userInstruction,
+        generationRunId: revisionOptions.generationRunId,
+        inputJson: generationInputJson(
+          yearlyPayload,
+          revisionOptions.previousOutput,
+          modelCalls
+        ),
         rewriteJson: {
           errorCode: "YEARLY_REPORT_REWRITE_ATTEMPT_FAILED",
           message: errorText
@@ -1041,6 +1276,14 @@ async function processYearlyReportRewrite(
 
     await upsertRewrite({
       messageId,
+      version: revisionOptions.version,
+      userInstruction: revisionOptions.userInstruction,
+      generationRunId: revisionOptions.generationRunId,
+      inputJson: generationInputJson(
+        yearlyPayload,
+        revisionOptions.previousOutput,
+        modelCalls
+      ),
       rewriteJson: {
         errorCode: "YEARLY_REPORT_REWRITE_FAILED_FINAL",
         message: errorText
@@ -1064,6 +1307,8 @@ async function upsertRewrite(args: {
   validationJson: Prisma.InputJsonValue;
   version?: number;
   userInstruction?: string;
+  generationRunId?: string;
+  inputJson?: Prisma.InputJsonValue;
 }): Promise<void> {
   const version = args.version ?? 1;
   await prisma.rewrite.upsert({
@@ -1095,6 +1340,29 @@ async function upsertRewrite(args: {
       generatedAt: new Date()
     }
   });
+
+  if (args.generationRunId) {
+    const terminalStatus =
+      args.status === "published" ||
+      args.status === "failed" ||
+      args.status === "skipped";
+    await logPrisma.generationRun.update({
+      where: { id: args.generationRunId },
+      data: {
+        version,
+        status: args.status,
+        userInstruction: args.userInstruction ?? null,
+        ...(args.inputJson ? { inputJson: args.inputJson } : {}),
+        outputJson: args.rewriteJson,
+        validationJson: args.validationJson,
+        model: config.ANTHROPIC_MODEL,
+        promptVersion: PROMPT_VERSION,
+        promptChars: extractPromptChars(args.validationJson),
+        errorText: extractRewriteErrorText(args.rewriteJson),
+        ...(terminalStatus ? { finishedAt: new Date() } : {})
+      }
+    });
+  }
 }
 
 const ingestWorker = new Worker<IngestJobData>(
@@ -1272,10 +1540,70 @@ const rewriteWorker = new Worker<RewriteJobData>(
         sourceBodyChars: source.bodyText.length
       };
 
+      // Manual reprocesses should create a new row before any branch can persist output.
+      let targetVersion = job.data.targetVersion ?? 1;
+      if (
+        !job.data.targetVersion &&
+        (job.data.reason === "manual-reprocess" || job.data.instruction)
+      ) {
+        const maxRow = await prisma.rewrite.findFirst({
+          where: { messageId },
+          orderBy: { version: "desc" },
+          select: { version: true }
+        });
+        targetVersion = (maxRow?.version ?? 0) + 1;
+      }
+
+      let previousOutput: RewriteOutput | undefined;
+      if (job.data.previousRewriteJson) {
+        try {
+          previousOutput = rewriteOutputSchema.parse(
+            normalizeRewriteJson(job.data.previousRewriteJson)
+          );
+        } catch {
+          // Corrupted queued previous output: fall back to DB lookup.
+        }
+      }
+      if (
+        !previousOutput &&
+        (job.data.reason === "manual-reprocess" || job.data.instruction) &&
+        targetVersion > 1
+      ) {
+        const prevRewrite = await prisma.rewrite.findFirst({
+          where: {
+            messageId,
+            version: { lt: targetVersion },
+            status: { in: ["published", "pending"] }
+          },
+          orderBy: { version: "desc" },
+          select: { rewriteJson: true }
+        });
+        if (prevRewrite) {
+          try {
+            previousOutput = rewriteOutputSchema.parse(
+              normalizeRewriteJson(prevRewrite.rewriteJson)
+            );
+          } catch {
+            // Corrupted previous output: fall back to fresh generation.
+          }
+        }
+      }
+
+      const generationRunId = await startGenerationRun(
+        job,
+        messageId,
+        targetVersion,
+        payload,
+        previousOutput
+      );
+
       // Skip full AI rewrite for mechanical categories, unless manually triggered
       if (job.data.reason !== "manual-reprocess" && shouldSkipRewrite(categories)) {
         await upsertRewrite({
           messageId,
+          version: targetVersion,
+          userInstruction: job.data.instruction,
+          generationRunId,
           rewriteJson: {
             skippedReason: "CATEGORY_SKIP",
             categories
@@ -1291,11 +1619,7 @@ const rewriteWorker = new Worker<RewriteJobData>(
           } as Prisma.InputJsonValue
         });
 
-        await publishQueue.add(
-          "publish-notice",
-          { messageId },
-          { removeOnComplete: 2000, removeOnFail: 2000 }
-        );
+        await enqueuePublish(messageId, targetVersion, generationRunId);
         return;
       }
 
@@ -1324,12 +1648,19 @@ const rewriteWorker = new Worker<RewriteJobData>(
           if (isYearlyReportCategory(categories)) {
             const yearlyContent = await extractYearlyReportSections(rawJson, messageId);
             if (yearlyContent) {
-              if (job.data.instruction) {
-                console.log(
-                  `[rewrite] instruction-based revision not yet supported for yearly report rewrites (${messageId})`
-                );
-              }
-              await processYearlyReportRewrite(messageId, source, payload, job, yearlyContent);
+              await processYearlyReportRewrite(
+                messageId,
+                source,
+                payload,
+                job,
+                yearlyContent,
+                {
+                  version: targetVersion,
+                  userInstruction: job.data.instruction,
+                  previousOutput,
+                  generationRunId
+                }
+              );
               return;
             }
             // No remuneration data found — skip (shows as grayed-out in feed)
@@ -1338,6 +1669,9 @@ const rewriteWorker = new Worker<RewriteJobData>(
             );
             await upsertRewrite({
               messageId,
+              version: targetVersion,
+              userInstruction: job.data.instruction,
+              generationRunId,
               rewriteJson: {
                 skippedReason: "YEARLY_REPORT_NO_REMUNERATION",
                 categories
@@ -1351,23 +1685,26 @@ const rewriteWorker = new Worker<RewriteJobData>(
                 promptChars: 0
               } as Prisma.InputJsonValue
             });
-            await publishQueue.add(
-              "publish-notice",
-              { messageId },
-              { removeOnComplete: 2000, removeOnFail: 2000 }
-            );
+            await enqueuePublish(messageId, targetVersion, generationRunId);
             return;
           }
 
           // TIER 2: Quarterly report — filename-matched PDF extraction (existing behavior)
           const reportContent = await extractReportContent(rawJson, messageId);
           if (reportContent) {
-            if (job.data.instruction) {
-              console.log(
-                `[rewrite] instruction-based revision not yet supported for report rewrites (${messageId})`
-              );
-            }
-            await processReportRewrite(messageId, source, payload, job, reportContent);
+            await processReportRewrite(
+              messageId,
+              source,
+              payload,
+              job,
+              reportContent,
+              {
+                version: targetVersion,
+                userInstruction: job.data.instruction,
+                previousOutput,
+                generationRunId
+              }
+            );
             return;
           }
 
@@ -1398,6 +1735,9 @@ const rewriteWorker = new Worker<RewriteJobData>(
           );
           await upsertRewrite({
             messageId,
+            version: targetVersion,
+            userInstruction: job.data.instruction,
+            generationRunId,
             rewriteJson: {
               skippedReason: "AI_TRIAGE_SKIP",
               triageReason: triage.reason,
@@ -1414,50 +1754,12 @@ const rewriteWorker = new Worker<RewriteJobData>(
             } as Prisma.InputJsonValue
           });
 
-          await publishQueue.add(
-            "publish-notice",
-            { messageId },
-            { removeOnComplete: 2000, removeOnFail: 2000 }
-          );
+          await enqueuePublish(messageId, targetVersion, generationRunId);
           return;
         }
         console.log(
           `[triage] proceeding with ${messageId} (${source.issuerSign}): ${triage.reason}`
         );
-      }
-
-      // Determine version number for this rewrite
-      let targetVersion = 1;
-      if (job.data.reason === "manual-reprocess" || job.data.instruction) {
-        const maxRow = await prisma.rewrite.findFirst({
-          where: { messageId },
-          orderBy: { version: "desc" },
-          select: { version: true }
-        });
-        targetVersion = (maxRow?.version ?? 0) + 1;
-      }
-
-      // Fetch previous version's output for revision context
-      let previousOutput: RewriteOutput | undefined;
-      if (job.data.instruction && targetVersion > 1) {
-        const prevRewrite = await prisma.rewrite.findFirst({
-          where: {
-            messageId,
-            version: { lt: targetVersion },
-            status: { in: ["published", "pending"] }
-          },
-          orderBy: { version: "desc" },
-          select: { rewriteJson: true }
-        });
-        if (prevRewrite) {
-          try {
-            previousOutput = rewriteOutputSchema.parse(
-              normalizeRewriteJson(prevRewrite.rewriteJson)
-            );
-          } catch {
-            // Corrupted/non-parseable previous output — fall back to fresh generation
-          }
-        }
       }
 
       const maxAttempts = job.opts.attempts ?? 1;
@@ -1474,12 +1776,14 @@ const rewriteWorker = new Worker<RewriteJobData>(
       let attributionRiskCount = 0;
       let styleSanitization: ReturnType<typeof sanitizeRewriteStyle>["stats"] | null =
         null;
+      const modelCalls: ModelCallLog[] = [];
 
       if (payload.bodyText.trim().length === 0) {
         await upsertRewrite({
           messageId,
           version: targetVersion,
           userInstruction: job.data.instruction,
+          generationRunId,
           rewriteJson: {
             errorCode: "SOURCE_TEXT_EMPTY",
             message: "Source bodyText is empty."
@@ -1498,6 +1802,7 @@ const rewriteWorker = new Worker<RewriteJobData>(
 
       try {
         const initialDraftResult = await callModelRewrite(payload, job.data.instruction, previousOutput);
+        modelCalls.push(initialDraftResult.modelCall);
         promptChars += initialDraftResult.promptChars;
         hiddenDraft = initialDraftResult.rewrite;
         let rewrite = hiddenDraft;
@@ -1526,6 +1831,7 @@ const rewriteWorker = new Worker<RewriteJobData>(
               combinedCorrection,
               rewrite
             );
+            modelCalls.push(correctedResult.modelCall);
             promptChars += correctedResult.promptChars;
             rewrite = correctedResult.rewrite;
             correctionApplied = true;
@@ -1551,6 +1857,7 @@ const rewriteWorker = new Worker<RewriteJobData>(
             combinedAttribution,
             rewrite
           );
+          modelCalls.push(correctedForAttribution.modelCall);
           promptChars += correctedForAttribution.promptChars;
           rewrite = correctedForAttribution.rewrite;
           attributionCorrectionApplied = true;
@@ -1572,6 +1879,8 @@ const rewriteWorker = new Worker<RewriteJobData>(
           messageId,
           version: targetVersion,
           userInstruction: job.data.instruction,
+          generationRunId,
+          inputJson: generationInputJson(payload, previousOutput, modelCalls),
           rewriteJson: rewrite,
           status: "pending",
           validationJson: {
@@ -1633,16 +1942,7 @@ const rewriteWorker = new Worker<RewriteJobData>(
           } as Prisma.InputJsonValue
         });
 
-        await publishQueue.add(
-          "publish-notice",
-          {
-            messageId
-          },
-          {
-            removeOnComplete: 2000,
-            removeOnFail: 2000
-          }
-        );
+        await enqueuePublish(messageId, targetVersion, generationRunId);
         return;
       } catch (error) {
         const errorText = error instanceof Error ? error.message : String(error);
@@ -1652,6 +1952,8 @@ const rewriteWorker = new Worker<RewriteJobData>(
             messageId,
             version: targetVersion,
             userInstruction: job.data.instruction,
+            generationRunId,
+            inputJson: generationInputJson(payload, previousOutput, modelCalls),
             rewriteJson: {
               errorCode: "REWRITE_ATTEMPT_FAILED",
               message: errorText
@@ -1684,6 +1986,8 @@ const rewriteWorker = new Worker<RewriteJobData>(
           messageId,
           version: targetVersion,
           userInstruction: job.data.instruction,
+          generationRunId,
+          inputJson: generationInputJson(payload, previousOutput, modelCalls),
           rewriteJson: {
             errorCode: "REWRITE_FAILED_FINAL",
             message: errorText
@@ -1746,11 +2050,42 @@ const publishWorker = new Worker<PublishJobData>(
         }
       });
 
-      // Promote all "pending" rewrites to "published" for this notice
-      await prisma.rewrite.updateMany({
-        where: { messageId: source.messageId, status: "pending" },
-        data: { status: "published" }
+      const pendingRewrites = await prisma.rewrite.findMany({
+        where: {
+          messageId: source.messageId,
+          status: "pending",
+          ...(job.data.version ? { version: job.data.version } : {})
+        },
+        orderBy: { version: "desc" },
+        take: job.data.version ? undefined : 1,
+        select: { version: true }
       });
+
+      const publishedVersions = pendingRewrites.map((rewrite) => rewrite.version);
+      if (publishedVersions.length > 0) {
+        await prisma.rewrite.updateMany({
+          where: {
+            messageId: source.messageId,
+            status: "pending",
+            version: { in: publishedVersions }
+          },
+          data: { status: "published" }
+        });
+      }
+
+      if (publishedVersions.length > 0) {
+        await logPrisma.generationRun.updateMany({
+          where: {
+            messageId: source.messageId,
+            version: { in: publishedVersions },
+            status: "pending"
+          },
+          data: {
+            status: "published",
+            finishedAt: new Date()
+          }
+        });
+      }
 
       await redisPub.publish(
         REDIS_CHANNELS.feedNewItem,
@@ -1882,7 +2217,12 @@ async function shutdown(): Promise<void> {
     publishQueue.close()
   ]);
   await redisPub.quit();
-  await prisma.$disconnect();
+  await Promise.all([
+    prisma.$disconnect(),
+    logPrisma === prisma
+      ? Promise.resolve()
+      : logPrisma.$disconnect()
+  ]);
 }
 
 process.on("SIGINT", () => {

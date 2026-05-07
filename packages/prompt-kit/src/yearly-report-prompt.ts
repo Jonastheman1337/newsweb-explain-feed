@@ -1,4 +1,8 @@
-import type { PromptPayload } from "./prompt.js";
+import type { RewriteOutput } from "@newsweb/shared";
+import {
+  formatRewriteForRevisionPrompt,
+  type PromptPayload
+} from "./prompt.js";
 import {
   EDITORIAL_AUDIENCE,
   EDITORIAL_AVOID,
@@ -105,4 +109,29 @@ export function createYearlyReportUserPrompt(payload: YearlyReportPromptPayload)
   }
 
   return parts.join("\n");
+}
+
+export function createYearlyReportRevisionUserPrompt(
+  payload: YearlyReportPromptPayload,
+  previousOutput: RewriteOutput,
+  instruction: string
+): string {
+  return [
+    "Lag en revidert versjon av lederlonnssaken under, basert pa instruksjonen.",
+    "VIKTIG: Instruksjonen er styrende. Hvis den ber om ny vinkel, annet fokus, annen struktur, annen lengde eller stor omskriving, skal du endre alle berorte felt tydelig.",
+    "Behold bare tekst som fortsatt passer med instruksjonen. Ikke gjor tilfeldige smaendringer for variasjon.",
+    "Hvis instruksjonen er bred, kan du skrive om tittel, lead, body, key_facts, importance og source_spans sa mye som nodvendig.",
+    "Hold deg til lederlonn og godtgjorelse. Ikke legg inn drift, strategi, investeringer, utbytte eller resultater.",
+    "Returner HELE JSON-strukturen med alle felt, ogsa de som er uendret.",
+    "",
+    createYearlyReportUserPrompt(payload),
+    "",
+    "FORRIGE VERSJON (DIN OUTPUT SOM SKAL REVIDERES):",
+    "<<<",
+    formatRewriteForRevisionPrompt(previousOutput),
+    ">>>",
+    "",
+    "INSTRUKSJON:",
+    instruction
+  ].join("\n");
 }

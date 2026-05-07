@@ -16,7 +16,7 @@
     "test": "npm run test -w packages/shared && npm run test -w packages/prompt-kit && npm run build -w packages/shared && npm run build -w packages/prompt-kit && npm run test -w apps/api && npm run test -w apps/worker",
     "prisma:generate": "prisma generate",
     "prisma:migrate:dev": "prisma migrate dev",
-    "prisma:migrate:deploy": "prisma migrate deploy"
+    "prisma:migrate:deploy": "prisma migrate deploy && node scripts/init-log-db.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.13.10",

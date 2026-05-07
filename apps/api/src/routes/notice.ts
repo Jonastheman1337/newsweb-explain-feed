@@ -3,8 +3,9 @@ import {
   noticeResponseSchema,
   rewriteOutputSchema
 } from "@newsweb/shared";
-import { prisma } from "@newsweb/shared/db";
-import type { FastifyPluginAsync } from "fastify";
+import { logPrisma, prisma } from "@newsweb/shared/db";
+import type { FastifyBaseLogger, FastifyPluginAsync } from "fastify";
+import type { Prisma } from "@prisma/client";
 import { z } from "zod";
 
 const paramsSchema = z.object({
@@ -20,6 +21,59 @@ const generateBodySchema = z
     instruction: z.string().max(2000).optional()
   })
   .optional();
+
+function toJsonValue(value: unknown): Prisma.InputJsonValue {
+  return JSON.parse(JSON.stringify(value ?? null)) as Prisma.InputJsonValue;
+}
+
+async function logUserAction(
+  logger: FastifyBaseLogger,
+  args: {
+    messageId: number;
+    version?: number | null;
+    action: string;
+    payload?: unknown;
+  }
+): Promise<void> {
+  try {
+    await logPrisma.userActionEvent.create({
+      data: {
+        messageId: args.messageId,
+        version: args.version ?? null,
+        action: args.action,
+        payloadJson: toJsonValue(args.payload ?? {})
+      }
+    });
+  } catch (error) {
+    logger.error(
+      { err: error, action: args.action, messageId: args.messageId },
+      "Failed to write user action event"
+    );
+  }
+}
+
+async function nextRewriteContext(messageId: number): Promise<{
+  targetVersion: number;
+  previousRewriteJson: Prisma.JsonValue | null;
+}> {
+  const maxRow = await prisma.rewrite.findFirst({
+    where: { messageId },
+    orderBy: { version: "desc" },
+    select: { version: true }
+  });
+  const previousRewrite = await prisma.rewrite.findFirst({
+    where: {
+      messageId,
+      status: { in: ["published", "pending"] }
+    },
+    orderBy: { version: "desc" },
+    select: { rewriteJson: true }
+  });
+  return {
+    targetVersion: (maxRow?.version ?? 0) + 1,
+    previousRewriteJson: previousRewrite?.rewriteJson ?? null
+  };
+}
 
 export const noticeRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get(
@@ -42,6 +96,10 @@ export const noticeRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.code(404).send({ message: "Notis ikke funnet." });
       }
 
+      const publishedRewrites = notice.rewrites.filter(
+        (r) => r.status === "published"
+      );
+
       // Find the latest rewrite by generatedAt for backward-compat status checks
       const latestRewrite = notice.rewrites.length
         ? notice.rewrites.reduce((a, b) =>
@@ -49,11 +107,12 @@ export const noticeRoutes: FastifyPluginAsync = async (fastify) => {
           )
         : null;
 
-      // No rewrite or still pending → processing
+      // No rewrite, or still pending with no published fallback -> processing
       if (
         !latestRewrite ||
-        latestRewrite.status === "pending" ||
-        latestRewrite.status === "needs_retry"
+        ((latestRewrite.status === "pending" ||
+          latestRewrite.status === "needs_retry") &&
+          publishedRewrites.length === 0)
       ) {
         return reply.send({
           source: {
@@ -102,9 +161,6 @@ export const noticeRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       // Build rewrites array from all published versions
-      const publishedRewrites = notice.rewrites.filter(
-        (r) => r.status === "published"
-      );
       const latestPublished = publishedRewrites.length
         ? publishedRewrites[publishedRewrites.length - 1]
         : latestRewrite;
@@ -199,15 +255,28 @@ export const noticeRoutes: FastifyPluginAsync = async (fastify) => {
       const { messageId } = paramsSchema.parse(request.params);
       const body = editLogBodySchema.parse(request.body);
 
-      await prisma.editLog.create({
-        data: {
-          messageId,
-          originalTitle: body.originalTitle,
-          originalBody: body.originalBody,
-          editedTitle: body.editedTitle,
-          editedBody: body.editedBody,
-          hasEdits: body.hasEdits
-        }
+      try {
+        await prisma.editLog.create({
+          data: {
+            messageId,
+            originalTitle: body.originalTitle,
+            originalBody: body.originalBody,
+            editedTitle: body.editedTitle,
+            editedBody: body.editedBody,
+            hasEdits: body.hasEdits
+          }
+        });
+      } catch (error) {
+        request.log.error(
+          { err: error, messageId },
+          "Failed to write edit log"
+        );
+      }
+
+      await logUserAction(request.log, {
+        messageId,
+        action: body.hasEdits ? "copy_text_with_edits" : "copy_text",
+        payload: body
       });
 
       return reply.send({ ok: true });
@@ -236,6 +305,13 @@ export const noticeRoutes: FastifyPluginAsync = async (fastify) => {
         }
       });
 
+      await logUserAction(request.log, {
+        messageId,
+        version: body.version ?? null,
+        action: "feedback_submit",
+        payload: body
+      });
+
       return reply.send({ ok: true });
     }
   );
@@ -243,7 +319,14 @@ export const noticeRoutes: FastifyPluginAsync = async (fastify) => {
   const titleSuggestionLogSchema = z.object({
     currentTitle: z.string(),
     suggestions: z.array(z.string()),
-    selectedTitle: z.string().nullable().optional()
+    selectedTitle: z.string().nullable().optional(),
+    action: z
+      .enum([
+        "title_suggestion_request",
+        "title_suggestion_refresh",
+        "title_suggestion_select"
+      ])
+      .optional()
   });
 
   fastify.post(
@@ -255,13 +338,30 @@ export const noticeRoutes: FastifyPluginAsync = async (fastify) => {
       const { messageId } = paramsSchema.parse(request.params);
       const body = titleSuggestionLogSchema.parse(request.body);
 
-      await prisma.titleSuggestionLog.create({
-        data: {
-          messageId,
-          currentTitle: body.currentTitle,
-          suggestions: body.suggestions,
-          selectedTitle: body.selectedTitle ?? null
-        }
+      try {
+        await prisma.titleSuggestionLog.create({
+          data: {
+            messageId,
+            currentTitle: body.currentTitle,
+            suggestions: body.suggestions,
+            selectedTitle: body.selectedTitle ?? null
+          }
+        });
+      } catch (error) {
+        request.log.error(
+          { err: error, messageId },
+          "Failed to write title suggestion log"
+        );
+      }
+
+      await logUserAction(request.log, {
+        messageId,
+        action:
+          body.action ??
+          (body.selectedTitle
+            ? "title_suggestion_select"
+            : "title_suggestion_request"),
+        payload: body
       });
 
       return reply.send({ ok: true });
@@ -286,22 +386,84 @@ export const noticeRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.code(404).send({ message: "Notis ikke funnet." });
       }
 
-      const job = await fastify.rewriteQueue.add(
-        "rewrite-on-demand",
-        {
+      const instruction = body?.instruction?.trim() || undefined;
+      const { targetVersion, previousRewriteJson } =
+        await nextRewriteContext(messageId);
+      const generationRun = await logPrisma.generationRun.create({
+        data: {
           messageId,
+          version: targetVersion,
           reason: "manual-reprocess",
-          ...(body?.instruction ? { instruction: body.instruction } : {})
-        },
-        {
-          attempts: 3,
-          backoff: { type: "exponential", delay: 5000 },
-          removeOnComplete: 2000,
-          removeOnFail: 2000
+          status: "queued",
+          userInstruction: instruction ?? null,
+          ...(previousRewriteJson
+            ? { previousRewriteJson: toJsonValue(previousRewriteJson) }
+            : {}),
+          inputJson: toJsonValue({
+            endpoint: "/notice/:messageId/generate",
+            messageId,
+            targetVersion,
+            previousRewriteJson,
+            instruction: instruction ?? null
+          })
         }
-      );
+      });
 
-      return reply.send({ queued: true, jobId: job.id ?? null });
+      let job;
+      try {
+        job = await fastify.rewriteQueue.add(
+          "rewrite-on-demand",
+          {
+            messageId,
+            reason: "manual-reprocess",
+            generationRunId: generationRun.id,
+            targetVersion,
+            ...(previousRewriteJson ? { previousRewriteJson } : {}),
+            ...(instruction ? { instruction } : {})
+          },
+          {
+            attempts: 3,
+            backoff: { type: "exponential", delay: 5000 },
+            removeOnComplete: 2000,
+            removeOnFail: 2000
+          }
+        );
+      } catch (error) {
+        await logPrisma.generationRun.update({
+          where: { id: generationRun.id },
+          data: {
+            status: "failed",
+            errorText: error instanceof Error ? error.message : String(error),
+            finishedAt: new Date()
+          }
+        });
+        throw error;
+      }
+
+      await logPrisma.generationRun.update({
+        where: { id: generationRun.id },
+        data: {
+          jobId: job.id != null ? String(job.id) : null,
+          jobName: "rewrite-on-demand"
+        }
+      });
+
+      await logUserAction(request.log, {
+        messageId,
+        version: targetVersion,
+        action: "regenerate_request",
+        payload: {
+          instruction: instruction ?? null,
+          generationRunId: generationRun.id,
+          jobId: job.id ?? null
+        }
+      });
+
+      return reply.send({
+        queued: true,
+        jobId: job.id ?? null,
+        version: targetVersion
+      });
     }
   );
 };

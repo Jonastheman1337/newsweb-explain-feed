@@ -1,4 +1,8 @@
-import type { PromptPayload } from "./prompt.js";
+import type { RewriteOutput } from "@newsweb/shared";
+import {
+  formatRewriteForRevisionPrompt,
+  type PromptPayload
+} from "./prompt.js";
 import {
   EDITORIAL_ATTRIBUTION,
   EDITORIAL_AUDIENCE,
@@ -212,4 +216,28 @@ export function createReportUserPrompt(payload: ReportPromptPayload): string {
   }
 
   return parts.join("\n");
+}
+
+export function createReportRevisionUserPrompt(
+  payload: ReportPromptPayload,
+  previousOutput: RewriteOutput,
+  instruction: string
+): string {
+  return [
+    "Lag en revidert versjon av rapportnyheten under, basert pa instruksjonen.",
+    "VIKTIG: Instruksjonen er styrende. Hvis den ber om ny vinkel, annet fokus, annen struktur, annen lengde eller stor omskriving, skal du endre alle berorte felt tydelig.",
+    "Behold bare tekst som fortsatt passer med instruksjonen. Ikke gjor tilfeldige smaendringer for variasjon.",
+    "Hvis instruksjonen er bred, kan du skrive om tittel, lead, body, key_facts, importance og source_spans sa mye som nodvendig.",
+    "Returner HELE JSON-strukturen med alle felt, ogsa de som er uendret.",
+    "",
+    createReportUserPrompt(payload),
+    "",
+    "FORRIGE VERSJON (DIN OUTPUT SOM SKAL REVIDERES):",
+    "<<<",
+    formatRewriteForRevisionPrompt(previousOutput),
+    ">>>",
+    "",
+    "INSTRUKSJON:",
+    instruction
+  ].join("\n");
 }

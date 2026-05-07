@@ -1,6 +1,17 @@
 import type { RewriteOutput } from "@newsweb/shared";
 import { describe, expect, it } from "vitest";
-import { createRevisionUserPrompt, type PromptPayload } from "./prompt.js";
+import {
+  createRevisionUserPrompt,
+  type PromptPayload
+} from "./prompt.js";
+import {
+  createReportRevisionUserPrompt,
+  type ReportPromptPayload
+} from "./report-prompt.js";
+import {
+  createYearlyReportRevisionUserPrompt,
+  type YearlyReportPromptPayload
+} from "./yearly-report-prompt.js";
 
 const samplePayload: PromptPayload = {
   messageId: 12345,
@@ -30,6 +41,19 @@ const sampleOutput: RewriteOutput = {
   confidence: "high",
   importance: "medium",
   source_spans: ["inngått en avtale om kjøp av 100% av aksjene"]
+};
+
+const sampleReportPayload: ReportPromptPayload = {
+  ...samplePayload,
+  reportText: "Inntektene steg til 100 millioner kroner. Resultat for skatt var 20 millioner.",
+  reportPageCount: 12
+};
+
+const sampleYearlyPayload: YearlyReportPromptPayload = {
+  ...samplePayload,
+  letterText: null,
+  remunerationText: "CEO fikk samlet godtgjorelse pa 5 millioner kroner.",
+  reportPageCount: 80
 };
 
 describe("createRevisionUserPrompt", () => {
@@ -81,9 +105,43 @@ describe("createRevisionUserPrompt", () => {
   it("includes strengthened revision instructions with examples", () => {
     const result = createRevisionUserPrompt(samplePayload, sampleOutput, "Test");
 
-    expect(result).toContain("VIKTIG: Behold alt som ikke er berort av instruksjonen");
+    expect(result).toContain("VIKTIG: Instruksjonen er styrende");
+    expect(result).toContain("Ikke gjor tilfeldige smaendringer");
     expect(result).toContain("Fjern dette fra teksten");
     expect(result).toContain("Gjor det kortere");
     expect(result).toContain("For komplisert");
+    expect(result).toContain("Vinkle pa kontrakten");
+  });
+});
+
+describe("createReportRevisionUserPrompt", () => {
+  it("keeps report source context and user instruction in revision mode", () => {
+    const result = createReportRevisionUserPrompt(
+      sampleReportPayload,
+      sampleOutput,
+      "Vinkle mer pa inntektsveksten"
+    );
+
+    expect(result).toContain("rapportnyheten");
+    expect(result).toContain("KILDE (UTDRAG FRA RAPPORT):");
+    expect(result).toContain(sampleReportPayload.reportText);
+    expect(result).toContain("FORRIGE VERSJON");
+    expect(result).toContain("Vinkle mer pa inntektsveksten");
+  });
+});
+
+describe("createYearlyReportRevisionUserPrompt", () => {
+  it("keeps remuneration source context and user instruction in revision mode", () => {
+    const result = createYearlyReportRevisionUserPrompt(
+      sampleYearlyPayload,
+      sampleOutput,
+      "Gjor saken tydeligere pa CEO-lonn"
+    );
+
+    expect(result).toContain("lederlonnssaken");
+    expect(result).toContain("KILDE (GODTGJ");
+    expect(result).toContain(sampleYearlyPayload.remunerationText);
+    expect(result).toContain("FORRIGE VERSJON");
+    expect(result).toContain("Gjor saken tydeligere pa CEO-lonn");
   });
 });

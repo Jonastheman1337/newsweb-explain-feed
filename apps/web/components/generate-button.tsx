@@ -25,6 +25,7 @@ const RUNNING_JOB_STATES = new Set([
 
 type GenerateResponse = {
   jobId?: string | number | null;
+  version?: number | null;
 };
 
 type RewriteStatusResponse = {
