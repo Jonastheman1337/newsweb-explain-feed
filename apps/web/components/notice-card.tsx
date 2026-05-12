@@ -30,6 +30,14 @@ function importanceLabel(value: FeedItem["importance"]): string {
   return "Medium";
 }
 
+function MaxAiLink({ messageId }: { messageId: number }) {
+  return (
+    <Link href={`/notice/${messageId}`} className="originalLink">
+      Max AI →
+    </Link>
+  );
+}
+
 export function NoticeCard({ item }: NoticeCardProps) {
   const [showSplit, setShowSplit] = useState(false);
 
@@ -46,7 +54,12 @@ export function NoticeCard({ item }: NoticeCardProps) {
             {item.title}
           </Link>
         </h2>
-        <GenerateButton messageId={item.messageId} label="Regenerer notis" hasAttachments={item.hasAttachments} />
+        <div className="editableActions">
+          <MaxAiLink messageId={item.messageId} />
+          <span className="actionsRight">
+            <GenerateButton messageId={item.messageId} label="Regenerer notis" hasAttachments={item.hasAttachments} />
+          </span>
+        </div>
       </article>
     );
   }
@@ -64,7 +77,12 @@ export function NoticeCard({ item }: NoticeCardProps) {
             {item.title}
           </Link>
         </h2>
-        <GenerateButton messageId={item.messageId} hasAttachments={item.hasAttachments} />
+        <div className="editableActions">
+          <MaxAiLink messageId={item.messageId} />
+          <span className="actionsRight">
+            <GenerateButton messageId={item.messageId} hasAttachments={item.hasAttachments} />
+          </span>
+        </div>
       </article>
     );
   }
@@ -104,9 +122,7 @@ export function NoticeCard({ item }: NoticeCardProps) {
               </button>
             }
           >
-            <Link href={`/notice/${item.messageId}`} className="originalLink">
-              Max AI →
-            </Link>
+            <MaxAiLink messageId={item.messageId} />
           </EditableRewrite>
         </div>
         {showSplit && (
