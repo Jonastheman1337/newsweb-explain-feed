@@ -54,11 +54,13 @@ services:
         value: noreply@example.com
       - key: ADMIN_API_KEY
         generateValue: true
-      - key: ANTHROPIC_API_KEY
+      - key: LITELLM_API_KEY
         sync: false
-      - key: ANTHROPIC_MODEL
+      - key: LITELLM_BASE_URL
+        sync: false
+      - key: LITELLM_MODEL
         value: claude-sonnet-4-6
-      - key: ANTHROPIC_TIMEOUT_MS
+      - key: LITELLM_TIMEOUT_MS
         value: 60000
       - key: POLL_INTERVAL_MS
         value: 20000

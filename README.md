@@ -14,7 +14,7 @@ apps/worker   BullMQ workers: poll, ingest, rewrite, publish
 Postgres app DB      source notices, rewrite versions, feed state, user feedback
 Postgres log DB      generation_runs and user_action_events
 Redis/BullMQ         temporary queues, job state, and short-lived diagnostics
-Anthropic            model calls for rewrites, triage, and title suggestions
+LiteLLM              model calls for rewrites, triage, and title suggestions
 ```
 
 Rewrite lifecycle:
@@ -32,7 +32,7 @@ Rewrite lifecycle:
 - npm 11+
 - PostgreSQL 16+
 - Redis 7+
-- Anthropic API key
+- LiteLLM API key and proxy base URL
 
 ## Environment
 
@@ -42,8 +42,9 @@ Copy `.env.example` to `.env` and fill in the secrets:
 DATABASE_URL=postgresql://...
 GENERATION_LOG_DATABASE_URL=postgresql://...
 REDIS_URL=redis://...
-ANTHROPIC_API_KEY=...
-ANTHROPIC_MODEL=claude-sonnet-4-6
+LITELLM_API_KEY=...
+LITELLM_BASE_URL=https://your-litellm-proxy.example.com/v1
+LITELLM_MODEL=claude-sonnet-4-6
 SESSION_SECRET=...
 ADMIN_API_KEY=...
 ```
@@ -52,6 +53,9 @@ ADMIN_API_KEY=...
 If it is empty, local development falls back to the primary app DB, but
 production should use a separate DB so operational logs survive independently
 of app table changes.
+
+`LITELLM_BASE_URL` should point at the LiteLLM proxy base URL. Include `/v1`
+if your proxy is configured that way.
 
 ## Local Development
 

@@ -41,6 +41,12 @@ function toJsonValue(value: unknown): Prisma.InputJsonValue {
   return JSON.parse(JSON.stringify(value ?? null)) as Prisma.InputJsonValue;
 }
 
+function liteLLMChatCompletionsUrl(baseUrl: string): string {
+  const normalizedBaseUrl = baseUrl.replace(/\/+$/, "");
+  if (normalizedBaseUrl.endsWith("/chat/completions")) return normalizedBaseUrl;
+  return `${normalizedBaseUrl}/chat/completions`;
+}
+
 async function updateGenerationRunFailure(runId: string | null, errorText: string) {
   if (!runId) return;
   try {
@@ -65,11 +71,21 @@ export async function POST(
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE)?.value;
 
-  const ANTHROPIC_API_KEY = loadEnvVar("ANTHROPIC_API_KEY", "");
-  const ANTHROPIC_MODEL = loadEnvVar("ANTHROPIC_MODEL", "claude-sonnet-4-6");
+  const LITELLM_API_KEY = loadEnvVar("LITELLM_API_KEY", "");
+  const LITELLM_BASE_URL = loadEnvVar(
+    "LITELLM_BASE_URL",
+    loadEnvVar("LITELLM_API_BASE", "")
+  );
+  const LITELLM_MODEL = loadEnvVar(
+    "LITELLM_MODEL",
+    loadEnvVar("ANTHROPIC_MODEL", "claude-sonnet-4-6")
+  );
+  const LITELLM_TIMEOUT_MS = Number(
+    loadEnvVar("LITELLM_TIMEOUT_MS", loadEnvVar("ANTHROPIC_TIMEOUT_MS", "15000"))
+  );
 
-  if (!ANTHROPIC_API_KEY) {
-    return NextResponse.json({ message: "API key not configured" }, { status: 500 });
+  if (!LITELLM_API_KEY || !LITELLM_BASE_URL) {
+    return NextResponse.json({ message: "LiteLLM is not configured" }, { status: 500 });
   }
 
   // Fetch the notice to get context — pass auth token if available
@@ -115,7 +131,7 @@ export async function POST(
     lead,
     body,
     issuerName,
-    model: ANTHROPIC_MODEL,
+    model: LITELLM_MODEL,
     prompt
   };
 
@@ -126,7 +142,7 @@ export async function POST(
         reason: "title-suggestion",
         status: "started",
         inputJson: toJsonValue(requestPayload),
-        model: ANTHROPIC_MODEL,
+        model: LITELLM_MODEL,
         promptVersion: "title-suggestions-v1",
         promptChars: prompt.length,
         startedAt: new Date()
@@ -155,16 +171,17 @@ export async function POST(
   }
 
   try {
-    const anthropicRes = await fetch("https://api.anthropic.com/v1/messages", {
+    const liteLLMRes = await fetch(liteLLMChatCompletionsUrl(LITELLM_BASE_URL), {
       method: "POST",
-      signal: AbortSignal.timeout(15000),
+      signal: AbortSignal.timeout(
+        Number.isFinite(LITELLM_TIMEOUT_MS) ? LITELLM_TIMEOUT_MS : 15000
+      ),
       headers: {
         "content-type": "application/json",
-        "x-api-key": ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01"
+        "Authorization": `Bearer ${LITELLM_API_KEY}`
       },
       body: JSON.stringify({
-        model: ANTHROPIC_MODEL,
+        model: LITELLM_MODEL,
         max_tokens: 512,
         temperature: 1,
         messages: [
@@ -173,15 +190,17 @@ export async function POST(
       })
     });
 
-    if (!anthropicRes.ok) {
-      const errText = await anthropicRes.text();
-      console.error("[suggest-titles] Anthropic error:", errText);
+    if (!liteLLMRes.ok) {
+      const errText = await liteLLMRes.text();
+      console.error("[suggest-titles] LiteLLM error:", errText);
       await updateGenerationRunFailure(generationRunId, errText);
       return NextResponse.json({ message: "AI request failed" }, { status: 502 });
     }
 
-    const result = await anthropicRes.json();
-    const text = result.content?.[0]?.text ?? "[]";
+    const result = (await liteLLMRes.json()) as {
+      choices?: Array<{ message?: { content?: string | null } }>;
+    };
+    const text = result.choices?.[0]?.message?.content ?? "[]";
 
     // Extract JSON array from response
     const match = text.match(/\[[\s\S]*\]/);

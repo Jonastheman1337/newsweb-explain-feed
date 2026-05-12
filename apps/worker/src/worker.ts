@@ -381,7 +381,7 @@ async function startGenerationRun(
             previousOutput as unknown as Prisma.InputJsonValue
         }
       : {}),
-    model: config.ANTHROPIC_MODEL,
+    model: config.LITELLM_MODEL,
     promptVersion: PROMPT_VERSION,
     startedAt: new Date()
   };
@@ -431,6 +431,12 @@ function clampRewriteArrays(raw: Record<string, unknown>): Record<string, unknow
   return raw;
 }
 
+function liteLLMChatCompletionsUrl(): string {
+  const baseUrl = config.LITELLM_BASE_URL.replace(/\/+$/, "");
+  if (baseUrl.endsWith("/chat/completions")) return baseUrl;
+  return `${baseUrl}/chat/completions`;
+}
+
 async function callModelForJson({
   schemaName,
   schema,
@@ -445,66 +451,84 @@ async function callModelForJson({
   const promptChars = systemPrompt.length + developerPrompt.length + userPrompt.length;
   const modelCall: ModelCallLog = {
     schemaName,
-    model: config.ANTHROPIC_MODEL,
+    model: config.LITELLM_MODEL,
     systemPrompt,
     developerPrompt,
     userPrompt,
     promptChars
   };
 
-  const anthropicResponse = await fetch("https://api.anthropic.com/v1/messages", {
+  const liteLLMResponse = await fetch(liteLLMChatCompletionsUrl(), {
     method: "POST",
-    signal: AbortSignal.timeout(config.ANTHROPIC_TIMEOUT_MS),
+    signal: AbortSignal.timeout(config.LITELLM_TIMEOUT_MS),
     headers: {
       "content-type": "application/json",
-      "x-api-key": config.ANTHROPIC_API_KEY,
-      "anthropic-version": "2023-06-01"
+      "Authorization": `Bearer ${config.LITELLM_API_KEY}`
     },
     body: JSON.stringify({
-      model: config.ANTHROPIC_MODEL,
+      model: config.LITELLM_MODEL,
       max_tokens: 4096,
       temperature: 0,
-      system: systemPrompt,
       tools: [
         {
-          name: schemaName,
-          description: "Return the structured output matching the schema.",
-          input_schema: schema
+          type: "function",
+          function: {
+            name: schemaName,
+            description: "Return the structured output matching the schema.",
+            parameters: schema
+          }
         }
       ],
-      tool_choice: { type: "tool", name: schemaName },
+      tool_choice: { type: "function", function: { name: schemaName } },
       messages: [
+        { role: "system", content: systemPrompt },
         {
           role: "user",
-          content: [
-            {
-              type: "text",
-              text: [developerPrompt, "", userPrompt].join("\n")
-            }
-          ]
+          content: [developerPrompt, "", userPrompt].join("\n")
         }
       ]
     })
   });
 
-  if (!anthropicResponse.ok) {
-    const errorBody = await anthropicResponse.text();
+  if (!liteLLMResponse.ok) {
+    const errorBody = await liteLLMResponse.text();
     throw new Error(
-      `Anthropic request failed: ${anthropicResponse.status} ${errorBody.slice(0, 300)}`
+      `LiteLLM request failed: ${liteLLMResponse.status} ${errorBody.slice(0, 300)}`
     );
   }
 
-  const responseJson = (await anthropicResponse.json()) as {
-    content?: Array<{ type?: string; input?: unknown }>;
+  const responseJson = (await liteLLMResponse.json()) as {
+    choices?: Array<{
+      message?: {
+        tool_calls?: Array<{
+          function?: {
+            name?: string;
+            arguments?: string;
+          };
+        }>;
+        function_call?: {
+          name?: string;
+          arguments?: string;
+        };
+      };
+    }>;
   };
-  const toolBlock = responseJson.content?.find((item) => item.type === "tool_use");
+  const message = responseJson.choices?.[0]?.message;
+  const toolCall = message?.tool_calls?.find(
+    (item) => item.function?.name === schemaName
+  );
+  const toolArguments =
+    toolCall?.function?.arguments ??
+    (message?.function_call?.name === schemaName
+      ? message.function_call.arguments
+      : undefined);
 
-  if (!toolBlock?.input) {
-    throw new Error("Model returned no tool_use block");
+  if (!toolArguments) {
+    throw new Error("Model returned no tool call arguments");
   }
 
   return {
-    content: JSON.stringify(toolBlock.input),
+    content: toolArguments,
     promptChars,
     modelCall
   };
@@ -523,36 +547,32 @@ async function callModelTriage(
   const promptChars = TRIAGE_PROMPT.length + userPrompt.length;
 
   try {
-    const anthropicResponse = await fetch("https://api.anthropic.com/v1/messages", {
+    const liteLLMResponse = await fetch(liteLLMChatCompletionsUrl(), {
       method: "POST",
       signal: AbortSignal.timeout(15000),
       headers: {
         "content-type": "application/json",
-        "x-api-key": config.ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01"
+        "Authorization": `Bearer ${config.LITELLM_API_KEY}`
       },
       body: JSON.stringify({
-        model: config.ANTHROPIC_MODEL,
+        model: config.LITELLM_MODEL,
         max_tokens: 150,
         temperature: 0,
-        system: TRIAGE_PROMPT,
-        messages: [{ role: "user", content: userPrompt }]
+        messages: [
+          { role: "system", content: TRIAGE_PROMPT },
+          { role: "user", content: userPrompt }
+        ]
       })
     });
 
-    if (!anthropicResponse.ok) {
-      return { newsworthy: true, reason: "Anthropic triage call failed", promptChars: 0 };
+    if (!liteLLMResponse.ok) {
+      return { newsworthy: true, reason: "LiteLLM triage call failed", promptChars: 0 };
     }
 
-    const responseJson = (await anthropicResponse.json()) as {
-      content?: Array<{ type?: string; text?: string }>;
+    const responseJson = (await liteLLMResponse.json()) as {
+      choices?: Array<{ message?: { content?: string | null } }>;
     };
-    const content =
-      responseJson.content
-        ?.filter((item) => item.type === "text" && typeof item.text === "string")
-        .map((item) => item.text ?? "")
-        .join("\n")
-        .trim() ?? "";
+    const content = responseJson.choices?.[0]?.message?.content?.trim() ?? "";
 
     const result = parseTriageResponse(content);
     return { ...result, promptChars };
@@ -1322,7 +1342,7 @@ async function upsertRewrite(args: {
       messageId: args.messageId,
       version,
       lang: "nb",
-      model: config.ANTHROPIC_MODEL,
+      model: config.LITELLM_MODEL,
       promptVersion: PROMPT_VERSION,
       rewriteJson: args.rewriteJson,
       validationJson: args.validationJson,
@@ -1331,7 +1351,7 @@ async function upsertRewrite(args: {
     },
     update: {
       lang: "nb",
-      model: config.ANTHROPIC_MODEL,
+      model: config.LITELLM_MODEL,
       promptVersion: PROMPT_VERSION,
       rewriteJson: args.rewriteJson,
       validationJson: args.validationJson,
@@ -1355,7 +1375,7 @@ async function upsertRewrite(args: {
         ...(args.inputJson ? { inputJson: args.inputJson } : {}),
         outputJson: args.rewriteJson,
         validationJson: args.validationJson,
-        model: config.ANTHROPIC_MODEL,
+        model: config.LITELLM_MODEL,
         promptVersion: PROMPT_VERSION,
         promptChars: extractPromptChars(args.validationJson),
         errorText: extractRewriteErrorText(args.rewriteJson),
@@ -2148,7 +2168,7 @@ async function bootstrap(): Promise<void> {
   }
 
   console.log(
-    `[worker] started. pollInterval=${config.POLL_INTERVAL_MS}ms model=${config.ANTHROPIC_MODEL}`
+    `[worker] started. pollInterval=${config.POLL_INTERVAL_MS}ms model=${config.LITELLM_MODEL}`
   );
 }
 
