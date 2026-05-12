@@ -31,6 +31,7 @@ type GenerateResponse = {
 
 type RewriteStatusResponse = {
   ready?: boolean;
+  failed?: boolean;
   version?: number | null;
   generatedAt?: string | null;
   jobState?: string | null;
@@ -113,6 +114,10 @@ export function InstructionInput({ messageId, activeVersion, hasAttachments }: I
 
     try {
       const data = await fetchRewriteStatus(jobId);
+      if (data?.failed) {
+        setStatus("error");
+        return;
+      }
       if (data?.ready && statusChanged(data)) {
         setStatus("idle");
         router.refresh();
@@ -180,7 +185,7 @@ export function InstructionInput({ messageId, activeVersion, hasAttachments }: I
             router.refresh();
             return;
           }
-          if (data?.jobState === "failed") {
+          if (data?.failed || data?.jobState === "failed") {
             stopPolling();
             setStatus("error");
             return;

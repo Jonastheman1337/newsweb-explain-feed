@@ -30,6 +30,7 @@ type GenerateResponse = {
 
 type RewriteStatusResponse = {
   ready?: boolean;
+  failed?: boolean;
   version?: number | null;
   generatedAt?: string | null;
   jobState?: string | null;
@@ -101,6 +102,10 @@ export function GenerateButton({ messageId, label, hasAttachments }: GenerateBut
 
     try {
       const data = await fetchRewriteStatus(jobId);
+      if (data?.failed) {
+        setStatus("error");
+        return;
+      }
       if (data?.ready && hasStatusChanged(data, versionBefore, generatedAtBefore)) {
         setStatus("done");
         router.refresh();
@@ -159,7 +164,7 @@ export function GenerateButton({ messageId, label, hasAttachments }: GenerateBut
             router.refresh();
             return;
           }
-          if (data?.jobState === "failed") {
+          if (data?.failed || data?.jobState === "failed") {
             stopPolling();
             setStatus("error");
             return;

@@ -233,7 +233,10 @@ export const noticeRoutes: FastifyPluginAsync = async (fastify) => {
         failed: rewrite.status === "failed",
         generatedAt: rewrite.generatedAt.toISOString(),
         version: rewrite.version,
-        jobState
+        jobState:
+          rewrite.status === "failed" && jobState === "completed"
+            ? "failed"
+            : jobState
       });
     }
   );

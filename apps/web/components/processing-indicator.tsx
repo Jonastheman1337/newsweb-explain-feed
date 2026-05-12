@@ -29,6 +29,7 @@ export function ProcessingIndicator({ messageId, hasAttachments }: ProcessingInd
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [stepIndex, setStepIndex] = useState(0);
   const [elapsed, setElapsed] = useState(0);
+  const [failed, setFailed] = useState(false);
 
   // Advance steps on a timer
   useEffect(() => {
@@ -59,6 +60,12 @@ export function ProcessingIndicator({ messageId, hasAttachments }: ProcessingInd
             router.refresh();
             return;
           }
+          if (data.failed || data.jobState === "failed") {
+            clearInterval(pollRef.current!);
+            pollRef.current = null;
+            setFailed(true);
+            return;
+          }
         }
       } catch {
         /* keep polling */
@@ -82,6 +89,17 @@ export function ProcessingIndicator({ messageId, hasAttachments }: ProcessingInd
     ((stepIndex / (STEPS.length - 1)) * 80) + (elapsed > 0 ? Math.min(elapsed / 500, 15) : 0),
     95
   );
+
+  if (failed) {
+    return (
+      <div className="processingWrap">
+        <span className="muted">Generering feilet.</span>
+        <button className="ghostButton" onClick={() => router.refresh()}>
+          Oppdater
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="processingWrap">
