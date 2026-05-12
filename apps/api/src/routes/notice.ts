@@ -22,6 +22,18 @@ const generateBodySchema = z
   })
   .optional();
 
+const RUNNING_JOB_STATES = new Set([
+  "active",
+  "delayed",
+  "prioritized",
+  "waiting",
+  "waiting-children"
+]);
+
+function isJobStillRunning(jobState: string | null): boolean {
+  return jobState ? RUNNING_JOB_STATES.has(jobState) : false;
+}
+
 function toJsonValue(value: unknown): Prisma.InputJsonValue {
   return JSON.parse(JSON.stringify(value ?? null)) as Prisma.InputJsonValue;
 }
@@ -228,15 +240,14 @@ export const noticeRoutes: FastifyPluginAsync = async (fastify) => {
         });
       }
 
+      const failed = rewrite.status === "failed" && !isJobStillRunning(jobState);
+
       return reply.send({
         ready: rewrite.status === "published" || rewrite.status === "skipped",
-        failed: rewrite.status === "failed",
+        failed,
         generatedAt: rewrite.generatedAt.toISOString(),
         version: rewrite.version,
-        jobState:
-          rewrite.status === "failed" && jobState === "completed"
-            ? "failed"
-            : jobState
+        jobState: failed && jobState === "completed" ? "failed" : jobState
       });
     }
   );
