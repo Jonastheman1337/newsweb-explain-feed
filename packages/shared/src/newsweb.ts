@@ -10,7 +10,7 @@ export const newswebListMessageSchema = z.object({
   newsId: z.number().int(),
   title: z.string(),
   issuerName: z.string(),
-  issuerSign: z.string(),
+  issuerSign: z.string().nullable().optional(),
   publishedTime: z.string().datetime(),
   markets: z.array(z.string()),
   category: z.array(newswebCategorySchema),

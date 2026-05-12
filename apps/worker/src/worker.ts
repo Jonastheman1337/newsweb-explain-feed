@@ -98,6 +98,7 @@ const redisPub = new Redis(config.REDIS_URL, { maxRetriesPerRequest: null });
 const ingestQueue = new Queue<IngestJobData>(QUEUE_NAMES.ingest, { connection });
 const rewriteQueue = new Queue<RewriteJobData>(QUEUE_NAMES.rewrite, { connection });
 const publishQueue = new Queue<PublishJobData>(QUEUE_NAMES.publish, { connection });
+const skippedMissingIssuerSign = new Set<number>();
 
 async function enqueuePublish(
   messageId: number,
@@ -158,17 +159,30 @@ async function fetchList(daysBack = 0): Promise<IngestJobData[]> {
   }
   const json = await response.json();
   const parsed = newswebListResponseSchema.parse(json);
-  return parsed.data.messages.map((message) => ({
-    messageId: message.messageId,
-    newsId: message.newsId,
-    title: message.title,
-    issuerName: message.issuerName,
-    issuerSign: message.issuerSign,
-    publishedTime: message.publishedTime,
-    categories: message.category.map((item) => fixDoubleEncodedUtf8(item.category_no)),
-    markets: message.markets,
-    numbAttachments: message.numbAttachments
-  }));
+  return parsed.data.messages.flatMap((message) => {
+    if (!message.issuerSign) {
+      if (!skippedMissingIssuerSign.has(message.messageId)) {
+        skippedMissingIssuerSign.add(message.messageId);
+        console.warn(
+          `[newsweb] skipping ${message.messageId}: missing issuerSign in list response`
+        );
+      }
+      return [];
+    }
+    return [
+      {
+        messageId: message.messageId,
+        newsId: message.newsId,
+        title: message.title,
+        issuerName: message.issuerName,
+        issuerSign: message.issuerSign,
+        publishedTime: message.publishedTime,
+        categories: message.category.map((item) => fixDoubleEncodedUtf8(item.category_no)),
+        markets: message.markets,
+        numbAttachments: message.numbAttachments
+      }
+    ];
+  });
 }
 
 async function fetchMessageDetails(messageId: number): Promise<{
