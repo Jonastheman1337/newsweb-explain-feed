@@ -39,6 +39,7 @@ export default async function NoticePage({ params }: NoticePageProps) {
 
   const isProcessing = "processing" in notice && notice.processing === true;
   const isSkipped = "skipped" in notice && notice.skipped === true;
+  const isFailed = "failed" in notice && notice.failed === true;
 
   const dateline = (
     <p key="dateline" className="muted">
@@ -69,6 +70,14 @@ export default async function NoticePage({ params }: NoticePageProps) {
             <h2>{notice.source.title}</h2>
             {dateline}
             <p>Denne børsmeldingen har ikke blitt omskrevet enda.</p>
+            <GenerateButton messageId={notice.source.messageId} hasAttachments={notice.source.hasAttachments} />
+          </>
+        ) : isFailed ? (
+          <>
+            <p className="noticePanelTitle">Generering feilet</p>
+            <h2>{notice.source.title}</h2>
+            {dateline}
+            <p>AI-notisen kunne ikke genereres automatisk.</p>
             <GenerateButton messageId={notice.source.messageId} hasAttachments={notice.source.hasAttachments} />
           </>
         ) : (

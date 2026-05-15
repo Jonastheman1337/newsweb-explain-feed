@@ -147,9 +147,20 @@ export const noticeRoutes: FastifyPluginAsync = async (fastify) => {
         latestRewrite.status === "failed" &&
         !notice.rewrites.some((r) => r.status === "published")
       ) {
-        return reply
-          .code(404)
-          .send({ message: "Omskrivingen feilet." });
+        return reply.send({
+          source: {
+            messageId: notice.messageId,
+            title: notice.title,
+            issuerName: notice.issuerName,
+            issuerSign: notice.issuerSign,
+            publishedAt: notice.publishedAt.toISOString(),
+            categories: (notice.categoriesJson as string[]) ?? [],
+            markets: (notice.marketsJson as string[]) ?? [],
+            bodyText: notice.bodyText,
+            hasAttachments: notice.hasAttachments
+          },
+          failed: true
+        });
       }
 
       if (

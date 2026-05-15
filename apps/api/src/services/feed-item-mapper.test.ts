@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { mapDbItemToFeedItem } from "./feed-item-mapper.js";
 
-function rewrite(version: number, status: "pending" | "published", generatedAt: Date) {
+function rewrite(
+  version: number,
+  status: "pending" | "published" | "failed" | "skipped",
+  generatedAt: Date
+) {
   return {
     id: `rewrite-${version}`,
     messageId: 123,
@@ -72,6 +76,26 @@ describe("mapDbItemToFeedItem", () => {
     );
 
     expect(item?.processing).toBe(true);
+    expect(item?.title).toBe("Original tittel");
+  });
+
+  it("keeps failed rewrites visible as retryable source cards", () => {
+    const item = mapDbItemToFeedItem(
+      feedItem([rewrite(1, "failed", new Date("2026-05-07T08:00:00.000Z"))]) as never
+    );
+
+    expect(item?.failed).toBe(true);
+    expect(item?.processing).toBe(false);
+    expect(item?.title).toBe("Original tittel");
+  });
+
+  it("keeps skipped rewrites visible as source cards", () => {
+    const item = mapDbItemToFeedItem(
+      feedItem([rewrite(1, "skipped", new Date("2026-05-07T08:00:00.000Z"))]) as never
+    );
+
+    expect(item?.skipped).toBe(true);
+    expect(item?.processing).toBe(false);
     expect(item?.title).toBe("Original tittel");
   });
 });

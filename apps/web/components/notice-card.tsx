@@ -87,6 +87,29 @@ export function NoticeCard({ item }: NoticeCardProps) {
     );
   }
 
+  if (item.failed) {
+    return (
+      <article className="card cardSkipped">
+        <div className="muted">
+          <a href={`https://newsweb.oslobors.no/message/${item.messageId}`} target="_blank" rel="noopener noreferrer">
+            {formatOsloTime(item.publishedAt)} | {item.issuerName} ({item.issuerSign})
+          </a>
+        </div>
+        <h2>
+          <Link href={`/notice/${item.messageId}`} className="headlineLink">
+            {item.title}
+          </Link>
+        </h2>
+        <div className="editableActions">
+          <MaxAiLink messageId={item.messageId} />
+          <span className="actionsRight">
+            <GenerateButton messageId={item.messageId} label="Prøv igjen" hasAttachments={item.hasAttachments} />
+          </span>
+        </div>
+      </article>
+    );
+  }
+
   const articleBody = [item.lead, ...item.body].filter(Boolean).join("\n\n");
   const isImportant = item.importance === "viktig";
   const cardClassName = isImportant && !showSplit ? "card cardImportant" : "card";

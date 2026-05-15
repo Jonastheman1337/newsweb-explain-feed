@@ -49,6 +49,7 @@ export const feedItemSchema = z.object({
   sourceTitle: z.string(),
   sourceBodyText: z.string(),
   skipped: z.boolean().default(false),
+  failed: z.boolean().default(false),
   processing: z.boolean().default(false)
 });
 

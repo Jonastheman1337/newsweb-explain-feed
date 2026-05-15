@@ -84,6 +84,7 @@ type RewriteVersion = {
 type NoticeResponse =
   | { source: NoticeSource; rewrite: RewriteOutput; rewrites?: RewriteVersion[]; skipped?: false; processing?: false }
   | { source: NoticeSource; skipped: true }
+  | { source: NoticeSource; failed: true }
   | { source: NoticeSource; processing: true };
 
 export async function getNotice(token: string | null | undefined, messageId: number) {

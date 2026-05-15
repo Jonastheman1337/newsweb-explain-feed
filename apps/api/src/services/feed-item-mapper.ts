@@ -7,6 +7,33 @@ type FeedItemWithRelations = PrismaFeedItem & {
   };
 };
 
+function sourceOnlyFeedItem(
+  item: FeedItemWithRelations,
+  flags: { skipped?: boolean; failed?: boolean; processing?: boolean } = {}
+): FeedItem {
+  return {
+    messageId: item.messageId,
+    publishedAt: item.publishedAt.toISOString(),
+    visibilityStatus: item.visibilityStatus,
+    title: item.sourceNotice.title,
+    issuerName: item.sourceNotice.issuerName,
+    issuerSign: item.sourceNotice.issuerSign,
+    lead: "",
+    body: [],
+    keyFacts: [],
+    negativeOrSurprising: [],
+    sourceLimitations: [],
+    confidence: "high",
+    importance: "uviktig",
+    hasAttachments: item.sourceNotice.hasAttachments,
+    sourceTitle: item.sourceNotice.title,
+    sourceBodyText: item.sourceNotice.bodyText,
+    skipped: flags.skipped ?? false,
+    failed: flags.failed ?? false,
+    processing: flags.processing ?? false
+  };
+}
+
 export function mapDbItemToFeedItem(item: FeedItemWithRelations): FeedItem | null {
   const latestRewrite = item.sourceNotice.rewrites[0];
   const rewriteRecord =
@@ -18,53 +45,15 @@ export function mapDbItemToFeedItem(item: FeedItemWithRelations): FeedItem | nul
     rewriteRecord.status === "pending" ||
     rewriteRecord.status === "needs_retry"
   ) {
-    return {
-      messageId: item.messageId,
-      publishedAt: item.publishedAt.toISOString(),
-      visibilityStatus: item.visibilityStatus,
-      title: item.sourceNotice.title,
-      issuerName: item.sourceNotice.issuerName,
-      issuerSign: item.sourceNotice.issuerSign,
-      lead: "",
-      body: [],
-      keyFacts: [],
-      negativeOrSurprising: [],
-      sourceLimitations: [],
-      confidence: "high",
-      importance: "uviktig",
-      hasAttachments: item.sourceNotice.hasAttachments,
-      sourceTitle: item.sourceNotice.title,
-      sourceBodyText: item.sourceNotice.bodyText,
-      skipped: false,
-      processing: true
-    };
+    return sourceOnlyFeedItem(item, { processing: true });
   }
 
   if (rewriteRecord.status === "failed") {
-    return null;
+    return sourceOnlyFeedItem(item, { failed: true });
   }
 
   if (rewriteRecord.status === "skipped") {
-    return {
-      messageId: item.messageId,
-      publishedAt: item.publishedAt.toISOString(),
-      visibilityStatus: item.visibilityStatus,
-      title: item.sourceNotice.title,
-      issuerName: item.sourceNotice.issuerName,
-      issuerSign: item.sourceNotice.issuerSign,
-      lead: "",
-      body: [],
-      keyFacts: [],
-      negativeOrSurprising: [],
-      sourceLimitations: [],
-      confidence: "high",
-      importance: "uviktig",
-      hasAttachments: item.sourceNotice.hasAttachments,
-      sourceTitle: item.sourceNotice.title,
-      sourceBodyText: item.sourceNotice.bodyText,
-      skipped: true,
-      processing: false
-    };
+    return sourceOnlyFeedItem(item, { skipped: true });
   }
 
   const rewrite = rewriteOutputSchema.parse(
@@ -88,6 +77,7 @@ export function mapDbItemToFeedItem(item: FeedItemWithRelations): FeedItem | nul
     sourceTitle: item.sourceNotice.title,
     sourceBodyText: item.sourceNotice.bodyText,
     skipped: false,
+    failed: false,
     processing: false
   };
 }
