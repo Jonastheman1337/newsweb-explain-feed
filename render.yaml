@@ -73,7 +73,7 @@ services:
       - key: POLL_INTERVAL_MS
         value: 20000
       - key: LATEST_BOOTSTRAP_COUNT
-        value: 10
+        value: 30
 
 databases:
   - name: newsweb-explain-db

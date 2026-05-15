@@ -32,7 +32,7 @@ const configSchema = z
       .enum(["none", "minimal", "low", "medium", "high", "xhigh"])
       .default("high"),
     POLL_INTERVAL_MS: z.coerce.number().int().min(5000).default(20000),
-    LATEST_BOOTSTRAP_COUNT: z.coerce.number().int().min(0).max(50).default(10)
+    LATEST_BOOTSTRAP_COUNT: z.coerce.number().int().min(0).max(50).default(30)
   });
 
 export type WorkerConfig = z.infer<typeof configSchema>;

@@ -198,6 +198,20 @@ async function fetchList(daysBack = 0): Promise<IngestJobData[]> {
   });
 }
 
+async function fetchRecentListAtLeast(count: number): Promise<IngestJobData[]> {
+  const windows = [3, 7, 14, 30];
+  let latest: IngestJobData[] = [];
+
+  for (const daysBack of windows) {
+    latest = await fetchList(daysBack);
+    if (latest.length >= count) {
+      return latest;
+    }
+  }
+
+  return latest;
+}
+
 async function fetchMessageDetails(messageId: number): Promise<{
   bodyText: string;
   hasAttachments: boolean;
@@ -229,19 +243,20 @@ async function fetchMessageDetails(messageId: number): Promise<{
 
 async function enqueueLatestNotices(count: number): Promise<{
   requested: number;
+  feedItemsEnsured: number;
   queuedIngest: number;
   queuedRewrite: number;
 }> {
   if (count <= 0) {
     return {
       requested: 0,
+      feedItemsEnsured: 0,
       queuedIngest: 0,
       queuedRewrite: 0
     };
   }
 
-  // Use 3-day window to find recent notices even on weekends/holidays
-  const list = await fetchList(3);
+  const list = await fetchRecentListAtLeast(count);
   const latest = [...list]
     .sort(
       (left, right) =>
@@ -262,11 +277,27 @@ async function enqueueLatestNotices(count: number): Promise<{
   });
   const existingSet = new Set(existing.map((item) => item.messageId));
 
+  let feedItemsEnsured = 0;
   let queuedIngest = 0;
   let queuedRewrite = 0;
 
   for (const item of latest) {
     if (existingSet.has(item.messageId)) {
+      await prisma.feedItem.upsert({
+        where: { messageId: item.messageId },
+        create: {
+          messageId: item.messageId,
+          publishedAt: new Date(item.publishedTime),
+          visibilityStatus: "published",
+          rankScore: 0
+        },
+        update: {
+          publishedAt: new Date(item.publishedTime),
+          visibilityStatus: "published"
+        }
+      });
+      feedItemsEnsured += 1;
+
       // Already ingested — check if it has a rewrite; if so, skip
       const existingRewrite = await prisma.rewrite.findFirst({
         where: { messageId: item.messageId },
@@ -311,6 +342,7 @@ async function enqueueLatestNotices(count: number): Promise<{
 
   return {
     requested: latest.length,
+    feedItemsEnsured,
     queuedIngest,
     queuedRewrite
   };
@@ -2520,7 +2552,7 @@ async function bootstrap(): Promise<void> {
     try {
       const seeded = await enqueueLatestNotices(config.LATEST_BOOTSTRAP_COUNT);
       console.log(
-        `[worker] seeded latest notices requested=${seeded.requested} ingestQueued=${seeded.queuedIngest} rewriteQueued=${seeded.queuedRewrite}`
+        `[worker] seeded latest notices requested=${seeded.requested} feedItemsEnsured=${seeded.feedItemsEnsured} ingestQueued=${seeded.queuedIngest} rewriteQueued=${seeded.queuedRewrite}`
       );
     } catch (error) {
       console.error(

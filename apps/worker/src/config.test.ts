@@ -57,5 +57,6 @@ describe("parseWorkerConfig", () => {
     expect(config.OPENAI_DEFAULT_REASONING_EFFORT).toBe("low");
     expect(config.OPENAI_REPORT_REASONING_EFFORT).toBe("medium");
     expect(config.OPENAI_HARD_REASONING_EFFORT).toBe("high");
+    expect(config.LATEST_BOOTSTRAP_COUNT).toBe(30);
   });
 });
