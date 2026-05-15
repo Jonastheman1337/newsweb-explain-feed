@@ -76,4 +76,24 @@ describe("findUnexpectedNumbers", () => {
     const missing = findUnexpectedNumbers(rewrite, source);
     expect(missing).toEqual([]);
   });
+
+  it("treats percent signs and prosent wording as the same number", () => {
+    const rewrite: RewriteOutput = {
+      title: "Marginen steg",
+      lead: "Selskapet opplyser at marginen var 10 prosent.",
+      body: ["Omsetningen steg 12 prosent i perioden."],
+      company_sentence: "Test AS leverer digitale tjenester.",
+      key_facts: ["Margin 10 prosent", "Omsetning opp 12 prosent"],
+      negative_or_surprising: [],
+      excluded_hype: [],
+      source_limitations: [],
+      confidence: "medium",
+      importance: "medium",
+      source_spans: ["margin was 10%", "revenue increased 12 percent"]
+    };
+
+    const source = "The margin was 10% and revenue increased 12 percent.";
+    const missing = findUnexpectedNumbers(rewrite, source);
+    expect(missing).toEqual([]);
+  });
 });

@@ -15,6 +15,7 @@ export const EDITORIAL_AUDIENCE = `HVEM SKRIVER VI FOR?
 export const EDITORIAL_LANGUAGE = `SPRAK OG FORENKLING
 - Skriv hverdagssprak. Tenk deg at du forklarer nyheten muntlig til en kompis som folger med pa aksjer.
 - Vanlige finansord er greit: 'omsetning', 'resultat for skatt', 'driftsresultat', 'ebitda', 'utbytte', 'guiding', 'aksje', 'kurs', 'datterselskap', 'kontrakt', 'aksjekapital', 'innsidehandel'. Disse trenger ikke forklaring.
+- Ikke bland regnskapsbegrepene inntekter/omsetning og resultat. Hvis kilden bare omtaler inntekter eller omsetning, skal det ikke bli til resultat, overskudd eller tap i teksten.
 - Foretrekk enkle synonymer fremfor tunge fagord, spesielt i titler. Tenk alltid: finnes det et enklere norsk ord som betyr det samme? Bruk det. Fagbegrepet kan komme i body der det forklares. 'Henter penger' er bedre enn 'gjennomforer kapitalinnhenting'. 'Sammenslåing' er lettere enn 'fusjon'.
 - Bruk fagbegreper, men forklar dem gjennom kontekst slik at leseren bade forstar og laerer:
   'ebitda' → 'driftsresultatet (ebitda) gikk opp til 48 millioner' (forklar ved forste bruk, bruk forkortelsen etterpå)
@@ -32,6 +33,8 @@ export const EDITORIAL_LANGUAGE = `SPRAK OG FORENKLING
 - Skriv norsk, ikke engelske lanord. Hvis det finnes et godt norsk ord, bruk det. 'Helseteknologi' er bedre enn 'medtech', 'programvare' er bedre enn 'software', 'skytjenester' er bedre enn 'cloud services'. Engelske bransjetermer og produktnavn er ok nar det ikke finnes et naturlig norsk alternativ.`;
 
 export const EDITORIAL_TITLE = `- title: kort, stram og slagkraftig. MAKS 8 ORD. Tittelen blir avvist hvis den er lengre. Kutt hvert ord som ikke er strengt nodvendig. Ett poeng per tittel — ikke propp inn to nyheter. Bruk gjerne forkortelser som 'mill.' og 'mrd.'. Bruk selskapsnavn, ikke ticker-koder.
+  Velg det nyhetspoenget som mest sannsynlig er kursdrivende. Hvis en negativ opplysning er det viktigste for aksjeeieren, skal tittelen vinkles pa det negative.
+  Ikke beskriv tall med subjektive storrelsesord som 'stort', 'lite', 'betydelig', 'kraftig' eller lignende i tittelen. Bruk konkret tall eller konkret hendelse.
   Tittelen trenger ikke inneholde all kontekst. Detaljer horer hjemme i lead. Flytt detaljer dit i stedet for a presse dem inn i tittelen.
   Dropp tekniske spesifikasjoner de fleste ikke har forutsetning for a vurdere (MW, GWh, bpd o.l.) — la det sta i body.
   Velg det enkleste synonymet i titler. Hvis det finnes et hverdagsord som betyr det samme som et fagord, bruk hverdagsordet i tittelen.
@@ -48,7 +51,10 @@ export const EDITORIAL_WRITING_STYLE = `SKRIVESTIL
 - Skriv naturlig norsk, ikke ordrett maskinoversettelse. Unnga passiv og tungt hjelpeverb-sprak.
 - Vev selskapskontekst naturlig inn i forste setning.
 - Skriv ut 'millioner' og 'milliarder' i titler og lopende tekst. Forkortelsene 'mill.' og 'mrd.' kan brukes nar tittelen ellers blir for lang (over 8 ord) eller i oppramsinger med mange tall.
+- Skriv 'prosent', ikke '%', i title, lead og body.
 - Bruk norsk tallformat med punktum som tusenskille: '3.193.485', ikke '3 193 485'. Desimaltegn er komma: '1,5 mill.'.
+- Gjengi summer og valuta slik de star i kilden. Ikke regn om valuta til kroner eller annen valuta med mindre kilden selv oppgir omregningen.
+- Bruk publiseringstidspunktet i metadata som anker for relative datoer som 'i dag', 'i gar', 'onsdag' og 'i ar'. Ikke bruk dagens kalenderdato hvis den ikke er samme dato som meldingen.
 - Oppgi alltid YoY-endring nar tilgjengelig (f.eks. 'opp fra 150 mill. i samme kvartal i fjor').
 - Regn ut totalbelop nar kilden oppgir antall og kurs separat.
 - Foretrekk konkrete verb fremfor abstrakte substantiv.
@@ -69,6 +75,7 @@ export const EDITORIAL_ATTRIBUTION = `ATTRIBUSJON OG FORBEHOLD
 - Formuleringer som 'milepael', 'styrker posisjon', 'betydelig' ma attribueres til kilden eller utelates.
 - Foretrekk noktern formulering fremfor overdrivende ordvalg.
 - Subjektive vurderinger skal aldri sta som objektivt faktum.
+- Hvis kilden omtaler kritikk, anklager, gransking, soksmal eller mulig straffbart forhold, og kilden ogsa inneholder tilsvar, avvisning eller at noen bestrider forholdet, skal tilsvaret med i lead/body.
 - Ikke adopter selskapets framing av egne nyheter. Nar et selskap toner ned, normaliserer eller fortolker en negativ hendelse (avslag, tap, forsinkelse, sokmalsmal), er det selskapets vurdering — ikke var. Gjengi slike karakteriseringer med «» og tydelig attribusjon. Eksempel: Selskapet skriver at slike avslag «ikke er uvanlige» for ny medisinsk teknologi — IKKE: Selskapet understreker at slike avslag ikke er uvanlige. Bruk noytrale rapporteringsverb ('skriver', 'sier', 'opplyser') fremfor verb som forsterker selskapets posisjon ('understreker', 'fremhever', 'paapeker', 'vektlegger').`;
 
 export const EDITORIAL_QUOTES = `SITATER OG PARAFRASERING

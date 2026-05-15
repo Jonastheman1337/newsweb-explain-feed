@@ -12,6 +12,7 @@ export type StyleSanitizationStats = {
   replacedFiscalYearAbbrev: number;
   expandedMarketCodes: number;
   removedAsaSuffix: number;
+  replacedPercentSigns: number;
 };
 
 export type StyleSanitizationResult = {
@@ -50,6 +51,11 @@ function sanitizeText(text: string, stats: StyleSanitizationStats): string {
     return "";
   });
 
+  result = result.replace(/\s*%/g, () => {
+    stats.replacedPercentSigns += 1;
+    return " prosent";
+  });
+
   result = result.replace(/\s+([,.;:!?])/g, "$1");
   result = result.replace(/\s{2,}/g, " ");
   result = result.replace(/\(\s+/g, "(");
@@ -84,7 +90,8 @@ export function sanitizeRewriteStyle(rewrite: RewriteOutput): StyleSanitizationR
     removedRegisteredMarks: 0,
     replacedFiscalYearAbbrev: 0,
     expandedMarketCodes: 0,
-    removedAsaSuffix: 0
+    removedAsaSuffix: 0,
+    replacedPercentSigns: 0
   };
 
   const sanitized: RewriteOutput = {
@@ -103,7 +110,8 @@ export function sanitizeRewriteStyle(rewrite: RewriteOutput): StyleSanitizationR
     stats.removedRegisteredMarks > 0 ||
     stats.replacedFiscalYearAbbrev > 0 ||
     stats.expandedMarketCodes > 0 ||
-    stats.removedAsaSuffix > 0;
+    stats.removedAsaSuffix > 0 ||
+    stats.replacedPercentSigns > 0;
 
   return {
     rewrite: sanitized,

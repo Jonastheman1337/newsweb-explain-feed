@@ -2,6 +2,7 @@ import type { PromptPayload } from "@newsweb/prompt-kit";
 import type { RewriteOutput } from "@newsweb/shared";
 import { describe, expect, it } from "vitest";
 import {
+  countVisibleArticleChars,
   countWords,
   countSentences,
   countSummarySentences,
@@ -73,6 +74,17 @@ describe("countSummarySentences", () => {
   });
 });
 
+describe("countVisibleArticleChars", () => {
+  it("counts lead and body but not title or metadata", () => {
+    const rewrite = createRewrite({
+      title: "Dette telles ikke",
+      lead: "Lead",
+      body: ["Body"]
+    });
+    expect(countVisibleArticleChars(rewrite)).toBe("Lead\n\nBody".length);
+  });
+});
+
 describe("validateRewriteOutput", () => {
   it("allows up to two unexpected number tokens", () => {
     const payload = createPayload();
@@ -104,6 +116,26 @@ describe("validateRewriteOutput", () => {
     expect(result.valid).toBe(false);
     expect(result.errors.some((error) => error.startsWith("Unexpected numbers:"))).toBe(
       true
+    );
+  });
+
+  it("uses PDF supplement text when validating numbers", () => {
+    const payload = createPayload({
+      pdfSupplementText:
+        "The selected report page shows revenue of 303 and operating profit of 404."
+    });
+    const rewrite = createRewrite({
+      lead: "Selskapet la frem kvartalstall med nye detaljer.",
+      body: [
+        "Omsetningen i kvartalet var 303.",
+        "Driftsresultatet i perioden var 404.",
+        "Meldingen oppgir ingen ny guiding."
+      ]
+    });
+
+    const result = validateRewriteOutput(rewrite, payload);
+    expect(result.errors.some((error) => error.startsWith("Unexpected numbers:"))).toBe(
+      false
     );
   });
 
@@ -147,5 +179,82 @@ describe("validateRewriteOutput", () => {
     const result = validateRewriteOutput(rewrite, payload);
     expect(result.valid).toBe(false);
     expect(result.errors).toContain("Title exceeds 8 words.");
+  });
+
+  it("fails when visible article text uses percent signs", () => {
+    const payload = createPayload();
+    const rewrite = createRewrite({
+      lead: "Selskapet la frem kvartalstall.",
+      body: ["Omsetningen steg 10% i kvartalet."]
+    });
+
+    const result = validateRewriteOutput(rewrite, payload);
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain(
+      "Visible article text uses %, write prosent instead."
+    );
+  });
+
+  it("fails when visible article text exceeds the 1000 character cap", () => {
+    const payload = createPayload();
+    const rewrite = createRewrite({
+      lead: "Selskapet la frem kvartalstall.",
+      body: ["A".repeat(980)]
+    });
+
+    const result = validateRewriteOutput(rewrite, payload);
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain("Visible article text exceeds 1000 chars.");
+  });
+
+  it("flags currency markers that are not present in the source", () => {
+    const payload = createPayload({
+      bodyText:
+        "Selskapet melder at inntektene var 10 millioner dollar i kvartalet."
+    });
+    const rewrite = createRewrite({
+      lead: "Selskapet melder om inntekter pa 10 millioner kroner.",
+      body: ["Meldingen oppgir ikke andre tall."]
+    });
+
+    const result = validateRewriteOutput(rewrite, payload);
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain(
+      "Visible article text uses currency not present in source: NOK/kroner."
+    );
+  });
+
+  it("flags missing right of reply when the source includes accusations and denial", () => {
+    const payload = createPayload({
+      bodyText:
+        "Selskapet opplyser at en tidligere leder er anklaget for regnskapsbrudd. Den tidligere lederen avviser anklagene og sier seg uenig i fremstillingen."
+    });
+    const rewrite = createRewrite({
+      lead: "En tidligere leder er anklaget for regnskapsbrudd.",
+      body: ["Saken omtales i en borsmelding fra selskapet."]
+    });
+
+    const result = validateRewriteOutput(rewrite, payload);
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain(
+      "Source contains criticism/accusation and a reply, but reply is missing from visible article text."
+    );
+  });
+
+  it("flags likely revenue/result terminology mixups", () => {
+    const payload = createPayload({
+      bodyText:
+        "Selskapet melder at inntektene var 100 millioner kroner i kvartalet. Omsetningen var stabil sammenlignet med samme periode i fjor."
+    });
+    const rewrite = createRewrite({
+      lead: "Selskapet melder at resultatet var 100 millioner kroner.",
+      body: ["Meldingen omtaler ikke andre tall."]
+    });
+
+    const result = validateRewriteOutput(rewrite, payload);
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain(
+      "Source only appears to mention revenue/income, but visible article text uses result/profit/loss terminology."
+    );
   });
 });

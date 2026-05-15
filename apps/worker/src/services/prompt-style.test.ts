@@ -40,4 +40,18 @@ describe("prompt style guidance", () => {
     expect(developerPrompt).toContain("Guillemets");
     expect(userPrompt).toContain("Hvis kilden har direkte sitater");
   });
+
+  it("includes E24-style market-moving and factuality guardrails", () => {
+    const developerPrompt = createDeveloperPrompt("{}");
+
+    expect(developerPrompt).toContain("kursdrivende");
+    expect(developerPrompt).toContain("vinkles pa det negative");
+    expect(developerPrompt).toContain("Skriv 'prosent', ikke '%'");
+    expect(developerPrompt).toContain(
+      "Ikke bland regnskapsbegrepene inntekter/omsetning og resultat"
+    );
+    expect(developerPrompt).toContain("Ikke regn om valuta");
+    expect(developerPrompt).toContain("tilsvaret med i lead/body");
+    expect(developerPrompt).toContain("Bruk publiseringstidspunktet");
+  });
 });

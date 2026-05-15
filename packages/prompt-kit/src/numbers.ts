@@ -1,6 +1,6 @@
 import type { RewriteOutput } from "@newsweb/shared";
 
-const numberTokenRegex = /-?\d[\d\s.,:%/-]*/g;
+const numberTokenRegex = /-?\d[\d\s.,:%/-]*(?:\s*(?:prosent|percent))?/gi;
 
 function sanitizeNumberToken(token: string): string {
   const trimmed = token.trim();
@@ -81,8 +81,9 @@ function parseNumberToken(
 
   const negative = sanitized.startsWith("-");
   const unsigned = negative ? sanitized.slice(1) : sanitized;
-  const hasPercent = unsigned.endsWith("%");
-  const core = hasPercent ? unsigned.slice(0, -1) : unsigned;
+  const hasPercent =
+    unsigned.endsWith("%") || /\b(?:prosent|percent)\b/i.test(token);
+  const core = unsigned.endsWith("%") ? unsigned.slice(0, -1) : unsigned;
 
   if (!/\d/.test(core)) {
     return null;

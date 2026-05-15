@@ -7,7 +7,7 @@ function createRewrite(overrides?: Partial<RewriteOutput>): RewriteOutput {
     title: "Norsk Titanium ASA pa XHEL FY25",
     lead: "Norsk Titanium ASA melder at selskapet i FY25 starter leveranser pa XSTO og XCSE.",
     body: [
-      "Selskapet skriver at teknologien® kutter kostnader i FY25.",
+      "Selskapet skriver at teknologien® kutter kostnader 10% i FY25.",
       "Noteringen pa XHEL, XSTO og XCSE omtales som viktig av selskapet.",
       "Norsk Titanium ASA viser til planer for videre vekst i FY25."
     ],
@@ -36,6 +36,8 @@ describe("sanitizeRewriteStyle", () => {
     expect(result.rewrite.lead).not.toContain("XSTO");
     expect(result.rewrite.lead).not.toContain("XCSE");
     expect(result.rewrite.body.join(" ")).not.toContain("®");
+    expect(result.rewrite.body.join(" ")).not.toContain("%");
+    expect(result.rewrite.body.join(" ")).toContain("10 prosent");
 
     expect(result.rewrite.title).toContain("regnskapsaret 2025");
     expect(result.rewrite.lead).toContain("Stockholm-borsen");
@@ -46,6 +48,7 @@ describe("sanitizeRewriteStyle", () => {
     expect(result.stats.expandedMarketCodes).toBeGreaterThan(0);
     expect(result.stats.removedAsaSuffix).toBeGreaterThan(0);
     expect(result.stats.removedRegisteredMarks).toBeGreaterThan(0);
+    expect(result.stats.replacedPercentSigns).toBeGreaterThan(0);
   });
 
   it("keeps schema-safe minimum lengths", () => {

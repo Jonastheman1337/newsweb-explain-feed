@@ -14,7 +14,7 @@ import {
   EDITORIAL_WRITING_STYLE
 } from "./shared-editorial.js";
 
-export const PROMPT_VERSION = "v5.0.0";
+export const PROMPT_VERSION = "v5.1.0";
 
 export type PromptPayload = {
   messageId: number;

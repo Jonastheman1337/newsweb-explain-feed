@@ -59,8 +59,8 @@ const sampleYearlyPayload: YearlyReportPromptPayload = {
 };
 
 describe("OpenAI prompt contract", () => {
-  it("bumps the prompt version for the Responses structured-output migration", () => {
-    expect(PROMPT_VERSION).toBe("v5.0.0");
+  it("bumps the prompt version for the editorial guardrail update", () => {
+    expect(PROMPT_VERSION).toBe("v5.1.0");
   });
 
   it("does not embed the JSON schema in the developer prompt", () => {

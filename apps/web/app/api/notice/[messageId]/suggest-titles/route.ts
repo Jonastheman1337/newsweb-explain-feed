@@ -60,13 +60,24 @@ const titleSuggestionsJsonSchema = {
   required: ["titles"]
 } as const;
 
+const MAX_TITLE_WORDS = 8;
+
+function countTitleWords(title: string): number {
+  return title.trim().split(/\s+/).filter(Boolean).length;
+}
+
+function normalizeTitleSuggestion(title: string): string {
+  return title.replace(/\s*%/g, " prosent").replace(/\s{2,}/g, " ").trim();
+}
+
 function parseTitleSuggestions(raw: string): string[] {
   const parsed = JSON.parse(raw) as { titles?: unknown };
   if (!Array.isArray(parsed.titles)) return [];
   return parsed.titles
     .filter((item): item is string => typeof item === "string")
-    .map((item) => item.trim())
+    .map((item) => normalizeTitleSuggestion(item))
     .filter(Boolean)
+    .filter((item) => countTitleWords(item) <= MAX_TITLE_WORDS)
     .slice(0, 5);
 }
 
@@ -140,9 +151,13 @@ export async function POST(
     "Regler:",
     "- Maks 8 ord per tittel.",
     "- Kort, stram og slagkraftig.",
+    "- Velg det mest kursdrivende nyhetspoenget.",
+    "- Hvis saken har en tydelig negativ opplysning, lag minst ett forslag som vinkler pa den.",
+    "- Ikke beskriv tall med subjektive ord som 'stort', 'lite', 'betydelig' eller 'kraftig'.",
     "- Bruk selskapsnavn, ikke ticker-koder.",
     "- Hvert forslag skal ha en ulik vinkling eller fokus.",
     "- Skriv ut 'millioner' og 'milliarder' med mindre tittelen blir for lang.",
+    "- Skriv 'prosent', ikke '%'.",
     "- Norsk bokmål med korrekte tegn (æ, ø, å).",
     "- Returner fem titler i det strukturerte skjemaet."
   ].join("\n");
@@ -177,7 +192,7 @@ export async function POST(
         status: "started",
         inputJson: toJsonValue(requestPayload),
         model: OPENAI_FAST_MODEL,
-        promptVersion: "title-suggestions-v2",
+        promptVersion: "title-suggestions-v3",
         promptChars: prompt.length,
         startedAt: new Date()
       }
