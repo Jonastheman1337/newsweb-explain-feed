@@ -71,6 +71,10 @@ import {
   type OpenAIFileInput,
   type OpenAIReasoningEffort
 } from "./services/openai-responses.js";
+import {
+  latestBootstrapRewriteJobId,
+  shouldQueueLatestBootstrapRewrite
+} from "./services/latest-bootstrap.js";
 import { sanitizeRewriteStyle } from "./services/style-sanitizer.js";
 
 const NEWSWEB_LIST_URL = "https://api3.oslo.oslobors.no/v1/newsreader/list";
@@ -298,12 +302,13 @@ async function enqueueLatestNotices(count: number): Promise<{
       });
       feedItemsEnsured += 1;
 
-      // Already ingested — check if it has a rewrite; if so, skip
-      const existingRewrite = await prisma.rewrite.findFirst({
+      // Already ingested - retry only notices that have no usable rewrite.
+      const existingRewrites = await prisma.rewrite.findMany({
         where: { messageId: item.messageId },
-        select: { status: true }
+        orderBy: { generatedAt: "desc" },
+        select: { status: true, version: true, generatedAt: true }
       });
-      if (existingRewrite) {
+      if (!shouldQueueLatestBootstrapRewrite(existingRewrites)) {
         continue;
       }
       await rewriteQueue.add(
@@ -313,7 +318,7 @@ async function enqueueLatestNotices(count: number): Promise<{
           reason: "new-message"
         },
         {
-          jobId: `rewrite-latest-${item.messageId}`,
+          jobId: latestBootstrapRewriteJobId(item.messageId, existingRewrites),
           attempts: 3,
           backoff: {
             type: "exponential",
@@ -405,6 +410,23 @@ function extractRewriteErrorText(rewriteJson: Prisma.InputJsonValue): string | n
     return typeof message === "string" ? message : null;
   }
   return null;
+}
+
+function logFinalRewriteFailure(
+  messageId: number,
+  errorCode: string,
+  errorText: string
+): void {
+  console.error(
+    JSON.stringify({
+      service: "worker",
+      queue: QUEUE_NAMES.rewrite,
+      event: "final_failed",
+      messageId,
+      errorCode,
+      error: errorText
+    })
+  );
 }
 
 function generationInputJson(
@@ -1281,7 +1303,7 @@ async function processReportRewrite(
           promptChars
         } as Prisma.InputJsonValue
       });
-      throw new Error(`report rewrite pipeline failed for ${messageId}`);
+      throw new Error(`report rewrite pipeline failed for ${messageId}: ${errorText}`);
     }
 
     await upsertRewrite({
@@ -1307,6 +1329,7 @@ async function processReportRewrite(
         promptChars
       } as Prisma.InputJsonValue
     });
+    logFinalRewriteFailure(messageId, "REPORT_REWRITE_FAILED_FINAL", errorText);
   }
 }
 
@@ -1571,7 +1594,9 @@ async function processYearlyReportRewrite(
           promptChars
         } as Prisma.InputJsonValue
       });
-      throw new Error(`yearly report rewrite pipeline failed for ${messageId}`);
+      throw new Error(
+        `yearly report rewrite pipeline failed for ${messageId}: ${errorText}`
+      );
     }
 
     await upsertRewrite({
@@ -1597,6 +1622,11 @@ async function processYearlyReportRewrite(
         promptChars
       } as Prisma.InputJsonValue
     });
+    logFinalRewriteFailure(
+      messageId,
+      "YEARLY_REPORT_REWRITE_FAILED_FINAL",
+      errorText
+    );
   }
 }
 
@@ -2395,7 +2425,7 @@ const rewriteWorker = new Worker<RewriteJobData>(
               }
             } as Prisma.InputJsonValue
           });
-          throw new Error(`rewrite pipeline failed for ${messageId}`);
+          throw new Error(`rewrite pipeline failed for ${messageId}: ${errorText}`);
         }
 
         await upsertRewrite({
@@ -2429,6 +2459,7 @@ const rewriteWorker = new Worker<RewriteJobData>(
             }
           } as Prisma.InputJsonValue
         });
+        logFinalRewriteFailure(messageId, "REWRITE_FAILED_FINAL", errorText);
       }
     });
   },
