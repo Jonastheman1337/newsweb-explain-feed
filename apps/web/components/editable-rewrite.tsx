@@ -1,12 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useEditorialTelemetry } from "../lib/editorial-telemetry";
 import { useTitleSuggestions } from "./title-suggestions";
 
 type EditableRewriteProps = {
   messageId: number;
   originalTitle: string;
   originalBody: string;
+  activeVersion?: number;
   dateline?: ReactNode;
   children?: ReactNode;
   extraActions?: ReactNode;
@@ -18,6 +20,7 @@ export function EditableRewrite({
   messageId,
   originalTitle,
   originalBody,
+  activeVersion,
   dateline,
   children,
   extraActions,
@@ -29,6 +32,7 @@ export function EditableRewrite({
   const [copied, setCopied] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const titleRef = useRef<HTMLHeadingElement>(null);
+  const { buildTelemetry } = useEditorialTelemetry(messageId, activeVersion);
 
   // Reset when the AI output changes (e.g. after regeneration)
   useEffect(() => {
@@ -72,7 +76,10 @@ export function EditableRewrite({
         originalBody,
         editedTitle,
         editedBody,
-        hasEdits
+        hasEdits,
+        telemetry: buildTelemetry({
+          actionSource: "editable_rewrite"
+        })
       })
     }).catch(() => {
       // Logging failure is silent — copy must feel instant
@@ -81,6 +88,7 @@ export function EditableRewrite({
 
   const titleSuggestions = useTitleSuggestions({
     messageId,
+    activeVersion,
     currentTitle: editedTitle,
     onPreview(title) {
       if (titleRef.current) titleRef.current.textContent = title;

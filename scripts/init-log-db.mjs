@@ -73,7 +73,14 @@ try {
       "id" TEXT NOT NULL,
       "message_id" INTEGER,
       "version" INTEGER,
+      "client_event_id" TEXT,
+      "editor_id_hash" TEXT,
+      "session_id_hash" TEXT,
+      "rewrite_id" TEXT,
+      "prompt_version" TEXT,
+      "model" TEXT,
       "action" TEXT NOT NULL,
+      "action_source" TEXT,
       "payload_json" JSONB,
       "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
       CONSTRAINT "user_action_events_pkey" PRIMARY KEY ("id")
@@ -88,6 +95,37 @@ try {
   await prisma.$executeRawUnsafe(`
     CREATE INDEX IF NOT EXISTS "user_action_events_action_created_at_idx"
       ON "user_action_events"("action", "created_at" DESC);
+  `);
+
+  await prisma.$executeRawUnsafe(`
+    ALTER TABLE "user_action_events"
+      ADD COLUMN IF NOT EXISTS "client_event_id" TEXT,
+      ADD COLUMN IF NOT EXISTS "editor_id_hash" TEXT,
+      ADD COLUMN IF NOT EXISTS "session_id_hash" TEXT,
+      ADD COLUMN IF NOT EXISTS "rewrite_id" TEXT,
+      ADD COLUMN IF NOT EXISTS "prompt_version" TEXT,
+      ADD COLUMN IF NOT EXISTS "model" TEXT,
+      ADD COLUMN IF NOT EXISTS "action_source" TEXT;
+  `);
+
+  await prisma.$executeRawUnsafe(`
+    CREATE INDEX IF NOT EXISTS "user_action_events_client_event_id_idx"
+      ON "user_action_events"("client_event_id");
+  `);
+
+  await prisma.$executeRawUnsafe(`
+    CREATE INDEX IF NOT EXISTS "user_action_events_editor_id_hash_created_at_idx"
+      ON "user_action_events"("editor_id_hash", "created_at" DESC);
+  `);
+
+  await prisma.$executeRawUnsafe(`
+    CREATE INDEX IF NOT EXISTS "user_action_events_session_id_hash_created_at_idx"
+      ON "user_action_events"("session_id_hash", "created_at" DESC);
+  `);
+
+  await prisma.$executeRawUnsafe(`
+    CREATE INDEX IF NOT EXISTS "user_action_events_rewrite_id_created_at_idx"
+      ON "user_action_events"("rewrite_id", "created_at" DESC);
   `);
 
   console.log("[log-db] generation_runs and user_action_events tables ready.");

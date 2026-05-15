@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useEditorialTelemetry } from "../lib/editorial-telemetry";
 import { E24Loader } from "./e24-loader";
 
 const BASE_STEPS = [
@@ -53,6 +54,7 @@ export function GenerateButton({ messageId, label, hasAttachments }: GenerateBut
   const [progressStep, setProgressStep] = useState(0);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const progressRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const { buildTelemetry } = useEditorialTelemetry(messageId);
 
   const stopPolling = useCallback(() => {
     if (pollRef.current) {
@@ -133,7 +135,11 @@ export function GenerateButton({ messageId, label, hasAttachments }: GenerateBut
 
       const response = await fetch(`/api/notice/${messageId}/generate`, {
         method: "POST",
-        credentials: "include"
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          telemetry: buildTelemetry({ actionSource: "generate_button" })
+        })
       });
 
       if (!response.ok) {

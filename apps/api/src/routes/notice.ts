@@ -4,9 +4,15 @@ import {
   rewriteOutputSchema
 } from "@newsweb/shared";
 import { logPrisma, prisma } from "@newsweb/shared/db";
-import type { FastifyBaseLogger, FastifyPluginAsync } from "fastify";
+import type { FastifyPluginAsync } from "fastify";
 import type { Prisma } from "@prisma/client";
 import { z } from "zod";
+import {
+  editorialTelemetrySchema,
+  passiveEditorialActionSchema,
+  toJsonValue,
+  tryCreateUserActionEvent
+} from "../services/editorial-telemetry.js";
 
 const paramsSchema = z.object({
   messageId: z.coerce.number().int().positive()
@@ -18,7 +24,8 @@ const statusQuerySchema = z.object({
 
 const generateBodySchema = z
   .object({
-    instruction: z.string().max(2000).optional()
+    instruction: z.string().max(2000).optional(),
+    telemetry: editorialTelemetrySchema
   })
   .optional();
 
@@ -32,36 +39,6 @@ const RUNNING_JOB_STATES = new Set([
 
 function isJobStillRunning(jobState: string | null): boolean {
   return jobState ? RUNNING_JOB_STATES.has(jobState) : false;
-}
-
-function toJsonValue(value: unknown): Prisma.InputJsonValue {
-  return JSON.parse(JSON.stringify(value ?? null)) as Prisma.InputJsonValue;
-}
-
-async function logUserAction(
-  logger: FastifyBaseLogger,
-  args: {
-    messageId: number;
-    version?: number | null;
-    action: string;
-    payload?: unknown;
-  }
-): Promise<void> {
-  try {
-    await logPrisma.userActionEvent.create({
-      data: {
-        messageId: args.messageId,
-        version: args.version ?? null,
-        action: args.action,
-        payloadJson: toJsonValue(args.payload ?? {})
-      }
-    });
-  } catch (error) {
-    logger.error(
-      { err: error, action: args.action, messageId: args.messageId },
-      "Failed to write user action event"
-    );
-  }
 }
 
 async function nextRewriteContext(messageId: number): Promise<{
@@ -142,7 +119,7 @@ export const noticeRoutes: FastifyPluginAsync = async (fastify) => {
         });
       }
 
-      // Failed rewrite with no published version → 404
+      // Failed rewrite with no published version -> keep source visible and retryable.
       if (
         latestRewrite.status === "failed" &&
         !notice.rewrites.some((r) => r.status === "published")
@@ -263,12 +240,42 @@ export const noticeRoutes: FastifyPluginAsync = async (fastify) => {
     }
   );
 
+  const eventBodySchema = z.object({
+    action: passiveEditorialActionSchema,
+    telemetry: editorialTelemetrySchema,
+    payload: z.unknown().optional()
+  });
+
+  fastify.post(
+    "/notice/:messageId/event",
+    {
+      preHandler: fastify.authenticate
+    },
+    async (request, reply) => {
+      const { messageId } = paramsSchema.parse(request.params);
+      const body = eventBodySchema.parse(request.body ?? {});
+
+      const event = await tryCreateUserActionEvent({
+        logger: request.log,
+        sessionSecret: fastify.config.SESSION_SECRET,
+        messageId,
+        action: body.action,
+        telemetry: body.telemetry,
+        actionSource: body.telemetry?.actionSource ?? "notice_page",
+        payload: body.payload ?? {}
+      });
+
+      return reply.send({ ok: true, eventId: event.id });
+    }
+  );
+
   const editLogBodySchema = z.object({
     originalTitle: z.string(),
     originalBody: z.string(),
     editedTitle: z.string(),
     editedBody: z.string(),
-    hasEdits: z.boolean()
+    hasEdits: z.boolean(),
+    telemetry: editorialTelemetrySchema
   });
 
   fastify.post(
@@ -279,10 +286,27 @@ export const noticeRoutes: FastifyPluginAsync = async (fastify) => {
     async (request, reply) => {
       const { messageId } = paramsSchema.parse(request.params);
       const body = editLogBodySchema.parse(request.body);
+      const action = body.hasEdits ? "copy_text_with_edits" : "copy_text";
+      const event = await tryCreateUserActionEvent({
+        logger: request.log,
+        sessionSecret: fastify.config.SESSION_SECRET,
+        messageId,
+        action,
+        telemetry: body.telemetry,
+        actionSource: body.telemetry?.actionSource ?? "editable_rewrite",
+        payload: {
+          originalTitle: body.originalTitle,
+          originalBody: body.originalBody,
+          editedTitle: body.editedTitle,
+          editedBody: body.editedBody,
+          hasEdits: body.hasEdits
+        }
+      });
 
       try {
         await prisma.editLog.create({
           data: {
+            eventId: event.id,
             messageId,
             originalTitle: body.originalTitle,
             originalBody: body.originalBody,
@@ -298,19 +322,14 @@ export const noticeRoutes: FastifyPluginAsync = async (fastify) => {
         );
       }
 
-      await logUserAction(request.log, {
-        messageId,
-        action: body.hasEdits ? "copy_text_with_edits" : "copy_text",
-        payload: body
-      });
-
       return reply.send({ ok: true });
     }
   );
 
   const feedbackBodySchema = z.object({
     text: z.string().min(1).max(2000),
-    version: z.number().int().positive().optional()
+    version: z.number().int().positive().optional(),
+    telemetry: editorialTelemetrySchema
   });
 
   fastify.post(
@@ -321,20 +340,27 @@ export const noticeRoutes: FastifyPluginAsync = async (fastify) => {
     async (request, reply) => {
       const { messageId } = paramsSchema.parse(request.params);
       const body = feedbackBodySchema.parse(request.body);
+      const event = await tryCreateUserActionEvent({
+        logger: request.log,
+        sessionSecret: fastify.config.SESSION_SECRET,
+        messageId,
+        version: body.version ?? null,
+        action: "feedback_submit",
+        telemetry: body.telemetry,
+        actionSource: body.telemetry?.actionSource ?? "instruction_input",
+        payload: {
+          text: body.text,
+          version: body.version ?? null
+        }
+      });
 
       await prisma.feedback.create({
         data: {
+          eventId: event.id,
           messageId,
           version: body.version ?? null,
           text: body.text
         }
-      });
-
-      await logUserAction(request.log, {
-        messageId,
-        version: body.version ?? null,
-        action: "feedback_submit",
-        payload: body
       });
 
       return reply.send({ ok: true });
@@ -345,13 +371,16 @@ export const noticeRoutes: FastifyPluginAsync = async (fastify) => {
     currentTitle: z.string(),
     suggestions: z.array(z.string()),
     selectedTitle: z.string().nullable().optional(),
+    selectedIndex: z.number().int().nonnegative().nullable().optional(),
+    selectedWasOriginal: z.boolean().optional(),
     action: z
       .enum([
         "title_suggestion_request",
         "title_suggestion_refresh",
         "title_suggestion_select"
       ])
-      .optional()
+      .optional(),
+    telemetry: editorialTelemetrySchema
   });
 
   fastify.post(
@@ -362,14 +391,38 @@ export const noticeRoutes: FastifyPluginAsync = async (fastify) => {
     async (request, reply) => {
       const { messageId } = paramsSchema.parse(request.params);
       const body = titleSuggestionLogSchema.parse(request.body);
+      const action =
+        body.action ??
+        (body.selectedTitle
+          ? "title_suggestion_select"
+          : "title_suggestion_request");
+      const event = await tryCreateUserActionEvent({
+        logger: request.log,
+        sessionSecret: fastify.config.SESSION_SECRET,
+        messageId,
+        action,
+        telemetry: body.telemetry,
+        actionSource: body.telemetry?.actionSource ?? "title_suggestions",
+        payload: {
+          currentTitle: body.currentTitle,
+          suggestions: body.suggestions,
+          selectedTitle: body.selectedTitle ?? null,
+          selectedIndex: body.selectedIndex ?? null,
+          selectedWasOriginal: body.selectedWasOriginal ?? false
+        }
+      });
 
       try {
         await prisma.titleSuggestionLog.create({
           data: {
+            eventId: event.id,
             messageId,
             currentTitle: body.currentTitle,
             suggestions: body.suggestions,
-            selectedTitle: body.selectedTitle ?? null
+            selectedTitle: body.selectedTitle ?? null,
+            action,
+            selectedIndex: body.selectedIndex ?? null,
+            selectedWasOriginal: body.selectedWasOriginal ?? false
           }
         });
       } catch (error) {
@@ -378,16 +431,6 @@ export const noticeRoutes: FastifyPluginAsync = async (fastify) => {
           "Failed to write title suggestion log"
         );
       }
-
-      await logUserAction(request.log, {
-        messageId,
-        action:
-          body.action ??
-          (body.selectedTitle
-            ? "title_suggestion_select"
-            : "title_suggestion_request"),
-        payload: body
-      });
 
       return reply.send({ ok: true });
     }
@@ -473,12 +516,17 @@ export const noticeRoutes: FastifyPluginAsync = async (fastify) => {
         }
       });
 
-      await logUserAction(request.log, {
+      await tryCreateUserActionEvent({
+        logger: request.log,
+        sessionSecret: fastify.config.SESSION_SECRET,
         messageId,
-        version: targetVersion,
+        version: body?.telemetry?.version ?? null,
         action: "regenerate_request",
+        telemetry: body?.telemetry,
+        actionSource: body?.telemetry?.actionSource ?? "instruction_input",
         payload: {
           instruction: instruction ?? null,
+          targetVersion,
           generationRunId: generationRun.id,
           jobId: job.id ?? null
         }

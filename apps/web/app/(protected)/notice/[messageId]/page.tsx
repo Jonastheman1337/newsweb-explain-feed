@@ -7,6 +7,10 @@ import { ProcessingIndicator } from "../../../../components/processing-indicator
 import { RewriteTabs } from "../../../../components/rewrite-tabs";
 import { InstructionInput } from "../../../../components/instruction-input";
 import { SourceBodyText } from "../../../../components/source-body-text";
+import {
+  NoticeTelemetry,
+  SourceLink
+} from "../../../../components/notice-telemetry";
 import { getSessionToken } from "../../../../lib/session";
 
 type NoticePageProps = {
@@ -40,18 +44,39 @@ export default async function NoticePage({ params }: NoticePageProps) {
   const isProcessing = "processing" in notice && notice.processing === true;
   const isSkipped = "skipped" in notice && notice.skipped === true;
   const isFailed = "failed" in notice && notice.failed === true;
+  const activeVersion =
+    "rewrites" in notice && notice.rewrites?.length
+      ? notice.rewrites[notice.rewrites.length - 1]?.version
+      : undefined;
+  const sourceUrl = `https://newsweb.oslobors.no/message/${notice.source.messageId}`;
+  const telemetryState = isProcessing
+    ? "processing"
+    : isSkipped
+      ? "skipped"
+      : isFailed
+        ? "failed"
+        : "published";
 
   const dateline = (
     <p key="dateline" className="muted">
-      <a href={`https://newsweb.oslobors.no/message/${notice.source.messageId}`} target="_blank" rel="noopener noreferrer">
+      <SourceLink
+        messageId={notice.source.messageId}
+        activeVersion={activeVersion}
+        href={sourceUrl}
+      >
         {notice.source.issuerName} ({notice.source.issuerSign}) |{" "}
         {formatOsloTime(notice.source.publishedAt)}
-      </a>
+      </SourceLink>
     </p>
   );
 
   return (
     <section>
+      <NoticeTelemetry
+        messageId={notice.source.messageId}
+        activeVersion={activeVersion}
+        state={telemetryState}
+      />
       <Link href="/feed" className="muted" title="Tilbake til feed">
         ←
       </Link>
@@ -78,7 +103,7 @@ export default async function NoticePage({ params }: NoticePageProps) {
             <h2>{notice.source.title}</h2>
             {dateline}
             <p>AI-notisen kunne ikke genereres automatisk.</p>
-            <GenerateButton messageId={notice.source.messageId} hasAttachments={notice.source.hasAttachments} />
+            <GenerateButton messageId={notice.source.messageId} label="Prøv igjen" hasAttachments={notice.source.hasAttachments} />
           </>
         ) : (
           (() => {
@@ -104,12 +129,13 @@ export default async function NoticePage({ params }: NoticePageProps) {
                       messageId={notice.source.messageId}
                       originalTitle={rewrite.title}
                       originalBody={[rewrite.lead, ...rewrite.body].filter(Boolean).join("\n\n")}
+                      activeVersion={activeVersion}
                       dateline={dateline}
                       panelTitle="AI-generert notis"
                     />
                     <InstructionInput
                       messageId={notice.source.messageId}
-                      activeVersion={rewrites?.[0]?.version}
+                      activeVersion={activeVersion}
                       hasAttachments={notice.source.hasAttachments}
                     />
                   </>
@@ -124,20 +150,24 @@ export default async function NoticePage({ params }: NoticePageProps) {
         <p className="noticePanelTitle">Original børsmelding</p>
         <h2>{notice.source.title}</h2>
         <p className="muted">
-          <a href={`https://newsweb.oslobors.no/message/${notice.source.messageId}`} target="_blank" rel="noopener noreferrer">
+          <SourceLink
+            messageId={notice.source.messageId}
+            activeVersion={activeVersion}
+            href={sourceUrl}
+          >
             {notice.source.issuerName} ({notice.source.issuerSign}) |{" "}
             {formatOsloTime(notice.source.publishedAt)}
-          </a>
+          </SourceLink>
         </p>
         <SourceBodyText text={notice.source.bodyText} />
-        <a
-          href={`https://newsweb.oslobors.no/message/${notice.source.messageId}`}
-          target="_blank"
-          rel="noopener noreferrer"
+        <SourceLink
+          messageId={notice.source.messageId}
+          activeVersion={activeVersion}
+          href={sourceUrl}
           className="muted"
         >
           Se børsmeldingen på Newsweb
-        </a>
+        </SourceLink>
       </article>
       </div>
     </section>

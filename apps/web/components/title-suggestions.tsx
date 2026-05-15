@@ -1,9 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useEditorialTelemetry } from "../lib/editorial-telemetry";
 
 type TitleSuggestionsProps = {
   messageId: number;
+  activeVersion?: number;
   currentTitle: string;
   onPreview: (title: string) => void;
   onRevert: () => void;
@@ -12,6 +14,7 @@ type TitleSuggestionsProps = {
 
 export function useTitleSuggestions({
   messageId,
+  activeVersion,
   currentTitle,
   onPreview,
   onRevert,
@@ -23,6 +26,7 @@ export function useTitleSuggestions({
   const [titles, setTitles] = useState<string[]>([]);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
+  const { buildTelemetry } = useEditorialTelemetry(messageId, activeVersion);
 
   const close = useCallback(() => {
     setOpen(false);
@@ -46,7 +50,9 @@ export function useTitleSuggestions({
   function logSuggestions(
     suggestions: string[],
     action: "title_suggestion_request" | "title_suggestion_refresh" | "title_suggestion_select",
-    selectedTitle?: string | null
+    selectedTitle?: string | null,
+    selectedIndex?: number | null,
+    selectedWasOriginal = false
   ) {
     fetch(`/api/notice/${messageId}/title-suggestion-log`, {
       method: "POST",
@@ -56,7 +62,10 @@ export function useTitleSuggestions({
         currentTitle,
         suggestions,
         selectedTitle: selectedTitle ?? null,
-        action
+        selectedIndex: selectedIndex ?? null,
+        selectedWasOriginal,
+        action,
+        telemetry: buildTelemetry({ actionSource: "title_suggestions" })
       })
     }).catch(() => { /* silent */ });
   }
@@ -67,7 +76,12 @@ export function useTitleSuggestions({
     try {
       const res = await fetch(`/api/notice/${messageId}/suggest-titles`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         credentials: "include",
+        body: JSON.stringify({
+          currentTitle,
+          telemetry: buildTelemetry({ actionSource: "title_suggestions" })
+        })
       });
       if (res.ok) {
         const data = await res.json();
@@ -98,8 +112,14 @@ export function useTitleSuggestions({
     }
   }
 
-  function handleCommit(title: string) {
-    logSuggestions(titles, "title_suggestion_select", title);
+  function handleCommit(title: string, selectedIndex: number | null, selectedWasOriginal = false) {
+    logSuggestions(
+      titles,
+      "title_suggestion_select",
+      title,
+      selectedIndex,
+      selectedWasOriginal
+    );
     onCommit(title);
     setOpen(false);
   }
@@ -132,7 +152,7 @@ export function useTitleSuggestions({
         <>
           <button
             className="titleSuggestOption titleSuggestCurrent"
-            onClick={() => handleCommit(currentTitle)}
+            onClick={() => handleCommit(currentTitle, null, true)}
             onMouseEnter={() => onRevert()}
             type="button"
           >
@@ -143,7 +163,7 @@ export function useTitleSuggestions({
             <button
               key={i}
               className="titleSuggestOption"
-              onClick={() => handleCommit(title)}
+              onClick={() => handleCommit(title, i)}
               onMouseEnter={() => onPreview(title)}
               type="button"
             >

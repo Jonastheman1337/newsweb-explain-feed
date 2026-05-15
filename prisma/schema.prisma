@@ -141,20 +141,32 @@ model GenerationRun {
 }
 
 model UserActionEvent {
-  id          String   @id @default(cuid())
-  messageId   Int?     @map("message_id")
-  version     Int?
-  action      String
-  payloadJson Json?    @map("payload_json")
-  createdAt   DateTime @default(now()) @map("created_at")
+  id            String   @id @default(cuid())
+  messageId     Int?     @map("message_id")
+  version       Int?
+  clientEventId String?  @map("client_event_id")
+  editorIdHash  String?  @map("editor_id_hash")
+  sessionIdHash String?  @map("session_id_hash")
+  rewriteId     String?  @map("rewrite_id")
+  promptVersion String?  @map("prompt_version")
+  model         String?
+  action        String
+  actionSource  String?  @map("action_source")
+  payloadJson   Json?    @map("payload_json")
+  createdAt     DateTime @default(now()) @map("created_at")
 
   @@index([messageId, createdAt(sort: Desc)])
   @@index([action, createdAt(sort: Desc)])
+  @@index([clientEventId])
+  @@index([editorIdHash, createdAt(sort: Desc)])
+  @@index([sessionIdHash, createdAt(sort: Desc)])
+  @@index([rewriteId, createdAt(sort: Desc)])
   @@map("user_action_events")
 }
 
 model EditLog {
   id              String   @id @default(cuid())
+  eventId         String?  @map("event_id")
   messageId       Int      @map("message_id")
   originalTitle   String   @map("original_title")
   originalBody    String   @map("original_body") @db.Text
@@ -164,28 +176,36 @@ model EditLog {
   copiedAt        DateTime @default(now()) @map("copied_at")
 
   @@index([messageId, copiedAt(sort: Desc)])
+  @@index([eventId])
   @@map("edit_logs")
 }
 
 model Feedback {
   id        String   @id @default(cuid())
+  eventId   String?  @map("event_id")
   messageId Int      @map("message_id")
   version   Int?
   text      String   @db.Text
   createdAt DateTime @default(now()) @map("created_at")
 
   @@index([messageId, createdAt(sort: Desc)])
+  @@index([eventId])
   @@map("feedback")
 }
 
 model TitleSuggestionLog {
   id              String   @id @default(cuid())
+  eventId         String?  @map("event_id")
   messageId       Int      @map("message_id")
   currentTitle    String   @map("current_title")
   suggestions     Json     @map("suggestions")
   selectedTitle   String?  @map("selected_title")
+  action          String?
+  selectedIndex   Int?     @map("selected_index")
+  selectedWasOriginal Boolean? @map("selected_was_original")
   createdAt       DateTime @default(now()) @map("created_at")
 
   @@index([messageId, createdAt(sort: Desc)])
+  @@index([eventId])
   @@map("title_suggestion_logs")
 }

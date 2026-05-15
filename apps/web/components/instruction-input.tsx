@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { useEditorialTelemetry } from "../lib/editorial-telemetry";
 import { E24Loader } from "./e24-loader";
 
 const BASE_STEPS = [
@@ -55,6 +56,7 @@ export function InstructionInput({ messageId, activeVersion, hasAttachments }: I
   const generatedAtBeforeRef = useRef<string | null>(null);
   const isRegenRef = useRef(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const { buildTelemetry } = useEditorialTelemetry(messageId, activeVersion);
 
   const resizeTextarea = useCallback(() => {
     const ta = textareaRef.current;
@@ -153,7 +155,19 @@ export function InstructionInput({ messageId, activeVersion, hasAttachments }: I
       };
       if (instruction) {
         fetchOptions.headers = { "Content-Type": "application/json" };
-        fetchOptions.body = JSON.stringify({ instruction });
+        fetchOptions.body = JSON.stringify({
+          instruction,
+          telemetry: buildTelemetry({
+            actionSource: "instruction_input"
+          })
+        });
+      } else {
+        fetchOptions.headers = { "Content-Type": "application/json" };
+        fetchOptions.body = JSON.stringify({
+          telemetry: buildTelemetry({
+            actionSource: "instruction_input"
+          })
+        });
       }
       const response = await fetch(`/api/notice/${messageId}/generate`, fetchOptions);
 
@@ -211,7 +225,10 @@ export function InstructionInput({ messageId, activeVersion, hasAttachments }: I
         credentials: "include",
         body: JSON.stringify({
           text: text.trim(),
-          ...(activeVersion != null ? { version: activeVersion } : {})
+          ...(activeVersion != null ? { version: activeVersion } : {}),
+          telemetry: buildTelemetry({
+            actionSource: "instruction_input"
+          })
         })
       });
 

@@ -2,14 +2,14 @@ import { logPrisma, prisma } from "@newsweb/shared/db";
 import type { Prisma } from "@prisma/client";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
+import {
+  toJsonValue,
+  tryCreateUserActionEvent
+} from "../services/editorial-telemetry.js";
 
 const paramsSchema = z.object({
   messageId: z.coerce.number().int().positive()
 });
-
-function toJsonValue(value: unknown): Prisma.InputJsonValue {
-  return JSON.parse(JSON.stringify(value ?? null)) as Prisma.InputJsonValue;
-}
 
 async function nextRewriteContext(messageId: number): Promise<{
   targetVersion: number;
@@ -92,24 +92,18 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
         }
       });
 
-      try {
-        await logPrisma.userActionEvent.create({
-          data: {
-            messageId,
-            version: targetVersion,
-            action: "admin_reprocess_request",
-            payloadJson: toJsonValue({
-              generationRunId: generationRun.id,
-              jobId: job.id ?? null
-            })
-          }
-        });
-      } catch (error) {
-        request.log.error(
-          { err: error, messageId },
-          "Failed to write admin reprocess action event"
-        );
-      }
+      await tryCreateUserActionEvent({
+        logger: request.log,
+        sessionSecret: fastify.config.SESSION_SECRET,
+        messageId,
+        version: targetVersion,
+        action: "admin_reprocess_request",
+        actionSource: "admin_api",
+        payload: {
+          generationRunId: generationRun.id,
+          jobId: job.id ?? null
+        }
+      });
     } catch (error) {
       await logPrisma.generationRun.update({
         where: { id: generationRun.id },
