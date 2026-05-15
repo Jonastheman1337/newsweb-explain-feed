@@ -55,10 +55,22 @@ import {
   parseTriageResponse
 } from "./services/newsworthiness-triage.js";
 import {
+  downloadGeneralPdfAttachment,
+  downloadReportPdfAttachment,
+  downloadYearlyReportPdfAttachment,
   extractGeneralPdfContent,
   extractReportContent,
-  extractYearlyReportSections
+  extractYearlyReportSections,
+  reportNeedsOpenAIPdfFallback,
+  type PdfAttachmentDownload,
+  type ReportExtractionResult
 } from "./services/pdf-extract.js";
+import {
+  callOpenAIForJson,
+  createOpenAIClient,
+  type OpenAIFileInput,
+  type OpenAIReasoningEffort
+} from "./services/openai-responses.js";
 import { sanitizeRewriteStyle } from "./services/style-sanitizer.js";
 
 const NEWSWEB_LIST_URL = "https://api3.oslo.oslobors.no/v1/newsreader/list";
@@ -92,6 +104,7 @@ type PublishJobData = {
 };
 
 const config = loadConfig();
+const openAIClient = createOpenAIClient(config.OPENAI_API_KEY);
 
 const connection = parseRedisUrl(config.REDIS_URL);
 const redisPub = new Redis(config.REDIS_URL, { maxRetriesPerRequest: null });
@@ -395,7 +408,7 @@ async function startGenerationRun(
             previousOutput as unknown as Prisma.InputJsonValue
         }
       : {}),
-    model: config.LITELLM_MODEL,
+    model: config.OPENAI_MODEL,
     promptVersion: PROMPT_VERSION,
     startedAt: new Date()
   };
@@ -424,16 +437,33 @@ type JsonModelCallInput = {
   systemPrompt: string;
   developerPrompt: string;
   userPrompt: string;
+  model?: string;
+  reasoningEffort?: OpenAIReasoningEffort;
+  timeoutMs?: number;
+  maxOutputTokens?: number;
+  file?: OpenAIFileInput;
 };
 
 type ModelCallLog = {
+  provider: "openai";
   schemaName: string;
   model: string;
+  reasoningEffort: OpenAIReasoningEffort;
   systemPrompt: string;
   developerPrompt: string;
   userPrompt: string;
   promptChars: number;
 };
+
+const triageJsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    newsworthy: { type: "boolean" },
+    reason: { type: "string" }
+  },
+  required: ["newsworthy", "reason"]
+} as const;
 
 function clampRewriteArrays(raw: Record<string, unknown>): Record<string, unknown> {
   const limits: Record<string, number> = { body: 8, key_facts: 8, source_spans: 8, negative_or_surprising: 6, excluded_hype: 6, source_limitations: 6 };
@@ -445,18 +475,17 @@ function clampRewriteArrays(raw: Record<string, unknown>): Record<string, unknow
   return raw;
 }
 
-function liteLLMChatCompletionsUrl(): string {
-  const baseUrl = config.LITELLM_BASE_URL.replace(/\/+$/, "");
-  if (baseUrl.endsWith("/chat/completions")) return baseUrl;
-  return `${baseUrl}/chat/completions`;
-}
-
 async function callModelForJson({
   schemaName,
   schema,
   systemPrompt,
   developerPrompt,
-  userPrompt
+  userPrompt,
+  model = config.OPENAI_MODEL,
+  reasoningEffort = config.OPENAI_DEFAULT_REASONING_EFFORT,
+  timeoutMs = config.OPENAI_TIMEOUT_MS,
+  maxOutputTokens = 4096,
+  file
 }: JsonModelCallInput): Promise<{
   content: string;
   promptChars: number;
@@ -464,85 +493,29 @@ async function callModelForJson({
 }> {
   const promptChars = systemPrompt.length + developerPrompt.length + userPrompt.length;
   const modelCall: ModelCallLog = {
+    provider: "openai",
     schemaName,
-    model: config.LITELLM_MODEL,
+    model,
+    reasoningEffort,
     systemPrompt,
     developerPrompt,
     userPrompt,
     promptChars
   };
 
-  const liteLLMResponse = await fetch(liteLLMChatCompletionsUrl(), {
-    method: "POST",
-    signal: AbortSignal.timeout(config.LITELLM_TIMEOUT_MS),
-    headers: {
-      "content-type": "application/json",
-      "Authorization": `Bearer ${config.LITELLM_API_KEY}`
-    },
-    body: JSON.stringify({
-      model: config.LITELLM_MODEL,
-      max_tokens: 4096,
-      temperature: 0,
-      tools: [
-        {
-          type: "function",
-          function: {
-            name: schemaName,
-            description: "Return the structured output matching the schema.",
-            parameters: schema
-          }
-        }
-      ],
-      tool_choice: { type: "function", function: { name: schemaName } },
-      messages: [
-        { role: "system", content: systemPrompt },
-        {
-          role: "user",
-          content: [developerPrompt, "", userPrompt].join("\n")
-        }
-      ]
-    })
-  });
-
-  if (!liteLLMResponse.ok) {
-    const errorBody = await liteLLMResponse.text();
-    throw new Error(
-      `LiteLLM request failed: ${liteLLMResponse.status} ${errorBody.slice(0, 300)}`
-    );
-  }
-
-  const responseJson = (await liteLLMResponse.json()) as {
-    choices?: Array<{
-      message?: {
-        tool_calls?: Array<{
-          function?: {
-            name?: string;
-            arguments?: string;
-          };
-        }>;
-        function_call?: {
-          name?: string;
-          arguments?: string;
-        };
-      };
-    }>;
-  };
-  const message = responseJson.choices?.[0]?.message;
-  const toolCall = message?.tool_calls?.find(
-    (item) => item.function?.name === schemaName
-  );
-  const toolArguments =
-    toolCall?.function?.arguments ??
-    (message?.function_call?.name === schemaName
-      ? message.function_call.arguments
-      : undefined);
-
-  if (!toolArguments) {
-    throw new Error("Model returned no tool call arguments");
-  }
-
   return {
-    content: toolArguments,
+    content: await callOpenAIForJson(openAIClient, {
+      schemaName,
+      schema,
+      systemPrompt,
+      developerPrompt,
+      userPrompt,
+      model,
+      reasoningEffort,
+      timeoutMs,
+      maxOutputTokens,
+      file
+    }),
     promptChars,
     modelCall
   };
@@ -556,57 +529,51 @@ async function callModelTriage(
   newsworthy: boolean;
   reason: string;
   promptChars: number;
+  modelCall: ModelCallLog | null;
 }> {
   const userPrompt = buildTriageUserPrompt(title, bodyText, categories);
-  const promptChars = TRIAGE_PROMPT.length + userPrompt.length;
 
   try {
-    const liteLLMResponse = await fetch(liteLLMChatCompletionsUrl(), {
-      method: "POST",
-      signal: AbortSignal.timeout(15000),
-      headers: {
-        "content-type": "application/json",
-        "Authorization": `Bearer ${config.LITELLM_API_KEY}`
-      },
-      body: JSON.stringify({
-        model: config.LITELLM_MODEL,
-        max_tokens: 150,
-        temperature: 0,
-        messages: [
-          { role: "system", content: TRIAGE_PROMPT },
-          { role: "user", content: userPrompt }
-        ]
-      })
+    const result = await callModelForJson({
+      schemaName: "newsworthiness_triage",
+      schema: triageJsonSchema as Record<string, unknown>,
+      systemPrompt: TRIAGE_PROMPT,
+      developerPrompt: "Svar kun med strukturert triage etter skjemaet.",
+      userPrompt,
+      model: config.OPENAI_FAST_MODEL,
+      reasoningEffort: "none",
+      timeoutMs: config.OPENAI_FAST_TIMEOUT_MS,
+      maxOutputTokens: 200
     });
 
-    if (!liteLLMResponse.ok) {
-      return { newsworthy: true, reason: "LiteLLM triage call failed", promptChars: 0 };
-    }
-
-    const responseJson = (await liteLLMResponse.json()) as {
-      choices?: Array<{ message?: { content?: string | null } }>;
+    return {
+      ...parseTriageResponse(result.content),
+      promptChars: result.promptChars,
+      modelCall: result.modelCall
     };
-    const content = responseJson.choices?.[0]?.message?.content?.trim() ?? "";
-
-    const result = parseTriageResponse(content);
-    return { ...result, promptChars };
   } catch {
     // Fail-open: if triage errors, proceed with full rewrite
-    return { newsworthy: true, reason: "Triage call error — defaulting to newsworthy", promptChars: 0 };
+    return {
+      newsworthy: true,
+      reason: "Triage call error - defaulting to newsworthy",
+      promptChars: 0,
+      modelCall: null
+    };
   }
 }
 
 async function callModelRewrite(
   payload: PromptPayload,
   revisionInstruction?: string,
-  previousOutput?: RewriteOutput
+  previousOutput?: RewriteOutput,
+  reasoningEffort: OpenAIReasoningEffort = config.OPENAI_DEFAULT_REASONING_EFFORT
 ): Promise<{
   rewrite: RewriteOutput;
   promptChars: number;
   modelCall: ModelCallLog;
 }> {
   const systemPrompt = createSystemPrompt();
-  const developerPrompt = createDeveloperPrompt(JSON.stringify(rewriteOutputJsonSchema));
+  const developerPrompt = createDeveloperPrompt();
   let userPrompt: string;
   if (revisionInstruction && previousOutput) {
     userPrompt = createRevisionUserPrompt(
@@ -624,7 +591,8 @@ async function callModelRewrite(
     schema: rewriteOutputJsonSchema as Record<string, unknown>,
     systemPrompt,
     developerPrompt,
-    userPrompt
+    userPrompt,
+    reasoningEffort
   });
 
   return {
@@ -640,6 +608,7 @@ async function callModelReferenceCheck(
 ): Promise<{
   coverage: ReferenceCoverageReport;
   promptChars: number;
+  modelCall: ModelCallLog | null;
 }> {
   const draftSentences = collectDraftSentences(draftRewrite);
   if (draftSentences.length === 0) {
@@ -651,7 +620,8 @@ async function callModelReferenceCheck(
         items: [],
         unsupportedSentences: []
       },
-      promptChars: 0
+      promptChars: 0,
+      modelCall: null
     };
   }
 
@@ -664,9 +634,7 @@ async function callModelReferenceCheck(
     "Hvis en setning inneholder subjektive vurderinger eller verdisprak (f.eks. 'milepael', 'styrker posisjon', 'betydelig') uten tydelig attribusjon til kilden/selskapet, skal grounded settes til false.",
     "Paatander om effekt, betydning eller kommersiell verdi ma enten ha direkte dekning i kilden og attribusjon, eller markeres som ikke dekket.",
     "interpretation skal kort forklare hvorfor setningen er dekket eller ikke.",
-    "sourceEvidence skal inneholde et kort tekstutdrag fra referansen; tom streng hvis ingenting dekker setningen.",
-    "JSON schema:",
-    JSON.stringify(referenceCheckJsonSchema)
+    "sourceEvidence skal inneholde et kort tekstutdrag fra referansen; tom streng hvis ingenting dekker setningen."
   ].join("\n");
 
   const userPrompt = [
@@ -695,23 +663,23 @@ async function callModelReferenceCheck(
   const parsed = referenceCheckResultSchema.parse(JSON.parse(result.content));
   return {
     coverage: buildCoverageReport(draftSentences, parsed),
-    promptChars: result.promptChars
+    promptChars: result.promptChars,
+    modelCall: result.modelCall
   };
 }
 
 async function callModelReportRewrite(
   payload: ReportPromptPayload,
   revisionInstruction?: string,
-  previousOutput?: RewriteOutput
+  previousOutput?: RewriteOutput,
+  reasoningEffort: OpenAIReasoningEffort = config.OPENAI_REPORT_REASONING_EFFORT
 ): Promise<{
   rewrite: RewriteOutput;
   promptChars: number;
   modelCall: ModelCallLog;
 }> {
   const systemPrompt = createReportSystemPrompt();
-  const developerPrompt = createReportDeveloperPrompt(
-    JSON.stringify(rewriteOutputJsonSchema)
-  );
+  const developerPrompt = createReportDeveloperPrompt();
   let userPrompt: string;
   if (revisionInstruction && previousOutput) {
     userPrompt = createReportRevisionUserPrompt(
@@ -729,7 +697,8 @@ async function callModelReportRewrite(
     schema: rewriteOutputJsonSchema as Record<string, unknown>,
     systemPrompt,
     developerPrompt,
-    userPrompt
+    userPrompt,
+    reasoningEffort
   });
 
   return {
@@ -742,16 +711,15 @@ async function callModelReportRewrite(
 async function callModelYearlyReportRewrite(
   payload: YearlyReportPromptPayload,
   revisionInstruction?: string,
-  previousOutput?: RewriteOutput
+  previousOutput?: RewriteOutput,
+  reasoningEffort: OpenAIReasoningEffort = config.OPENAI_REPORT_REASONING_EFFORT
 ): Promise<{
   rewrite: RewriteOutput;
   promptChars: number;
   modelCall: ModelCallLog;
 }> {
   const systemPrompt = createYearlyReportSystemPrompt();
-  const developerPrompt = createYearlyReportDeveloperPrompt(
-    JSON.stringify(rewriteOutputJsonSchema)
-  );
+  const developerPrompt = createYearlyReportDeveloperPrompt();
   let userPrompt: string;
   if (revisionInstruction && previousOutput) {
     userPrompt = createYearlyReportRevisionUserPrompt(
@@ -769,7 +737,8 @@ async function callModelYearlyReportRewrite(
     schema: rewriteOutputJsonSchema as Record<string, unknown>,
     systemPrompt,
     developerPrompt,
-    userPrompt
+    userPrompt,
+    reasoningEffort
   });
 
   return {
@@ -779,11 +748,242 @@ async function callModelYearlyReportRewrite(
   };
 }
 
+const pdfContextJsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    context: { type: "string" },
+    sourceEvidence: {
+      type: "array",
+      items: { type: "string" },
+      maxItems: 8
+    },
+    limitations: {
+      type: "array",
+      items: { type: "string" },
+      maxItems: 5
+    },
+    confidence: { type: "string", enum: ["high", "medium", "low"] }
+  },
+  required: ["context", "sourceEvidence", "limitations", "confidence"]
+} as const;
+
+const yearlyRemunerationPdfContextJsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    found: { type: "boolean" },
+    context: { type: "string" },
+    sourceEvidence: {
+      type: "array",
+      items: { type: "string" },
+      maxItems: 8
+    },
+    limitations: {
+      type: "array",
+      items: { type: "string" },
+      maxItems: 5
+    },
+    confidence: { type: "string", enum: ["high", "medium", "low"] }
+  },
+  required: ["found", "context", "sourceEvidence", "limitations", "confidence"]
+} as const;
+
+type PdfContextResult = {
+  context: string;
+  sourceEvidence: string[];
+  limitations: string[];
+  confidence: "high" | "medium" | "low";
+  found?: boolean;
+  promptChars: number;
+  modelCall: ModelCallLog;
+};
+
+function readStringArray(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string")
+    : [];
+}
+
+function readConfidence(value: unknown): "high" | "medium" | "low" {
+  return value === "high" || value === "medium" || value === "low"
+    ? value
+    : "low";
+}
+
+function formatPdfContext(result: PdfContextResult, heading: string): string {
+  return [
+    heading,
+    result.context.trim(),
+    "",
+    "SOURCE EVIDENCE:",
+    ...(result.sourceEvidence.length > 0
+      ? result.sourceEvidence.map((item) => `- ${item}`)
+      : ["- No concise evidence extracted."]),
+    "",
+    "LIMITATIONS:",
+    ...(result.limitations.length > 0
+      ? result.limitations.map((item) => `- ${item}`)
+      : ["- None stated."]),
+    "",
+    `CONFIDENCE: ${result.confidence}`
+  ].join("\n");
+}
+
+async function callOpenAIPdfContext({
+  pdf,
+  schemaName,
+  schema,
+  userPrompt,
+  foundField = false
+}: {
+  pdf: PdfAttachmentDownload;
+  schemaName: string;
+  schema: Record<string, unknown>;
+  userPrompt: string;
+  foundField?: boolean;
+}): Promise<PdfContextResult> {
+  const systemPrompt =
+    "You read attached PDFs for a newsroom pipeline. Extract concise factual context only.";
+  const developerPrompt = [
+    "Use only the attached PDF and the user request.",
+    "Do not write a news article.",
+    "Include compact source evidence with page or section references when visible.",
+    "If the requested material is missing, state that in limitations."
+  ].join("\n");
+
+  const result = await callModelForJson({
+    schemaName,
+    schema,
+    systemPrompt,
+    developerPrompt,
+    userPrompt,
+    model: config.OPENAI_MODEL,
+    reasoningEffort: config.OPENAI_HARD_REASONING_EFFORT,
+    timeoutMs: config.OPENAI_TIMEOUT_MS,
+    maxOutputTokens: 2500,
+    file: {
+      filename: pdf.attachmentName ?? `attachment-${pdf.attachmentId}.pdf`,
+      mimeType: "application/pdf",
+      data: pdf.buffer
+    }
+  });
+  const parsed = JSON.parse(result.content) as Record<string, unknown>;
+  return {
+    context: typeof parsed.context === "string" ? parsed.context : "",
+    sourceEvidence: readStringArray(parsed.sourceEvidence),
+    limitations: readStringArray(parsed.limitations),
+    confidence: readConfidence(parsed.confidence),
+    ...(foundField ? { found: parsed.found === true } : {}),
+    promptChars: result.promptChars,
+    modelCall: result.modelCall
+  };
+}
+
+async function extractReportContextWithOpenAIPdf(
+  pdf: PdfAttachmentDownload,
+  source: { title: string; issuerName: string; issuerSign: string },
+  userInstruction?: string
+): Promise<PdfContextResult> {
+  return callOpenAIPdfContext({
+    pdf,
+    schemaName: "pdf_report_context",
+    schema: pdfContextJsonSchema as Record<string, unknown>,
+    userPrompt: [
+      `Company: ${source.issuerName} (${source.issuerSign})`,
+      `Notice title: ${source.title}`,
+      userInstruction ? `User instruction: ${userInstruction}` : "",
+      "",
+      "Extract concise report context for a Norwegian business-news rewrite.",
+      "Prioritize revenue, operating result/EBIT, result before tax, reporting period, outlook/key events, and any user-requested page or topic."
+    ]
+      .filter(Boolean)
+      .join("\n")
+  });
+}
+
+async function extractYearlyRemunerationWithOpenAIPdf(
+  pdf: PdfAttachmentDownload,
+  source: { title: string; issuerName: string; issuerSign: string }
+): Promise<PdfContextResult> {
+  return callOpenAIPdfContext({
+    pdf,
+    schemaName: "pdf_yearly_remuneration_context",
+    schema: yearlyRemunerationPdfContextJsonSchema as Record<string, unknown>,
+    foundField: true,
+    userPrompt: [
+      `Company: ${source.issuerName} (${source.issuerSign})`,
+      `Notice title: ${source.title}`,
+      "",
+      "Find the annual-report section about remuneration, salary, compensation, or pay for senior executives, CEO, board, or management.",
+      "Extract only concrete names, roles, amounts, table labels, periods, and source evidence. Set found=false if no remuneration section with concrete amounts is present."
+    ].join("\n")
+  });
+}
+
+async function extractGeneralContextWithOpenAIPdf(
+  pdf: PdfAttachmentDownload,
+  payload: PromptPayload,
+  userInstruction?: string
+): Promise<PdfContextResult> {
+  return callOpenAIPdfContext({
+    pdf,
+    schemaName: "pdf_general_context",
+    schema: pdfContextJsonSchema as Record<string, unknown>,
+    userPrompt: [
+      `Company: ${payload.issuerName} (${payload.issuerSign})`,
+      `Notice title: ${payload.title}`,
+      userInstruction ? `User instruction: ${userInstruction}` : "",
+      "",
+      "Extract concise supplementary context from this PDF that is directly relevant to the notice.",
+      "Prefer concrete facts, numbers, dates, contract terms, transaction terms, and source evidence. Ignore boilerplate."
+    ]
+      .filter(Boolean)
+      .join("\n")
+  });
+}
+
+function reportExtractionFromOpenAIPdf(
+  pdf: PdfAttachmentDownload,
+  result: PdfContextResult,
+  existing?: ReportExtractionResult
+): ReportExtractionResult {
+  const text = formatPdfContext(result, "OPENAI PDF FALLBACK REPORT CONTEXT");
+  return {
+    text,
+    referenceText: text,
+    pageCount: pdf.pageCount,
+    metrics: existing?.metrics ?? [],
+    selectedPages: existing?.selectedPages ?? [],
+    diagnostics: {
+      incomeStatementFound: existing?.diagnostics.incomeStatementFound ?? false,
+      fallbackUsed: true,
+      openAIPdfFallback: true,
+      requestedPageNumbers: existing?.diagnostics.requestedPageNumbers ?? [],
+      requestedTopicTerms: existing?.diagnostics.requestedTopicTerms ?? [],
+      totalExtractedChars:
+        existing?.diagnostics.totalExtractedChars ?? text.length
+    },
+    attachmentId: pdf.attachmentId,
+    attachmentName: pdf.attachmentName
+  };
+}
+
 type RewriteRevisionOptions = {
   version?: number;
   userInstruction?: string;
   previousOutput?: RewriteOutput;
   generationRunId?: string;
+  modelCalls?: ModelCallLog[];
+  promptChars?: number;
+};
+
+type YearlyReportExtractionResult = {
+  letterText: string | null;
+  remunerationText: string | null;
+  pageCount: number;
+  attachmentId: number;
+  openAIPdfFallback?: boolean;
 };
 
 async function processReportRewrite(
@@ -801,18 +1001,20 @@ async function processReportRewrite(
   },
   payload: PromptPayload,
   job: { opts: { attempts?: number }; attemptsMade: number },
-  reportContent: { text: string; pageCount: number; attachmentId: number },
+  reportContent: ReportExtractionResult,
   revisionOptions: RewriteRevisionOptions = {}
 ): Promise<void> {
   const reportPayload: ReportPromptPayload = {
     ...payload,
     reportText: reportContent.text,
-    reportPageCount: reportContent.pageCount
+    reportPageCount: reportContent.pageCount,
+    reportMetrics: reportContent.metrics,
+    reportSelectedPages: reportContent.selectedPages
   };
 
   const maxAttempts = job.opts.attempts ?? 1;
   const finalAttempt = job.attemptsMade + 1 >= maxAttempts;
-  let promptChars = 0;
+  let promptChars = revisionOptions.promptChars ?? 0;
   let checkerError: string | null = null;
   let correctionApplied = false;
   let initialCoverage: ReferenceCoverageReport | null = null;
@@ -823,31 +1025,44 @@ async function processReportRewrite(
   let attributionCorrectionApplied = false;
   let attributionRiskCount = 0;
   let styleSanitization: ReturnType<typeof sanitizeRewriteStyle>["stats"] | null = null;
-  const modelCalls: ModelCallLog[] = [];
+  const modelCalls: ModelCallLog[] = [...(revisionOptions.modelCalls ?? [])];
+  const reportReasoningEffort = reportContent.diagnostics.openAIPdfFallback
+    ? config.OPENAI_HARD_REASONING_EFFORT
+    : config.OPENAI_REPORT_REASONING_EFFORT;
+  const reportReferenceText = [
+    payload.bodyText && payload.bodyText.trim().length >= 100
+      ? payload.bodyText
+      : "",
+    reportContent.referenceText || reportContent.text
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+  const reportReferencePayload: PromptPayload = {
+    ...payload,
+    bodyText: reportReferenceText,
+    sourceBodyChars: reportReferenceText.length
+  };
 
   try {
     const initialDraftResult = await callModelReportRewrite(
       reportPayload,
       revisionOptions.userInstruction,
-      revisionOptions.previousOutput
+      revisionOptions.previousOutput,
+      reportReasoningEffort
     );
     modelCalls.push(initialDraftResult.modelCall);
     promptChars += initialDraftResult.promptChars;
     hiddenDraft = initialDraftResult.rewrite;
     let rewrite = hiddenDraft;
 
-    // Reference check against extracted report text (not the stub body)
-    const refPayload: PromptPayload = {
-      ...payload,
-      bodyText: reportContent.text,
-      sourceBodyChars: reportContent.text.length
-    };
-
     try {
       const initialReferenceCheck = await callModelReferenceCheck(
-        refPayload,
+        reportReferencePayload,
         rewrite
       );
+      if (initialReferenceCheck.modelCall) {
+        modelCalls.push(initialReferenceCheck.modelCall);
+      }
       promptChars += initialReferenceCheck.promptChars;
       initialCoverage = initialReferenceCheck.coverage;
       finalCoverage = initialReferenceCheck.coverage;
@@ -865,7 +1080,8 @@ async function processReportRewrite(
         const correctedResult = await callModelReportRewrite(
           reportPayload,
           combinedCorrection,
-          rewrite
+          rewrite,
+          reportReasoningEffort
         );
         modelCalls.push(correctedResult.modelCall);
         promptChars += correctedResult.promptChars;
@@ -873,9 +1089,12 @@ async function processReportRewrite(
         correctionApplied = true;
 
         const finalReferenceCheck = await callModelReferenceCheck(
-          refPayload,
+          reportReferencePayload,
           rewrite
         );
+        if (finalReferenceCheck.modelCall) {
+          modelCalls.push(finalReferenceCheck.modelCall);
+        }
         promptChars += finalReferenceCheck.promptChars;
         finalCoverage = finalReferenceCheck.coverage;
       }
@@ -897,7 +1116,8 @@ async function processReportRewrite(
       const correctedForAttribution = await callModelReportRewrite(
         reportPayload,
         combinedAttribution,
-        rewrite
+        rewrite,
+        reportReasoningEffort
       );
       modelCalls.push(correctedForAttribution.modelCall);
       promptChars += correctedForAttribution.promptChars;
@@ -915,7 +1135,7 @@ async function processReportRewrite(
     rewrite = styleResult.rewrite;
     styleSanitization = styleResult.stats;
 
-    const validation = validateRewriteOutput(rewrite, payload);
+    const validation = validateRewriteOutput(rewrite, reportReferencePayload);
 
     await upsertRewrite({
       messageId,
@@ -937,8 +1157,14 @@ async function processReportRewrite(
         promptChars,
         reportExtraction: {
           attachmentId: reportContent.attachmentId,
+          attachmentName: reportContent.attachmentName,
           pageCount: reportContent.pageCount,
-          extractedChars: reportContent.text.length
+          extractedChars: reportContent.diagnostics.totalExtractedChars,
+          contextChars: reportContent.text.length,
+          validationSourceChars: reportReferenceText.length,
+          selectedPages: reportContent.selectedPages,
+          metricCandidates: reportContent.metrics,
+          diagnostics: reportContent.diagnostics
         },
         styleSanitization,
         referenceCheck: {
@@ -1067,12 +1293,7 @@ async function processYearlyReportRewrite(
   },
   payload: PromptPayload,
   job: { opts: { attempts?: number }; attemptsMade: number },
-  yearlyContent: {
-    letterText: string | null;
-    remunerationText: string | null;
-    pageCount: number;
-    attachmentId: number;
-  },
+  yearlyContent: YearlyReportExtractionResult,
   revisionOptions: RewriteRevisionOptions = {}
 ): Promise<void> {
   const yearlyPayload: YearlyReportPromptPayload = {
@@ -1092,7 +1313,7 @@ async function processYearlyReportRewrite(
 
   const maxAttempts = job.opts.attempts ?? 1;
   const finalAttempt = job.attemptsMade + 1 >= maxAttempts;
-  let promptChars = 0;
+  let promptChars = revisionOptions.promptChars ?? 0;
   let checkerError: string | null = null;
   let correctionApplied = false;
   let initialCoverage: ReferenceCoverageReport | null = null;
@@ -1103,13 +1324,17 @@ async function processYearlyReportRewrite(
   let attributionCorrectionApplied = false;
   let attributionRiskCount = 0;
   let styleSanitization: ReturnType<typeof sanitizeRewriteStyle>["stats"] | null = null;
-  const modelCalls: ModelCallLog[] = [];
+  const modelCalls: ModelCallLog[] = [...(revisionOptions.modelCalls ?? [])];
+  const reportReasoningEffort = yearlyContent.openAIPdfFallback
+    ? config.OPENAI_HARD_REASONING_EFFORT
+    : config.OPENAI_REPORT_REASONING_EFFORT;
 
   try {
     const initialDraftResult = await callModelYearlyReportRewrite(
       yearlyPayload,
       revisionOptions.userInstruction,
-      revisionOptions.previousOutput
+      revisionOptions.previousOutput,
+      reportReasoningEffort
     );
     modelCalls.push(initialDraftResult.modelCall);
     promptChars += initialDraftResult.promptChars;
@@ -1128,6 +1353,9 @@ async function processYearlyReportRewrite(
         refPayload,
         rewrite
       );
+      if (initialReferenceCheck.modelCall) {
+        modelCalls.push(initialReferenceCheck.modelCall);
+      }
       promptChars += initialReferenceCheck.promptChars;
       initialCoverage = initialReferenceCheck.coverage;
       finalCoverage = initialReferenceCheck.coverage;
@@ -1145,7 +1373,8 @@ async function processYearlyReportRewrite(
         const correctedResult = await callModelYearlyReportRewrite(
           yearlyPayload,
           combinedCorrection,
-          rewrite
+          rewrite,
+          reportReasoningEffort
         );
         modelCalls.push(correctedResult.modelCall);
         promptChars += correctedResult.promptChars;
@@ -1156,6 +1385,9 @@ async function processYearlyReportRewrite(
           refPayload,
           rewrite
         );
+        if (finalReferenceCheck.modelCall) {
+          modelCalls.push(finalReferenceCheck.modelCall);
+        }
         promptChars += finalReferenceCheck.promptChars;
         finalCoverage = finalReferenceCheck.coverage;
       }
@@ -1177,7 +1409,8 @@ async function processYearlyReportRewrite(
       const correctedForAttribution = await callModelYearlyReportRewrite(
         yearlyPayload,
         combinedAttribution,
-        rewrite
+        rewrite,
+        reportReasoningEffort
       );
       modelCalls.push(correctedForAttribution.modelCall);
       promptChars += correctedForAttribution.promptChars;
@@ -1218,6 +1451,7 @@ async function processYearlyReportRewrite(
         yearlyReportExtraction: {
           attachmentId: yearlyContent.attachmentId,
           pageCount: yearlyContent.pageCount,
+          openAIPdfFallback: yearlyContent.openAIPdfFallback ?? false,
           hasLetterText: !!yearlyContent.letterText,
           hasRemunerationText: !!yearlyContent.remunerationText,
           extractedChars: combinedText.length
@@ -1356,7 +1590,7 @@ async function upsertRewrite(args: {
       messageId: args.messageId,
       version,
       lang: "nb",
-      model: config.LITELLM_MODEL,
+      model: config.OPENAI_MODEL,
       promptVersion: PROMPT_VERSION,
       rewriteJson: args.rewriteJson,
       validationJson: args.validationJson,
@@ -1365,7 +1599,7 @@ async function upsertRewrite(args: {
     },
     update: {
       lang: "nb",
-      model: config.LITELLM_MODEL,
+      model: config.OPENAI_MODEL,
       promptVersion: PROMPT_VERSION,
       rewriteJson: args.rewriteJson,
       validationJson: args.validationJson,
@@ -1389,7 +1623,7 @@ async function upsertRewrite(args: {
         ...(args.inputJson ? { inputJson: args.inputJson } : {}),
         outputJson: args.rewriteJson,
         validationJson: args.validationJson,
-        model: config.LITELLM_MODEL,
+        model: config.OPENAI_MODEL,
         promptVersion: PROMPT_VERSION,
         promptChars: extractPromptChars(args.validationJson),
         errorText: extractRewriteErrorText(args.rewriteJson),
@@ -1630,6 +1864,8 @@ const rewriteWorker = new Worker<RewriteJobData>(
         payload,
         previousOutput
       );
+      const preRewriteModelCalls: ModelCallLog[] = [];
+      let preRewritePromptChars = 0;
 
       // Skip full AI rewrite for mechanical categories, unless manually triggered
       if (job.data.reason !== "manual-reprocess" && shouldSkipRewrite(categories)) {
@@ -1680,7 +1916,34 @@ const rewriteWorker = new Worker<RewriteJobData>(
 
           // TIER 1: Yearly report — targeted remuneration extraction
           if (isYearlyReportCategory(categories)) {
-            const yearlyContent = await extractYearlyReportSections(rawJson, messageId);
+            let yearlyContent: YearlyReportExtractionResult | null =
+              await extractYearlyReportSections(rawJson, messageId);
+            if (!yearlyContent) {
+              const yearlyPdf = await downloadYearlyReportPdfAttachment(
+                rawJson,
+                messageId
+              );
+              if (yearlyPdf) {
+                const fallback = await extractYearlyRemunerationWithOpenAIPdf(
+                  yearlyPdf,
+                  source
+                );
+                preRewriteModelCalls.push(fallback.modelCall);
+                preRewritePromptChars += fallback.promptChars;
+                if (fallback.found && fallback.context.trim().length > 0) {
+                  yearlyContent = {
+                    letterText: null,
+                    remunerationText: formatPdfContext(
+                      fallback,
+                      "OPENAI PDF FALLBACK YEARLY REMUNERATION CONTEXT"
+                    ),
+                    pageCount: yearlyPdf.pageCount,
+                    attachmentId: yearlyPdf.attachmentId,
+                    openAIPdfFallback: true
+                  };
+                }
+              }
+            }
             if (yearlyContent) {
               await processYearlyReportRewrite(
                 messageId,
@@ -1692,7 +1955,9 @@ const rewriteWorker = new Worker<RewriteJobData>(
                   version: targetVersion,
                   userInstruction: job.data.instruction,
                   previousOutput,
-                  generationRunId
+                  generationRunId,
+                  modelCalls: preRewriteModelCalls,
+                  promptChars: preRewritePromptChars
                 }
               );
               return;
@@ -1706,6 +1971,11 @@ const rewriteWorker = new Worker<RewriteJobData>(
               version: targetVersion,
               userInstruction: job.data.instruction,
               generationRunId,
+              inputJson: generationInputJson(
+                payload,
+                previousOutput,
+                preRewriteModelCalls
+              ),
               rewriteJson: {
                 skippedReason: "YEARLY_REPORT_NO_REMUNERATION",
                 categories
@@ -1716,7 +1986,7 @@ const rewriteWorker = new Worker<RewriteJobData>(
                 errorCode: null,
                 errors: [],
                 sourceBodyChars: payload.sourceBodyChars,
-                promptChars: 0
+                promptChars: preRewritePromptChars
               } as Prisma.InputJsonValue
             });
             await enqueuePublish(messageId, targetVersion, generationRunId);
@@ -1724,7 +1994,45 @@ const rewriteWorker = new Worker<RewriteJobData>(
           }
 
           // TIER 2: Quarterly report — filename-matched PDF extraction (existing behavior)
-          const reportContent = await extractReportContent(rawJson, messageId);
+          let reportContent = await extractReportContent(
+            rawJson,
+            messageId,
+            job.data.instruction
+          );
+          if (reportContent && reportNeedsOpenAIPdfFallback(reportContent)) {
+            const reportPdf = await downloadReportPdfAttachment(rawJson, messageId);
+            if (reportPdf) {
+              const fallback = await extractReportContextWithOpenAIPdf(
+                reportPdf,
+                source,
+                job.data.instruction
+              );
+              preRewriteModelCalls.push(fallback.modelCall);
+              preRewritePromptChars += fallback.promptChars;
+              if (fallback.context.trim().length > 0) {
+                reportContent = reportExtractionFromOpenAIPdf(
+                  reportPdf,
+                  fallback,
+                  reportContent
+                );
+              }
+            }
+          }
+          if (!reportContent) {
+            const reportPdf = await downloadReportPdfAttachment(rawJson, messageId);
+            if (reportPdf) {
+              const fallback = await extractReportContextWithOpenAIPdf(
+                reportPdf,
+                source,
+                job.data.instruction
+              );
+              preRewriteModelCalls.push(fallback.modelCall);
+              preRewritePromptChars += fallback.promptChars;
+              if (fallback.context.trim().length > 0) {
+                reportContent = reportExtractionFromOpenAIPdf(reportPdf, fallback);
+              }
+            }
+          }
           if (reportContent) {
             await processReportRewrite(
               messageId,
@@ -1736,7 +2044,9 @@ const rewriteWorker = new Worker<RewriteJobData>(
                 version: targetVersion,
                 userInstruction: job.data.instruction,
                 previousOutput,
-                generationRunId
+                generationRunId,
+                modelCalls: preRewriteModelCalls,
+                promptChars: preRewritePromptChars
               }
             );
             return;
@@ -1749,6 +2059,25 @@ const rewriteWorker = new Worker<RewriteJobData>(
             payload.pdfSupplementPageCount = generalPdf.pageCount;
             payload.pdfSupplementAttachmentId = generalPdf.attachmentId;
             // Fall through to triage/rewrite with augmented payload
+          } else {
+            const fallbackPdf = await downloadGeneralPdfAttachment(rawJson, messageId);
+            if (fallbackPdf) {
+              const fallback = await extractGeneralContextWithOpenAIPdf(
+                fallbackPdf,
+                payload,
+                job.data.instruction
+              );
+              preRewriteModelCalls.push(fallback.modelCall);
+              preRewritePromptChars += fallback.promptChars;
+              if (fallback.context.trim().length > 0) {
+                payload.pdfSupplementText = formatPdfContext(
+                  fallback,
+                  "OPENAI PDF FALLBACK SUPPLEMENT CONTEXT"
+                );
+                payload.pdfSupplementPageCount = fallbackPdf.pageCount;
+                payload.pdfSupplementAttachmentId = fallbackPdf.attachmentId;
+              }
+            }
           }
         } catch (error) {
           console.log(
@@ -1763,6 +2092,10 @@ const rewriteWorker = new Worker<RewriteJobData>(
       // AI triage for ambiguous categories — lightweight check before full pipeline
       if (job.data.reason !== "manual-reprocess" && needsNewsworthinessTriage(categories)) {
         const triage = await callModelTriage(source.title, source.bodyText, categories);
+        if (triage.modelCall) {
+          preRewriteModelCalls.push(triage.modelCall);
+          preRewritePromptChars += triage.promptChars;
+        }
         if (!triage.newsworthy) {
           console.log(
             `[triage] skipping ${messageId} (${source.issuerSign}): ${triage.reason}`
@@ -1772,6 +2105,11 @@ const rewriteWorker = new Worker<RewriteJobData>(
             version: targetVersion,
             userInstruction: job.data.instruction,
             generationRunId,
+            inputJson: generationInputJson(
+              payload,
+              previousOutput,
+              preRewriteModelCalls
+            ),
             rewriteJson: {
               skippedReason: "AI_TRIAGE_SKIP",
               triageReason: triage.reason,
@@ -1783,7 +2121,7 @@ const rewriteWorker = new Worker<RewriteJobData>(
               errorCode: null,
               errors: [],
               sourceBodyChars: payload.sourceBodyChars,
-              promptChars: triage.promptChars,
+              promptChars: preRewritePromptChars,
               triageResult: { newsworthy: false, reason: triage.reason }
             } as Prisma.InputJsonValue
           });
@@ -1798,7 +2136,7 @@ const rewriteWorker = new Worker<RewriteJobData>(
 
       const maxAttempts = job.opts.attempts ?? 1;
       const finalAttempt = job.attemptsMade + 1 >= maxAttempts;
-      let promptChars = 0;
+      let promptChars = preRewritePromptChars;
       let checkerError: string | null = null;
       let correctionApplied = false;
       let initialCoverage: ReferenceCoverageReport | null = null;
@@ -1810,7 +2148,7 @@ const rewriteWorker = new Worker<RewriteJobData>(
       let attributionRiskCount = 0;
       let styleSanitization: ReturnType<typeof sanitizeRewriteStyle>["stats"] | null =
         null;
-      const modelCalls: ModelCallLog[] = [];
+      const modelCalls: ModelCallLog[] = [...preRewriteModelCalls];
 
       if (payload.bodyText.trim().length === 0) {
         await upsertRewrite({
@@ -1835,7 +2173,11 @@ const rewriteWorker = new Worker<RewriteJobData>(
       }
 
       try {
-        const initialDraftResult = await callModelRewrite(payload, job.data.instruction, previousOutput);
+        const initialDraftResult = await callModelRewrite(
+          payload,
+          job.data.instruction,
+          previousOutput
+        );
         modelCalls.push(initialDraftResult.modelCall);
         promptChars += initialDraftResult.promptChars;
         hiddenDraft = initialDraftResult.rewrite;
@@ -1849,6 +2191,9 @@ const rewriteWorker = new Worker<RewriteJobData>(
             : payload;
 
           const initialReferenceCheck = await callModelReferenceCheck(refPayload, rewrite);
+          if (initialReferenceCheck.modelCall) {
+            modelCalls.push(initialReferenceCheck.modelCall);
+          }
           promptChars += initialReferenceCheck.promptChars;
           initialCoverage = initialReferenceCheck.coverage;
           finalCoverage = initialReferenceCheck.coverage;
@@ -1863,7 +2208,8 @@ const rewriteWorker = new Worker<RewriteJobData>(
             const correctedResult = await callModelRewrite(
               payload,
               combinedCorrection,
-              rewrite
+              rewrite,
+              config.OPENAI_REPORT_REASONING_EFFORT
             );
             modelCalls.push(correctedResult.modelCall);
             promptChars += correctedResult.promptChars;
@@ -1871,6 +2217,9 @@ const rewriteWorker = new Worker<RewriteJobData>(
             correctionApplied = true;
 
             const finalReferenceCheck = await callModelReferenceCheck(refPayload, rewrite);
+            if (finalReferenceCheck.modelCall) {
+              modelCalls.push(finalReferenceCheck.modelCall);
+            }
             promptChars += finalReferenceCheck.promptChars;
             finalCoverage = finalReferenceCheck.coverage;
           }
@@ -1889,7 +2238,8 @@ const rewriteWorker = new Worker<RewriteJobData>(
           const correctedForAttribution = await callModelRewrite(
             payload,
             combinedAttribution,
-            rewrite
+            rewrite,
+            config.OPENAI_REPORT_REASONING_EFFORT
           );
           modelCalls.push(correctedForAttribution.modelCall);
           promptChars += correctedForAttribution.promptChars;
@@ -2182,7 +2532,7 @@ async function bootstrap(): Promise<void> {
   }
 
   console.log(
-    `[worker] started. pollInterval=${config.POLL_INTERVAL_MS}ms model=${config.LITELLM_MODEL}`
+    `[worker] started. pollInterval=${config.POLL_INTERVAL_MS}ms model=${config.OPENAI_MODEL} fastModel=${config.OPENAI_FAST_MODEL}`
   );
 }
 

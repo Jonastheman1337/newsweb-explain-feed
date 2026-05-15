@@ -27,7 +27,7 @@ export function createYearlyReportSystemPrompt(): string {
   ].join(" ");
 }
 
-export function createYearlyReportDeveloperPrompt(schemaJson: string): string {
+export function createYearlyReportDeveloperPrompt(_schemaJson?: string): string {
   return `${EDITORIAL_AUDIENCE}
 
 ${EDITORIAL_LANGUAGE}
@@ -53,10 +53,7 @@ ${EDITORIAL_AVOID}
 
 source_limitations SKAL inkludere: 'Basert pa lederlonnsdata fra arsrapporten'
 
-${EDITORIAL_NORWEGIAN}
-
-JSON schema:
-${schemaJson}`;
+${EDITORIAL_NORWEGIAN}`;
 }
 
 export type YearlyReportPromptPayload = PromptPayload & {

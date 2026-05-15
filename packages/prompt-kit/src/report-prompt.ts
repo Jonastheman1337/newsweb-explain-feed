@@ -22,7 +22,7 @@ export function createReportSystemPrompt(): string {
     "Du skriver korte børsnyheter på norsk bokmål for en travel leser som scanner nyheter på mobilen.",
     "Leseren er en privatinvestor — kanskje en student eller nybegynner — som vil vite: hva skjedde, og hva betyr det for aksjen?",
     "Skriv så enkelt at en videregåendeelev med interesse for finans forstår teksten uten å google noe.",
-    "Kilden er et utdrag fra en kvartals- eller halvårsrapport, eventuelt kombinert med en børsmelding.",
+    "Kilden er et kuratert utdrag fra en kvartals- eller halvårsrapport, eventuelt kombinert med en børsmelding.",
     "Du skal lage en kort nyhetssak basert på nøkkeltallene.",
     "Ikke vær en papegøye som bare ramser opp tall. Plukk ut det viktigste, det overraskende eller det dramatiske.",
     "Ikke følg rapportens struktur eller rekkefølge. Du er redaktøren ��� restrukturer fritt etter hva som er viktigst for leseren.",
@@ -84,7 +84,7 @@ Snudd til overskudd (Salmon Evolution — i pluss trass inntektsfall):
 {"title":"Salmon Evolution i pluss i fjerde kvartal","lead":"Salmon Evolution fikk et resultat før skatt på 1,14 millioner kroner i fjerde kvartal, fra minus 26,9 millioner i samme kvartal året før, ifølge en melding.","body":["Omsetningen ble på 98,7 millioner kroner, ned fra 148,7 millioner i samme periode året før.","De realiserte prisene var på 74 kroner kiloet, ned ti prosent fra perioden året før, skriver Salmon Evolution.","Selskapet leverte en slaktevekt på 1.203 tonn i kvartalet.","Salmon Evolution melder om at arbeidet med fase to av Indre Harøy-anlegget går etter planen."],"company_sentence":"Salmon Evolution driver landbasert lakseoppdrett.","key_facts":["Resultat før skatt: 1,14 mill., opp fra minus 26,9 mill.","Omsetning: 98,7 mill., ned fra 148,7 mill.","Realisert pris: 74 kr/kg, ned 10 %","Slaktevekt: 1.203 tonn"],"negative_or_surprising":["Snudde til overskudd trass kraftig inntektsfall","Lakseprisene falt 10 %"],"excluded_hype":[],"source_limitations":["Kun et utdrag av rapporten er analysert"],"confidence":"high","importance":"uviktig","source_spans":["resultat 1,14 mill.","omsetning 98,7 mill.","74 kroner kiloet"]}
 `.trim();
 
-export function createReportDeveloperPrompt(schemaJson: string): string {
+export function createReportDeveloperPrompt(_schemaJson?: string): string {
   return `OPPGAVE
 Lag en kort nyhetssak i E24-stil basert på utdraget fra en kvartals-/halvårsrapport.
 Leseren er en privatinvestor som kanskje gar pa videregaende og er interessert i finans. Vanlige finansord som 'driftsresultat', 'ebitda' og 'omsetning' er greit, men tyngre jargong ma forklares gjennom kontekst.
@@ -94,9 +94,13 @@ ${EDITORIAL_AUDIENCE}
 
 HVILKE TALL ER VIKTIGE?
 Bruk redaksjonelt skjonn — plukk ut det som er mest nyhetsverdig:
+- Den konsoliderte resultatoppstillingen / income statement er foretrukken kilde for regnskapstallene.
+- Tre ankertall skal alltid sjekkes der de finnes: inntekter, driftsresultat (operating profit/EBIT) og resultat for skatt.
+- Hvis strukturerte nokkeltall er oppgitt i rapportkonteksten, bruk dem som veiviser, men verifiser mot sideteksten.
+- CEO-/ledelseskommentarer kan forklare utviklingen, men skal ikke overstyre tall fra resultatoppstillingen.
 - Resultat for skatt — ofte overskriften, men ikke alltid
 - Inntekter (total omsetning)
-- Driftsresultat (operating profit) / ebitda
+- Driftsresultat (operating profit/EBIT). Bruk ebitda bare hvis rapporten ikke oppgir driftsresultat/EBIT.
 - Utbytte — hvis et totalbelop er oppgitt, er det ofte svaert nyhetsverdig
 - Endring fra samme kvartal i fjor (YoY) der det er tilgjengelig
 - Guidanse/utsikter og eventuelle prognoser
@@ -114,7 +118,7 @@ Nar bade en borsmelding og en rapport er tilgjengelig, kombiner dem. Meldingen k
 
 TALL-DISIPLIN
 - Plukk ut 3-4 nokkeltall. Ikke rams opp alt rapporten inneholder.
-- De viktigste tallene for en aksjeeier er typisk: inntekter, resultat for skatt, ebitda og utbytte.
+- De viktigste tallene for en aksjeeier er typisk: inntekter, driftsresultat/EBIT, resultat for skatt og utbytte.
 - Unnga nisjetall som bruttofortjeneste, 'adjusted operating profit' og andre mellomlinjer med mindre de er selskapets eget nokkeltall.
 - Helårstall kan nevnes kort, men hold fokus på kvartalet.
 - Balansetall (gjeld, kontanter, egenkapital) bare nar de er nyheten (f.eks. likviditetskrise).
@@ -155,15 +159,25 @@ ${REPORT_STYLE_EXAMPLES}
 Sprak: norsk Bokmal. Tone: noytral, enkel, lett a forsta for en privatinvestor uten profesjonell finansbakgrunn.
 Bruk kun tall og fakta som finnes i kilden.
 
-${EDITORIAL_NORWEGIAN}
-
-JSON schema:
-${schemaJson}`;
+${EDITORIAL_NORWEGIAN}`;
 }
 
 export type ReportPromptPayload = PromptPayload & {
   reportText: string;
   reportPageCount: number;
+  reportMetrics?: Array<{
+    metric: string;
+    label: string;
+    values: string[];
+    pageNumber: number;
+    rowText: string;
+  }>;
+  reportSelectedPages?: Array<{
+    pageNumber: number;
+    reasons: string[];
+    score: number;
+    textChars: number;
+  }>;
 };
 
 export function createReportUserPrompt(payload: ReportPromptPayload): string {
@@ -175,12 +189,22 @@ export function createReportUserPrompt(payload: ReportPromptPayload): string {
     `publishedAt: ${payload.publishedAt}`,
     `categories: ${payload.categories.join(", ") || "ikke oppgitt"}`,
     `markets: ${payload.markets.join(", ") || "ikke oppgitt"}`,
-    `reportPageCount: ${payload.reportPageCount}`
+    `reportPageCount: ${payload.reportPageCount}`,
+    ...(payload.reportSelectedPages?.length
+      ? [
+          `selectedReportPages: ${payload.reportSelectedPages
+            .map((page) => `${page.pageNumber}(${page.reasons.join("+")})`)
+            .join(", ")}`
+        ]
+      : [])
   ].join("\n");
 
   const parts: string[] = [
     "Lag en kort, publiserbar nyhetssak basert på kildene under.",
     "Skriv nyhetstekst, ikke sammendrag. Plukk ut de viktigste nøkkeltallene for en aksjeeier.",
+    "Rapportkilden under er valgt fra hele PDF-en: resultatoppstilling først, deretter relevante ledelses-/utsiktsider og eventuelle sider brukeren ba om.",
+    "Bruk resultatoppstillingen som foretrukken kilde for inntekter, driftsresultat/EBIT og resultat før skatt.",
+    "Hvis brukeren har bedt om et tema eller en side, bruk USER REQUESTED CONTEXT i rapportkilden aktivt.",
     "Skriv så enkelt at en videregåendeelev med interesse for finans forstår det.",
     "Bruk aktiv form, presens og omvendt nyhetspyramide.",
     "Bruk kun data i kildene under. Ikke bruk markdown.",
@@ -200,7 +224,7 @@ export function createReportUserPrompt(payload: ReportPromptPayload): string {
     );
     parts.push(
       "",
-      "KILDE 2 (UTDRAG FRA RAPPORT):",
+      "KILDE 2 (KURATERT RAPPORTKONTEKST FRA PDF):",
       "<<<",
       payload.reportText || "ikke oppgitt",
       ">>>"
@@ -208,7 +232,7 @@ export function createReportUserPrompt(payload: ReportPromptPayload): string {
   } else {
     parts.push(
       "",
-      "KILDE (UTDRAG FRA RAPPORT):",
+      "KILDE (KURATERT RAPPORTKONTEKST FRA PDF):",
       "<<<",
       payload.reportText || "ikke oppgitt",
       ">>>"

@@ -14,7 +14,7 @@ apps/worker   BullMQ workers: poll, ingest, rewrite, publish
 Postgres app DB      source notices, rewrite versions, feed state, user feedback
 Postgres log DB      generation_runs and user_action_events
 Redis/BullMQ         temporary queues, job state, and short-lived diagnostics
-LiteLLM              model calls for rewrites, triage, and title suggestions
+OpenAI Responses API model calls for rewrites, triage, PDF fallback, and title suggestions
 ```
 
 Rewrite lifecycle:
@@ -32,7 +32,7 @@ Rewrite lifecycle:
 - npm 11+
 - PostgreSQL 16+
 - Redis 7+
-- LiteLLM API key and proxy base URL
+- OpenAI API key
 
 ## Environment
 
@@ -42,9 +42,14 @@ Copy `.env.example` to `.env` and fill in the secrets:
 DATABASE_URL=postgresql://...
 GENERATION_LOG_DATABASE_URL=postgresql://...
 REDIS_URL=redis://...
-LITELLM_API_KEY=...
-LITELLM_BASE_URL=https://your-litellm-proxy.example.com/v1
-LITELLM_MODEL=claude-sonnet-4-6
+OPENAI_API_KEY=...
+OPENAI_MODEL=gpt-5.5
+OPENAI_FAST_MODEL=gpt-5.4-mini
+OPENAI_TIMEOUT_MS=60000
+OPENAI_FAST_TIMEOUT_MS=15000
+OPENAI_DEFAULT_REASONING_EFFORT=low
+OPENAI_REPORT_REASONING_EFFORT=medium
+OPENAI_HARD_REASONING_EFFORT=high
 SESSION_SECRET=...
 ADMIN_API_KEY=...
 ```
@@ -54,8 +59,10 @@ If it is empty, local development falls back to the primary app DB, but
 production should use a separate DB so operational logs survive independently
 of app table changes.
 
-`LITELLM_BASE_URL` should point at the LiteLLM proxy base URL. Include `/v1`
-if your proxy is configured that way.
+`OPENAI_MODEL` is used for rewrites, report handling, reference checks, and
+corrections. `OPENAI_FAST_MODEL` is used for triage and title suggestions.
+Local PDF text extraction remains the primary path; OpenAI PDF reading is only
+used as a fallback when local extraction diagnostics are weak.
 
 ## Local Development
 

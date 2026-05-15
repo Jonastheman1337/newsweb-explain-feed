@@ -14,7 +14,7 @@ import {
   EDITORIAL_WRITING_STYLE
 } from "./shared-editorial.js";
 
-export const PROMPT_VERSION = "v4.4.0";
+export const PROMPT_VERSION = "v5.0.0";
 
 export type PromptPayload = {
   messageId: number;
@@ -72,7 +72,7 @@ Materiell hendelse (2 body-avsnitt):
 {"title":"Gulf Keystone stopper produksjonen","lead":"Oljeselskapet Gulf Keystone har midlertidig stengt ned produksjonen i Kurdistan i Irak på grunn av sikkerhetssituasjonen.","body":["Selskapet har satt i gang tiltak for å beskytte de ansatte. Oljeanleggene er ikke skadet, ifølge meldingen.","Gulf Keystone følger situasjonen tett og lover å komme med oppdateringer."],"company_sentence":"Gulf Keystone er et oljeselskap som produserer olje i Kurdistan-regionen i Irak.","key_facts":["Produksjonen er stanset midlertidig","Ansatte beskyttes, anlegg ikke skadet"],"negative_or_surprising":["Produksjonsstans grunnet sikkerhetssituasjon"],"excluded_hype":[],"source_limitations":[],"confidence":"high","importance":"viktig","source_spans":["midlertidig har stengt produksjonen","tiltak for å beskytte ansatte"]}
 `.trim();
 
-export function createDeveloperPrompt(schemaJson: string): string {
+export function createDeveloperPrompt(_schemaJson?: string): string {
   return `OPPGAVE
 Lag en kort nyhetssak i E24-stil. Ikke et referat, men en publiserbar nyhet.
 Leseren er en privatinvestor som kanskje gar pa videregaende og er interessert i finans. Vanlige finansord som 'datterselskap', 'kontrakt' og 'aksjekapital' er greit, men tyngre jargong ma forklares gjennom kontekst.
@@ -119,10 +119,7 @@ Sprak: norsk Bokmal. Tone: noytral, enkel, lett a forsta for en privatinvestor u
 Bruk kun tall og fakta som finnes i kilden.
 Hvis meldingen viser til vedlegg, legg inn en begrensning i source_limitations om at vedlegg ikke er analysert.
 
-${EDITORIAL_NORWEGIAN}
-
-JSON schema:
-${schemaJson}`;
+${EDITORIAL_NORWEGIAN}`;
 }
 
 export function createUserPrompt(payload: PromptPayload): string {

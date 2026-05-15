@@ -2,19 +2,18 @@ import { describe, expect, it } from "vitest";
 import { parseWorkerConfig } from "./config.js";
 
 describe("parseWorkerConfig", () => {
-  it("fails when LITELLM_API_KEY is missing", () => {
+  it("fails when OPENAI_API_KEY is missing", () => {
     expect(() =>
       parseWorkerConfig({
         NODE_ENV: "development",
         DATABASE_URL:
           "postgresql://newsweb:newsweb@localhost:5432/newsweb_explain?schema=public",
         REDIS_URL: "redis://localhost:6379",
-        LITELLM_BASE_URL: "https://litellm.example.com/v1",
-        LITELLM_MODEL: "claude-sonnet-4-6",
-        LITELLM_TIMEOUT_MS: "15000",
+        OPENAI_MODEL: "gpt-5.5",
+        OPENAI_TIMEOUT_MS: "15000",
         POLL_INTERVAL_MS: "20000"
       })
-    ).toThrow(/LITELLM_KEY_MISSING/);
+    ).toThrow(/OPENAI_KEY_MISSING/);
   });
 
   it("parses valid config", () => {
@@ -23,30 +22,40 @@ describe("parseWorkerConfig", () => {
       DATABASE_URL:
         "postgresql://newsweb:newsweb@localhost:5432/newsweb_explain?schema=public",
       REDIS_URL: "redis://localhost:6379",
-      LITELLM_API_KEY: "sk-litellm-test-key",
-      LITELLM_BASE_URL: "https://litellm.example.com/v1",
-      LITELLM_MODEL: "claude-sonnet-4-6",
-      LITELLM_TIMEOUT_MS: "60000",
+      OPENAI_API_KEY: "sk-openai-test-key",
+      OPENAI_MODEL: "gpt-5.5",
+      OPENAI_FAST_MODEL: "gpt-5.4-mini",
+      OPENAI_TIMEOUT_MS: "60000",
+      OPENAI_FAST_TIMEOUT_MS: "15000",
+      OPENAI_DEFAULT_REASONING_EFFORT: "low",
+      OPENAI_REPORT_REASONING_EFFORT: "medium",
+      OPENAI_HARD_REASONING_EFFORT: "high",
       POLL_INTERVAL_MS: "20000"
     });
-    expect(config.LITELLM_MODEL).toBe("claude-sonnet-4-6");
-    expect(config.LITELLM_TIMEOUT_MS).toBe(60000);
+    expect(config.OPENAI_MODEL).toBe("gpt-5.5");
+    expect(config.OPENAI_FAST_MODEL).toBe("gpt-5.4-mini");
+    expect(config.OPENAI_TIMEOUT_MS).toBe(60000);
+    expect(config.OPENAI_FAST_TIMEOUT_MS).toBe(15000);
+    expect(config.OPENAI_DEFAULT_REASONING_EFFORT).toBe("low");
+    expect(config.OPENAI_REPORT_REASONING_EFFORT).toBe("medium");
+    expect(config.OPENAI_HARD_REASONING_EFFORT).toBe("high");
   });
 
-  it("uses legacy model and timeout env names as fallbacks", () => {
+  it("uses OpenAI defaults for model and reasoning settings", () => {
     const config = parseWorkerConfig({
       NODE_ENV: "development",
       DATABASE_URL:
         "postgresql://newsweb:newsweb@localhost:5432/newsweb_explain?schema=public",
       REDIS_URL: "redis://localhost:6379",
-      LITELLM_API_KEY: "sk-litellm-test-key",
-      LITELLM_API_BASE: "https://litellm.example.com/v1",
-      ANTHROPIC_MODEL: "claude-sonnet-4-6",
-      ANTHROPIC_TIMEOUT_MS: "15000",
+      OPENAI_API_KEY: "sk-openai-test-key",
       POLL_INTERVAL_MS: "20000"
     });
-    expect(config.LITELLM_BASE_URL).toBe("https://litellm.example.com/v1");
-    expect(config.LITELLM_MODEL).toBe("claude-sonnet-4-6");
-    expect(config.LITELLM_TIMEOUT_MS).toBe(15000);
+    expect(config.OPENAI_MODEL).toBe("gpt-5.5");
+    expect(config.OPENAI_FAST_MODEL).toBe("gpt-5.4-mini");
+    expect(config.OPENAI_TIMEOUT_MS).toBe(60000);
+    expect(config.OPENAI_FAST_TIMEOUT_MS).toBe(15000);
+    expect(config.OPENAI_DEFAULT_REASONING_EFFORT).toBe("low");
+    expect(config.OPENAI_REPORT_REASONING_EFFORT).toBe("medium");
+    expect(config.OPENAI_HARD_REASONING_EFFORT).toBe("high");
   });
 });

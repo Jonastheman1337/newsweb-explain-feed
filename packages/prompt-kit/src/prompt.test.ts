@@ -1,6 +1,8 @@
 import type { RewriteOutput } from "@newsweb/shared";
 import { describe, expect, it } from "vitest";
 import {
+  PROMPT_VERSION,
+  createDeveloperPrompt,
   createRevisionUserPrompt,
   type PromptPayload
 } from "./prompt.js";
@@ -55,6 +57,19 @@ const sampleYearlyPayload: YearlyReportPromptPayload = {
   remunerationText: "CEO fikk samlet godtgjorelse pa 5 millioner kroner.",
   reportPageCount: 80
 };
+
+describe("OpenAI prompt contract", () => {
+  it("bumps the prompt version for the Responses structured-output migration", () => {
+    expect(PROMPT_VERSION).toBe("v5.0.0");
+  });
+
+  it("does not embed the JSON schema in the developer prompt", () => {
+    const result = createDeveloperPrompt('{"type":"object"}');
+
+    expect(result).not.toContain("JSON schema");
+    expect(result).not.toContain('{"type":"object"}');
+  });
+});
 
 describe("createRevisionUserPrompt", () => {
   it("includes formatted previous output with labeled fields", () => {
@@ -123,7 +138,7 @@ describe("createReportRevisionUserPrompt", () => {
     );
 
     expect(result).toContain("rapportnyheten");
-    expect(result).toContain("KILDE (UTDRAG FRA RAPPORT):");
+    expect(result).toContain("KILDE (KURATERT RAPPORTKONTEKST FRA PDF):");
     expect(result).toContain(sampleReportPayload.reportText);
     expect(result).toContain("FORRIGE VERSJON");
     expect(result).toContain("Vinkle mer pa inntektsveksten");

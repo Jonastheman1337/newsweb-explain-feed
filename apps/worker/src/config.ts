@@ -14,16 +14,23 @@ const configSchema = z
       .default("development"),
     DATABASE_URL: z.string().min(1),
     REDIS_URL: z.string().url(),
-    LITELLM_API_KEY: z
-      .string({ required_error: "LITELLM_KEY_MISSING" })
+    OPENAI_API_KEY: z
+      .string({ required_error: "OPENAI_KEY_MISSING" })
       .trim()
-      .min(1, "LITELLM_KEY_MISSING"),
-    LITELLM_BASE_URL: z
-      .string({ required_error: "LITELLM_BASE_URL_MISSING" })
-      .trim()
-      .url("LITELLM_BASE_URL_INVALID"),
-    LITELLM_MODEL: z.string().default("claude-sonnet-4-6"),
-    LITELLM_TIMEOUT_MS: z.coerce.number().int().min(1000).default(60000),
+      .min(1, "OPENAI_KEY_MISSING"),
+    OPENAI_MODEL: z.string().default("gpt-5.5"),
+    OPENAI_FAST_MODEL: z.string().default("gpt-5.4-mini"),
+    OPENAI_TIMEOUT_MS: z.coerce.number().int().min(1000).default(60000),
+    OPENAI_FAST_TIMEOUT_MS: z.coerce.number().int().min(1000).default(15000),
+    OPENAI_DEFAULT_REASONING_EFFORT: z
+      .enum(["none", "minimal", "low", "medium", "high", "xhigh"])
+      .default("low"),
+    OPENAI_REPORT_REASONING_EFFORT: z
+      .enum(["none", "minimal", "low", "medium", "high", "xhigh"])
+      .default("medium"),
+    OPENAI_HARD_REASONING_EFFORT: z
+      .enum(["none", "minimal", "low", "medium", "high", "xhigh"])
+      .default("high"),
     POLL_INTERVAL_MS: z.coerce.number().int().min(5000).default(20000),
     LATEST_BOOTSTRAP_COUNT: z.coerce.number().int().min(0).max(50).default(10)
   });
@@ -31,12 +38,7 @@ const configSchema = z
 export type WorkerConfig = z.infer<typeof configSchema>;
 
 export function parseWorkerConfig(env: NodeJS.ProcessEnv): WorkerConfig {
-  return configSchema.parse({
-    ...env,
-    LITELLM_BASE_URL: env.LITELLM_BASE_URL ?? env.LITELLM_API_BASE,
-    LITELLM_MODEL: env.LITELLM_MODEL ?? env.ANTHROPIC_MODEL,
-    LITELLM_TIMEOUT_MS: env.LITELLM_TIMEOUT_MS ?? env.ANTHROPIC_TIMEOUT_MS
-  });
+  return configSchema.parse(env);
 }
 
 export function loadConfig(): WorkerConfig {

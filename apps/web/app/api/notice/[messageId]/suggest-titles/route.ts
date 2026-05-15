@@ -4,6 +4,7 @@ import type { Prisma } from "@prisma/client";
 import { logPrisma } from "@newsweb/shared/db";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import OpenAI from "openai";
 import { getApiBaseUrl } from "../../../../../lib/api-base-url";
 import { SESSION_COOKIE } from "../../../../../lib/session-cookie";
 
@@ -41,10 +42,32 @@ function toJsonValue(value: unknown): Prisma.InputJsonValue {
   return JSON.parse(JSON.stringify(value ?? null)) as Prisma.InputJsonValue;
 }
 
-function liteLLMChatCompletionsUrl(baseUrl: string): string {
-  const normalizedBaseUrl = baseUrl.replace(/\/+$/, "");
-  if (normalizedBaseUrl.endsWith("/chat/completions")) return normalizedBaseUrl;
-  return `${normalizedBaseUrl}/chat/completions`;
+const titleSuggestionsJsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    titles: {
+      type: "array",
+      minItems: 5,
+      maxItems: 5,
+      items: {
+        type: "string",
+        minLength: 3,
+        maxLength: 120
+      }
+    }
+  },
+  required: ["titles"]
+} as const;
+
+function parseTitleSuggestions(raw: string): string[] {
+  const parsed = JSON.parse(raw) as { titles?: unknown };
+  if (!Array.isArray(parsed.titles)) return [];
+  return parsed.titles
+    .filter((item): item is string => typeof item === "string")
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .slice(0, 5);
 }
 
 async function updateGenerationRunFailure(runId: string | null, errorText: string) {
@@ -70,22 +93,24 @@ export async function POST(
   const { messageId } = await params;
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE)?.value;
+  let requestBody: {
+    currentTitle?: unknown;
+    telemetry?: unknown;
+  } = {};
+  try {
+    requestBody = await request.json();
+  } catch {
+    requestBody = {};
+  }
 
-  const LITELLM_API_KEY = loadEnvVar("LITELLM_API_KEY", "");
-  const LITELLM_BASE_URL = loadEnvVar(
-    "LITELLM_BASE_URL",
-    loadEnvVar("LITELLM_API_BASE", "")
-  );
-  const LITELLM_MODEL = loadEnvVar(
-    "LITELLM_MODEL",
-    loadEnvVar("ANTHROPIC_MODEL", "claude-sonnet-4-6")
-  );
-  const LITELLM_TIMEOUT_MS = Number(
-    loadEnvVar("LITELLM_TIMEOUT_MS", loadEnvVar("ANTHROPIC_TIMEOUT_MS", "15000"))
+  const OPENAI_API_KEY = loadEnvVar("OPENAI_API_KEY", "");
+  const OPENAI_FAST_MODEL = loadEnvVar("OPENAI_FAST_MODEL", "gpt-5.4-mini");
+  const OPENAI_FAST_TIMEOUT_MS = Number(
+    loadEnvVar("OPENAI_FAST_TIMEOUT_MS", "15000")
   );
 
-  if (!LITELLM_API_KEY || !LITELLM_BASE_URL) {
-    return NextResponse.json({ message: "LiteLLM is not configured" }, { status: 500 });
+  if (!OPENAI_API_KEY) {
+    return NextResponse.json({ message: "OpenAI is not configured" }, { status: 500 });
   }
 
   // Fetch the notice to get context — pass auth token if available
@@ -99,12 +124,17 @@ export async function POST(
   }
   const notice = await noticeRes.json();
 
-  const currentTitle = notice.rewrite?.title ?? notice.source?.title ?? "";
+  const requestedCurrentTitle =
+    typeof requestBody.currentTitle === "string"
+      ? requestBody.currentTitle.trim()
+      : "";
+  const currentTitle =
+    requestedCurrentTitle || notice.rewrite?.title || notice.source?.title || "";
   const lead = notice.rewrite?.lead ?? "";
   const body = notice.rewrite?.body?.join("\n") ?? "";
   const issuerName = notice.source?.issuerName ?? "";
 
-  const prompt = [
+  const developerPrompt = [
     "Du er en erfaren nyhetsredaktør som skriver titler i E24-stil.",
     "Lag 5 alternative titler for nyhetssaken under.",
     "Regler:",
@@ -114,13 +144,16 @@ export async function POST(
     "- Hvert forslag skal ha en ulik vinkling eller fokus.",
     "- Skriv ut 'millioner' og 'milliarder' med mindre tittelen blir for lang.",
     "- Norsk bokmål med korrekte tegn (æ, ø, å).",
-    "- Returner KUN en JSON-array med 5 strenger, ingenting annet.",
-    "",
+    "- Returner fem titler i det strukturerte skjemaet."
+  ].join("\n");
+  const userPrompt = [
     `Selskap: ${issuerName}`,
     `Nåværende tittel: ${currentTitle}`,
     `Lead: ${lead}`,
     `Brødtekst: ${body}`
   ].join("\n");
+
+  const prompt = [developerPrompt, "", userPrompt].join("\n");
 
   let generationRunId: string | null = null;
   const numericMessageId = Number(messageId);
@@ -131,7 +164,8 @@ export async function POST(
     lead,
     body,
     issuerName,
-    model: LITELLM_MODEL,
+    model: OPENAI_FAST_MODEL,
+    reasoningEffort: "none",
     prompt
   };
 
@@ -142,8 +176,8 @@ export async function POST(
         reason: "title-suggestion",
         status: "started",
         inputJson: toJsonValue(requestPayload),
-        model: LITELLM_MODEL,
-        promptVersion: "title-suggestions-v1",
+        model: OPENAI_FAST_MODEL,
+        promptVersion: "title-suggestions-v2",
         promptChars: prompt.length,
         startedAt: new Date()
       }
@@ -151,16 +185,21 @@ export async function POST(
     generationRunId = generationRun.id;
 
     try {
-      await logPrisma.userActionEvent.create({
-        data: {
-          messageId: numericMessageId,
+      await fetch(`${API_BASE_URL}/notice/${messageId}/event`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
           action: "title_suggestion_generation_request",
-          payloadJson: toJsonValue({
+          telemetry: requestBody.telemetry,
+          payload: {
             generationRunId,
             currentTitle,
             issuerName
-          })
-        }
+          }
+        })
       });
     } catch (error) {
       console.error("[suggest-titles] failed to write action event:", error);
@@ -171,53 +210,41 @@ export async function POST(
   }
 
   try {
-    const liteLLMRes = await fetch(liteLLMChatCompletionsUrl(LITELLM_BASE_URL), {
-      method: "POST",
-      signal: AbortSignal.timeout(
-        Number.isFinite(LITELLM_TIMEOUT_MS) ? LITELLM_TIMEOUT_MS : 15000
-      ),
-      headers: {
-        "content-type": "application/json",
-        "Authorization": `Bearer ${LITELLM_API_KEY}`
-      },
-      body: JSON.stringify({
-        model: LITELLM_MODEL,
-        max_tokens: 512,
-        temperature: 1,
-        messages: [
-          { role: "user", content: prompt }
-        ]
-      })
-    });
-
-    if (!liteLLMRes.ok) {
-      const errText = await liteLLMRes.text();
-      console.error("[suggest-titles] LiteLLM error:", errText);
-      await updateGenerationRunFailure(generationRunId, errText);
-      return NextResponse.json({ message: "AI request failed" }, { status: 502 });
-    }
-
-    const result = (await liteLLMRes.json()) as {
-      choices?: Array<{ message?: { content?: string | null } }>;
-    };
-    const text = result.choices?.[0]?.message?.content ?? "[]";
-
-    // Extract JSON array from response
-    const match = text.match(/\[[\s\S]*\]/);
-    if (!match) {
-      await logPrisma.generationRun.update({
-        where: { id: generationRunId! },
-        data: {
-          status: "finished",
-          outputJson: toJsonValue({ rawText: text, titles: [] }),
-          finishedAt: new Date()
+    const openAI = new OpenAI({ apiKey: OPENAI_API_KEY });
+    const response = await openAI.responses.create(
+      {
+        model: OPENAI_FAST_MODEL,
+        max_output_tokens: 512,
+        store: false,
+        reasoning: { effort: "none" },
+        input: [
+          { role: "developer", content: developerPrompt },
+          { role: "user", content: userPrompt }
+        ],
+        text: {
+          format: {
+            type: "json_schema",
+            name: "title_suggestions",
+            schema: titleSuggestionsJsonSchema,
+            strict: true
+          },
+          verbosity: "low"
         }
-      });
-      return NextResponse.json({ titles: [] });
+      },
+      {
+        signal: AbortSignal.timeout(
+          Number.isFinite(OPENAI_FAST_TIMEOUT_MS)
+            ? OPENAI_FAST_TIMEOUT_MS
+            : 15000
+        )
+      }
+    );
+    const text = response.output_text?.trim() ?? "";
+    if (!text) {
+      throw new Error("OpenAI returned no title suggestion output");
     }
 
-    const titles: string[] = JSON.parse(match[0]);
-    const selectedTitles = titles.slice(0, 5);
+    const selectedTitles = parseTitleSuggestions(text);
     await logPrisma.generationRun.update({
       where: { id: generationRunId! },
       data: {
