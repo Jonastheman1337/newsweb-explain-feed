@@ -9,7 +9,12 @@ type FeedItemWithRelations = PrismaFeedItem & {
 
 function sourceOnlyFeedItem(
   item: FeedItemWithRelations,
-  flags: { skipped?: boolean; failed?: boolean; processing?: boolean } = {}
+  flags: {
+    notGenerated?: boolean;
+    skipped?: boolean;
+    failed?: boolean;
+    processing?: boolean;
+  } = {}
 ): FeedItem {
   return {
     messageId: item.messageId,
@@ -28,6 +33,7 @@ function sourceOnlyFeedItem(
     hasAttachments: item.sourceNotice.hasAttachments,
     sourceTitle: item.sourceNotice.title,
     sourceBodyText: item.sourceNotice.bodyText,
+    notGenerated: flags.notGenerated ?? false,
     skipped: flags.skipped ?? false,
     failed: flags.failed ?? false,
     processing: flags.processing ?? false
@@ -40,11 +46,11 @@ export function mapDbItemToFeedItem(item: FeedItemWithRelations): FeedItem | nul
     item.sourceNotice.rewrites.find((rewrite) => rewrite.status === "published") ??
     latestRewrite;
 
-  if (
-    !rewriteRecord ||
-    rewriteRecord.status === "pending" ||
-    rewriteRecord.status === "needs_retry"
-  ) {
+  if (!rewriteRecord) {
+    return sourceOnlyFeedItem(item, { notGenerated: true });
+  }
+
+  if (rewriteRecord.status === "pending" || rewriteRecord.status === "needs_retry") {
     return sourceOnlyFeedItem(item, { processing: true });
   }
 
@@ -76,6 +82,7 @@ export function mapDbItemToFeedItem(item: FeedItemWithRelations): FeedItem | nul
     hasAttachments: item.sourceNotice.hasAttachments,
     sourceTitle: item.sourceNotice.title,
     sourceBodyText: item.sourceNotice.bodyText,
+    notGenerated: false,
     skipped: false,
     failed: false,
     processing: false

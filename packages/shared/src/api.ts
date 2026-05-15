@@ -48,6 +48,7 @@ export const feedItemSchema = z.object({
   hasAttachments: z.boolean(),
   sourceTitle: z.string(),
   sourceBodyText: z.string(),
+  notGenerated: z.boolean().default(false),
   skipped: z.boolean().default(false),
   failed: z.boolean().default(false),
   processing: z.boolean().default(false)

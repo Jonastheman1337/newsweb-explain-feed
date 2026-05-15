@@ -41,6 +41,30 @@ function MaxAiLink({ messageId }: { messageId: number }) {
 export function NoticeCard({ item }: NoticeCardProps) {
   const [showSplit, setShowSplit] = useState(false);
 
+  if (item.notGenerated) {
+    return (
+      <article className="card">
+        <div className="muted">
+          <a href={`https://newsweb.oslobors.no/message/${item.messageId}`} target="_blank" rel="noopener noreferrer">
+            {formatOsloTime(item.publishedAt)} | {item.issuerName} ({item.issuerSign})
+          </a>
+        </div>
+        <h2>
+          <Link href={`/notice/${item.messageId}`} className="headlineLink">
+            {item.title}
+          </Link>
+        </h2>
+        <p className="muted">Ikke generert enda</p>
+        <div className="editableActions">
+          <MaxAiLink messageId={item.messageId} />
+          <span className="actionsRight">
+            <GenerateButton messageId={item.messageId} hasAttachments={item.hasAttachments} />
+          </span>
+        </div>
+      </article>
+    );
+  }
+
   if (item.processing) {
     return (
       <article className="card cardProcessing">
@@ -54,6 +78,7 @@ export function NoticeCard({ item }: NoticeCardProps) {
             {item.title}
           </Link>
         </h2>
+        <p className="muted">AI-notis genereres</p>
         <div className="editableActions">
           <MaxAiLink messageId={item.messageId} />
           <span className="actionsRight">

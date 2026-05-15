@@ -107,6 +107,8 @@ type PublishJobData = {
   generationRunId?: string;
 };
 
+type FeedUpdateState = "source" | "processing" | "published";
+
 const config = loadConfig();
 const openAIClient = createOpenAIClient(config.OPENAI_API_KEY);
 
@@ -116,6 +118,16 @@ const ingestQueue = new Queue<IngestJobData>(QUEUE_NAMES.ingest, { connection })
 const rewriteQueue = new Queue<RewriteJobData>(QUEUE_NAMES.rewrite, { connection });
 const publishQueue = new Queue<PublishJobData>(QUEUE_NAMES.publish, { connection });
 const skippedMissingIssuerSign = new Set<number>();
+
+async function publishFeedUpdate(
+  messageId: number,
+  state: FeedUpdateState
+): Promise<void> {
+  await redisPub.publish(
+    REDIS_CHANNELS.feedNewItem,
+    JSON.stringify({ messageId, state })
+  );
+}
 
 async function enqueuePublish(
   messageId: number,
@@ -1804,6 +1816,7 @@ const ingestWorker = new Worker<IngestJobData>(
           },
           update: {}
         });
+        await publishFeedUpdate(job.data.messageId, "published");
         return;
       }
 
@@ -1817,6 +1830,27 @@ const ingestWorker = new Worker<IngestJobData>(
         },
         update: {}
       });
+      await publishFeedUpdate(job.data.messageId, "source");
+
+      const existingRewrite = await prisma.rewrite.findFirst({
+        where: { messageId: job.data.messageId },
+        select: { id: true }
+      });
+      if (!existingRewrite) {
+        await upsertRewrite({
+          messageId: job.data.messageId,
+          version: 1,
+          rewriteJson: {} as Prisma.InputJsonValue,
+          status: "pending",
+          validationJson: {
+            valid: false,
+            errorCode: "REWRITE_QUEUED",
+            errors: [],
+            sourceBodyChars: details.bodyText.length,
+            promptChars: 0
+          } as Prisma.InputJsonValue
+        });
+      }
 
       await rewriteQueue.add(
         "rewrite-notice",
@@ -1835,6 +1869,7 @@ const ingestWorker = new Worker<IngestJobData>(
           removeOnFail: 2000
         }
       );
+      await publishFeedUpdate(job.data.messageId, "processing");
     });
   },
   {
@@ -2534,10 +2569,7 @@ const publishWorker = new Worker<PublishJobData>(
         });
       }
 
-      await redisPub.publish(
-        REDIS_CHANNELS.feedNewItem,
-        JSON.stringify({ messageId: source.messageId })
-      );
+      await publishFeedUpdate(source.messageId, "published");
     });
   },
   {

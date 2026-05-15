@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import type { FeedItem } from "@newsweb/shared";
 import { NoticeCard } from "./notice-card";
 
@@ -14,15 +14,20 @@ type LiveFeedListProps = {
   };
 };
 
-export function LiveFeedList({ initialItems, filters }: LiveFeedListProps) {
-  const [newItems, setNewItems] = useState<FeedItem[]>([]);
-  const knownIds = useRef(new Set(initialItems.map((i) => i.messageId)));
+function sortFeedItems(items: FeedItem[]): FeedItem[] {
+  return [...items].sort((left, right) => {
+    const timeDiff =
+      new Date(right.publishedAt).getTime() - new Date(left.publishedAt).getTime();
+    if (timeDiff !== 0) return timeDiff;
+    return right.messageId - left.messageId;
+  });
+}
 
-  // Keep knownIds in sync when initialItems change (e.g. filter/pagination navigation)
+export function LiveFeedList({ initialItems, filters }: LiveFeedListProps) {
+  const [items, setItems] = useState<FeedItem[]>(() => sortFeedItems(initialItems));
+
   useEffect(() => {
-    const ids = new Set(initialItems.map((i) => i.messageId));
-    knownIds.current = ids;
-    setNewItems([]);
+    setItems(sortFeedItems(initialItems));
   }, [initialItems]);
 
   useEffect(() => {
@@ -34,10 +39,15 @@ export function LiveFeedList({ initialItems, filters }: LiveFeedListProps) {
     es.onmessage = (event) => {
       try {
         const item: FeedItem = JSON.parse(event.data);
-        if (!knownIds.current.has(item.messageId)) {
-          knownIds.current.add(item.messageId);
-          setNewItems((prev) => [item, ...prev]);
-        }
+        setItems((prev) => {
+          const exists = prev.some((existing) => existing.messageId === item.messageId);
+          const next = exists
+            ? prev.map((existing) =>
+                existing.messageId === item.messageId ? item : existing
+              )
+            : [item, ...prev];
+          return sortFeedItems(next);
+        });
       } catch {
         // Ignore parse errors
       }
@@ -46,16 +56,9 @@ export function LiveFeedList({ initialItems, filters }: LiveFeedListProps) {
     return () => es.close();
   }, [filters?.market, filters?.category, filters?.issuer, filters?.q]);
 
-  const seen = new Set<number>();
-  const allItems = [...newItems, ...initialItems].filter((item) => {
-    if (seen.has(item.messageId)) return false;
-    seen.add(item.messageId);
-    return true;
-  });
-
   return (
     <>
-      {allItems.map((item) => (
+      {items.map((item) => (
         <NoticeCard key={item.messageId} item={item} />
       ))}
     </>

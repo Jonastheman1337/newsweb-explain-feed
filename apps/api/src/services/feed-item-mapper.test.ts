@@ -76,6 +76,15 @@ describe("mapDbItemToFeedItem", () => {
     );
 
     expect(item?.processing).toBe(true);
+    expect(item?.notGenerated).toBe(false);
+    expect(item?.title).toBe("Original tittel");
+  });
+
+  it("reports not generated when no rewrite exists", () => {
+    const item = mapDbItemToFeedItem(feedItem([]) as never);
+
+    expect(item?.notGenerated).toBe(true);
+    expect(item?.processing).toBe(false);
     expect(item?.title).toBe("Original tittel");
   });
 
