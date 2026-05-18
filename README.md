@@ -59,6 +59,14 @@ If it is empty, local development falls back to the primary app DB, but
 production should use a separate DB so operational logs survive independently
 of app table changes.
 
+Render free tier allows only one active free Postgres database per account. If
+the hosted service has no `GENERATION_LOG_DATABASE_URL`, `generation_runs` and
+`user_action_events` are intentionally stored in the primary app DB. The
+`/admin/signals` page shows which mode is active. To move future operational
+logs to a dedicated DB, provision a paid/dedicated Postgres instance, set
+`GENERATION_LOG_DATABASE_URL` to its internal connection string, and redeploy so
+the pre-deploy command initializes the log tables.
+
 `OPENAI_MODEL` is used for rewrites, report handling, reference checks, and
 corrections. `OPENAI_FAST_MODEL` is used for triage and title suggestions.
 Local PDF text extraction remains the primary path; OpenAI PDF reading is only
@@ -152,6 +160,10 @@ fails, the API returns an error and does not enqueue an unlogged job. Copy/actio
 events keep the user flow working if log writes fail; the API logs the failure.
 
 ## DB Inspection Recipes
+
+The app includes a protected read-only admin view at `/admin/signals` with
+filters for date range, message ID, action/status, and CSV export. Use direct
+SQL for deeper inspection or bulk debugging.
 
 Set the log DB URL in your shell:
 

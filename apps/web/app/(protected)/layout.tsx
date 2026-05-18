@@ -20,7 +20,13 @@ export default async function ProtectedLayout({
         <Link href="/feed" style={{ textDecoration: "none", color: "inherit" }}>
           <h1>Autoweb</h1>
         </Link>
-        <span style={{ display: "flex", gap: "0.25rem", alignItems: "center" }}>
+        <span style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
+          <Link href="/feed" className="ghostButton">
+            Feed
+          </Link>
+          <Link href="/admin/signals" className="ghostButton">
+            Signals
+          </Link>
           <NotificationToggle />
           <ThemeToggle />
         </span>

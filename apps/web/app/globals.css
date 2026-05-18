@@ -778,6 +778,212 @@ a {
 }
 .themeToggle:hover { opacity: 1; }
 
+.signalsPage {
+  display: grid;
+  gap: 1rem;
+}
+
+.signalsHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 0.9rem;
+}
+
+.signalsHeader h2 {
+  margin: 0 0 0.25rem;
+  font-family: var(--font-heading), sans-serif;
+  font-size: 1.35rem;
+}
+
+.signalsNotice,
+.signalsWarning {
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+  font-size: 0.85rem;
+}
+
+.signalsWarning {
+  border-color: var(--warning);
+  color: var(--warning);
+}
+
+.signalsTabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 0.5rem;
+}
+
+.signalsTab {
+  padding: 0.35rem 0;
+  color: var(--ink-soft);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  border-bottom: 2px solid transparent;
+}
+
+.signalsTab + .signalsTab {
+  margin-left: 0.6rem;
+}
+
+.signalsTab.active,
+.signalsTab:hover {
+  color: var(--ink);
+  border-bottom-color: var(--ink);
+}
+
+.signalsFilters {
+  display: grid;
+  grid-template-columns: 0.9fr 1.2fr 0.8fr 0.8fr 0.7fr auto;
+  gap: 0.55rem;
+  align-items: end;
+}
+
+.signalsFilters label {
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.72rem;
+  color: var(--ink-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.signalsFilters input,
+.signalsFilters select,
+.signalsFilters button {
+  min-height: 2.15rem;
+  padding: 0.4rem 0.5rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--bg-soft);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.85rem;
+}
+
+.signalsFilters button {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.signalsFilters button:hover {
+  border-color: var(--ink-soft);
+}
+
+.signalsCount {
+  color: var(--ink-soft);
+  font-size: 0.82rem;
+}
+
+.signalsTableWrap {
+  overflow-x: auto;
+  border-top: 1px solid var(--line);
+}
+
+.signalsTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.signalsTable th,
+.signalsTable td {
+  vertical-align: top;
+  text-align: left;
+  padding: 0.65rem 0.6rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.signalsTable th {
+  color: var(--ink-soft);
+  font-size: 0.72rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.signalsText {
+  min-width: 220px;
+  max-width: 420px;
+  line-height: 1.45;
+}
+
+.signalsMeta {
+  min-width: 150px;
+  color: var(--ink-soft);
+  line-height: 1.5;
+}
+
+.signalsMono {
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  font-size: 0.76rem;
+}
+
+.signalsBadge {
+  display: inline-block;
+  padding: 0.1rem 0.35rem;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--bg-soft);
+  color: var(--ink);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.signalsLink {
+  color: var(--ink);
+  text-decoration: underline;
+  text-decoration-color: var(--line);
+  text-underline-offset: 3px;
+}
+
+.signalsLink:hover {
+  text-decoration-color: var(--ink);
+}
+
+.signalsDetails {
+  margin-top: 0.35rem;
+}
+
+.signalsDetails summary {
+  color: var(--ink-soft);
+  cursor: pointer;
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.signalsDetails pre {
+  max-width: 520px;
+  max-height: 260px;
+  overflow: auto;
+  margin: 0.4rem 0 0;
+  padding: 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg-soft);
+  color: var(--ink);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  font-size: 0.75rem;
+}
+
+.signalsEmpty {
+  padding: 1rem 0;
+  color: var(--ink-soft);
+}
+
 @media (max-width: 940px) {
   .filterGrid {
     grid-template-columns: 1fr 1fr;
@@ -794,6 +1000,10 @@ a {
   .cardSplitGrid {
     grid-template-columns: 1fr;
   }
+
+  .signalsFilters {
+    grid-template-columns: 1fr 1fr;
+  }
 }
 
 @media (max-width: 640px) {
@@ -803,5 +1013,17 @@ a {
 
   .filterGrid {
     grid-template-columns: 1fr;
+  }
+
+  .signalsHeader {
+    display: grid;
+  }
+
+  .signalsFilters {
+    grid-template-columns: 1fr;
+  }
+
+  .signalsTab + .signalsTab {
+    margin-left: 0;
   }
 }
