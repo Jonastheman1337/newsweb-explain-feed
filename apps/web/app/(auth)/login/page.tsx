@@ -15,5 +15,9 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   }
 
   const params = await searchParams;
-  return <LoginForm token={params.token} />;
+  return (
+    <main className="loginWrap">
+      <LoginForm token={params.token} />
+    </main>
+  );
 }
