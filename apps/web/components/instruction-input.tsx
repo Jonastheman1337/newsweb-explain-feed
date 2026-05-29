@@ -32,6 +32,7 @@ type InstructionInputProps = {
 export function InstructionInput({ messageId, activeVersion }: InstructionInputProps) {
   const router = useRouter();
   const [text, setText] = useState("");
+  const [xhighEnabled, setXhighEnabled] = useState(false);
   const [status, setStatus] = useState<"idle" | "loading" | "polling" | "sent" | "error">("idle");
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const versionBeforeRef = useRef<number | null>(null);
@@ -110,12 +111,14 @@ export function InstructionInput({ messageId, activeVersion }: InstructionInputP
 
   async function handleGenerate(options: { reasoningEffortOverride?: "xhigh" } = {}) {
     const instruction = text.trim();
-    const { reasoningEffortOverride } = options;
+    const reasoningEffortOverride =
+      options.reasoningEffortOverride ?? (xhighEnabled ? "xhigh" : undefined);
     isRegenRef.current = !instruction;
     versionBeforeRef.current = null;
     generatedAtBeforeRef.current = null;
     stopPolling();
     setStatus("loading");
+    setXhighEnabled(false);
 
     try {
       // Capture current version and generatedAt right before triggering
@@ -249,15 +252,32 @@ export function InstructionInput({ messageId, activeVersion }: InstructionInputP
               : (text.trim() ? "Generer ny versjon" : "Regenerer notis")}
         </button>
         <button
-          className="ghostButton"
-          onClick={() => handleGenerate({ reasoningEffortOverride: "xhigh" })}
+          className={`xhighToggle${xhighEnabled ? " xhighToggleActive" : ""}`}
+          type="button"
+          onClick={() => setXhighEnabled((enabled) => !enabled)}
           disabled={busy}
+          aria-label="Bruk xhigh-resonnering ved neste generering"
+          aria-pressed={xhighEnabled}
+          title="Bruk xhigh-resonnering ved neste generering"
         >
-          {status === "loading"
-            ? "Sender ..."
-            : status === "polling"
-              ? getGenerationPhaseLabel(phase ?? "queued") + "..."
-              : (text.trim() ? "Generer xhigh" : "Regenerer xhigh")}
+          <svg
+            className="xhighIcon"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M8.4 18.8c-2.1 0-3.8-1.7-3.8-3.8 0-.8.2-1.5.7-2.1a4 4 0 0 1-.5-2 4.1 4.1 0 0 1 4.1-4.1h.3A4.1 4.1 0 0 1 16.8 6a3.8 3.8 0 0 1 2.6 6.8c.4.6.6 1.3.6 2.1 0 2.1-1.7 3.8-3.8 3.8" />
+            <path d="M8.8 6.8v12" />
+            <path d="M15.2 6v12.8" />
+            <path d="M8.8 10.4c1.2 0 2.1-.6 2.5-1.6" />
+            <path d="M15.2 10.2c-1.2 0-2.1-.5-2.6-1.4" />
+            <path d="M8.8 14.2c1.2 0 2.1.5 2.6 1.4" />
+            <path d="M15.2 14.4c-1.2 0-2.1.6-2.5 1.6" />
+          </svg>
         </button>
         {status === "polling" && <E24Loader />}
         {status === "error" && (
