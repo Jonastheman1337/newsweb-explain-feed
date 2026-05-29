@@ -204,6 +204,9 @@ export function NoticeCard({ item }: NoticeCardProps) {
           <div className="cardSourcePanel">
             <SplitViewPanel
               messageId={item.messageId}
+              issuerName={item.issuerName}
+              issuerSign={item.issuerSign}
+              publishedAt={item.publishedAt}
               sourceTitle={item.sourceTitle}
               sourceBodyText={item.sourceBodyText}
               attachments={item.attachments}
