@@ -8,7 +8,6 @@ import { getGenerationPhaseLabel } from "./generation-steps";
 
 const POLL_INTERVAL_MS = 3000;
 const VISIBLE_FEED_PHASES = new Set<GenerationPhase>([
-  "reading_pdf_attachment",
   "writing_notice",
   "checking_references",
   "finalizing",
