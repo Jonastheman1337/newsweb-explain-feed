@@ -7,6 +7,13 @@ import { useEffect, useState } from "react";
 import { getGenerationPhaseLabel } from "./generation-steps";
 
 const POLL_INTERVAL_MS = 3000;
+const VISIBLE_FEED_PHASES = new Set<GenerationPhase>([
+  "reading_pdf_attachment",
+  "writing_notice",
+  "checking_references",
+  "finalizing",
+  "publishing"
+]);
 
 type FeedProcessingIndicatorProps = {
   messageId: number;
@@ -52,6 +59,10 @@ export function FeedProcessingIndicator({ messageId }: FeedProcessingIndicatorPr
       }
     };
   }, [messageId, router]);
+
+  if (!phase || !VISIBLE_FEED_PHASES.has(phase)) {
+    return null;
+  }
 
   return (
     <div className="feedProcessingStatus" role="status" aria-live="polite">
