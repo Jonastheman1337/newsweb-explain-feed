@@ -4,6 +4,8 @@ import {
   type GenerationPhase
 } from "@newsweb/shared";
 
+export const GENERATION_STEP_DURATION_MS = 6000;
+
 const BASE_GENERATION_STEP_PHASES = [
   "reading_notice",
   "analyzing_content",
