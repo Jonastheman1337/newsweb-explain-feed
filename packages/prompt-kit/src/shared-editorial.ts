@@ -18,14 +18,18 @@ export const EDITORIAL_LANGUAGE = `SPRAK OG FORENKLING
 - Ikke bland regnskapsbegrepene inntekter/omsetning og resultat. Hvis kilden bare omtaler inntekter eller omsetning, skal det ikke bli til resultat, overskudd eller tap i teksten.
 - Foretrekk enkle synonymer fremfor tunge fagord, spesielt i titler. Tenk alltid: finnes det et enklere norsk ord som betyr det samme? Bruk det. Fagbegrepet kan komme i body der det forklares. 'Henter penger' er bedre enn 'gjennomforer kapitalinnhenting'. 'Sammenslåing' er lettere enn 'fusjon'.
 - Bruk fagbegreper, men forklar dem gjennom kontekst slik at leseren bade forstar og laerer:
-  'ebitda' → 'driftsresultatet (ebitda) gikk opp til 48 millioner' (forklar ved forste bruk, bruk forkortelsen etterpå)
+  'ebitda' → 'driftsresultatet før renter, skatt, av- og nedskrivninger (ebitda) gikk opp til 48 millioner' (forklar bare hvis begrepet er nodvendig)
   'guiding' → 'selskapet guidet en ebitda pa 240-250 millioner' (konteksten forklarer)
   'rettet emisjon' → 'henter 251 mill. kroner i en rettet emisjon. Pengene hentes ved å selge nye aksjer til utvalgte investorer.'
+  'reparasjonsemisjon' → 'en reparasjonsemisjon gir aksjonærer som ikke fikk bli med sist, mulighet til å kjøpe nye aksjer.'
+  'tegningsrett' → 'tegningsretter gir rett til å kjøpe nye aksjer. Brukes de ikke innen fristen, faller de bort.'
+  'fullmakt' → 'styrelederen kan stemme på vegne av andre aksjonærer på generalforsamlingen.'
+  'låneendringer' → forklar konkret: utsetter forfall, endrer vilkår, får mer tid eller trenger ny kapital. Hvis kilden ikke sier hva det betyr, dropp det.
   'konvertible obligasjoner' → 'utsteder konvertible obligasjoner — lån som senere kan gjøres om til aksjer.'
   'spleis' → 'gjennomfører en aksjespleis. Det betyr at aksjer slås sammen slik at hver aksje blir mer verdt, men aksjonærene får færre.'
   'warrant' → 'tildeler warrants, som gir rett til å kjøpe aksjer til en fast pris senere.'
   'goodwill-nedskrivning' → 'skriver ned goodwill — verdien av et tidligere oppkjøp.'
-- Poenget er: bruk termen + forklar i samme eller neste setning. Da lærer leseren begrepet.
+- Poenget er: forklar hva begrepet gjor med aksjonærene, selskapet eller pengene. Ikke skriv leksikondefinisjoner.
 - Unnga lange, tunge setninger. Bryt dem opp.
 - Produktnavn og tekniske betegnelser fra kilden er ofte uforståelige for leseren. Forklar kort hva produktet eller teknologien gjør, eller generaliser.
 - Før du leverer: finn alle fagord, produktnavn, forkortelser og tekniske uttrykk en vanlig privatinvestor kan snuble i. Hvis ordet er nødvendig, forklar det naturlig i samme eller neste setning. Hvis du ikke kan forklare det kort med kilden som grunnlag, generaliser eller dropp ordet.
@@ -50,11 +54,13 @@ export const EDITORIAL_WRITING_STYLE = `SKRIVESTIL
 - Ga rett pa saken i forste setning. Unnga tomme innledninger som 'har kunngjort' og 'kort fortalt'.
 - Hvert avsnitt tilforer ny informasjon. Unnga gjentakelser.
 - Ikke gjenta samme tall eller faktum i flere avsnitt. Ved oppramsing med samme kurs, pris eller dato: skriv fellesopplysningen én gang samlet.
+- Rutinesaker skal komprimeres hardt: generalforsamling/utbytte, innsidehandel, avlyst reparasjonsemisjon, flagging/fullmakt og små kontrakter klarer seg normalt med ett kort body-avsnitt eller bare lead hvis det ikke finnes et nytt materiell poeng.
 - Behold egennavn og titler korrekt, men normaliser selskapsnavn til vanlig stor forbokstav. Skriv 'Polight' ikke 'poLight', 'Idex' ikke 'IDEX'. Unntak: forkortelser som er allment kjent (ABB, DNB).
 - Skriv naturlig norsk, ikke ordrett maskinoversettelse. Unnga passiv og tungt hjelpeverb-sprak.
 - Vev selskapskontekst naturlig inn i forste setning.
 - Skriv ut 'millioner' og 'milliarder' i titler og lopende tekst. Forkortelsene 'mill.' og 'mrd.' kan brukes nar tittelen ellers blir for lang (over 8 ord) eller i oppramsinger med mange tall.
 - Skriv beløp på 1.000 millioner eller mer som milliarder: 'én milliard kroner', '1,2 milliarder kroner', ikke '1.000 millioner' eller '1.200 millioner'.
+- Skriv lange eksakte totalbeløp lesbart: '1,3 milliarder kroner', ikke '1.317.662.931 kroner', med mindre det eksakte tallet i seg selv er poenget.
 - Bruk kolon sjelden i titler. Foretrekk en normal setning eller verbtittel nar det fungerer.
 - Skriv 'prosent', ikke '%', i title, lead og body.
 - Bruk norsk tallformat med punktum som tusenskille: '3.193.485', ikke '3 193 485'. Desimaltegn er komma: '1,5 mill.'.
@@ -65,6 +71,7 @@ export const EDITORIAL_WRITING_STYLE = `SKRIVESTIL
 - Foretrekk konkrete verb fremfor abstrakte substantiv.
 - Vaer konkret med tall. Ikke skriv 'betydelig vekst' — skriv hvor mye.
 - Ikke bruk vage kvalifiseringer som 'klar fremgang', 'sterk utvikling', 'solid vekst', 'markant okning' uten a folge opp med konkrete tall i samme setning. Enten gi tallene med en gang, eller dropp kvalifiseringen.
+- Ikke bruk tomt selskaps- eller finanssprak som 'styrke likviditeten', 'optimalisere kapitalstrukturen' eller 'låneendringer' alene. Forklar konkret hva selskapet gjor eller hvilket problem det løser; ellers kutt det.
 - Ikke bruk generiske avslutninger. Vev kildehenvisningen naturlig inn i teksten.`;
 
 export const EDITORIAL_NO_MARKET_COMMENTARY = `INGEN KURSKOMMENTAR ELLER INVESTERINGSLOGIKK

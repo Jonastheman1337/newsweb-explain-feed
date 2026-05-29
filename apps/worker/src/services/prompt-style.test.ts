@@ -1,5 +1,6 @@
 import {
   createDeveloperPrompt,
+  createReportDeveloperPrompt,
   createSystemPrompt,
   createUserPrompt,
   type PromptPayload
@@ -62,5 +63,23 @@ describe("prompt style guidance", () => {
     expect(developerPrompt).toContain("terminer");
     expect(developerPrompt).toContain("Aldri skriv 'PDF'");
     expect(developerPrompt).toContain("Ikke gjenta samme tall eller faktum");
+  });
+
+  it("includes signal-derived guidance for short routine notices", () => {
+    const developerPrompt = createDeveloperPrompt("{}");
+
+    expect(developerPrompt).toContain("Rutinesaker skal komprimeres hardt");
+    expect(developerPrompt).toContain("1,3 milliarder kroner");
+    expect(developerPrompt).toContain("stemme på vegne av andre aksjonærer");
+    expect(developerPrompt).toContain("styrke likviditeten");
+  });
+
+  it("includes report-specific angle and accounting guidance", () => {
+    const reportPrompt = createReportDeveloperPrompt("{}");
+
+    expect(reportPrompt).toContain("ikke det største isolerte tallet");
+    expect(reportPrompt).toContain("små per-aksje-beløp");
+    expect(reportPrompt).toContain("driftsresultat (ebit)");
+    expect(reportPrompt).toContain("første kvartal' to ganger");
   });
 });

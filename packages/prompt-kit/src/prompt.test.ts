@@ -61,7 +61,7 @@ const sampleYearlyPayload: YearlyReportPromptPayload = {
 
 describe("OpenAI prompt contract", () => {
   it("bumps the prompt version for the editorial guardrail update", () => {
-    expect(PROMPT_VERSION).toBe("v5.3.0");
+    expect(PROMPT_VERSION).toBe("v5.4.0");
   });
 
   it("does not embed the JSON schema in the developer prompt", () => {
@@ -69,6 +69,28 @@ describe("OpenAI prompt contract", () => {
 
     expect(result).not.toContain("JSON schema");
     expect(result).not.toContain('{"type":"object"}');
+  });
+
+  it("includes signal-derived guidance for routine compression and plain explanation", () => {
+    const result = createDeveloperPrompt();
+
+    expect(result).toContain("Rutinesaker skal komprimeres hardt");
+    expect(result).toContain("avlyst reparasjonsemisjon");
+    expect(result).toContain("fullmakt");
+    expect(result).toContain("stemme på vegne av andre aksjonærer");
+    expect(result).toContain("1,3 milliarder kroner");
+    expect(result).toContain("styrke likviditeten");
+    expect(result).toContain("låneendringer");
+  });
+
+  it("includes regression examples for short routine cases", () => {
+    const result = createDeveloperPrompt();
+
+    expect(result).toContain("Avlyst reparasjonsemisjon");
+    expect(result).toContain("Idex dropper reparasjonsemisjon");
+    expect(result).toContain("Fullmakt til generalforsamling");
+    expect(result).toContain("Ren tegningspåminnelse");
+    expect(result).toContain("Meldingen inneholder ingen nye vilkår");
   });
 });
 
@@ -152,6 +174,16 @@ describe("createReportRevisionUserPrompt", () => {
     expect(result).toContain("Ikke la saken bli en ren talliste");
     expect(result).toContain("utsikter");
     expect(result).toContain("markedsforhold");
+  });
+
+  it("tightens report angle, dividend and accounting-language guidance", () => {
+    const result = createReportDeveloperPrompt();
+
+    expect(result).toContain("ikke det største isolerte tallet");
+    expect(result).toContain("små per-aksje-beløp");
+    expect(result).toContain("driftsresultat (ebit)");
+    expect(result).toContain("ebitda");
+    expect(result).toContain("første kvartal' to ganger");
   });
 
   it("keeps report source context and user instruction in revision mode", () => {

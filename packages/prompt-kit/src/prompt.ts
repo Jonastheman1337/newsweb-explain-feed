@@ -14,7 +14,7 @@ import {
   EDITORIAL_WRITING_STYLE
 } from "./shared-editorial.js";
 
-export const PROMPT_VERSION = "v5.3.0";
+export const PROMPT_VERSION = "v5.4.0";
 
 export type PromptPayload = {
   messageId: number;
@@ -61,6 +61,15 @@ Innsidehandel med oppramsing (3 body-avsnitt):
 
 Innsidehandel med ekstra skjema (1 body-avsnitt, merk: skjemareferanse BARE i source_limitations):
 {"title":"Odfjell Technology-topp løser inn alle opsjoner","lead":"Jone Torstensen, en toppleder i Odfjell Technology, har løst inn alle opsjonene sine i selskapet.","body":["Opsjonene ble tildelt i juni 2022 som del av en insentivordning for ansatte. De kunne gjøres opp i aksjer eller kontant basert på aksjeverdien, ifølge børsmeldingen."],"company_sentence":"Odfjell Technology leverer teknologi og løsninger til olje- og gassindustrien.","key_facts":["Primærinnsider har løst inn alle opsjoner","Opsjonene ble tildelt i juni 2022"],"negative_or_surprising":[],"excluded_hype":[],"source_limitations":["Vedlagt skjema med detaljer om antall opsjoner og kurs er ikke analysert"],"confidence":"medium","importance":"uviktig","source_spans":["exercised all of his share options","granted on 14 June 2022"]}
+
+Avlyst reparasjonsemisjon (kort og ferdig i lead):
+{"title":"Idex dropper reparasjonsemisjon","lead":"Biometriselskapet Idex Biometrics dropper den planlagte reparasjonsemisjonen etter at aksjen har handlet til eller under emisjonskursen på 8,25 kroner, ifølge en børsmelding.","body":[],"company_sentence":"Idex Biometrics utvikler løsninger for fingeravtrykk og betalingsteknologi.","key_facts":["Dropper planlagt reparasjonsemisjon","Aksjen har handlet til eller under emisjonskursen"],"negative_or_surprising":[],"excluded_hype":[],"source_limitations":[],"confidence":"high","importance":"uviktig","source_spans":["cancellation of the subsequent offering","traded at or below the subscription price"]}
+
+Fullmakt til generalforsamling (forklar hva fullmakt betyr):
+{"title":"Vow-styreleder kan stemme for 5,65 prosent","lead":"Vow-styreleder Thomas F. Borgen kan stemme for 5,65 prosent av aksjene på generalforsamlingen etter å ha fått fullmakter fra andre aksjonærer, ifølge en børsmelding.","body":["Fullmaktene gjelder bare generalforsamlingen og er uten stemmeinstruks. Det betyr at aksjonærene ikke har sagt hvordan han skal stemme for aksjene."],"company_sentence":"Vow leverer teknologi for avfallshåndtering og ren energi.","key_facts":["Styreleder kan stemme for 5,65 prosent av aksjene","Fullmaktene kommer fra andre aksjonærer"],"negative_or_surprising":[],"excluded_hype":[],"source_limitations":[],"confidence":"high","importance":"uviktig","source_spans":["proxies without voting instructions","5.65% of the shares"]}
+
+Ren tegningspåminnelse (støy, ekstremt kort hvis den likevel skrives):
+{"title":"Awilco LNG har tegningsfrist i dag","lead":"Awilco LNG har siste tegningsdag i reparasjonsemisjonen i dag, ifølge en børsmelding.","body":["Meldingen inneholder ingen nye vilkår eller resultat fra tilbudet."],"company_sentence":"Awilco LNG frakter flytende naturgass.","key_facts":["Siste tegningsdag i reparasjonsemisjon"],"negative_or_surprising":[],"excluded_hype":[],"source_limitations":[],"confidence":"high","importance":"uviktig","source_spans":["last day of subscription period","expires today"]}
 
 Kontrakt (2 body-avsnitt):
 {"title":"AF Gruppen-datter lander 200 mill.-kontrakt","lead":"Betonmast, et datterselskap av AF Gruppen, har signert en kontrakt på 200 mill. kroner med Ragn-Sells for bygging av et nullutslippsanlegg for næringsavfall i Drammen, melder selskapet.","body":["Kontrakten er en totalentreprise, som betyr at Betonmast tar ansvar for hele byggeprosjektet.","Anlegget skal sortere næringsavfall og bygges med tilhørende infrastruktur."],"company_sentence":"Betonmast er et datterselskap av entreprenørkonsernet AF Gruppen.","key_facts":["Kontrakt verdt 200 mill. kroner","Nullutslippsanlegg i Drammen"],"negative_or_surprising":[],"excluded_hype":[],"source_limitations":[],"confidence":"high","importance":"uviktig","source_spans":["kontrakt med Ragn-Sells","totalentreprise med verdi på rundt 200 millioner kroner"]}

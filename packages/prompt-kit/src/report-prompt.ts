@@ -109,6 +109,7 @@ Bruk redaksjonelt skjonn — plukk ut det som er mest nyhetsverdig:
 - Strategiske nyheter, oppkjop eller store hendelser nevnt i rapporten
 
 Vaer fleksibel: Et selskap kan ha enorm omsetningsvekst men nesten null i resultat — det er interessant og saken bor reflektere det. Ikke led mekanisk med resultat for skatt hvis et annet tall forteller den egentlige historien.
+Led med den tydeligste utviklingen for en aksjeeier, ikke det største isolerte tallet. Hvis en kapitalinnhenting, ordrebok eller utbytte er mindre viktig enn resultatretningen, skal resultatretningen styre tittel og lead.
 
 For energi-/oljeselskaper er justert driftsresultat typisk nokkeltallet markedet folger. La deg tilpasse til det rapporten selv vektlegger.
 
@@ -121,6 +122,8 @@ Nar bade en borsmelding og en rapport er tilgjengelig, kombiner dem. Meldingen k
 TALL-DISIPLIN
 - Plukk ut 3-4 nokkeltall. Ikke rams opp alt rapporten inneholder.
 - De viktigste tallene for en aksjeeier er typisk: inntekter, driftsresultat/EBIT, resultat for skatt og utbytte.
+- Ved utbytte: Ikke vinkle tittelen på små per-aksje-beløp alene. Bruk totalbeløp, tydelig endring ('øker', 'kutter', 'holder') eller velg en sterkere resultat-/balansevinkel.
+- Skriv synlige regnskapsforkortelser med små bokstaver: 'driftsresultat (ebit)' og 'driftsresultat før renter, skatt, av- og nedskrivninger (ebitda)'.
 - Etter nøkkeltallene: se etter årsak, utsikter, markedskommentar, risiko eller hendelser etter kvartalsslutt. Ta med én kort forklarende setning hvis kilden gir dekning. Ikke la saken bli en ren talliste.
 - Unnga nisjetall som bruttofortjeneste, 'adjusted operating profit' og andre mellomlinjer med mindre de er selskapets eget nokkeltall.
 - Helårstall kan nevnes kort, men hold fokus på kvartalet.
@@ -136,6 +139,7 @@ ${EDITORIAL_TITLE}
   Nar du bruker punktliste, ta med fjorarstallet med retning: '• Omsetning pa 37,5 millioner dollar, ned fra 44,2 millioner i samme kvartal aret for'
   Hvert punktlisteelement er et eget element i body-arrayen — IKKE en lang streng med alle punkter.
   Maks 3-4 kulepunkter. Velg de viktigste tallene, ikke rams opp alt.
+  Ikke gjenta samme tidsperiode unødig i første setning, som 'første kvartal' to ganger. Varier setningen eller flytt én tidsmarkør.
   Gode titler: 'Subsea 7 femdobler resultatet', 'BW Offshore endte pa bunn av resultatguiding', 'Otovo vil hente inntil 191 millioner', 'Jinhui Shipping i minus i fjerde kvartal'.
   Nar bade resultat og en annen nyhet (oppkjop, emisjon) presenteres samtidig, kan tittelen bruke tankestrek sparsomt. Ikke bruk kolon hvis en normal tittel fungerer.
 - importance: 'viktig' kun ved store overraskelser eller klare kursdrivere. 'medium' for solide rapporter. 'uviktig' for rutine uten overraskelser.
