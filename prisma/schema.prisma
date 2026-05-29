@@ -121,6 +121,8 @@ model GenerationRun {
   jobName             String?      @map("job_name")
   reason              String
   status              String
+  phase               String?
+  phaseUpdatedAt      DateTime?    @map("phase_updated_at")
   userInstruction     String?      @map("user_instruction") @db.Text
   inputJson           Json?        @map("input_json")
   previousRewriteJson Json?        @map("previous_rewrite_json")

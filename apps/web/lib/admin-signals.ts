@@ -98,11 +98,31 @@ export type GenerationSignal = {
   model: string | null;
   promptVersion: string | null;
   promptChars: number | null;
+  reasoningEffortOverride: string | null;
+  modelCalls: ModelCallSignal[];
+  referenceCheck: ReferenceCheckSignal | null;
+  validationJson: Prisma.JsonValue | null;
   errorText: string | null;
+  errorGroup: string | null;
+  errorGroupCount: number;
   requestedAt: string;
   startedAt: string | null;
   finishedAt: string | null;
   notice: NoticeSummary | null;
+};
+
+export type ModelCallSignal = {
+  schemaName: string | null;
+  model: string | null;
+  reasoningEffort: string | null;
+  timeoutMs: number | null;
+  maxOutputTokens: number | null;
+  promptChars: number | null;
+};
+
+export type ReferenceCheckSignal = {
+  summary: string;
+  detailJson: Prisma.JsonValue | null;
 };
 
 export type SignalsData =
@@ -182,6 +202,28 @@ function jsonText(value: Prisma.JsonValue | null): string {
   return JSON.stringify(value);
 }
 
+function asJsonRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function asJsonArray(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
+}
+
+function stringValue(value: unknown): string | null {
+  return typeof value === "string" ? value : null;
+}
+
+function numberValue(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function booleanValue(value: unknown): boolean {
+  return value === true;
+}
+
 function asStringArray(value: Prisma.JsonValue): string[] {
   if (!Array.isArray(value)) return [];
   return value.filter((item): item is string => typeof item === "string");
@@ -189,6 +231,85 @@ function asStringArray(value: Prisma.JsonValue): string[] {
 
 function truncate(value: string, length = 220): string {
   return value.length > length ? `${value.slice(0, length - 1)}...` : value;
+}
+
+function generationErrorGroup(errorText: string | null): string | null {
+  if (!errorText) return null;
+  if (/no output_text/i.test(errorText)) return "openai_no_output_text";
+  if (/request was aborted|aborted|aborterror/i.test(errorText)) {
+    return "openai_request_aborted";
+  }
+  if (/timeout|timed out|etimedout/i.test(errorText)) return "openai_timeout";
+  if (/unterminated string|unexpected token|json/i.test(errorText)) {
+    return "json_parse_error";
+  }
+  return truncate(errorText.replace(/\s+/g, " "), 80);
+}
+
+function extractModelCalls(inputJson: Prisma.JsonValue | null): ModelCallSignal[] {
+  const input = asJsonRecord(inputJson);
+  return asJsonArray(input?.modelCalls)
+    .map(asJsonRecord)
+    .filter((call): call is Record<string, unknown> => call != null)
+    .map((call) => ({
+      schemaName: stringValue(call.schemaName),
+      model: stringValue(call.model),
+      reasoningEffort: stringValue(call.reasoningEffort),
+      timeoutMs: numberValue(call.timeoutMs),
+      maxOutputTokens: numberValue(call.maxOutputTokens),
+      promptChars: numberValue(call.promptChars)
+    }));
+}
+
+function extractReasoningEffortOverride(inputJson: Prisma.JsonValue | null): string | null {
+  const input = asJsonRecord(inputJson);
+  return stringValue(input?.reasoningEffortOverride);
+}
+
+function extractReferenceCheck(
+  validationJson: Prisma.JsonValue | null
+): ReferenceCheckSignal | null {
+  const validation = asJsonRecord(validationJson);
+  const referenceCheck = asJsonRecord(validation?.referenceCheck);
+  if (!referenceCheck) return null;
+
+  const checkerError = stringValue(referenceCheck.checkerError);
+  const initialCoverage = numberValue(referenceCheck.initialCoveragePercent);
+  const finalCoverage = numberValue(referenceCheck.finalCoveragePercent);
+  const unsupportedSentenceCount = numberValue(referenceCheck.unsupportedSentenceCount);
+  const attributionRiskCount = numberValue(referenceCheck.attributionRiskCount);
+  const summaryParts: string[] = [];
+
+  if (checkerError) {
+    summaryParts.push(`checker error: ${truncate(checkerError, 90)}`);
+  } else if (finalCoverage != null) {
+    summaryParts.push(`${finalCoverage}% grounded`);
+  } else if (initialCoverage != null) {
+    summaryParts.push(`${initialCoverage}% grounded initially`);
+  } else {
+    summaryParts.push("ran");
+  }
+
+  if (unsupportedSentenceCount != null) {
+    summaryParts.push(`${unsupportedSentenceCount} unsupported`);
+  }
+  if (booleanValue(referenceCheck.correctionApplied)) {
+    summaryParts.push("fact correction applied");
+  }
+  if (booleanValue(referenceCheck.attributionCorrectionApplied)) {
+    summaryParts.push("attribution corrected");
+  }
+  if (attributionRiskCount != null && attributionRiskCount > 0) {
+    summaryParts.push(`${attributionRiskCount} attribution risks`);
+  }
+  if (booleanValue(referenceCheck.importanceAdjusted)) {
+    summaryParts.push("importance adjusted");
+  }
+
+  return {
+    summary: summaryParts.join(" | "),
+    detailJson: referenceCheck as Prisma.JsonValue
+  };
 }
 
 async function fetchNoticeMap(messageIds: Array<number | null | undefined>) {
@@ -430,6 +551,8 @@ async function getGenerations(
         model: true,
         promptVersion: true,
         promptChars: true,
+        inputJson: true,
+        validationJson: true,
         errorText: true,
         requestedAt: true,
         startedAt: true,
@@ -439,6 +562,9 @@ async function getGenerations(
     return rows.map((row) => ({
       ...row,
       sourceDb,
+      reasoningEffortOverride: extractReasoningEffortOverride(row.inputJson),
+      modelCalls: extractModelCalls(row.inputJson),
+      referenceCheck: extractReferenceCheck(row.validationJson),
       requestedAt: row.requestedAt.toISOString(),
       startedAt: row.startedAt?.toISOString() ?? null,
       finishedAt: row.finishedAt?.toISOString() ?? null,
@@ -449,10 +575,25 @@ async function getGenerations(
   const sortedRows = result.rows
     .sort((a, b) => b.requestedAt.localeCompare(a.requestedAt))
     .slice(0, query.limit);
-  const noticeMap = await fetchNoticeMap(sortedRows.map((row) => row.messageId));
+  const errorGroupCounts = new Map<string, number>();
+  for (const row of sortedRows) {
+    const group = generationErrorGroup(row.errorText);
+    if (group) {
+      errorGroupCounts.set(group, (errorGroupCounts.get(group) ?? 0) + 1);
+    }
+  }
+  const groupedRows = sortedRows.map((row) => {
+    const errorGroup = generationErrorGroup(row.errorText);
+    return {
+      ...row,
+      errorGroup,
+      errorGroupCount: errorGroup ? errorGroupCounts.get(errorGroup) ?? 0 : 0
+    };
+  });
+  const noticeMap = await fetchNoticeMap(groupedRows.map((row) => row.messageId));
 
   return {
-    rows: attachNotice(sortedRows, noticeMap),
+    rows: attachNotice(groupedRows, noticeMap),
     warnings: result.warnings
   };
 }
@@ -658,9 +799,16 @@ export async function getSignalsCsv(query: SignalsQuery): Promise<string> {
       "model",
       "prompt_version",
       "prompt_chars",
+      "reasoning_override",
+      "model_calls",
+      "reference_check_summary",
+      "reference_check_json",
+      "validation_json",
       "started_at",
       "finished_at",
-      "error_text"
+      "error_text",
+      "error_group",
+      "error_group_count"
     ],
     data.rows.map((row) => [
       row.requestedAt,
@@ -676,9 +824,16 @@ export async function getSignalsCsv(query: SignalsQuery): Promise<string> {
       row.model,
       row.promptVersion,
       row.promptChars,
+      row.reasoningEffortOverride,
+      jsonText(row.modelCalls as unknown as Prisma.JsonValue),
+      row.referenceCheck?.summary ?? null,
+      jsonText(row.referenceCheck?.detailJson ?? null),
+      jsonText(row.validationJson),
       row.startedAt,
       row.finishedAt,
-      row.errorText
+      row.errorText,
+      row.errorGroup,
+      row.errorGroupCount
     ])
   );
 }

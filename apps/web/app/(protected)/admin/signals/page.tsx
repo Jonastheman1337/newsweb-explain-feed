@@ -84,6 +84,34 @@ function TextDetails({ label, value }: { label: string; value: string | null }) 
   );
 }
 
+function modelCallsText(row: GenerationSignal): string | null {
+  if (!row.modelCalls.length) return null;
+  return row.modelCalls
+    .map((call) => {
+      const name = call.schemaName ?? "model_call";
+      const reasoning = call.reasoningEffort ?? "-";
+      const promptChars = call.promptChars != null ? `, ${call.promptChars} chars` : "";
+      const timeout = call.timeoutMs != null ? `, timeout ${call.timeoutMs}ms` : "";
+      const maxTokens =
+        call.maxOutputTokens != null ? `, max ${call.maxOutputTokens} tokens` : "";
+      return `${name}: ${reasoning}${promptChars}${timeout}${maxTokens}`;
+    })
+    .join("\n");
+}
+
+function ReferenceCheckDetails({ row }: { row: GenerationSignal }) {
+  if (!row.referenceCheck) return null;
+  return (
+    <div className="signalsMeta">
+      <div>Reference check: {row.referenceCheck.summary}</div>
+      <TextDetails
+        label="Reference details"
+        value={previewJson(row.referenceCheck.detailJson)}
+      />
+    </div>
+  );
+}
+
 function FeedbackTable({ rows }: { rows: FeedbackSignal[] }) {
   if (!rows.length) return <EmptyState />;
   return (
@@ -254,14 +282,25 @@ function GenerationsTable({ rows }: { rows: GenerationSignal[] }) {
             <td>
               <span className="signalsBadge">{row.status}</span>
               <div className="muted">{row.jobName ?? row.jobId ?? ""}</div>
+              {row.errorGroup ? (
+                <div className="muted">
+                  Group: {row.errorGroup} ({row.errorGroupCount})
+                </div>
+              ) : null}
             </td>
             <td className="signalsMeta">
               <div>{row.model ?? "-"}</div>
               <div>{row.promptVersion ?? "-"}</div>
               <div>{row.promptChars ?? "-"} chars</div>
+              {row.reasoningEffortOverride ? (
+                <div>Override: {row.reasoningEffortOverride}</div>
+              ) : null}
+              <TextDetails label="Model calls" value={modelCallsText(row)} />
             </td>
             <td>
               <TextDetails label="User instruction" value={row.userInstruction} />
+              <ReferenceCheckDetails row={row} />
+              <TextDetails label="Validation" value={previewJson(row.validationJson)} />
               <TextDetails label="Error" value={row.errorText} />
             </td>
           </tr>

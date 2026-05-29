@@ -49,8 +49,17 @@ function feedItem(rewrites: ReturnType<typeof rewrite>[]) {
       categoriesJson: [],
       marketsJson: [],
       bodyText: "Original meldingstekst.",
-      hasAttachments: false,
-      rawMessageJson: {},
+      hasAttachments: true,
+      rawMessageJson: {
+        attachments: [
+          {
+            id: 77,
+            name: "rapport.pdf",
+            contentType: "application/pdf",
+            size: 987
+          }
+        ]
+      },
       ingestedAt: new Date("2026-05-07T08:00:00.000Z"),
       rewrites
     }
@@ -68,6 +77,14 @@ describe("mapDbItemToFeedItem", () => {
 
     expect(item?.processing).toBe(false);
     expect(item?.title).toBe("Publisert versjon 1");
+    expect(item?.attachments).toEqual([
+      {
+        id: 77,
+        fileName: "rapport.pdf",
+        fileType: "application/pdf",
+        fileSize: 987
+      }
+    ]);
   });
 
   it("reports processing when only a pending rewrite exists", () => {

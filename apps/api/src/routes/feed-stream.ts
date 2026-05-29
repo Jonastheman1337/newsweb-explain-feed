@@ -4,9 +4,9 @@ import type { FastifyPluginAsync } from "fastify";
 import { Redis } from "ioredis";
 import { mapDbItemToFeedItem } from "../services/feed-item-mapper.js";
 
-type FeedUpdateState = "source" | "processing" | "published";
+type FeedUpdateState = "source" | "processing" | "published" | "failed";
 
-function parseFeedUpdate(message: string): {
+export function parseFeedUpdate(message: string): {
   messageId: number;
   state?: FeedUpdateState;
 } {
@@ -19,13 +19,14 @@ function parseFeedUpdate(message: string): {
     state:
       parsed.state === "source" ||
       parsed.state === "processing" ||
-      parsed.state === "published"
+      parsed.state === "published" ||
+      parsed.state === "failed"
         ? parsed.state
         : undefined
   };
 }
 
-function applyFeedUpdateState(
+export function applyFeedUpdateState(
   item: FeedItem,
   state: FeedUpdateState | undefined
 ): FeedItem {
@@ -77,7 +78,7 @@ export const feedStreamRoutes: FastifyPluginAsync = async (fastify) => {
 
       reply.raw.writeHead(200, {
         "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache",
+        "Cache-Control": "no-cache, no-transform",
         Connection: "keep-alive",
         "X-Accel-Buffering": "no"
       });

@@ -1,15 +1,31 @@
 import { SourceBodyText } from "./source-body-text";
+import { AttachmentLinks } from "./attachment-links";
 
-type SplitViewPanelProps = {
-  sourceTitle: string;
-  sourceBodyText: string;
+type Attachment = {
+  id: number;
+  fileName: string;
+  fileType: string | null;
+  fileSize: number | null;
 };
 
-export function SplitViewPanel({ sourceTitle, sourceBodyText }: SplitViewPanelProps) {
+type SplitViewPanelProps = {
+  messageId: number;
+  sourceTitle: string;
+  sourceBodyText: string;
+  attachments: Attachment[];
+};
+
+export function SplitViewPanel({
+  messageId,
+  sourceTitle,
+  sourceBodyText,
+  attachments
+}: SplitViewPanelProps) {
   return (
     <div>
       <h3>{sourceTitle}</h3>
       <SourceBodyText text={sourceBodyText} />
+      <AttachmentLinks messageId={messageId} attachments={attachments} />
     </div>
   );
 }

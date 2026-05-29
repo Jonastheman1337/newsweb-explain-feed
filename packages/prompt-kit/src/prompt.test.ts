@@ -7,6 +7,7 @@ import {
   type PromptPayload
 } from "./prompt.js";
 import {
+  createReportDeveloperPrompt,
   createReportRevisionUserPrompt,
   type ReportPromptPayload
 } from "./report-prompt.js";
@@ -60,7 +61,7 @@ const sampleYearlyPayload: YearlyReportPromptPayload = {
 
 describe("OpenAI prompt contract", () => {
   it("bumps the prompt version for the editorial guardrail update", () => {
-    expect(PROMPT_VERSION).toBe("v5.1.0");
+    expect(PROMPT_VERSION).toBe("v5.3.0");
   });
 
   it("does not embed the JSON schema in the developer prompt", () => {
@@ -127,9 +128,32 @@ describe("createRevisionUserPrompt", () => {
     expect(result).toContain("For komplisert");
     expect(result).toContain("Vinkle pa kontrakten");
   });
+
+  it("labels supplemental source text without visible PDF language", () => {
+    const result = createRevisionUserPrompt(
+      {
+        ...samplePayload,
+        hasAttachments: true,
+        pdfSupplementText: "Selskapet opplyser at avtalen er signert."
+      },
+      sampleOutput,
+      "Bruk ekstra kildetekst"
+    );
+
+    expect(result).toContain("EKSTRA KILDETEKST FRA SELSKAPET");
+    expect(result).not.toContain("PDF-VEDLEGG");
+  });
 });
 
 describe("createReportRevisionUserPrompt", () => {
+  it("asks report rewrites to include context beyond a pure number list", () => {
+    const result = createReportDeveloperPrompt();
+
+    expect(result).toContain("Ikke la saken bli en ren talliste");
+    expect(result).toContain("utsikter");
+    expect(result).toContain("markedsforhold");
+  });
+
   it("keeps report source context and user instruction in revision mode", () => {
     const result = createReportRevisionUserPrompt(
       sampleReportPayload,
@@ -138,7 +162,7 @@ describe("createReportRevisionUserPrompt", () => {
     );
 
     expect(result).toContain("rapportnyheten");
-    expect(result).toContain("KILDE (KURATERT RAPPORTKONTEKST FRA PDF):");
+    expect(result).toContain("KILDE (KURATERT RAPPORTKONTEKST):");
     expect(result).toContain(sampleReportPayload.reportText);
     expect(result).toContain("FORRIGE VERSJON");
     expect(result).toContain("Vinkle mer pa inntektsveksten");

@@ -14,7 +14,7 @@ import {
   EDITORIAL_WRITING_STYLE
 } from "./shared-editorial.js";
 
-export const PROMPT_VERSION = "v5.1.0";
+export const PROMPT_VERSION = "v5.3.0";
 
 export type PromptPayload = {
   messageId: number;
@@ -59,7 +59,7 @@ Kort rutinemelding (1 body-avsnitt):
 Innsidehandel med oppramsing (3 body-avsnitt):
 {"title":"ABG-topper selger aksjer for over 24 mill.","lead":"To av toppsjefene i meglerhuset ABG Sundal Collier har solgt aksjer i eget selskap for til sammen over 24 mill. kroner, viser en børsmelding.","body":["Styreleder Knut Brundtland solgte aksjer for ca. 13,5 mill. kroner, til en kurs på 8 kroner per aksje.","Aksjesjef Hans Øyvind Haukeli solgte for ca. 10,8 mill. kroner til samme kurs.","Til sammen er det solgt aksjer for over 24 mill. kroner."],"company_sentence":"ABG Sundal Collier er et nordisk megler- og investeringsselskap.","key_facts":["To toppledere solgt for til sammen over 24 mill.","Kurs 8 kroner per aksje"],"negative_or_surprising":["Stort innsidersalg fra to toppledere samtidig"],"excluded_hype":[],"source_limitations":[],"confidence":"high","importance":"medium","source_spans":["solgt 1.690.000 ABG-aksjer til en kurs på 8 kroner","solgt 1.352.000 aksjer"]}
 
-Innsidehandel med vedlegg (1 body-avsnitt, merk: vedleggreferanse BARE i source_limitations):
+Innsidehandel med ekstra skjema (1 body-avsnitt, merk: skjemareferanse BARE i source_limitations):
 {"title":"Odfjell Technology-topp løser inn alle opsjoner","lead":"Jone Torstensen, en toppleder i Odfjell Technology, har løst inn alle opsjonene sine i selskapet.","body":["Opsjonene ble tildelt i juni 2022 som del av en insentivordning for ansatte. De kunne gjøres opp i aksjer eller kontant basert på aksjeverdien, ifølge børsmeldingen."],"company_sentence":"Odfjell Technology leverer teknologi og løsninger til olje- og gassindustrien.","key_facts":["Primærinnsider har løst inn alle opsjoner","Opsjonene ble tildelt i juni 2022"],"negative_or_surprising":[],"excluded_hype":[],"source_limitations":["Vedlagt skjema med detaljer om antall opsjoner og kurs er ikke analysert"],"confidence":"medium","importance":"uviktig","source_spans":["exercised all of his share options","granted on 14 June 2022"]}
 
 Kontrakt (2 body-avsnitt):
@@ -79,6 +79,8 @@ Leseren er en privatinvestor som kanskje gar pa videregaende og er interessert i
 
 ${EDITORIAL_AUDIENCE}
 - Vi er ikke papegøyer som bare omformulerer borsmeldingen. Vi plukker ut det viktige, overraskende eller dramatiske.
+- Ikke prøv å løfte rutineinformasjon over nyhetsterskelen. Hvis tilgjengelig tekst bare sier at et dokument, en presentasjon eller et skjema er publisert, er det støy: skriv ekstremt kort, sett importance til 'uviktig' og legg manglende grunnlag i source_limitations.
+- Rene påminnelser om tegningsperiode, siste tegningsdag eller oppstart av tegningsperiode er støy hvis de ikke inneholder nye vilkår, proveny, resultat eller konsekvens.
 
 ${EDITORIAL_LANGUAGE}
 
@@ -90,7 +92,7 @@ ${EDITORIAL_TITLE}
   Korte avsnitt med oppramsing av datapunkter (innsidehandler, kursendringer o.l.) er ok.
   Gode titler: 'Scatec starter bygging av solkraftverk', 'Polight får millionordre', 'Awilco henter 251 millioner', 'Tre trekker seg før KMC-sammenslåing'.
   Darlige titler: 'Scatec starter bygging av 255 MW solkraftverk i Sør-Afrika', 'Tre trekker seg fra KMC Properties-fusjonen'.
-  Nar tittelen har to poeng, bruk tankestrek eller kolon: 'Awilco henter 251 mill. – satser pa LNG-handel' (her er 'mill.' ok fordi tittelen ellers blir for lang).
+  Nar tittelen har to poeng, bruk helst en normal verbtittel. Tankestrek kan brukes sparsomt; kolon skal nesten aldri brukes.
   Dropp kvalifiseringer i tittelen som leseren ikke kan vurdere ('fra AR-selskap', 'til Bangkok'). La slike detaljer sta i lead.
   Nar et tall er like over en terskel (f.eks. 1,1 mill.), kan det vaere mer slagkraftig a runde av i tittelen: 'millionordre'. Det eksakte tallet kan sta i lead.
 - importance: ${EDITORIAL_IMPORTANCE.split("\n").slice(1).map(l => l.trim()).join(" ")}
@@ -117,7 +119,7 @@ ${STYLE_EXAMPLES}
 
 Sprak: norsk Bokmal. Tone: noytral, enkel, lett a forsta for en privatinvestor uten profesjonell finansbakgrunn.
 Bruk kun tall og fakta som finnes i kilden.
-Hvis meldingen viser til vedlegg, legg inn en begrensning i source_limitations om at vedlegg ikke er analysert.
+Hvis meldingen viser til ekstra dokumenter som ikke er analysert, legg inn begrensningen i source_limitations. Ikke vis dette i title, lead eller body.
 
 ${EDITORIAL_NORWEGIAN}`;
 }
@@ -157,8 +159,8 @@ export function createUserPrompt(payload: PromptPayload): string {
   if (payload.pdfSupplementText) {
     parts.push(
       "",
-      "SUPPLERENDE KILDE (PDF-VEDLEGG):",
-      "Bruk PDF-vedlegget kun hvis det inneholder nyhetsverdige opplysninger som ikke dekkes av borsmeldingen.",
+      "EKSTRA KILDETEKST FRA SELSKAPET:",
+      "Bruk denne kildeteksten kun hvis den inneholder nyhetsverdige opplysninger som ikke dekkes av borsmeldingen.",
       "<<<",
       payload.pdfSupplementText,
       ">>>"
@@ -203,7 +205,8 @@ export function createRevisionUserPrompt(
     "Lag en revidert versjon av nyhetssaken under, basert pa instruksjonen.",
     "VIKTIG: Instruksjonen er styrende. Hvis instruksjonen ber om ny vinkel, annet fokus, annen struktur, annen lengde eller stor omskriving, skal du endre alle berorte felt tydelig.",
     "Behold bare tekst som fortsatt passer med instruksjonen. Ikke gjor tilfeldige smaendringer for variasjon.",
-    "Hvis instruksjonen er smal og konkret, endrer du bare det som trengs. Hvis instruksjonen er bred, kan du skrive om tittel, lead, body, key_facts, importance og source_spans sa mye som nodvendig.",
+    "Hvis instruksjonen er smal og konkret, endrer du bare det som trengs. Sarlig ved 'fjern/kutt/dropp/ta bort dette: ...' skal du fjerne bare den angitte teksten og ellers bevare forrige versjon.",
+    "Hvis instruksjonen er bred, kan du skrive om tittel, lead, body, key_facts, importance og source_spans sa mye som nodvendig.",
     "Lead + body maks 1000 tegn og maks 8 body-avsnitt. Disse grensene gjelder med mindre instruksjonen eksplisitt ber om lengre tekst.",
     "Hvis instruksjonen ber deg fokusere mer pa noe, kutt eller kort ned andre deler for a holde deg innenfor grensene. Prioriter, ikke utvid.",
     "Eksempler pa instruksjoner og forventet oppforsel:",
@@ -234,8 +237,8 @@ export function createRevisionUserPrompt(
     ...(payload.pdfSupplementText
       ? [
           "",
-          "SUPPLERENDE KILDE (PDF-VEDLEGG):",
-          "Bruk PDF-vedlegget kun hvis det inneholder nyhetsverdige opplysninger som ikke dekkes av borsmeldingen.",
+          "EKSTRA KILDETEKST FRA SELSKAPET:",
+          "Bruk denne kildeteksten kun hvis den inneholder nyhetsverdige opplysninger som ikke dekkes av borsmeldingen.",
           "<<<",
           payload.pdfSupplementText,
           ">>>"

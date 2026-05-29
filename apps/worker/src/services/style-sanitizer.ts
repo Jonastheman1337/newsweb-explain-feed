@@ -13,6 +13,7 @@ export type StyleSanitizationStats = {
   expandedMarketCodes: number;
   removedAsaSuffix: number;
   replacedPercentSigns: number;
+  normalizedBillionPhrases: number;
 };
 
 export type StyleSanitizationResult = {
@@ -26,6 +27,30 @@ function normalizeFiscalYearToken(rawYear: string): string {
     return `regnskapsaret 20${year}`;
   }
   return `regnskapsaret ${year}`;
+}
+
+function parseNorwegianInteger(raw: string): number | null {
+  const normalized = raw.replace(/[ .]/g, "");
+  if (!/^\d+$/.test(normalized)) {
+    return null;
+  }
+  const value = Number(normalized);
+  return Number.isSafeInteger(value) ? value : null;
+}
+
+function formatBillionFromMillions(millionAmount: number): string {
+  if (millionAmount === 1000) {
+    return "én milliard";
+  }
+  const billions = millionAmount / 1000;
+  if (Number.isInteger(billions)) {
+    return `${billions} milliarder`;
+  }
+  return `${billions
+    .toFixed(3)
+    .replace(/0+$/g, "")
+    .replace(/\.$/g, "")
+    .replace(".", ",")} milliarder`;
 }
 
 function sanitizeText(text: string, stats: StyleSanitizationStats): string {
@@ -55,6 +80,19 @@ function sanitizeText(text: string, stats: StyleSanitizationStats): string {
     stats.replacedPercentSigns += 1;
     return " prosent";
   });
+
+  result = result.replace(
+    /\b(\d{1,3}(?:[ .]\d{3})+|\d{4,})\s+millioner(?:\s+kroner)?\b/gi,
+    (match: string, rawAmount: string) => {
+      const millionAmount = parseNorwegianInteger(rawAmount);
+      if (millionAmount == null || millionAmount < 1000) {
+        return match;
+      }
+      stats.normalizedBillionPhrases += 1;
+      const formatted = formatBillionFromMillions(millionAmount);
+      return /\bkroner\b/i.test(match) ? `${formatted} kroner` : formatted;
+    }
+  );
 
   result = result.replace(/\s+([,.;:!?])/g, "$1");
   result = result.replace(/\s{2,}/g, " ");
@@ -91,7 +129,8 @@ export function sanitizeRewriteStyle(rewrite: RewriteOutput): StyleSanitizationR
     replacedFiscalYearAbbrev: 0,
     expandedMarketCodes: 0,
     removedAsaSuffix: 0,
-    replacedPercentSigns: 0
+    replacedPercentSigns: 0,
+    normalizedBillionPhrases: 0
   };
 
   const sanitized: RewriteOutput = {
@@ -111,7 +150,8 @@ export function sanitizeRewriteStyle(rewrite: RewriteOutput): StyleSanitizationR
     stats.replacedFiscalYearAbbrev > 0 ||
     stats.expandedMarketCodes > 0 ||
     stats.removedAsaSuffix > 0 ||
-    stats.replacedPercentSigns > 0;
+    stats.replacedPercentSigns > 0 ||
+    stats.normalizedBillionPhrases > 0;
 
   return {
     rewrite: sanitized,

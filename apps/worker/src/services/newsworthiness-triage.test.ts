@@ -1,7 +1,9 @@
 import { needsNewsworthinessTriage } from "@newsweb/shared";
 import { describe, expect, it } from "vitest";
 import {
+  TRIAGE_PROMPT,
   buildTriageUserPrompt,
+  getDeterministicTriageSkip,
   parseTriageResponse
 } from "./newsworthiness-triage.js";
 
@@ -15,6 +17,7 @@ describe("needsNewsworthinessTriage", () => {
     expect(
       needsNewsworthinessTriage(["IKKE-INFORMASJONSPLIKTIGE PRESSEMELDINGER"])
     ).toBe(true);
+    expect(needsNewsworthinessTriage(["FLAGGING"])).toBe(true);
   });
 
   it("returns false for yearly report categories (handled by yearly report pipeline)", () => {
@@ -60,10 +63,77 @@ describe("buildTriageUserPrompt", () => {
     expect(prompt).toContain("Body text here");
   });
 
-  it("truncates body to 500 chars", () => {
-    const longBody = "A".repeat(1000);
+  it("truncates body to 1200 chars", () => {
+    const longBody = "A".repeat(2000);
     const prompt = buildTriageUserPrompt("Title", longBody, []);
-    expect(prompt.length).toBeLessThan(600);
+    expect(prompt.length).toBeLessThan(1300);
+  });
+
+  it("includes attachment context when provided", () => {
+    const prompt = buildTriageUserPrompt(
+      "Disclosure of Large Shareholdings",
+      "See attached notification form.",
+      ["FLAGGING"],
+      true
+    );
+
+    expect(prompt).toContain("Har vedlegg: ja");
+  });
+});
+
+describe("getDeterministicTriageSkip", () => {
+  it("skips document-only report publication notices", () => {
+    const result = getDeterministicTriageSkip(
+      "28-2026 5th Planet Games A/S - Interim Report Q1 2026",
+      "COPENHAGEN, May 21, 2026: The interim report for Q1 2026 has been released today. The full report can be viewed by clicking the link at the end of this document.",
+      ["IKKE-INFORMASJONSPLIKTIGE PRESSEMELDINGER"],
+      false
+    );
+
+    expect(result?.newsworthy).toBe(false);
+    expect(result?.kind).toBe("document-only");
+  });
+
+  it("keeps document notices with substantive financial facts", () => {
+    const result = getDeterministicTriageSkip(
+      "DOF Group ASA - Financial Report for 1st quarter 2026",
+      "Revenue increased to USD 475 million. Operating income was USD 94 million and the company declares a dividend of USD 0.37 per share.",
+      ["HALVÅRSRAPPORTER OG REVISJONSBERETNINGER / UTTALELSER OM FORENKLET REVISORKONTROLL"],
+      true
+    );
+
+    expect(result).toBeNull();
+  });
+
+  it("skips pure subscription-period reminders", () => {
+    const result = getDeterministicTriageSkip(
+      "AWILCO LNG ASA - LAST DAY OF SUBSCRIPTION PERIOD IN SUBSEQUENT OFFERING",
+      "The subscription period expires today at 16:30. Subscription rights not used before expiry will have no value.",
+      ["ANNEN INFORMASJONSPLIKTIG REGULATORISK INFORMASJON"],
+      false
+    );
+
+    expect(result?.newsworthy).toBe(false);
+    expect(result?.kind).toBe("routine-reminder");
+  });
+
+  it("keeps subscription-period notices with a new outcome", () => {
+    const result = getDeterministicTriageSkip(
+      "Result of subsequent offering",
+      "The subsequent offering was fully subscribed and gross proceeds were NOK 40 million.",
+      ["ANNEN INFORMASJONSPLIKTIG REGULATORISK INFORMASJON"],
+      false
+    );
+
+    expect(result).toBeNull();
+  });
+});
+
+describe("TRIAGE_PROMPT", () => {
+  it("explicitly rejects document-only and attachment-only notices", () => {
+    expect(TRIAGE_PROMPT).toContain("Form 6-K");
+    expect(TRIAGE_PROMPT).toContain("Invitasjoner til resultatpresentasjoner");
+    expect(TRIAGE_PROMPT).toContain("bare kan skrives ved å lese et vedlegg");
   });
 });
 

@@ -28,6 +28,8 @@ export const EDITORIAL_LANGUAGE = `SPRAK OG FORENKLING
 - Poenget er: bruk termen + forklar i samme eller neste setning. Da lærer leseren begrepet.
 - Unnga lange, tunge setninger. Bryt dem opp.
 - Produktnavn og tekniske betegnelser fra kilden er ofte uforståelige for leseren. Forklar kort hva produktet eller teknologien gjør, eller generaliser.
+- Før du leverer: finn alle fagord, produktnavn, forkortelser og tekniske uttrykk en vanlig privatinvestor kan snuble i. Hvis ordet er nødvendig, forklar det naturlig i samme eller neste setning. Hvis du ikke kan forklare det kort med kilden som grunnlag, generaliser eller dropp ordet.
+- Eksempler: Forklar ord som 'terminer', 'tegningsretter', 'reparasjonsemisjon', 'innkvartering', 'AAV', 'uttrykkssystem' og 'genuttrykk' hvis de må brukes. Ikke anta at leseren vet hva de betyr.
 - Bransje- og energiforkortelser ma forklares naturlig forste gang: 'Awilco, som frakter flytende naturgass (LNG)'. Etter forste forklaring kan forkortelsen brukes alene.
 - Forenkle teknisk sprak fra kilden. Bruk «» for a vise at du parafraserer selskapets egne ord.
 - Skriv norsk, ikke engelske lanord. Hvis det finnes et godt norsk ord, bruk det. 'Helseteknologi' er bedre enn 'medtech', 'programvare' er bedre enn 'software', 'skytjenester' er bedre enn 'cloud services'. Engelske bransjetermer og produktnavn er ok nar det ikke finnes et naturlig norsk alternativ.`;
@@ -47,16 +49,19 @@ export const EDITORIAL_WRITING_STYLE = `SKRIVESTIL
 - Aktiv form og presens. Ved ferske hendelser, bruk tidsnaer presens (f.eks. 'gar av') fremfor preteritum.
 - Ga rett pa saken i forste setning. Unnga tomme innledninger som 'har kunngjort' og 'kort fortalt'.
 - Hvert avsnitt tilforer ny informasjon. Unnga gjentakelser.
+- Ikke gjenta samme tall eller faktum i flere avsnitt. Ved oppramsing med samme kurs, pris eller dato: skriv fellesopplysningen én gang samlet.
 - Behold egennavn og titler korrekt, men normaliser selskapsnavn til vanlig stor forbokstav. Skriv 'Polight' ikke 'poLight', 'Idex' ikke 'IDEX'. Unntak: forkortelser som er allment kjent (ABB, DNB).
 - Skriv naturlig norsk, ikke ordrett maskinoversettelse. Unnga passiv og tungt hjelpeverb-sprak.
 - Vev selskapskontekst naturlig inn i forste setning.
 - Skriv ut 'millioner' og 'milliarder' i titler og lopende tekst. Forkortelsene 'mill.' og 'mrd.' kan brukes nar tittelen ellers blir for lang (over 8 ord) eller i oppramsinger med mange tall.
+- Skriv beløp på 1.000 millioner eller mer som milliarder: 'én milliard kroner', '1,2 milliarder kroner', ikke '1.000 millioner' eller '1.200 millioner'.
+- Bruk kolon sjelden i titler. Foretrekk en normal setning eller verbtittel nar det fungerer.
 - Skriv 'prosent', ikke '%', i title, lead og body.
 - Bruk norsk tallformat med punktum som tusenskille: '3.193.485', ikke '3 193 485'. Desimaltegn er komma: '1,5 mill.'.
 - Gjengi summer og valuta slik de star i kilden. Ikke regn om valuta til kroner eller annen valuta med mindre kilden selv oppgir omregningen.
 - Bruk publiseringstidspunktet i metadata som anker for relative datoer som 'i dag', 'i gar', 'onsdag' og 'i ar'. Ikke bruk dagens kalenderdato hvis den ikke er samme dato som meldingen.
 - Oppgi alltid YoY-endring nar tilgjengelig (f.eks. 'opp fra 150 mill. i samme kvartal i fjor').
-- Regn ut totalbelop nar kilden oppgir antall og kurs separat.
+- Regn ut totalbelop nar kilden oppgir antall og kurs separat. Hvis antall ganger pris gir et tydelig belop, skriv belopet direkte; ikke skriv 'kan utgjore' med mindre antall eller pris er usikkert.
 - Foretrekk konkrete verb fremfor abstrakte substantiv.
 - Vaer konkret med tall. Ikke skriv 'betydelig vekst' — skriv hvor mye.
 - Ikke bruk vage kvalifiseringer som 'klar fremgang', 'sterk utvikling', 'solid vekst', 'markant okning' uten a folge opp med konkrete tall i samme setning. Enten gi tallene med en gang, eller dropp kvalifiseringen.
@@ -71,12 +76,14 @@ export const EDITORIAL_NO_MARKET_COMMENTARY = `INGEN KURSKOMMENTAR ELLER INVESTE
 export const EDITORIAL_ATTRIBUTION = `ATTRIBUSJON OG FORBEHOLD
 - Kildehenvisning SKAL inn i forste eller andre setning: 'ifolge en borsmelding', 'viser kvartalsrapporten', 'melder selskapet'. Leseren ma vite hvor informasjonen kommer fra med en gang.
 - Attribuer selskapets egne pastander: 'melder selskapet', 'ifolge borsmeldingen', 'skriver selskapet'.
+- I title, lead og body: Aldri skriv 'PDF', 'vedlegg', 'vedlagte skjema', 'i vedlegget', 'rapportkontekst', 'analysert tekst/materiale' eller 'ikke oppgitt'. Hvis opplysningen kommer fra ekstra kildetekst, attribuer nøytralt: 'selskapet skriver', 'selskapet opplyser' eller 'ifølge meldingen'.
 - Effekt- eller verdipastander krever forbehold: 'kan', 'ifolge selskapet'.
 - Formuleringer som 'milepael', 'styrker posisjon', 'betydelig' ma attribueres til kilden eller utelates.
 - Foretrekk noktern formulering fremfor overdrivende ordvalg.
 - Subjektive vurderinger skal aldri sta som objektivt faktum.
 - Hvis kilden omtaler kritikk, anklager, gransking, soksmal eller mulig straffbart forhold, og kilden ogsa inneholder tilsvar, avvisning eller at noen bestrider forholdet, skal tilsvaret med i lead/body.
-- Ikke adopter selskapets framing av egne nyheter. Nar et selskap toner ned, normaliserer eller fortolker en negativ hendelse (avslag, tap, forsinkelse, sokmalsmal), er det selskapets vurdering — ikke var. Gjengi slike karakteriseringer med «» og tydelig attribusjon. Eksempel: Selskapet skriver at slike avslag «ikke er uvanlige» for ny medisinsk teknologi — IKKE: Selskapet understreker at slike avslag ikke er uvanlige. Bruk noytrale rapporteringsverb ('skriver', 'sier', 'opplyser') fremfor verb som forsterker selskapets posisjon ('understreker', 'fremhever', 'paapeker', 'vektlegger').`;
+- Ikke adopter selskapets framing av egne nyheter. Nar et selskap toner ned, normaliserer eller fortolker en negativ hendelse (avslag, tap, forsinkelse, sokmalsmal), er det selskapets vurdering — ikke var. Gjengi slike karakteriseringer med «» og tydelig attribusjon. Eksempel: Selskapet skriver at slike avslag «ikke er uvanlige» for ny medisinsk teknologi — IKKE: Selskapet understreker at slike avslag ikke er uvanlige. Bruk noytrale rapporteringsverb ('skriver', 'sier', 'opplyser') fremfor verb som forsterker selskapets posisjon ('understreker', 'fremhever', 'paapeker', 'vektlegger').
+- Ikke ta med defensiv forklaring fra selskapet bare for balanse. Ta den bare med hvis den forklarer det materielle nyhetspunktet, og attribuer noytralt.`;
 
 export const EDITORIAL_QUOTES = `SITATER OG PARAFRASERING
 To ulike verktoy:
@@ -94,8 +101,9 @@ export const EDITORIAL_AVOID = `UNNGA
 - Selskapsendelsen 'ASA' i title, lead, body og company_sentence.
 - Oppsummeringssprak: 'oppsummerer', 'i teksten star det', 'denne meldingen viser'.
 - Meta-kommentarer om meldingskategorien.
+- Synlig ekstraksjonssprak som 'rapportkontekst', 'analysert materiale', 'analysert tekst', 'ikke oppgitt' eller 'ikke opplyst'.
 - Finansjargong uten kontekst. Fagbegreper ma folges av en forklaring.
-- Tomme referanser til vedlegg i body/lead. Bruk source_limitations for mangler.`;
+- Synlige referanser til PDF, vedlegg eller skjema i title, lead og body. Bruk source_limitations for mangler.`;
 
 export const EDITORIAL_IMPORTANCE = `IMPORTANCE
 - 'viktig': kun ved klare signaler om stor kursbevegelse eller ekstraordinare hendelser. Velkjent selskap alene er ikke nok.

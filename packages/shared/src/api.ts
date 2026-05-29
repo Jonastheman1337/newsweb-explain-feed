@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { generationPhaseSchema } from "./generation-progress.js";
 import { rewriteOutputSchema } from "./rewrite.js";
 
 export const requestMagicLinkInputSchema = z.object({
@@ -46,6 +47,14 @@ export const feedItemSchema = z.object({
   confidence: z.enum(["high", "medium", "low"]),
   importance: z.enum(["viktig", "medium", "uviktig"]),
   hasAttachments: z.boolean(),
+  attachments: z.array(
+    z.object({
+      id: z.number().int(),
+      fileName: z.string(),
+      fileType: z.string().nullable(),
+      fileSize: z.number().nullable()
+    })
+  ),
   sourceTitle: z.string(),
   sourceBodyText: z.string(),
   notGenerated: z.boolean().default(false),
@@ -69,7 +78,15 @@ export const noticeResponseSchema = z.object({
     categories: z.array(z.string()),
     markets: z.array(z.string()),
     bodyText: z.string(),
-    hasAttachments: z.boolean()
+    hasAttachments: z.boolean(),
+    attachments: z.array(
+      z.object({
+        id: z.number().int(),
+        fileName: z.string(),
+        fileType: z.string().nullable(),
+        fileSize: z.number().nullable()
+      })
+    )
   }),
   rewrite: rewriteOutputSchema,
   rewrites: z
@@ -84,6 +101,18 @@ export const noticeResponseSchema = z.object({
     .optional()
 });
 
+export const rewriteStatusResponseSchema = z.object({
+  ready: z.boolean(),
+  failed: z.boolean(),
+  generatedAt: z.string().datetime().nullable(),
+  version: z.number().int().nullable(),
+  jobState: z.string().nullable(),
+  generationRunId: z.string().nullable(),
+  phase: generationPhaseSchema.nullable(),
+  phaseUpdatedAt: z.string().datetime().nullable()
+});
+
 export type FeedQuery = z.infer<typeof feedQuerySchema>;
 export type FeedResponse = z.infer<typeof feedResponseSchema>;
 export type FeedItem = z.infer<typeof feedItemSchema>;
+export type RewriteStatusResponse = z.infer<typeof rewriteStatusResponseSchema>;

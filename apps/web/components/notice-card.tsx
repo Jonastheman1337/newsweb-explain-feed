@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { usePathname, useSearchParams } from "next/navigation";
 import type { FeedItem } from "@newsweb/shared";
 import { GenerateButton } from "./generate-button";
-import { ProcessingIndicator } from "./processing-indicator";
+import { FeedProcessingIndicator } from "./feed-processing-indicator";
 import { EditableRewrite } from "./editable-rewrite";
 import { SplitViewPanel } from "./split-view-panel";
 
@@ -31,8 +32,28 @@ function importanceLabel(value: FeedItem["importance"]): string {
 }
 
 function MaxAiLink({ messageId }: { messageId: number }) {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const queryString = searchParams.toString();
+  const returnPath = `${pathname}${queryString ? `?${queryString}` : ""}`;
+
+  function rememberFeedPosition() {
+    sessionStorage.setItem(
+      "feed:return-position",
+      JSON.stringify({
+        returnPath,
+        messageId,
+        scrollY: window.scrollY
+      })
+    );
+  }
+
   return (
-    <Link href={`/notice/${messageId}`} className="originalLink">
+    <Link
+      href={`/notice/${messageId}?from=${encodeURIComponent(returnPath)}`}
+      className="originalLink"
+      onClick={rememberFeedPosition}
+    >
       Max AI →
     </Link>
   );
@@ -43,7 +64,7 @@ export function NoticeCard({ item }: NoticeCardProps) {
 
   if (item.notGenerated) {
     return (
-      <article className="card">
+      <article className="card" id={`notice-${item.messageId}`}>
         <div className="muted">
           <a href={`https://newsweb.oslobors.no/message/${item.messageId}`} target="_blank" rel="noopener noreferrer">
             {formatOsloTime(item.publishedAt)} | {item.issuerName} ({item.issuerSign})
@@ -67,7 +88,7 @@ export function NoticeCard({ item }: NoticeCardProps) {
 
   if (item.processing) {
     return (
-      <article className="card cardProcessing">
+      <article className="card cardProcessing" id={`notice-${item.messageId}`}>
         <div className="muted">
           <a href={`https://newsweb.oslobors.no/message/${item.messageId}`} target="_blank" rel="noopener noreferrer">
             {formatOsloTime(item.publishedAt)} | {item.issuerName} ({item.issuerSign})
@@ -78,7 +99,7 @@ export function NoticeCard({ item }: NoticeCardProps) {
             {item.title}
           </Link>
         </h2>
-        <p className="muted">AI-notis genereres</p>
+        <FeedProcessingIndicator hasAttachments={item.hasAttachments} />
         <div className="editableActions">
           <MaxAiLink messageId={item.messageId} />
           <span className="actionsRight">
@@ -91,7 +112,7 @@ export function NoticeCard({ item }: NoticeCardProps) {
 
   if (item.skipped) {
     return (
-      <article className="card cardSkipped">
+      <article className="card cardSkipped" id={`notice-${item.messageId}`}>
         <div className="muted">
           <a href={`https://newsweb.oslobors.no/message/${item.messageId}`} target="_blank" rel="noopener noreferrer">
             {formatOsloTime(item.publishedAt)} | {item.issuerName} ({item.issuerSign})
@@ -114,7 +135,7 @@ export function NoticeCard({ item }: NoticeCardProps) {
 
   if (item.failed) {
     return (
-      <article className="card cardSkipped">
+      <article className="card cardSkipped" id={`notice-${item.messageId}`}>
         <div className="muted">
           <a href={`https://newsweb.oslobors.no/message/${item.messageId}`} target="_blank" rel="noopener noreferrer">
             {formatOsloTime(item.publishedAt)} | {item.issuerName} ({item.issuerSign})
@@ -129,6 +150,12 @@ export function NoticeCard({ item }: NoticeCardProps) {
           <MaxAiLink messageId={item.messageId} />
           <span className="actionsRight">
             <GenerateButton messageId={item.messageId} label="Prøv igjen" hasAttachments={item.hasAttachments} />
+            <GenerateButton
+              messageId={item.messageId}
+              label="Prøv xhigh"
+              hasAttachments={item.hasAttachments}
+              reasoningEffortOverride="xhigh"
+            />
           </span>
         </div>
       </article>
@@ -146,7 +173,7 @@ export function NoticeCard({ item }: NoticeCardProps) {
   }
 
   return (
-    <article className={cardClassName}>
+    <article className={cardClassName} id={`notice-${item.messageId}`}>
       <div className={showSplit ? "cardSplitGrid" : undefined}>
         <div>
           <EditableRewrite
@@ -176,8 +203,10 @@ export function NoticeCard({ item }: NoticeCardProps) {
         {showSplit && (
           <div className="cardSourcePanel">
             <SplitViewPanel
+              messageId={item.messageId}
               sourceTitle={item.sourceTitle}
               sourceBodyText={item.sourceBodyText}
+              attachments={item.attachments}
             />
           </div>
         )}

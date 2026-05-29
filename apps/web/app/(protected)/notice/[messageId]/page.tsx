@@ -4,6 +4,7 @@ import { getNotice } from "../../../../lib/api";
 import { GenerateButton } from "../../../../components/generate-button";
 import { EditableRewrite } from "../../../../components/editable-rewrite";
 import { ProcessingIndicator } from "../../../../components/processing-indicator";
+import { NoticeRefreshListener } from "../../../../components/notice-refresh-listener";
 import { RewriteTabs } from "../../../../components/rewrite-tabs";
 import { InstructionInput } from "../../../../components/instruction-input";
 import { SourceBodyText } from "../../../../components/source-body-text";
@@ -11,10 +12,12 @@ import {
   NoticeTelemetry,
   SourceLink
 } from "../../../../components/notice-telemetry";
+import { AttachmentLinks } from "../../../../components/attachment-links";
 import { getSessionToken } from "../../../../lib/session";
 
 type NoticePageProps = {
   params: Promise<{ messageId: string }>;
+  searchParams: Promise<{ from?: string }>;
 };
 
 function formatOsloTime(isoString: string): string {
@@ -25,13 +28,21 @@ function formatOsloTime(isoString: string): string {
   }).format(new Date(isoString));
 }
 
-export default async function NoticePage({ params }: NoticePageProps) {
+function getReturnHref(from?: string): string {
+  if (!from) return "/feed";
+  if (from === "/feed" || from.startsWith("/feed?")) return from;
+  return "/feed";
+}
+
+export default async function NoticePage({ params, searchParams }: NoticePageProps) {
   const token = await getSessionToken();
   if (!token) {
     redirect("/login");
   }
 
   const { messageId } = await params;
+  const { from } = await searchParams;
+  const returnHref = getReturnHref(from);
   const id = Number(messageId);
   if (Number.isNaN(id)) {
     redirect("/feed");
@@ -77,7 +88,8 @@ export default async function NoticePage({ params }: NoticePageProps) {
         activeVersion={activeVersion}
         state={telemetryState}
       />
-      <Link href="/feed" className="muted" title="Tilbake til feed">
+      <NoticeRefreshListener messageId={notice.source.messageId} />
+      <Link href={returnHref} className="muted" title="Tilbake til feed">
         ←
       </Link>
       <div className="noticeGrid">
@@ -104,6 +116,12 @@ export default async function NoticePage({ params }: NoticePageProps) {
             {dateline}
             <p>AI-notisen kunne ikke genereres automatisk.</p>
             <GenerateButton messageId={notice.source.messageId} label="Prøv igjen" hasAttachments={notice.source.hasAttachments} />
+            <GenerateButton
+              messageId={notice.source.messageId}
+              label="Prøv xhigh"
+              hasAttachments={notice.source.hasAttachments}
+              reasoningEffortOverride="xhigh"
+            />
           </>
         ) : (
           (() => {
@@ -160,6 +178,10 @@ export default async function NoticePage({ params }: NoticePageProps) {
           </SourceLink>
         </p>
         <SourceBodyText text={notice.source.bodyText} />
+        <AttachmentLinks
+          messageId={notice.source.messageId}
+          attachments={notice.source.attachments}
+        />
         <SourceLink
           messageId={notice.source.messageId}
           activeVersion={activeVersion}

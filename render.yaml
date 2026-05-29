@@ -65,13 +65,13 @@ services:
       - key: OPENAI_FAST_TIMEOUT_MS
         value: 15000
       - key: OPENAI_DEFAULT_REASONING_EFFORT
-        value: xhigh
+        value: medium
       - key: OPENAI_REPORT_REASONING_EFFORT
-        value: xhigh
+        value: medium
       - key: OPENAI_HARD_REASONING_EFFORT
-        value: xhigh
+        value: medium
       - key: POLL_INTERVAL_MS
-        value: 20000
+        value: 5000
       - key: LATEST_BOOTSTRAP_COUNT
         value: 30
 

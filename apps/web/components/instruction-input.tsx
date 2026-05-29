@@ -5,16 +5,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useEditorialTelemetry } from "../lib/editorial-telemetry";
 import { E24Loader } from "./e24-loader";
+import {
+  GENERATION_STEP_DURATION_MS,
+  getGenerationSteps
+} from "./generation-steps";
 
-const BASE_STEPS = [
-  "Leser original melding",
-  "Analyserer innhold",
-  "Skriver AI-notis",
-  "Sjekker referanser",
-  "Ferdigstiller"
-];
-
-const PDF_STEP = "Leser PDF-vedlegg";
 const POLL_INTERVAL_MS = 3000;
 const MAX_POLL_ATTEMPTS = 180;
 const RUNNING_JOB_STATES = new Set([
@@ -45,9 +40,7 @@ type InstructionInputProps = {
 };
 
 export function InstructionInput({ messageId, activeVersion, hasAttachments }: InstructionInputProps) {
-  const PROGRESS_STEPS = hasAttachments
-    ? [BASE_STEPS[0], PDF_STEP, ...BASE_STEPS.slice(1)]
-    : BASE_STEPS;
+  const PROGRESS_STEPS = getGenerationSteps(hasAttachments);
   const router = useRouter();
   const [text, setText] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "polling" | "sent" | "error">("idle");
@@ -131,8 +124,9 @@ export function InstructionInput({ messageId, activeVersion, hasAttachments }: I
     router.refresh();
   }
 
-  async function handleGenerate() {
+  async function handleGenerate(options: { reasoningEffortOverride?: "xhigh" } = {}) {
     const instruction = text.trim();
+    const { reasoningEffortOverride } = options;
     isRegenRef.current = !instruction;
     versionBeforeRef.current = null;
     generatedAtBeforeRef.current = null;
@@ -152,23 +146,19 @@ export function InstructionInput({ messageId, activeVersion, hasAttachments }: I
       const fetchOptions: RequestInit = {
         method: "POST",
         credentials: "include",
+        headers: { "Content-Type": "application/json" },
       };
-      if (instruction) {
-        fetchOptions.headers = { "Content-Type": "application/json" };
-        fetchOptions.body = JSON.stringify({
-          instruction,
-          telemetry: buildTelemetry({
-            actionSource: "instruction_input"
-          })
-        });
-      } else {
-        fetchOptions.headers = { "Content-Type": "application/json" };
-        fetchOptions.body = JSON.stringify({
-          telemetry: buildTelemetry({
-            actionSource: "instruction_input"
-          })
-        });
-      }
+      const requestBody = {
+        ...(instruction ? { instruction } : {}),
+        ...(reasoningEffortOverride ? { reasoningEffortOverride } : {}),
+        telemetry: buildTelemetry({
+          actionSource:
+            reasoningEffortOverride === "xhigh"
+              ? "instruction_input_xhigh"
+              : "instruction_input"
+        })
+      };
+      fetchOptions.body = JSON.stringify(requestBody);
       const response = await fetch(`/api/notice/${messageId}/generate`, fetchOptions);
 
       if (!response.ok) {
@@ -186,7 +176,7 @@ export function InstructionInput({ messageId, activeVersion, hasAttachments }: I
       setProgressStep(0);
       progressRef.current = setInterval(() => {
         setProgressStep((prev) => Math.min(prev + 1, PROGRESS_STEPS.length - 1));
-      }, 6000);
+      }, GENERATION_STEP_DURATION_MS);
       let attempts = 0;
       pollRef.current = setInterval(async () => {
         attempts++;
@@ -267,7 +257,7 @@ export function InstructionInput({ messageId, activeVersion, hasAttachments }: I
       <div className="instructionActions">
         <button
           className="ghostButton"
-          onClick={handleGenerate}
+          onClick={() => handleGenerate()}
           disabled={busy}
         >
           {status === "loading"
@@ -275,6 +265,17 @@ export function InstructionInput({ messageId, activeVersion, hasAttachments }: I
             : status === "polling"
               ? PROGRESS_STEPS[progressStep] + "..."
               : (text.trim() ? "Generer ny versjon" : "Regenerer notis")}
+        </button>
+        <button
+          className="ghostButton"
+          onClick={() => handleGenerate({ reasoningEffortOverride: "xhigh" })}
+          disabled={busy}
+        >
+          {status === "loading"
+            ? "Sender ..."
+            : status === "polling"
+              ? PROGRESS_STEPS[progressStep] + "..."
+              : (text.trim() ? "Generer xhigh" : "Regenerer xhigh")}
         </button>
         {status === "polling" && <E24Loader />}
         {status === "error" && (

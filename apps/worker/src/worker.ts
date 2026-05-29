@@ -41,6 +41,22 @@ import {
 } from "./services/claim-precautions.js";
 import { applyImportanceHighBar } from "./services/importance.js";
 import {
+  appendRevisionChecklist,
+  isAmbiguousBareRemovalInstruction,
+  validateRevisionInstructionCompliance,
+  type RevisionInstructionCompliance
+} from "./services/revision-instructions.js";
+import {
+  EDITORIAL_REVIEW_DEVELOPER_PROMPT,
+  EDITORIAL_REVIEW_SYSTEM_PROMPT,
+  buildEditorialRevisionReviewUserPrompt,
+  editorialRepairInstruction,
+  editorialRevisionReviewJsonSchema,
+  parseEditorialRevisionReviewResponse,
+  shouldRunEditorialRevisionReview,
+  type EditorialRevisionReview
+} from "./services/editorial-review.js";
+import {
   buildCorrectionInstruction,
   buildCoverageReport,
   collectDraftSentences,
@@ -48,10 +64,14 @@ import {
   referenceCheckResultSchema,
   type ReferenceCoverageReport
 } from "./services/reference-check.js";
-import { validateRewriteOutput } from "./services/rewrite-validation.js";
+import {
+  validateRewriteOutput,
+  type RewriteValidationIssue
+} from "./services/rewrite-validation.js";
 import {
   TRIAGE_PROMPT,
   buildTriageUserPrompt,
+  getDeterministicTriageSkip,
   parseTriageResponse
 } from "./services/newsworthiness-triage.js";
 import {
@@ -76,6 +96,7 @@ import {
   shouldQueueLatestBootstrapRewrite
 } from "./services/latest-bootstrap.js";
 import { sanitizeRewriteStyle } from "./services/style-sanitizer.js";
+import { setGenerationPhase } from "./services/generation-phase.js";
 
 const NEWSWEB_LIST_URL = "https://api3.oslo.oslobors.no/v1/newsreader/list";
 const NEWSWEB_MESSAGE_URL = "https://api3.oslo.oslobors.no/v1/newsreader/message";
@@ -96,6 +117,7 @@ type RewriteJobData = {
   messageId: number;
   reason: "new-message" | "manual-reprocess";
   instruction?: string;
+  reasoningEffortOverride?: OpenAIReasoningEffort;
   generationRunId?: string;
   targetVersion?: number;
   previousRewriteJson?: unknown;
@@ -107,7 +129,7 @@ type PublishJobData = {
   generationRunId?: string;
 };
 
-type FeedUpdateState = "source" | "processing" | "published";
+type FeedUpdateState = "source" | "processing" | "published" | "failed";
 
 const config = loadConfig();
 const openAIClient = createOpenAIClient(config.OPENAI_API_KEY);
@@ -444,13 +466,129 @@ function logFinalRewriteFailure(
 function generationInputJson(
   payload: PromptPayload,
   previousOutput?: RewriteOutput,
-  modelCalls: ModelCallLog[] = []
+  modelCalls: ModelCallLog[] = [],
+  reasoningEffortOverride?: OpenAIReasoningEffort
 ): Prisma.InputJsonValue {
   return {
     sourcePayload: payload,
     previousRewrite: previousOutput ?? null,
+    reasoningEffortOverride: reasoningEffortOverride ?? null,
     modelCalls
   } as unknown as Prisma.InputJsonValue;
+}
+
+function referenceCoverageJson(
+  coverage: ReferenceCoverageReport | null
+): Prisma.InputJsonValue | null {
+  if (!coverage) return null;
+  return {
+    totalSentences: coverage.totalSentences,
+    groundedSentences: coverage.groundedSentences,
+    coveragePercent: coverage.coveragePercent,
+    sentenceReviews: coverage.items.map((item) => ({
+      index: item.index,
+      sentence: item.sentence,
+      grounded: item.grounded,
+      interpretation: item.interpretation,
+      sourceEvidence: item.sourceEvidence
+    })),
+    unsupportedSentences: coverage.unsupportedSentences.map((item) => ({
+      index: item.index,
+      sentence: item.sentence,
+      interpretation: item.interpretation,
+      sourceEvidence: item.sourceEvidence
+    }))
+  } as unknown as Prisma.InputJsonValue;
+}
+
+function validateRewriteWithRevisionCompliance(
+  rewrite: RewriteOutput,
+  payload: PromptPayload,
+  context: {
+    instruction?: string | null;
+    previousOutput?: RewriteOutput;
+    attachmentTextAvailable?: boolean;
+  }
+): {
+  valid: boolean;
+  errors: string[];
+  issues: RewriteValidationIssue[];
+  blockingErrors: string[];
+  warnings: string[];
+  revisionCompliance: RevisionInstructionCompliance | null;
+} {
+  const revisionCompliance = validateRevisionInstructionCompliance(rewrite, {
+    instruction: context.instruction,
+    previousOutput: context.previousOutput,
+    attachmentTextAvailable: context.attachmentTextAvailable
+  });
+  const validation = validateRewriteOutput(rewrite, payload, {
+    maxVisibleArticleChars: revisionCompliance?.maxVisibleArticleChars
+  });
+  const revisionWarnings = revisionCompliance?.warnings ?? [];
+  const revisionIssues: RewriteValidationIssue[] = revisionWarnings.map((message) => ({
+    code: "REVISION_INSTRUCTION_COMPLIANCE",
+    severity: "blocking",
+    message
+  }));
+  const issues = [...validation.issues, ...revisionIssues];
+  const errors = issues.map((issue) => issue.message);
+  const blockingErrors = issues
+    .filter((issue) => issue.severity === "blocking")
+    .map((issue) => issue.message);
+  const warnings = issues
+    .filter((issue) => issue.severity === "warning")
+    .map((issue) => issue.message);
+
+  return {
+    valid: issues.length === 0,
+    errors,
+    issues,
+    blockingErrors,
+    warnings,
+    revisionCompliance
+  };
+}
+
+function validationErrorCode(validation: {
+  valid: boolean;
+  blockingErrors: string[];
+}): string | null {
+  if (validation.blockingErrors.length > 0) {
+    return "BLOCKING_VALIDATION_ERRORS";
+  }
+  return validation.valid ? null : "NON_BLOCKING_VALIDATION_WARNINGS";
+}
+
+function statusForValidation(validation: {
+  blockingErrors: string[];
+}): "pending" | "failed" {
+  return validation.blockingErrors.length > 0 ? "failed" : "pending";
+}
+
+function phaseForRewriteStatus(
+  status: "pending" | "needs_retry" | "failed" | "published" | "skipped"
+) {
+  if (status === "pending") return "finalizing";
+  if (status === "needs_retry") return "queued";
+  if (status === "published") return "published";
+  if (status === "skipped") return "skipped";
+  return "failed";
+}
+
+function rewriteJsonForValidation(
+  rewrite: RewriteOutput,
+  validation: { blockingErrors: string[] }
+): Prisma.InputJsonValue {
+  if (validation.blockingErrors.length === 0) {
+    return rewrite as unknown as Prisma.InputJsonValue;
+  }
+
+  return {
+    errorCode: "BLOCKING_VALIDATION_ERRORS",
+    message: validation.blockingErrors.join("; "),
+    blockedRewrite: rewrite as unknown as Prisma.InputJsonValue
+  } as Prisma.InputJsonValue;
 }
 
 async function startGenerationRun(
@@ -460,14 +598,22 @@ async function startGenerationRun(
   payload: PromptPayload,
   previousOutput?: RewriteOutput
 ): Promise<string> {
+  const phaseUpdatedAt = new Date();
   const data = {
     version,
     jobId: job.id != null ? String(job.id) : null,
     jobName: job.name,
     reason: job.data.reason,
     status: "started",
+    phase: "reading_notice",
+    phaseUpdatedAt,
     userInstruction: job.data.instruction ?? null,
-    inputJson: generationInputJson(payload, previousOutput),
+    inputJson: generationInputJson(
+      payload,
+      previousOutput,
+      [],
+      job.data.reasoningEffortOverride
+    ),
     ...(previousOutput
       ? {
           previousRewriteJson:
@@ -515,11 +661,35 @@ type ModelCallLog = {
   schemaName: string;
   model: string;
   reasoningEffort: OpenAIReasoningEffort;
+  timeoutMs: number;
+  maxOutputTokens: number;
   systemPrompt: string;
   developerPrompt: string;
   userPrompt: string;
   promptChars: number;
 };
+
+type ModelCallFailureCarrier = Error & {
+  modelCall?: ModelCallLog;
+  promptChars?: number;
+  __modelCallLogged?: boolean;
+};
+
+function collectFailedModelCall(
+  error: unknown,
+  modelCalls: ModelCallLog[]
+): number {
+  if (!(error instanceof Error)) {
+    return 0;
+  }
+  const enriched = error as ModelCallFailureCarrier;
+  if (!enriched.modelCall || enriched.__modelCallLogged) {
+    return 0;
+  }
+  modelCalls.push(enriched.modelCall);
+  enriched.__modelCallLogged = true;
+  return enriched.promptChars ?? enriched.modelCall.promptChars;
+}
 
 const triageJsonSchema = {
   type: "object",
@@ -563,14 +733,16 @@ async function callModelForJson({
     schemaName,
     model,
     reasoningEffort,
+    timeoutMs,
+    maxOutputTokens,
     systemPrompt,
     developerPrompt,
     userPrompt,
     promptChars
   };
 
-  return {
-    content: await callOpenAIForJson(openAIClient, {
+  try {
+    const content = await callOpenAIForJson(openAIClient, {
       schemaName,
       schema,
       systemPrompt,
@@ -581,23 +753,34 @@ async function callModelForJson({
       timeoutMs,
       maxOutputTokens,
       file
-    }),
-    promptChars,
-    modelCall
-  };
+    });
+
+    return {
+      content,
+      promptChars,
+      modelCall
+    };
+  } catch (error) {
+    const enriched: ModelCallFailureCarrier =
+      error instanceof Error ? error : new Error(String(error));
+    enriched.modelCall = modelCall;
+    enriched.promptChars = promptChars;
+    throw enriched;
+  }
 }
 
 async function callModelTriage(
   title: string,
   bodyText: string,
-  categories: string[]
+  categories: string[],
+  hasAttachments?: boolean
 ): Promise<{
   newsworthy: boolean;
   reason: string;
   promptChars: number;
   modelCall: ModelCallLog | null;
 }> {
-  const userPrompt = buildTriageUserPrompt(title, bodyText, categories);
+  const userPrompt = buildTriageUserPrompt(title, bodyText, categories, hasAttachments);
 
   try {
     const result = await callModelForJson({
@@ -626,6 +809,42 @@ async function callModelTriage(
       modelCall: null
     };
   }
+}
+
+async function callModelEditorialRevisionReview({
+  instruction,
+  previousOutput,
+  draftRewrite,
+  reasoningEffort = config.OPENAI_DEFAULT_REASONING_EFFORT
+}: {
+  instruction: string;
+  previousOutput: RewriteOutput;
+  draftRewrite: RewriteOutput;
+  reasoningEffort?: OpenAIReasoningEffort;
+}): Promise<{
+  review: EditorialRevisionReview;
+  promptChars: number;
+  modelCall: ModelCallLog;
+}> {
+  const result = await callModelForJson({
+    schemaName: "editorial_revision_review",
+    schema: editorialRevisionReviewJsonSchema as Record<string, unknown>,
+    systemPrompt: EDITORIAL_REVIEW_SYSTEM_PROMPT,
+    developerPrompt: EDITORIAL_REVIEW_DEVELOPER_PROMPT,
+    userPrompt: buildEditorialRevisionReviewUserPrompt({
+      instruction,
+      previousOutput,
+      draftRewrite
+    }),
+    reasoningEffort,
+    maxOutputTokens: 900
+  });
+
+  return {
+    review: parseEditorialRevisionReviewResponse(result.content),
+    promptChars: result.promptChars,
+    modelCall: result.modelCall
+  };
 }
 
 async function callModelRewrite(
@@ -670,7 +889,8 @@ async function callModelRewrite(
 
 async function callModelReferenceCheck(
   payload: PromptPayload,
-  draftRewrite: RewriteOutput
+  draftRewrite: RewriteOutput,
+  reasoningEffort: OpenAIReasoningEffort = config.OPENAI_DEFAULT_REASONING_EFFORT
 ): Promise<{
   coverage: ReferenceCoverageReport;
   promptChars: number;
@@ -723,7 +943,8 @@ async function callModelReferenceCheck(
     schema: referenceCheckJsonSchema as Record<string, unknown>,
     systemPrompt,
     developerPrompt,
-    userPrompt
+    userPrompt,
+    reasoningEffort
   });
 
   const parsed = referenceCheckResultSchema.parse(JSON.parse(result.content));
@@ -814,6 +1035,105 @@ async function callModelYearlyReportRewrite(
   };
 }
 
+type EditorialReviewAudit = {
+  enabled: boolean;
+  repairApplied: boolean;
+  error: string | null;
+  review: EditorialRevisionReview | null;
+};
+
+async function applyEditorialRevisionReviewRepair<TPayload extends PromptPayload>({
+  payload,
+  rewrite,
+  instruction,
+  previousOutput,
+  revisionInstructionForPrompt,
+  reasoningEffort,
+  modelCalls,
+  callRewrite
+}: {
+  payload: TPayload;
+  rewrite: RewriteOutput;
+  instruction?: string | null;
+  previousOutput?: RewriteOutput;
+  revisionInstructionForPrompt?: string;
+  reasoningEffort: OpenAIReasoningEffort;
+  modelCalls: ModelCallLog[];
+  callRewrite: (
+    payload: TPayload,
+    revisionInstruction?: string,
+    previousOutput?: RewriteOutput,
+    reasoningEffort?: OpenAIReasoningEffort
+  ) => Promise<{
+    rewrite: RewriteOutput;
+    promptChars: number;
+    modelCall: ModelCallLog;
+  }>;
+}): Promise<{
+  rewrite: RewriteOutput;
+  promptChars: number;
+  audit: EditorialReviewAudit | null;
+}> {
+  if (
+    !shouldRunEditorialRevisionReview({
+      instruction,
+      previousOutput
+    }) ||
+    !instruction ||
+    !previousOutput
+  ) {
+    return { rewrite, promptChars: 0, audit: null };
+  }
+
+  const audit: EditorialReviewAudit = {
+    enabled: true,
+    repairApplied: false,
+    error: null,
+    review: null
+  };
+  let promptChars = 0;
+
+  try {
+    const reviewResult = await callModelEditorialRevisionReview({
+      instruction,
+      previousOutput,
+      draftRewrite: rewrite,
+      reasoningEffort
+    });
+    modelCalls.push(reviewResult.modelCall);
+    promptChars += reviewResult.promptChars;
+    audit.review = reviewResult.review;
+
+    const repairInstruction = editorialRepairInstruction(reviewResult.review);
+    if (!repairInstruction) {
+      return { rewrite, promptChars, audit };
+    }
+
+    const combinedRepairInstruction = [
+      revisionInstructionForPrompt,
+      "REDAKTØRSJEKK: Reparer utkastet smalt etter denne kontrollen. Ikke gjør andre endringer.",
+      repairInstruction
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+    const repaired = await callRewrite(
+      payload,
+      combinedRepairInstruction,
+      rewrite,
+      reasoningEffort
+    );
+    modelCalls.push(repaired.modelCall);
+    promptChars += repaired.promptChars;
+    audit.repairApplied = true;
+
+    return { rewrite: repaired.rewrite, promptChars, audit };
+  } catch (error) {
+    promptChars += collectFailedModelCall(error, modelCalls);
+    audit.error = error instanceof Error ? error.message : String(error);
+    return { rewrite, promptChars, audit };
+  }
+}
+
 const pdfContextJsonSchema = {
   type: "object",
   additionalProperties: false,
@@ -901,12 +1221,14 @@ async function callOpenAIPdfContext({
   schemaName,
   schema,
   userPrompt,
+  reasoningEffort = config.OPENAI_HARD_REASONING_EFFORT,
   foundField = false
 }: {
   pdf: PdfAttachmentDownload;
   schemaName: string;
   schema: Record<string, unknown>;
   userPrompt: string;
+  reasoningEffort?: OpenAIReasoningEffort;
   foundField?: boolean;
 }): Promise<PdfContextResult> {
   const systemPrompt =
@@ -925,7 +1247,7 @@ async function callOpenAIPdfContext({
     developerPrompt,
     userPrompt,
     model: config.OPENAI_MODEL,
-    reasoningEffort: config.OPENAI_HARD_REASONING_EFFORT,
+    reasoningEffort,
     timeoutMs: config.OPENAI_TIMEOUT_MS,
     maxOutputTokens: 2500,
     file: {
@@ -949,12 +1271,14 @@ async function callOpenAIPdfContext({
 async function extractReportContextWithOpenAIPdf(
   pdf: PdfAttachmentDownload,
   source: { title: string; issuerName: string; issuerSign: string },
-  userInstruction?: string
+  userInstruction?: string,
+  reasoningEffort?: OpenAIReasoningEffort
 ): Promise<PdfContextResult> {
   return callOpenAIPdfContext({
     pdf,
     schemaName: "pdf_report_context",
     schema: pdfContextJsonSchema as Record<string, unknown>,
+    reasoningEffort,
     userPrompt: [
       `Company: ${source.issuerName} (${source.issuerSign})`,
       `Notice title: ${source.title}`,
@@ -970,12 +1294,14 @@ async function extractReportContextWithOpenAIPdf(
 
 async function extractYearlyRemunerationWithOpenAIPdf(
   pdf: PdfAttachmentDownload,
-  source: { title: string; issuerName: string; issuerSign: string }
+  source: { title: string; issuerName: string; issuerSign: string },
+  reasoningEffort?: OpenAIReasoningEffort
 ): Promise<PdfContextResult> {
   return callOpenAIPdfContext({
     pdf,
     schemaName: "pdf_yearly_remuneration_context",
     schema: yearlyRemunerationPdfContextJsonSchema as Record<string, unknown>,
+    reasoningEffort,
     foundField: true,
     userPrompt: [
       `Company: ${source.issuerName} (${source.issuerSign})`,
@@ -990,12 +1316,14 @@ async function extractYearlyRemunerationWithOpenAIPdf(
 async function extractGeneralContextWithOpenAIPdf(
   pdf: PdfAttachmentDownload,
   payload: PromptPayload,
-  userInstruction?: string
+  userInstruction?: string,
+  reasoningEffort?: OpenAIReasoningEffort
 ): Promise<PdfContextResult> {
   return callOpenAIPdfContext({
     pdf,
     schemaName: "pdf_general_context",
     schema: pdfContextJsonSchema as Record<string, unknown>,
+    reasoningEffort,
     userPrompt: [
       `Company: ${payload.issuerName} (${payload.issuerSign})`,
       `Notice title: ${payload.title}`,
@@ -1038,6 +1366,7 @@ function reportExtractionFromOpenAIPdf(
 type RewriteRevisionOptions = {
   version?: number;
   userInstruction?: string;
+  reasoningEffortOverride?: OpenAIReasoningEffort;
   previousOutput?: RewriteOutput;
   generationRunId?: string;
   modelCalls?: ModelCallLog[];
@@ -1091,10 +1420,13 @@ async function processReportRewrite(
   let attributionCorrectionApplied = false;
   let attributionRiskCount = 0;
   let styleSanitization: ReturnType<typeof sanitizeRewriteStyle>["stats"] | null = null;
+  let editorialReview: EditorialReviewAudit | null = null;
   const modelCalls: ModelCallLog[] = [...(revisionOptions.modelCalls ?? [])];
-  const reportReasoningEffort = reportContent.diagnostics.openAIPdfFallback
-    ? config.OPENAI_HARD_REASONING_EFFORT
-    : config.OPENAI_REPORT_REASONING_EFFORT;
+  const reportReasoningEffort =
+    revisionOptions.reasoningEffortOverride ??
+    (reportContent.diagnostics.openAIPdfFallback
+      ? config.OPENAI_HARD_REASONING_EFFORT
+      : config.OPENAI_REPORT_REASONING_EFFORT);
   const reportReferenceText = [
     payload.bodyText && payload.bodyText.trim().length >= 100
       ? payload.bodyText
@@ -1108,11 +1440,18 @@ async function processReportRewrite(
     bodyText: reportReferenceText,
     sourceBodyChars: reportReferenceText.length
   };
+  const revisionInstructionForPrompt = appendRevisionChecklist(
+    revisionOptions.userInstruction
+  );
+  const attachmentTextAvailable =
+    Boolean(reportContent.text.trim()) ||
+    Boolean(reportContent.referenceText?.trim());
 
   try {
+    await setGenerationPhase(logPrisma, revisionOptions.generationRunId, "writing_notice");
     const initialDraftResult = await callModelReportRewrite(
       reportPayload,
-      revisionOptions.userInstruction,
+      revisionInstructionForPrompt,
       revisionOptions.previousOutput,
       reportReasoningEffort
     );
@@ -1122,9 +1461,15 @@ async function processReportRewrite(
     let rewrite = hiddenDraft;
 
     try {
+      await setGenerationPhase(
+        logPrisma,
+        revisionOptions.generationRunId,
+        "checking_references"
+      );
       const initialReferenceCheck = await callModelReferenceCheck(
         reportReferencePayload,
-        rewrite
+        rewrite,
+        reportReasoningEffort
       );
       if (initialReferenceCheck.modelCall) {
         modelCalls.push(initialReferenceCheck.modelCall);
@@ -1138,7 +1483,7 @@ async function processReportRewrite(
       );
       if (correctionInstruction) {
         const combinedCorrection = [
-          revisionOptions.userInstruction,
+          revisionInstructionForPrompt,
           correctionInstruction
         ]
           .filter(Boolean)
@@ -1156,7 +1501,8 @@ async function processReportRewrite(
 
         const finalReferenceCheck = await callModelReferenceCheck(
           reportReferencePayload,
-          rewrite
+          rewrite,
+          reportReasoningEffort
         );
         if (finalReferenceCheck.modelCall) {
           modelCalls.push(finalReferenceCheck.modelCall);
@@ -1165,16 +1511,18 @@ async function processReportRewrite(
         finalCoverage = finalReferenceCheck.coverage;
       }
     } catch (error) {
+      promptChars += collectFailedModelCall(error, modelCalls);
       checkerError = error instanceof Error ? error.message : String(error);
     }
 
+    await setGenerationPhase(logPrisma, revisionOptions.generationRunId, "finalizing");
     const attributionRisks = findAttributionRisks(rewrite);
     attributionRiskCount = attributionRisks.length;
     const attributionInstruction =
       buildAttributionCorrectionInstruction(attributionRisks);
     if (attributionInstruction) {
       const combinedAttribution = [
-        revisionOptions.userInstruction,
+        revisionInstructionForPrompt,
         attributionInstruction
       ]
         .filter(Boolean)
@@ -1192,6 +1540,20 @@ async function processReportRewrite(
       attributionRiskCount = findAttributionRisks(rewrite).length;
     }
 
+    const editorialReviewResult = await applyEditorialRevisionReviewRepair({
+      payload: reportPayload,
+      rewrite,
+      instruction: revisionOptions.userInstruction,
+      previousOutput: revisionOptions.previousOutput,
+      revisionInstructionForPrompt,
+      reasoningEffort: reportReasoningEffort,
+      modelCalls,
+      callRewrite: callModelReportRewrite
+    });
+    rewrite = editorialReviewResult.rewrite;
+    promptChars += editorialReviewResult.promptChars;
+    editorialReview = editorialReviewResult.audit;
+
     const importanceResult = applyImportanceHighBar(rewrite, payload);
     rewrite = importanceResult.rewrite;
     importanceAdjusted = importanceResult.adjusted;
@@ -1201,7 +1563,17 @@ async function processReportRewrite(
     rewrite = styleResult.rewrite;
     styleSanitization = styleResult.stats;
 
-    const validation = validateRewriteOutput(rewrite, reportReferencePayload);
+    const validation = validateRewriteWithRevisionCompliance(
+      rewrite,
+      reportReferencePayload,
+      {
+        instruction: revisionOptions.userInstruction,
+        previousOutput: revisionOptions.previousOutput,
+        attachmentTextAvailable
+      }
+    );
+    const rewriteStatus = statusForValidation(validation);
+    const persistedRewriteJson = rewriteJsonForValidation(rewrite, validation);
 
     await upsertRewrite({
       messageId,
@@ -1211,14 +1583,19 @@ async function processReportRewrite(
       inputJson: generationInputJson(
         reportPayload,
         revisionOptions.previousOutput,
-        modelCalls
+        modelCalls,
+        revisionOptions.reasoningEffortOverride
       ),
-      rewriteJson: rewrite,
-      status: "pending",
+      rewriteJson: persistedRewriteJson,
+      status: rewriteStatus,
       validationJson: {
         valid: validation.valid,
-        errorCode: validation.valid ? null : "NON_BLOCKING_VALIDATION_WARNINGS",
+        errorCode: validationErrorCode(validation),
         errors: validation.errors,
+        issues: validation.issues,
+        blockingErrors: validation.blockingErrors,
+        warnings: validation.warnings,
+        revisionInstructionCompliance: validation.revisionCompliance,
         sourceBodyChars: payload.sourceBodyChars,
         promptChars,
         reportExtraction: {
@@ -1233,6 +1610,7 @@ async function processReportRewrite(
           diagnostics: reportContent.diagnostics
         },
         styleSanitization,
+        editorialReview,
         referenceCheck: {
           enabled: true,
           checkerError,
@@ -1246,6 +1624,8 @@ async function processReportRewrite(
             null,
           importanceAdjusted,
           importanceAdjustReason,
+          initialCoverage: referenceCoverageJson(initialCoverage),
+          finalCoverage: referenceCoverageJson(finalCoverage ?? initialCoverage),
           totalSentences:
             finalCoverage?.totalSentences ?? initialCoverage?.totalSentences ?? 0,
           unsupportedSentenceCount:
@@ -1283,12 +1663,17 @@ async function processReportRewrite(
       } as Prisma.InputJsonValue
     });
 
-    await enqueuePublish(
-      messageId,
-      revisionOptions.version ?? 1,
-      revisionOptions.generationRunId
-    );
+    if (rewriteStatus === "pending") {
+      await enqueuePublish(
+        messageId,
+        revisionOptions.version ?? 1,
+        revisionOptions.generationRunId
+      );
+    } else {
+      await publishFeedUpdate(messageId, "failed");
+    }
   } catch (error) {
+    promptChars += collectFailedModelCall(error, modelCalls);
     const errorText = error instanceof Error ? error.message : String(error);
 
     if (!finalAttempt) {
@@ -1300,7 +1685,8 @@ async function processReportRewrite(
         inputJson: generationInputJson(
           reportPayload,
           revisionOptions.previousOutput,
-          modelCalls
+          modelCalls,
+          revisionOptions.reasoningEffortOverride
         ),
         rewriteJson: {
           errorCode: "REPORT_REWRITE_ATTEMPT_FAILED",
@@ -1326,7 +1712,8 @@ async function processReportRewrite(
       inputJson: generationInputJson(
         reportPayload,
         revisionOptions.previousOutput,
-        modelCalls
+        modelCalls,
+        revisionOptions.reasoningEffortOverride
       ),
       rewriteJson: {
         errorCode: "REPORT_REWRITE_FAILED_FINAL",
@@ -1342,6 +1729,7 @@ async function processReportRewrite(
       } as Prisma.InputJsonValue
     });
     logFinalRewriteFailure(messageId, "REPORT_REWRITE_FAILED_FINAL", errorText);
+    await publishFeedUpdate(messageId, "failed");
   }
 }
 
@@ -1391,15 +1779,23 @@ async function processYearlyReportRewrite(
   let attributionCorrectionApplied = false;
   let attributionRiskCount = 0;
   let styleSanitization: ReturnType<typeof sanitizeRewriteStyle>["stats"] | null = null;
+  let editorialReview: EditorialReviewAudit | null = null;
   const modelCalls: ModelCallLog[] = [...(revisionOptions.modelCalls ?? [])];
-  const reportReasoningEffort = yearlyContent.openAIPdfFallback
-    ? config.OPENAI_HARD_REASONING_EFFORT
-    : config.OPENAI_REPORT_REASONING_EFFORT;
+  const reportReasoningEffort =
+    revisionOptions.reasoningEffortOverride ??
+    (yearlyContent.openAIPdfFallback
+      ? config.OPENAI_HARD_REASONING_EFFORT
+      : config.OPENAI_REPORT_REASONING_EFFORT);
+  const revisionInstructionForPrompt = appendRevisionChecklist(
+    revisionOptions.userInstruction
+  );
+  const attachmentTextAvailable = Boolean(combinedText.trim());
 
   try {
+    await setGenerationPhase(logPrisma, revisionOptions.generationRunId, "writing_notice");
     const initialDraftResult = await callModelYearlyReportRewrite(
       yearlyPayload,
-      revisionOptions.userInstruction,
+      revisionInstructionForPrompt,
       revisionOptions.previousOutput,
       reportReasoningEffort
     );
@@ -1416,9 +1812,15 @@ async function processYearlyReportRewrite(
     };
 
     try {
+      await setGenerationPhase(
+        logPrisma,
+        revisionOptions.generationRunId,
+        "checking_references"
+      );
       const initialReferenceCheck = await callModelReferenceCheck(
         refPayload,
-        rewrite
+        rewrite,
+        reportReasoningEffort
       );
       if (initialReferenceCheck.modelCall) {
         modelCalls.push(initialReferenceCheck.modelCall);
@@ -1432,7 +1834,7 @@ async function processYearlyReportRewrite(
       );
       if (correctionInstruction) {
         const combinedCorrection = [
-          revisionOptions.userInstruction,
+          revisionInstructionForPrompt,
           correctionInstruction
         ]
           .filter(Boolean)
@@ -1450,7 +1852,8 @@ async function processYearlyReportRewrite(
 
         const finalReferenceCheck = await callModelReferenceCheck(
           refPayload,
-          rewrite
+          rewrite,
+          reportReasoningEffort
         );
         if (finalReferenceCheck.modelCall) {
           modelCalls.push(finalReferenceCheck.modelCall);
@@ -1459,16 +1862,18 @@ async function processYearlyReportRewrite(
         finalCoverage = finalReferenceCheck.coverage;
       }
     } catch (error) {
+      promptChars += collectFailedModelCall(error, modelCalls);
       checkerError = error instanceof Error ? error.message : String(error);
     }
 
+    await setGenerationPhase(logPrisma, revisionOptions.generationRunId, "finalizing");
     const attributionRisks = findAttributionRisks(rewrite);
     attributionRiskCount = attributionRisks.length;
     const attributionInstruction =
       buildAttributionCorrectionInstruction(attributionRisks);
     if (attributionInstruction) {
       const combinedAttribution = [
-        revisionOptions.userInstruction,
+        revisionInstructionForPrompt,
         attributionInstruction
       ]
         .filter(Boolean)
@@ -1486,6 +1891,20 @@ async function processYearlyReportRewrite(
       attributionRiskCount = findAttributionRisks(rewrite).length;
     }
 
+    const editorialReviewResult = await applyEditorialRevisionReviewRepair({
+      payload: yearlyPayload,
+      rewrite,
+      instruction: revisionOptions.userInstruction,
+      previousOutput: revisionOptions.previousOutput,
+      revisionInstructionForPrompt,
+      reasoningEffort: reportReasoningEffort,
+      modelCalls,
+      callRewrite: callModelYearlyReportRewrite
+    });
+    rewrite = editorialReviewResult.rewrite;
+    promptChars += editorialReviewResult.promptChars;
+    editorialReview = editorialReviewResult.audit;
+
     const importanceResult = applyImportanceHighBar(rewrite, payload);
     rewrite = importanceResult.rewrite;
     importanceAdjusted = importanceResult.adjusted;
@@ -1495,7 +1914,13 @@ async function processYearlyReportRewrite(
     rewrite = styleResult.rewrite;
     styleSanitization = styleResult.stats;
 
-    const validation = validateRewriteOutput(rewrite, payload);
+    const validation = validateRewriteWithRevisionCompliance(rewrite, payload, {
+      instruction: revisionOptions.userInstruction,
+      previousOutput: revisionOptions.previousOutput,
+      attachmentTextAvailable
+    });
+    const rewriteStatus = statusForValidation(validation);
+    const persistedRewriteJson = rewriteJsonForValidation(rewrite, validation);
 
     await upsertRewrite({
       messageId,
@@ -1505,14 +1930,19 @@ async function processYearlyReportRewrite(
       inputJson: generationInputJson(
         yearlyPayload,
         revisionOptions.previousOutput,
-        modelCalls
+        modelCalls,
+        revisionOptions.reasoningEffortOverride
       ),
-      rewriteJson: rewrite,
-      status: "pending",
+      rewriteJson: persistedRewriteJson,
+      status: rewriteStatus,
       validationJson: {
         valid: validation.valid,
-        errorCode: validation.valid ? null : "NON_BLOCKING_VALIDATION_WARNINGS",
+        errorCode: validationErrorCode(validation),
         errors: validation.errors,
+        issues: validation.issues,
+        blockingErrors: validation.blockingErrors,
+        warnings: validation.warnings,
+        revisionInstructionCompliance: validation.revisionCompliance,
         sourceBodyChars: payload.sourceBodyChars,
         promptChars,
         yearlyReportExtraction: {
@@ -1524,6 +1954,7 @@ async function processYearlyReportRewrite(
           extractedChars: combinedText.length
         },
         styleSanitization,
+        editorialReview,
         referenceCheck: {
           enabled: true,
           checkerError,
@@ -1537,6 +1968,8 @@ async function processYearlyReportRewrite(
             null,
           importanceAdjusted,
           importanceAdjustReason,
+          initialCoverage: referenceCoverageJson(initialCoverage),
+          finalCoverage: referenceCoverageJson(finalCoverage ?? initialCoverage),
           totalSentences:
             finalCoverage?.totalSentences ?? initialCoverage?.totalSentences ?? 0,
           unsupportedSentenceCount:
@@ -1574,12 +2007,17 @@ async function processYearlyReportRewrite(
       } as Prisma.InputJsonValue
     });
 
-    await enqueuePublish(
-      messageId,
-      revisionOptions.version ?? 1,
-      revisionOptions.generationRunId
-    );
+    if (rewriteStatus === "pending") {
+      await enqueuePublish(
+        messageId,
+        revisionOptions.version ?? 1,
+        revisionOptions.generationRunId
+      );
+    } else {
+      await publishFeedUpdate(messageId, "failed");
+    }
   } catch (error) {
+    promptChars += collectFailedModelCall(error, modelCalls);
     const errorText = error instanceof Error ? error.message : String(error);
 
     if (!finalAttempt) {
@@ -1591,7 +2029,8 @@ async function processYearlyReportRewrite(
         inputJson: generationInputJson(
           yearlyPayload,
           revisionOptions.previousOutput,
-          modelCalls
+          modelCalls,
+          revisionOptions.reasoningEffortOverride
         ),
         rewriteJson: {
           errorCode: "YEARLY_REPORT_REWRITE_ATTEMPT_FAILED",
@@ -1619,7 +2058,8 @@ async function processYearlyReportRewrite(
       inputJson: generationInputJson(
         yearlyPayload,
         revisionOptions.previousOutput,
-        modelCalls
+        modelCalls,
+        revisionOptions.reasoningEffortOverride
       ),
       rewriteJson: {
         errorCode: "YEARLY_REPORT_REWRITE_FAILED_FINAL",
@@ -1639,6 +2079,7 @@ async function processYearlyReportRewrite(
       "YEARLY_REPORT_REWRITE_FAILED_FINAL",
       errorText
     );
+    await publishFeedUpdate(messageId, "failed");
   }
 }
 
@@ -1684,6 +2125,8 @@ async function upsertRewrite(args: {
   });
 
   if (args.generationRunId) {
+    const phase = phaseForRewriteStatus(args.status);
+    const phaseUpdatedAt = new Date();
     const terminalStatus =
       args.status === "published" ||
       args.status === "failed" ||
@@ -1693,6 +2136,8 @@ async function upsertRewrite(args: {
       data: {
         version,
         status: args.status,
+        phase,
+        phaseUpdatedAt,
         userInstruction: args.userInstruction ?? null,
         ...(args.inputJson ? { inputJson: args.inputJson } : {}),
         outputJson: args.rewriteJson,
@@ -1852,23 +2297,64 @@ const ingestWorker = new Worker<IngestJobData>(
         });
       }
 
-      await rewriteQueue.add(
-        "rewrite-notice",
-        {
+      const phaseUpdatedAt = new Date();
+      const generationRun = await logPrisma.generationRun.create({
+        data: {
           messageId: job.data.messageId,
-          reason: "new-message"
-        },
-        {
-          jobId: `rewrite-${job.data.messageId}`,
-          attempts: 3,
-          backoff: {
-            type: "exponential",
-            delay: 5000
-          },
-          removeOnComplete: 2000,
-          removeOnFail: 2000
+          version: 1,
+          reason: "new-message",
+          status: "queued",
+          phase: "queued",
+          phaseUpdatedAt,
+          inputJson: {
+            endpoint: "worker/ingest",
+            messageId: job.data.messageId,
+            targetVersion: 1
+          } as Prisma.InputJsonValue
         }
-      );
+      });
+
+      let rewriteJob;
+      try {
+        rewriteJob = await rewriteQueue.add(
+          "rewrite-notice",
+          {
+            messageId: job.data.messageId,
+            reason: "new-message",
+            generationRunId: generationRun.id
+          },
+          {
+            jobId: `rewrite-${job.data.messageId}`,
+            attempts: 3,
+            backoff: {
+              type: "exponential",
+              delay: 5000
+            },
+            removeOnComplete: 2000,
+            removeOnFail: 2000
+          }
+        );
+      } catch (error) {
+        await logPrisma.generationRun.update({
+          where: { id: generationRun.id },
+          data: {
+            status: "failed",
+            phase: "failed",
+            phaseUpdatedAt: new Date(),
+            errorText: error instanceof Error ? error.message : String(error),
+            finishedAt: new Date()
+          }
+        });
+        throw error;
+      }
+
+      await logPrisma.generationRun.update({
+        where: { id: generationRun.id },
+        data: {
+          jobId: rewriteJob.id != null ? String(rewriteJob.id) : null,
+          jobName: "rewrite-notice"
+        }
+      });
       await publishFeedUpdate(job.data.messageId, "processing");
     });
   },
@@ -1883,6 +2369,11 @@ const rewriteWorker = new Worker<RewriteJobData>(
   async (job: Job<RewriteJobData>) => {
     const messageId = job.data.messageId;
     return withJobRun("rewrite", messageId, async () => {
+      await setGenerationPhase(
+        logPrisma,
+        job.data.generationRunId,
+        "reading_notice"
+      );
       const source = await prisma.sourceNotice.findUnique({
         where: { messageId }
       });
@@ -1964,8 +2455,41 @@ const rewriteWorker = new Worker<RewriteJobData>(
       const preRewriteModelCalls: ModelCallLog[] = [];
       let preRewritePromptChars = 0;
 
+      if (isAmbiguousBareRemovalInstruction(job.data.instruction)) {
+        await setGenerationPhase(logPrisma, generationRunId, "analyzing_content");
+        await upsertRewrite({
+          messageId,
+          version: targetVersion,
+          userInstruction: job.data.instruction,
+          generationRunId,
+          inputJson: generationInputJson(
+            payload,
+            previousOutput,
+            preRewriteModelCalls,
+            job.data.reasoningEffortOverride
+          ),
+          rewriteJson: {
+            skippedReason: "AMBIGUOUS_REVISION_INSTRUCTION",
+            message:
+              "Instruction asks to remove 'this' but does not include the exact text to remove."
+          } as Prisma.InputJsonValue,
+          status: "skipped",
+          validationJson: {
+            valid: false,
+            errorCode: "AMBIGUOUS_REVISION_INSTRUCTION",
+            errors: [
+              "Instruction asks to remove 'this' but does not include the exact text to remove."
+            ],
+            sourceBodyChars: payload.sourceBodyChars,
+            promptChars: preRewritePromptChars
+          } as Prisma.InputJsonValue
+        });
+        return;
+      }
+
       // Skip full AI rewrite for mechanical categories, unless manually triggered
       if (job.data.reason !== "manual-reprocess" && shouldSkipRewrite(categories)) {
+        await setGenerationPhase(logPrisma, generationRunId, "analyzing_content");
         await upsertRewrite({
           messageId,
           version: targetVersion,
@@ -1992,6 +2516,7 @@ const rewriteWorker = new Worker<RewriteJobData>(
 
       // Three-tier PDF processing for notices with attachments
       if (source.hasAttachments) {
+        await setGenerationPhase(logPrisma, generationRunId, "reading_pdf_attachment");
         try {
           // If stored attachments lack filenames (old ingestion), re-fetch from API
           let rawJson = source.rawMessageJson;
@@ -2023,7 +2548,8 @@ const rewriteWorker = new Worker<RewriteJobData>(
               if (yearlyPdf) {
                 const fallback = await extractYearlyRemunerationWithOpenAIPdf(
                   yearlyPdf,
-                  source
+                  source,
+                  job.data.reasoningEffortOverride
                 );
                 preRewriteModelCalls.push(fallback.modelCall);
                 preRewritePromptChars += fallback.promptChars;
@@ -2054,7 +2580,8 @@ const rewriteWorker = new Worker<RewriteJobData>(
                   previousOutput,
                   generationRunId,
                   modelCalls: preRewriteModelCalls,
-                  promptChars: preRewritePromptChars
+                  promptChars: preRewritePromptChars,
+                  reasoningEffortOverride: job.data.reasoningEffortOverride
                 }
               );
               return;
@@ -2071,7 +2598,8 @@ const rewriteWorker = new Worker<RewriteJobData>(
               inputJson: generationInputJson(
                 payload,
                 previousOutput,
-                preRewriteModelCalls
+                preRewriteModelCalls,
+                job.data.reasoningEffortOverride
               ),
               rewriteJson: {
                 skippedReason: "YEARLY_REPORT_NO_REMUNERATION",
@@ -2102,7 +2630,8 @@ const rewriteWorker = new Worker<RewriteJobData>(
               const fallback = await extractReportContextWithOpenAIPdf(
                 reportPdf,
                 source,
-                job.data.instruction
+                job.data.instruction,
+                job.data.reasoningEffortOverride
               );
               preRewriteModelCalls.push(fallback.modelCall);
               preRewritePromptChars += fallback.promptChars;
@@ -2121,7 +2650,8 @@ const rewriteWorker = new Worker<RewriteJobData>(
               const fallback = await extractReportContextWithOpenAIPdf(
                 reportPdf,
                 source,
-                job.data.instruction
+                job.data.instruction,
+                job.data.reasoningEffortOverride
               );
               preRewriteModelCalls.push(fallback.modelCall);
               preRewritePromptChars += fallback.promptChars;
@@ -2143,7 +2673,8 @@ const rewriteWorker = new Worker<RewriteJobData>(
                 previousOutput,
                 generationRunId,
                 modelCalls: preRewriteModelCalls,
-                promptChars: preRewritePromptChars
+                promptChars: preRewritePromptChars,
+                reasoningEffortOverride: job.data.reasoningEffortOverride
               }
             );
             return;
@@ -2162,7 +2693,8 @@ const rewriteWorker = new Worker<RewriteJobData>(
               const fallback = await extractGeneralContextWithOpenAIPdf(
                 fallbackPdf,
                 payload,
-                job.data.instruction
+                job.data.instruction,
+                job.data.reasoningEffortOverride
               );
               preRewriteModelCalls.push(fallback.modelCall);
               preRewritePromptChars += fallback.promptChars;
@@ -2186,9 +2718,60 @@ const rewriteWorker = new Worker<RewriteJobData>(
         }
       }
 
+      // Deterministic low-value triage before model calls.
+      await setGenerationPhase(logPrisma, generationRunId, "analyzing_content");
+      if (job.data.reason !== "manual-reprocess") {
+        const deterministicSkip = getDeterministicTriageSkip(
+          source.title,
+          [source.bodyText, payload.pdfSupplementText ?? ""].filter(Boolean).join("\n\n"),
+          categories,
+          source.hasAttachments
+        );
+        if (deterministicSkip) {
+          console.log(
+            `[triage] deterministic skip ${messageId} (${source.issuerSign}): ${deterministicSkip.reason}`
+          );
+          await upsertRewrite({
+            messageId,
+            version: targetVersion,
+            userInstruction: job.data.instruction,
+            generationRunId,
+            inputJson: generationInputJson(
+              payload,
+              previousOutput,
+              preRewriteModelCalls,
+              job.data.reasoningEffortOverride
+            ),
+            rewriteJson: {
+              skippedReason: "DETERMINISTIC_TRIAGE_SKIP",
+              triageKind: deterministicSkip.kind,
+              triageReason: deterministicSkip.reason,
+              categories
+            } as Prisma.InputJsonValue,
+            status: "skipped",
+            validationJson: {
+              valid: true,
+              errorCode: null,
+              errors: [],
+              sourceBodyChars: payload.sourceBodyChars,
+              promptChars: preRewritePromptChars,
+              triageResult: deterministicSkip
+            } as Prisma.InputJsonValue
+          });
+
+          await enqueuePublish(messageId, targetVersion, generationRunId);
+          return;
+        }
+      }
+
       // AI triage for ambiguous categories — lightweight check before full pipeline
       if (job.data.reason !== "manual-reprocess" && needsNewsworthinessTriage(categories)) {
-        const triage = await callModelTriage(source.title, source.bodyText, categories);
+        const triage = await callModelTriage(
+          source.title,
+          source.bodyText,
+          categories,
+          source.hasAttachments
+        );
         if (triage.modelCall) {
           preRewriteModelCalls.push(triage.modelCall);
           preRewritePromptChars += triage.promptChars;
@@ -2205,7 +2788,8 @@ const rewriteWorker = new Worker<RewriteJobData>(
             inputJson: generationInputJson(
               payload,
               previousOutput,
-              preRewriteModelCalls
+              preRewriteModelCalls,
+              job.data.reasoningEffortOverride
             ),
             rewriteJson: {
               skippedReason: "AI_TRIAGE_SKIP",
@@ -2245,7 +2829,16 @@ const rewriteWorker = new Worker<RewriteJobData>(
       let attributionRiskCount = 0;
       let styleSanitization: ReturnType<typeof sanitizeRewriteStyle>["stats"] | null =
         null;
+      let editorialReview: EditorialReviewAudit | null = null;
       const modelCalls: ModelCallLog[] = [...preRewriteModelCalls];
+      const rewriteReasoningEffort =
+        job.data.reasoningEffortOverride ?? config.OPENAI_DEFAULT_REASONING_EFFORT;
+      const correctionReasoningEffort =
+        job.data.reasoningEffortOverride ?? config.OPENAI_REPORT_REASONING_EFFORT;
+      const revisionInstructionForPrompt = appendRevisionChecklist(
+        job.data.instruction
+      );
+      const attachmentTextAvailable = Boolean(payload.pdfSupplementText?.trim());
 
       if (payload.bodyText.trim().length === 0) {
         await upsertRewrite({
@@ -2266,14 +2859,17 @@ const rewriteWorker = new Worker<RewriteJobData>(
             promptChars
           } as Prisma.InputJsonValue
         });
+        await publishFeedUpdate(messageId, "failed");
         return;
       }
 
       try {
+        await setGenerationPhase(logPrisma, generationRunId, "writing_notice");
         const initialDraftResult = await callModelRewrite(
           payload,
-          job.data.instruction,
-          previousOutput
+          revisionInstructionForPrompt,
+          previousOutput,
+          rewriteReasoningEffort
         );
         modelCalls.push(initialDraftResult.modelCall);
         promptChars += initialDraftResult.promptChars;
@@ -2281,13 +2877,18 @@ const rewriteWorker = new Worker<RewriteJobData>(
         let rewrite = hiddenDraft;
 
         try {
+          await setGenerationPhase(logPrisma, generationRunId, "checking_references");
           // Include PDF supplement text in reference check so facts from
           // attached PDFs are considered grounded (not just the body text)
           const refPayload = payload.pdfSupplementText
             ? { ...payload, bodyText: payload.bodyText + "\n\n" + payload.pdfSupplementText }
             : payload;
 
-          const initialReferenceCheck = await callModelReferenceCheck(refPayload, rewrite);
+          const initialReferenceCheck = await callModelReferenceCheck(
+            refPayload,
+            rewrite,
+            rewriteReasoningEffort
+          );
           if (initialReferenceCheck.modelCall) {
             modelCalls.push(initialReferenceCheck.modelCall);
           }
@@ -2299,21 +2900,25 @@ const rewriteWorker = new Worker<RewriteJobData>(
             initialReferenceCheck.coverage
           );
           if (correctionInstruction) {
-            const combinedCorrection = [job.data.instruction, correctionInstruction]
+            const combinedCorrection = [revisionInstructionForPrompt, correctionInstruction]
               .filter(Boolean)
               .join("\n\n");
             const correctedResult = await callModelRewrite(
               payload,
               combinedCorrection,
               rewrite,
-              config.OPENAI_REPORT_REASONING_EFFORT
+              correctionReasoningEffort
             );
             modelCalls.push(correctedResult.modelCall);
             promptChars += correctedResult.promptChars;
             rewrite = correctedResult.rewrite;
             correctionApplied = true;
 
-            const finalReferenceCheck = await callModelReferenceCheck(refPayload, rewrite);
+            const finalReferenceCheck = await callModelReferenceCheck(
+              refPayload,
+              rewrite,
+              rewriteReasoningEffort
+            );
             if (finalReferenceCheck.modelCall) {
               modelCalls.push(finalReferenceCheck.modelCall);
             }
@@ -2321,22 +2926,24 @@ const rewriteWorker = new Worker<RewriteJobData>(
             finalCoverage = finalReferenceCheck.coverage;
           }
         } catch (error) {
+          promptChars += collectFailedModelCall(error, modelCalls);
           checkerError = error instanceof Error ? error.message : String(error);
         }
 
+        await setGenerationPhase(logPrisma, generationRunId, "finalizing");
         const attributionRisks = findAttributionRisks(rewrite);
         attributionRiskCount = attributionRisks.length;
         const attributionInstruction =
           buildAttributionCorrectionInstruction(attributionRisks);
         if (attributionInstruction) {
-          const combinedAttribution = [job.data.instruction, attributionInstruction]
+          const combinedAttribution = [revisionInstructionForPrompt, attributionInstruction]
             .filter(Boolean)
             .join("\n\n");
           const correctedForAttribution = await callModelRewrite(
             payload,
             combinedAttribution,
             rewrite,
-            config.OPENAI_REPORT_REASONING_EFFORT
+            correctionReasoningEffort
           );
           modelCalls.push(correctedForAttribution.modelCall);
           promptChars += correctedForAttribution.promptChars;
@@ -2344,6 +2951,20 @@ const rewriteWorker = new Worker<RewriteJobData>(
           attributionCorrectionApplied = true;
           attributionRiskCount = findAttributionRisks(rewrite).length;
         }
+
+        const editorialReviewResult = await applyEditorialRevisionReviewRepair({
+          payload,
+          rewrite,
+          instruction: job.data.instruction,
+          previousOutput,
+          revisionInstructionForPrompt,
+          reasoningEffort: correctionReasoningEffort,
+          modelCalls,
+          callRewrite: callModelRewrite
+        });
+        rewrite = editorialReviewResult.rewrite;
+        promptChars += editorialReviewResult.promptChars;
+        editorialReview = editorialReviewResult.audit;
 
         const importanceResult = applyImportanceHighBar(rewrite, payload);
         rewrite = importanceResult.rewrite;
@@ -2354,25 +2975,39 @@ const rewriteWorker = new Worker<RewriteJobData>(
         rewrite = styleResult.rewrite;
         styleSanitization = styleResult.stats;
 
-        const validation = validateRewriteOutput(rewrite, payload);
+        const validation = validateRewriteWithRevisionCompliance(rewrite, payload, {
+          instruction: job.data.instruction,
+          previousOutput,
+          attachmentTextAvailable
+        });
+        const rewriteStatus = statusForValidation(validation);
+        const persistedRewriteJson = rewriteJsonForValidation(rewrite, validation);
 
         await upsertRewrite({
           messageId,
           version: targetVersion,
           userInstruction: job.data.instruction,
           generationRunId,
-          inputJson: generationInputJson(payload, previousOutput, modelCalls),
-          rewriteJson: rewrite,
-          status: "pending",
+          inputJson: generationInputJson(
+            payload,
+            previousOutput,
+            modelCalls,
+            job.data.reasoningEffortOverride
+          ),
+          rewriteJson: persistedRewriteJson,
+          status: rewriteStatus,
           validationJson: {
             valid: validation.valid,
-            errorCode: validation.valid
-              ? null
-              : "NON_BLOCKING_VALIDATION_WARNINGS",
+            errorCode: validationErrorCode(validation),
             errors: validation.errors,
+            issues: validation.issues,
+            blockingErrors: validation.blockingErrors,
+            warnings: validation.warnings,
+            revisionInstructionCompliance: validation.revisionCompliance,
             sourceBodyChars: payload.sourceBodyChars,
             promptChars,
             styleSanitization,
+            editorialReview,
             referenceCheck: {
               enabled: true,
               checkerError,
@@ -2386,6 +3021,8 @@ const rewriteWorker = new Worker<RewriteJobData>(
                 null,
               importanceAdjusted,
               importanceAdjustReason,
+              initialCoverage: referenceCoverageJson(initialCoverage),
+              finalCoverage: referenceCoverageJson(finalCoverage ?? initialCoverage),
               totalSentences:
                 finalCoverage?.totalSentences ?? initialCoverage?.totalSentences ?? 0,
               unsupportedSentenceCount:
@@ -2423,9 +3060,14 @@ const rewriteWorker = new Worker<RewriteJobData>(
           } as Prisma.InputJsonValue
         });
 
-        await enqueuePublish(messageId, targetVersion, generationRunId);
+        if (rewriteStatus === "pending") {
+          await enqueuePublish(messageId, targetVersion, generationRunId);
+        } else {
+          await publishFeedUpdate(messageId, "failed");
+        }
         return;
       } catch (error) {
+        promptChars += collectFailedModelCall(error, modelCalls);
         const errorText = error instanceof Error ? error.message : String(error);
 
         if (!finalAttempt) {
@@ -2434,7 +3076,12 @@ const rewriteWorker = new Worker<RewriteJobData>(
             version: targetVersion,
             userInstruction: job.data.instruction,
             generationRunId,
-            inputJson: generationInputJson(payload, previousOutput, modelCalls),
+            inputJson: generationInputJson(
+              payload,
+              previousOutput,
+              modelCalls,
+              job.data.reasoningEffortOverride
+            ),
             rewriteJson: {
               errorCode: "REWRITE_ATTEMPT_FAILED",
               message: errorText
@@ -2456,7 +3103,9 @@ const rewriteWorker = new Worker<RewriteJobData>(
                 importanceAdjusted,
                 importanceAdjustReason,
                 initialCoveragePercent: initialCoverage?.coveragePercent ?? null,
-                finalCoveragePercent: finalCoverage?.coveragePercent ?? null
+                finalCoveragePercent: finalCoverage?.coveragePercent ?? null,
+                initialCoverage: referenceCoverageJson(initialCoverage),
+                finalCoverage: referenceCoverageJson(finalCoverage)
               }
             } as Prisma.InputJsonValue
           });
@@ -2468,7 +3117,12 @@ const rewriteWorker = new Worker<RewriteJobData>(
           version: targetVersion,
           userInstruction: job.data.instruction,
           generationRunId,
-          inputJson: generationInputJson(payload, previousOutput, modelCalls),
+          inputJson: generationInputJson(
+            payload,
+            previousOutput,
+            modelCalls,
+            job.data.reasoningEffortOverride
+          ),
           rewriteJson: {
             errorCode: "REWRITE_FAILED_FINAL",
             message: errorText
@@ -2490,11 +3144,14 @@ const rewriteWorker = new Worker<RewriteJobData>(
               importanceAdjusted,
               importanceAdjustReason,
               initialCoveragePercent: initialCoverage?.coveragePercent ?? null,
-              finalCoveragePercent: finalCoverage?.coveragePercent ?? null
+              finalCoveragePercent: finalCoverage?.coveragePercent ?? null,
+              initialCoverage: referenceCoverageJson(initialCoverage),
+              finalCoverage: referenceCoverageJson(finalCoverage)
             }
           } as Prisma.InputJsonValue
         });
         logFinalRewriteFailure(messageId, "REWRITE_FAILED_FINAL", errorText);
+        await publishFeedUpdate(messageId, "failed");
       }
     });
   },
@@ -2545,6 +3202,7 @@ const publishWorker = new Worker<PublishJobData>(
 
       const publishedVersions = pendingRewrites.map((rewrite) => rewrite.version);
       if (publishedVersions.length > 0) {
+        await setGenerationPhase(logPrisma, job.data.generationRunId, "publishing");
         await prisma.rewrite.updateMany({
           where: {
             messageId: source.messageId,
@@ -2564,6 +3222,8 @@ const publishWorker = new Worker<PublishJobData>(
           },
           data: {
             status: "published",
+            phase: "published",
+            phaseUpdatedAt: new Date(),
             finishedAt: new Date()
           }
         });

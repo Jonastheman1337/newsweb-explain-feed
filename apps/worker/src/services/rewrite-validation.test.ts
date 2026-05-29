@@ -195,6 +195,66 @@ describe("validateRewriteOutput", () => {
     );
   });
 
+  it("fails when visible article text refers to PDF or attachments", () => {
+    const payload = createPayload({ hasAttachments: true });
+    const rewrite = createRewrite({
+      lead: "Selskapet opplyser om nye detaljer i PDF-vedlegget.",
+      body: ["Vedlegget viser at avtalen gjelder fra andre kvartal."],
+      source_limitations: ["Ekstra dokumenter er bare delvis analysert."]
+    });
+
+    const result = validateRewriteOutput(rewrite, payload);
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain(
+      "Visible article text refers to PDF/attachments, analyzed material, or missing source data; move limitations to source_limitations."
+    );
+    expect(result.blockingErrors).toContain(
+      "Visible article text refers to PDF/attachments, analyzed material, or missing source data; move limitations to source_limitations."
+    );
+    expect(result.issues).toContainEqual({
+      code: "VISIBLE_META_SOURCE_LANGUAGE",
+      severity: "blocking",
+      message:
+        "Visible article text refers to PDF/attachments, analyzed material, or missing source data; move limitations to source_limitations."
+    });
+  });
+
+  it("blocks visible extraction/meta limitation language from reviewed notices", () => {
+    const payload = createPayload({ hasAttachments: true });
+    const rewrite = createRewrite({
+      title: "5th Planet Games med Q1-melding uten tall",
+      lead:
+        "Den korte meldingen som er analysert, inneholder ingen finansielle nøkkeltall.",
+      body: [
+        "Ifølge den analyserte rapportkonteksten fremstår vedlegget som en énsides melding.",
+        "Inntekter og resultat er ikke oppgitt i det analyserte materialet."
+      ],
+      source_limitations: ["Full rapport er ikke analysert."]
+    });
+
+    const result = validateRewriteOutput(rewrite, payload);
+
+    expect(result.valid).toBe(false);
+    expect(result.blockingErrors).toHaveLength(1);
+    expect(result.issues.some((issue) => issue.code === "VISIBLE_META_SOURCE_LANGUAGE")).toBe(
+      true
+    );
+  });
+
+  it("warns on colon-heavy titles", () => {
+    const result = validateRewriteOutput(
+      createRewrite({ title: "DOF: Resultat etter skatt falt" }),
+      createPayload()
+    );
+
+    expect(result.issues).toContainEqual({
+      code: "COLON_HEAVY_TITLE",
+      severity: "warning",
+      message:
+        "Title uses a colon; prefer a normal sentence-style headline unless it introduces a list."
+    });
+  });
+
   it("fails when visible article text exceeds the 1000 character cap", () => {
     const payload = createPayload();
     const rewrite = createRewrite({
@@ -205,6 +265,20 @@ describe("validateRewriteOutput", () => {
     const result = validateRewriteOutput(rewrite, payload);
     expect(result.valid).toBe(false);
     expect(result.errors).toContain("Visible article text exceeds 1000 chars.");
+  });
+
+  it("allows an explicit higher visible character cap", () => {
+    const payload = createPayload();
+    const rewrite = createRewrite({
+      lead: "Selskapet la frem kvartalstall.",
+      body: ["A".repeat(980)]
+    });
+
+    const result = validateRewriteOutput(rewrite, payload, {
+      maxVisibleArticleChars: 1200
+    });
+    expect(result.errors).not.toContain("Visible article text exceeds 1000 chars.");
+    expect(result.errors).not.toContain("Visible article text exceeds 1200 chars.");
   });
 
   it("flags currency markers that are not present in the source", () => {

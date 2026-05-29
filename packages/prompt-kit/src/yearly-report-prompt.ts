@@ -117,6 +117,7 @@ export function createYearlyReportRevisionUserPrompt(
     "Lag en revidert versjon av lederlonnssaken under, basert pa instruksjonen.",
     "VIKTIG: Instruksjonen er styrende. Hvis den ber om ny vinkel, annet fokus, annen struktur, annen lengde eller stor omskriving, skal du endre alle berorte felt tydelig.",
     "Behold bare tekst som fortsatt passer med instruksjonen. Ikke gjor tilfeldige smaendringer for variasjon.",
+    "Hvis instruksjonen er smal og konkret, endrer du bare det som trengs. Sarlig ved 'fjern/kutt/dropp/ta bort dette: ...' skal du fjerne bare den angitte teksten og ellers bevare forrige versjon.",
     "Hvis instruksjonen er bred, kan du skrive om tittel, lead, body, key_facts, importance og source_spans sa mye som nodvendig.",
     "Hold deg til lederlonn og godtgjorelse. Ikke legg inn drift, strategi, investeringer, utbytte eller resultater.",
     "Returner HELE JSON-strukturen med alle felt, ogsa de som er uendret.",

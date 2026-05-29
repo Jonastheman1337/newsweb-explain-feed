@@ -11,7 +11,7 @@ describe("parseWorkerConfig", () => {
         REDIS_URL: "redis://localhost:6379",
         OPENAI_MODEL: "gpt-5.5",
         OPENAI_TIMEOUT_MS: "15000",
-        POLL_INTERVAL_MS: "20000"
+        POLL_INTERVAL_MS: "5000"
       })
     ).toThrow(/OPENAI_KEY_MISSING/);
   });
@@ -27,18 +27,19 @@ describe("parseWorkerConfig", () => {
       OPENAI_FAST_MODEL: "gpt-5.4-mini",
       OPENAI_TIMEOUT_MS: "60000",
       OPENAI_FAST_TIMEOUT_MS: "15000",
-      OPENAI_DEFAULT_REASONING_EFFORT: "low",
+      OPENAI_DEFAULT_REASONING_EFFORT: "medium",
       OPENAI_REPORT_REASONING_EFFORT: "medium",
-      OPENAI_HARD_REASONING_EFFORT: "high",
-      POLL_INTERVAL_MS: "20000"
+      OPENAI_HARD_REASONING_EFFORT: "medium",
+      POLL_INTERVAL_MS: "5000"
     });
     expect(config.OPENAI_MODEL).toBe("gpt-5.5");
     expect(config.OPENAI_FAST_MODEL).toBe("gpt-5.4-mini");
     expect(config.OPENAI_TIMEOUT_MS).toBe(60000);
     expect(config.OPENAI_FAST_TIMEOUT_MS).toBe(15000);
-    expect(config.OPENAI_DEFAULT_REASONING_EFFORT).toBe("low");
+    expect(config.OPENAI_DEFAULT_REASONING_EFFORT).toBe("medium");
     expect(config.OPENAI_REPORT_REASONING_EFFORT).toBe("medium");
-    expect(config.OPENAI_HARD_REASONING_EFFORT).toBe("high");
+    expect(config.OPENAI_HARD_REASONING_EFFORT).toBe("medium");
+    expect(config.POLL_INTERVAL_MS).toBe(5000);
   });
 
   it("uses OpenAI defaults for model and reasoning settings", () => {
@@ -47,16 +48,29 @@ describe("parseWorkerConfig", () => {
       DATABASE_URL:
         "postgresql://newsweb:newsweb@localhost:5432/newsweb_explain?schema=public",
       REDIS_URL: "redis://localhost:6379",
-      OPENAI_API_KEY: "sk-openai-test-key",
-      POLL_INTERVAL_MS: "20000"
+      OPENAI_API_KEY: "sk-openai-test-key"
     });
     expect(config.OPENAI_MODEL).toBe("gpt-5.5");
     expect(config.OPENAI_FAST_MODEL).toBe("gpt-5.4-mini");
-    expect(config.OPENAI_TIMEOUT_MS).toBe(60000);
+    expect(config.OPENAI_TIMEOUT_MS).toBe(240000);
     expect(config.OPENAI_FAST_TIMEOUT_MS).toBe(15000);
-    expect(config.OPENAI_DEFAULT_REASONING_EFFORT).toBe("low");
+    expect(config.OPENAI_DEFAULT_REASONING_EFFORT).toBe("medium");
     expect(config.OPENAI_REPORT_REASONING_EFFORT).toBe("medium");
-    expect(config.OPENAI_HARD_REASONING_EFFORT).toBe("high");
+    expect(config.OPENAI_HARD_REASONING_EFFORT).toBe("medium");
+    expect(config.POLL_INTERVAL_MS).toBe(5000);
     expect(config.LATEST_BOOTSTRAP_COUNT).toBe(30);
+  });
+
+  it("rejects poll intervals below 5 seconds", () => {
+    expect(() =>
+      parseWorkerConfig({
+        NODE_ENV: "development",
+        DATABASE_URL:
+          "postgresql://newsweb:newsweb@localhost:5432/newsweb_explain?schema=public",
+        REDIS_URL: "redis://localhost:6379",
+        OPENAI_API_KEY: "sk-openai-test-key",
+        POLL_INTERVAL_MS: "4999"
+      })
+    ).toThrow();
   });
 });

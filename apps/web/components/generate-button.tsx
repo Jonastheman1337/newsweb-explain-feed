@@ -4,16 +4,11 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useEditorialTelemetry } from "../lib/editorial-telemetry";
 import { E24Loader } from "./e24-loader";
+import {
+  GENERATION_STEP_DURATION_MS,
+  getGenerationSteps
+} from "./generation-steps";
 
-const BASE_STEPS = [
-  "Leser original melding",
-  "Analyserer innhold",
-  "Skriver AI-notis",
-  "Sjekker referanser",
-  "Ferdigstiller"
-];
-
-const PDF_STEP = "Leser PDF-vedlegg";
 const POLL_INTERVAL_MS = 3000;
 const MAX_POLL_ATTEMPTS = 180;
 const RUNNING_JOB_STATES = new Set([
@@ -41,12 +36,16 @@ type GenerateButtonProps = {
   messageId: number;
   label?: string;
   hasAttachments?: boolean;
+  reasoningEffortOverride?: "xhigh";
 };
 
-export function GenerateButton({ messageId, label, hasAttachments }: GenerateButtonProps) {
-  const PROGRESS_STEPS = hasAttachments
-    ? [BASE_STEPS[0], PDF_STEP, ...BASE_STEPS.slice(1)]
-    : BASE_STEPS;
+export function GenerateButton({
+  messageId,
+  label,
+  hasAttachments,
+  reasoningEffortOverride
+}: GenerateButtonProps) {
+  const PROGRESS_STEPS = getGenerationSteps(hasAttachments);
   const router = useRouter();
   const [status, setStatus] = useState<"idle" | "loading" | "polling" | "done" | "error">(
     "idle"
@@ -138,7 +137,13 @@ export function GenerateButton({ messageId, label, hasAttachments }: GenerateBut
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
-          telemetry: buildTelemetry({ actionSource: "generate_button" })
+          ...(reasoningEffortOverride ? { reasoningEffortOverride } : {}),
+          telemetry: buildTelemetry({
+            actionSource:
+              reasoningEffortOverride === "xhigh"
+                ? "generate_button_xhigh"
+                : "generate_button"
+          })
         })
       });
 
@@ -156,7 +161,7 @@ export function GenerateButton({ messageId, label, hasAttachments }: GenerateBut
       setProgressStep(0);
       progressRef.current = setInterval(() => {
         setProgressStep((prev) => Math.min(prev + 1, PROGRESS_STEPS.length - 1));
-      }, 6000);
+      }, GENERATION_STEP_DURATION_MS);
 
       let attempts = 0;
       pollRef.current = setInterval(async () => {

@@ -3,28 +3,18 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { E24Loader } from "./e24-loader";
+import {
+  GENERATION_STEP_DURATION_MS,
+  getGenerationSteps
+} from "./generation-steps";
 
 type ProcessingIndicatorProps = {
   messageId: number;
   hasAttachments?: boolean;
 };
 
-const BASE_STEPS = [
-  "Leser original melding",
-  "Analyserer innhold",
-  "Skriver AI-notis",
-  "Sjekker referanser",
-  "Ferdigstiller"
-];
-
-const PDF_STEP = "Leser PDF-vedlegg";
-
-const STEP_DURATION_MS = 6000;
-
 export function ProcessingIndicator({ messageId, hasAttachments }: ProcessingIndicatorProps) {
-  const STEPS = hasAttachments
-    ? [BASE_STEPS[0], PDF_STEP, ...BASE_STEPS.slice(1)]
-    : BASE_STEPS;
+  const steps = getGenerationSteps(hasAttachments);
   const router = useRouter();
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [stepIndex, setStepIndex] = useState(0);
@@ -33,15 +23,19 @@ export function ProcessingIndicator({ messageId, hasAttachments }: ProcessingInd
 
   // Advance steps on a timer
   useEffect(() => {
+    setStepIndex(0);
+    setElapsed(0);
     const interval = setInterval(() => {
       setElapsed((prev) => prev + 1000);
-      setStepIndex((prev) => {
-        const next = Math.floor((prev * STEP_DURATION_MS + 1000) / STEP_DURATION_MS);
-        return Math.min(next, STEPS.length - 1);
-      });
     }, 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [steps.length]);
+
+  useEffect(() => {
+    setStepIndex(
+      Math.min(Math.floor(elapsed / GENERATION_STEP_DURATION_MS), steps.length - 1)
+    );
+  }, [elapsed, steps.length]);
 
   // Poll for completion
   useEffect(() => {
@@ -86,7 +80,7 @@ export function ProcessingIndicator({ messageId, hasAttachments }: ProcessingInd
   }, [messageId, router]);
 
   const progress = Math.min(
-    ((stepIndex / (STEPS.length - 1)) * 80) + (elapsed > 0 ? Math.min(elapsed / 500, 15) : 0),
+    ((stepIndex / (steps.length - 1)) * 80) + (elapsed > 0 ? Math.min(elapsed / 500, 15) : 0),
     95
   );
 
@@ -104,7 +98,7 @@ export function ProcessingIndicator({ messageId, hasAttachments }: ProcessingInd
   return (
     <div className="processingWrap">
       <div className="processingSteps">
-        {STEPS.map((step, i) => (
+        {steps.map((step, i) => (
           <div
             key={step}
             className={`processingStep${i < stepIndex ? " stepDone" : i === stepIndex ? " stepActive" : ""}`}

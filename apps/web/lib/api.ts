@@ -72,6 +72,12 @@ type NoticeSource = {
   markets: string[];
   bodyText: string;
   hasAttachments: boolean;
+  attachments: Array<{
+    id: number;
+    fileName: string;
+    fileType: string | null;
+    fileSize: number | null;
+  }>;
 };
 
 type RewriteVersion = {

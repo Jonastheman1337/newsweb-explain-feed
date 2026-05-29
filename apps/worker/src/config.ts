@@ -20,18 +20,18 @@ const configSchema = z
       .min(1, "OPENAI_KEY_MISSING"),
     OPENAI_MODEL: z.string().default("gpt-5.5"),
     OPENAI_FAST_MODEL: z.string().default("gpt-5.4-mini"),
-    OPENAI_TIMEOUT_MS: z.coerce.number().int().min(1000).default(60000),
+    OPENAI_TIMEOUT_MS: z.coerce.number().int().min(1000).default(240000),
     OPENAI_FAST_TIMEOUT_MS: z.coerce.number().int().min(1000).default(15000),
     OPENAI_DEFAULT_REASONING_EFFORT: z
       .enum(["none", "minimal", "low", "medium", "high", "xhigh"])
-      .default("low"),
+      .default("medium"),
     OPENAI_REPORT_REASONING_EFFORT: z
       .enum(["none", "minimal", "low", "medium", "high", "xhigh"])
       .default("medium"),
     OPENAI_HARD_REASONING_EFFORT: z
       .enum(["none", "minimal", "low", "medium", "high", "xhigh"])
-      .default("high"),
-    POLL_INTERVAL_MS: z.coerce.number().int().min(5000).default(20000),
+      .default("medium"),
+    POLL_INTERVAL_MS: z.coerce.number().int().min(5000).default(5000),
     LATEST_BOOTSTRAP_COUNT: z.coerce.number().int().min(0).max(50).default(30)
   });
 

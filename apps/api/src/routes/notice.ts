@@ -4,6 +4,8 @@ import {
   rewriteOutputSchema
 } from "@newsweb/shared";
 import { logPrisma, prisma } from "@newsweb/shared/db";
+import { Readable } from "node:stream";
+import type { ReadableStream as NodeReadableStream } from "node:stream/web";
 import type { FastifyPluginAsync } from "fastify";
 import type { Prisma } from "@prisma/client";
 import { z } from "zod";
@@ -13,9 +15,23 @@ import {
   toJsonValue,
   tryCreateUserActionEvent
 } from "../services/editorial-telemetry.js";
+import {
+  buildGenerationStatusPayload,
+  chooseGenerationRun
+} from "../services/generation-status.js";
+import {
+  createAttachmentContentDisposition,
+  normalizeNewswebAttachments,
+  resolveNewswebAttachmentDownload
+} from "../services/newsweb-attachments.js";
 
 const paramsSchema = z.object({
   messageId: z.coerce.number().int().positive()
+});
+
+const attachmentParamsSchema = z.object({
+  messageId: z.coerce.number().int().positive(),
+  attachmentId: z.coerce.number().int().positive()
 });
 
 const statusQuerySchema = z.object({
@@ -25,21 +41,10 @@ const statusQuerySchema = z.object({
 const generateBodySchema = z
   .object({
     instruction: z.string().max(2000).optional(),
+    reasoningEffortOverride: z.enum(["xhigh"]).optional(),
     telemetry: editorialTelemetrySchema
   })
   .optional();
-
-const RUNNING_JOB_STATES = new Set([
-  "active",
-  "delayed",
-  "prioritized",
-  "waiting",
-  "waiting-children"
-]);
-
-function isJobStillRunning(jobState: string | null): boolean {
-  return jobState ? RUNNING_JOB_STATES.has(jobState) : false;
-}
 
 async function nextRewriteContext(messageId: number): Promise<{
   targetVersion: number;
@@ -61,6 +66,32 @@ async function nextRewriteContext(messageId: number): Promise<{
   return {
     targetVersion: (maxRow?.version ?? 0) + 1,
     previousRewriteJson: previousRewrite?.rewriteJson ?? null
+  };
+}
+
+function buildSourcePayload(notice: {
+  messageId: number;
+  title: string;
+  issuerName: string;
+  issuerSign: string;
+  publishedAt: Date;
+  categoriesJson: Prisma.JsonValue;
+  marketsJson: Prisma.JsonValue;
+  bodyText: string;
+  hasAttachments: boolean;
+  rawMessageJson: Prisma.JsonValue;
+}) {
+  return {
+    messageId: notice.messageId,
+    title: notice.title,
+    issuerName: notice.issuerName,
+    issuerSign: notice.issuerSign,
+    publishedAt: notice.publishedAt.toISOString(),
+    categories: (notice.categoriesJson as string[]) ?? [],
+    markets: (notice.marketsJson as string[]) ?? [],
+    bodyText: notice.bodyText,
+    hasAttachments: notice.hasAttachments,
+    attachments: normalizeNewswebAttachments(notice.rawMessageJson)
   };
 }
 
@@ -104,17 +135,7 @@ export const noticeRoutes: FastifyPluginAsync = async (fastify) => {
           publishedRewrites.length === 0)
       ) {
         return reply.send({
-          source: {
-            messageId: notice.messageId,
-            title: notice.title,
-            issuerName: notice.issuerName,
-            issuerSign: notice.issuerSign,
-            publishedAt: notice.publishedAt.toISOString(),
-            categories: (notice.categoriesJson as string[]) ?? [],
-            markets: (notice.marketsJson as string[]) ?? [],
-            bodyText: notice.bodyText,
-            hasAttachments: notice.hasAttachments
-          },
+          source: buildSourcePayload(notice),
           processing: true
         });
       }
@@ -125,17 +146,7 @@ export const noticeRoutes: FastifyPluginAsync = async (fastify) => {
         !notice.rewrites.some((r) => r.status === "published")
       ) {
         return reply.send({
-          source: {
-            messageId: notice.messageId,
-            title: notice.title,
-            issuerName: notice.issuerName,
-            issuerSign: notice.issuerSign,
-            publishedAt: notice.publishedAt.toISOString(),
-            categories: (notice.categoriesJson as string[]) ?? [],
-            markets: (notice.marketsJson as string[]) ?? [],
-            bodyText: notice.bodyText,
-            hasAttachments: notice.hasAttachments
-          },
+          source: buildSourcePayload(notice),
           failed: true
         });
       }
@@ -145,17 +156,7 @@ export const noticeRoutes: FastifyPluginAsync = async (fastify) => {
         !notice.rewrites.some((r) => r.status === "published")
       ) {
         return reply.send({
-          source: {
-            messageId: notice.messageId,
-            title: notice.title,
-            issuerName: notice.issuerName,
-            issuerSign: notice.issuerSign,
-            publishedAt: notice.publishedAt.toISOString(),
-            categories: (notice.categoriesJson as string[]) ?? [],
-            markets: (notice.marketsJson as string[]) ?? [],
-            bodyText: notice.bodyText,
-            hasAttachments: notice.hasAttachments
-          },
+          source: buildSourcePayload(notice),
           skipped: true
         });
       }
@@ -179,22 +180,89 @@ export const noticeRoutes: FastifyPluginAsync = async (fastify) => {
       }));
 
       const payload = {
-        source: {
-          messageId: notice.messageId,
-          title: notice.title,
-          issuerName: notice.issuerName,
-          issuerSign: notice.issuerSign,
-          publishedAt: notice.publishedAt.toISOString(),
-          categories: (notice.categoriesJson as string[]) ?? [],
-          markets: (notice.marketsJson as string[]) ?? [],
-          bodyText: notice.bodyText,
-          hasAttachments: notice.hasAttachments
-        },
+        source: buildSourcePayload(notice),
         rewrite,
         rewrites
       };
 
       return reply.send(noticeResponseSchema.parse(payload));
+    }
+  );
+
+  fastify.get(
+    "/notice/:messageId/attachments/:attachmentId",
+    {
+      preHandler: fastify.authenticate
+    },
+    async (request, reply) => {
+      const { messageId, attachmentId } = attachmentParamsSchema.parse(
+        request.params
+      );
+      const notice = await prisma.sourceNotice.findUnique({
+        where: { messageId },
+        select: { rawMessageJson: true }
+      });
+
+      if (!notice) {
+        return reply.code(404).send({ message: "Notis ikke funnet." });
+      }
+
+      let download;
+      try {
+        download = await resolveNewswebAttachmentDownload({
+          rawMessageJson: notice.rawMessageJson,
+          messageId,
+          attachmentId
+        });
+      } catch (error) {
+        request.log.error(
+          { err: error, messageId, attachmentId },
+          "Failed to fetch Newsweb attachment"
+        );
+        return reply
+          .code(502)
+          .send({ message: "Kunne ikke laste ned vedlegg." });
+      }
+
+      if (!download.ok) {
+        if (download.reason === "not_found") {
+          return reply.code(404).send({ message: "Vedlegg ikke funnet." });
+        }
+        return reply
+          .code(502)
+          .send({ message: "Kunne ikke laste ned vedlegg." });
+      }
+
+      const contentLength =
+        download.response.headers.get("content-length") ??
+        (download.attachment.fileSize == null
+          ? null
+          : String(download.attachment.fileSize));
+      const contentType =
+        download.response.headers.get("content-type") ??
+        download.attachment.fileType ??
+        "application/octet-stream";
+
+      reply.header("Content-Type", contentType);
+      reply.header(
+        "Content-Disposition",
+        createAttachmentContentDisposition(download.attachment.fileName)
+      );
+      reply.header("Cache-Control", "private, no-store");
+      if (contentLength) {
+        reply.header("Content-Length", contentLength);
+      }
+
+      if (!download.response.body) {
+        const buffer = Buffer.from(await download.response.arrayBuffer());
+        return reply.send(buffer);
+      }
+
+      return reply.send(
+        Readable.fromWeb(
+          download.response.body as unknown as NodeReadableStream<Uint8Array>
+        )
+      );
     }
   );
 
@@ -213,30 +281,47 @@ export const noticeRoutes: FastifyPluginAsync = async (fastify) => {
       });
 
       let jobState: string | null = null;
+      let jobGenerationRun = null;
       if (jobId) {
         const job = await fastify.rewriteQueue.getJob(jobId);
         jobState = job ? await job.getState() : "unknown";
-      }
-
-      if (!rewrite) {
-        return reply.send({
-          ready: false,
-          failed: false,
-          generatedAt: null,
-          version: null,
-          jobState
+        jobGenerationRun = await logPrisma.generationRun.findFirst({
+          where: {
+            messageId,
+            jobId,
+            reason: { in: ["new-message", "manual-reprocess"] }
+          },
+          orderBy: { requestedAt: "desc" },
+          select: {
+            id: true,
+            status: true,
+            phase: true,
+            phaseUpdatedAt: true
+          }
         });
       }
 
-      const failed = rewrite.status === "failed" && !isJobStillRunning(jobState);
-
-      return reply.send({
-        ready: rewrite.status === "published" || rewrite.status === "skipped",
-        failed,
-        generatedAt: rewrite.generatedAt.toISOString(),
-        version: rewrite.version,
-        jobState: failed && jobState === "completed" ? "failed" : jobState
+      const latestGenerationRun = await logPrisma.generationRun.findFirst({
+        where: {
+          messageId,
+          reason: { in: ["new-message", "manual-reprocess"] }
+        },
+        orderBy: { requestedAt: "desc" },
+        select: {
+          id: true,
+          status: true,
+          phase: true,
+          phaseUpdatedAt: true
+        }
       });
+
+      return reply.send(
+        buildGenerationStatusPayload({
+          generationRun: chooseGenerationRun(jobGenerationRun, latestGenerationRun),
+          rewrite,
+          jobState
+        })
+      );
     }
   );
 
@@ -455,14 +540,18 @@ export const noticeRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       const instruction = body?.instruction?.trim() || undefined;
+      const reasoningEffortOverride = body?.reasoningEffortOverride;
       const { targetVersion, previousRewriteJson } =
         await nextRewriteContext(messageId);
+      const phaseUpdatedAt = new Date();
       const generationRun = await logPrisma.generationRun.create({
         data: {
           messageId,
           version: targetVersion,
           reason: "manual-reprocess",
           status: "queued",
+          phase: "queued",
+          phaseUpdatedAt,
           userInstruction: instruction ?? null,
           ...(previousRewriteJson
             ? { previousRewriteJson: toJsonValue(previousRewriteJson) }
@@ -472,7 +561,8 @@ export const noticeRoutes: FastifyPluginAsync = async (fastify) => {
             messageId,
             targetVersion,
             previousRewriteJson,
-            instruction: instruction ?? null
+            instruction: instruction ?? null,
+            reasoningEffortOverride: reasoningEffortOverride ?? null
           })
         }
       });
@@ -486,6 +576,7 @@ export const noticeRoutes: FastifyPluginAsync = async (fastify) => {
             reason: "manual-reprocess",
             generationRunId: generationRun.id,
             targetVersion,
+            ...(reasoningEffortOverride ? { reasoningEffortOverride } : {}),
             ...(previousRewriteJson ? { previousRewriteJson } : {}),
             ...(instruction ? { instruction } : {})
           },
@@ -501,6 +592,8 @@ export const noticeRoutes: FastifyPluginAsync = async (fastify) => {
           where: { id: generationRun.id },
           data: {
             status: "failed",
+            phase: "failed",
+            phaseUpdatedAt: new Date(),
             errorText: error instanceof Error ? error.message : String(error),
             finishedAt: new Date()
           }
@@ -526,6 +619,7 @@ export const noticeRoutes: FastifyPluginAsync = async (fastify) => {
         actionSource: body?.telemetry?.actionSource ?? "instruction_input",
         payload: {
           instruction: instruction ?? null,
+          reasoningEffortOverride: reasoningEffortOverride ?? null,
           targetVersion,
           generationRunId: generationRun.id,
           jobId: job.id ?? null

@@ -58,4 +58,37 @@ describe("sanitizeRewriteStyle", () => {
     const result = sanitizeRewriteStyle(rewrite);
     expect(result.rewrite.source_limitations[0].length).toBeGreaterThanOrEqual(5);
   });
+
+  it("normalizes million amounts from 1.000 and up to milliarder", () => {
+    const rewrite = createRewrite();
+    rewrite.title = "Vegfinans utsteder for 1.000 millioner kroner";
+    rewrite.lead = "Vegfinans har utstedt nye obligasjoner på 1.000 millioner kroner.";
+    rewrite.body = [
+      "Lånet er på 1000 millioner kroner.",
+      "Rammen er 1.200 millioner kroner og kan økes til 2.500 millioner."
+    ];
+
+    const result = sanitizeRewriteStyle(rewrite);
+
+    expect(result.rewrite.title).toContain("én milliard kroner");
+    expect(result.rewrite.lead).toContain("én milliard kroner");
+    expect(result.rewrite.body[0]).toContain("én milliard kroner");
+    expect(result.rewrite.body[1]).toContain("1,2 milliarder kroner");
+    expect(result.rewrite.body[1]).toContain("2,5 milliarder");
+    expect(result.stats.normalizedBillionPhrases).toBe(5);
+  });
+
+  it("leaves amounts below 1.000 millioner unchanged", () => {
+    const rewrite = createRewrite();
+    rewrite.title = "Selskapet henter 999 millioner kroner";
+    rewrite.lead = "Selskapet henter 999 millioner kroner.";
+    rewrite.body = ["Rammen er 250 millioner kroner."];
+
+    const result = sanitizeRewriteStyle(rewrite);
+
+    expect(result.rewrite.title).toContain("999 millioner kroner");
+    expect(result.rewrite.lead).toContain("999 millioner kroner");
+    expect(result.rewrite.body[0]).toContain("250 millioner kroner");
+    expect(result.stats.normalizedBillionPhrases).toBe(0);
+  });
 });

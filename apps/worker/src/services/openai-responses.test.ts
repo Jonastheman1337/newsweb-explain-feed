@@ -72,19 +72,21 @@ describe("callOpenAIForJson", () => {
     expect(options?.signal).toBeInstanceOf(AbortSignal);
   });
 
-  it("throws when OpenAI returns no output_text", async () => {
-    const client = createMockClient({ outputText: "" });
+  it("retries and throws with diagnostics when OpenAI returns no output_text", async () => {
+    const calls: CapturedCall[] = [];
+    const client = createMockClient({ calls, outputText: "" });
 
     await expect(callOpenAIForJson(client, baseRequest)).rejects.toThrow(
-      /no output_text/
+      /no output_text.*after 2 attempts.*model=gpt-5\.5.*promptChars=19/
     );
+    expect(calls).toHaveLength(2);
   });
 
   it("wraps API errors with the schema name", async () => {
     const client = createMockClient({ error: new Error("rate limited") });
 
     await expect(callOpenAIForJson(client, baseRequest)).rejects.toThrow(
-      /OpenAI request failed for test_schema: rate limited/
+      /OpenAI request failed for test_schema: rate limited.*model=gpt-5\.5/
     );
   });
 

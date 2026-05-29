@@ -1,5 +1,6 @@
 import { normalizeRewriteJson, rewriteOutputSchema, type FeedItem } from "@newsweb/shared";
 import type { FeedItem as PrismaFeedItem, Rewrite, SourceNotice } from "@prisma/client";
+import { normalizeNewswebAttachments } from "./newsweb-attachments.js";
 
 type FeedItemWithRelations = PrismaFeedItem & {
   sourceNotice: SourceNotice & {
@@ -16,6 +17,10 @@ function sourceOnlyFeedItem(
     processing?: boolean;
   } = {}
 ): FeedItem {
+  const attachments = normalizeNewswebAttachments(
+    item.sourceNotice.rawMessageJson
+  );
+
   return {
     messageId: item.messageId,
     publishedAt: item.publishedAt.toISOString(),
@@ -31,6 +36,7 @@ function sourceOnlyFeedItem(
     confidence: "high",
     importance: "uviktig",
     hasAttachments: item.sourceNotice.hasAttachments,
+    attachments,
     sourceTitle: item.sourceNotice.title,
     sourceBodyText: item.sourceNotice.bodyText,
     notGenerated: flags.notGenerated ?? false,
@@ -65,6 +71,10 @@ export function mapDbItemToFeedItem(item: FeedItemWithRelations): FeedItem | nul
   const rewrite = rewriteOutputSchema.parse(
     normalizeRewriteJson(rewriteRecord.rewriteJson)
   );
+  const attachments = normalizeNewswebAttachments(
+    item.sourceNotice.rawMessageJson
+  );
+
   return {
     messageId: item.messageId,
     publishedAt: item.publishedAt.toISOString(),
@@ -80,6 +90,7 @@ export function mapDbItemToFeedItem(item: FeedItemWithRelations): FeedItem | nul
     confidence: rewrite.confidence,
     importance: rewrite.importance,
     hasAttachments: item.sourceNotice.hasAttachments,
+    attachments,
     sourceTitle: item.sourceNotice.title,
     sourceBodyText: item.sourceNotice.bodyText,
     notGenerated: false,

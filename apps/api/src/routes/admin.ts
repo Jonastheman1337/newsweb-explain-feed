@@ -44,12 +44,15 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
     const { messageId } = paramsSchema.parse(request.params);
     const { targetVersion, previousRewriteJson } =
       await nextRewriteContext(messageId);
+    const phaseUpdatedAt = new Date();
     const generationRun = await logPrisma.generationRun.create({
       data: {
         messageId,
         version: targetVersion,
         reason: "manual-reprocess",
         status: "queued",
+        phase: "queued",
+        phaseUpdatedAt,
         userInstruction: null,
         ...(previousRewriteJson
           ? { previousRewriteJson: toJsonValue(previousRewriteJson) }
@@ -109,6 +112,8 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
         where: { id: generationRun.id },
         data: {
           status: "failed",
+          phase: "failed",
+          phaseUpdatedAt: new Date(),
           errorText: error instanceof Error ? error.message : String(error),
           finishedAt: new Date()
         }

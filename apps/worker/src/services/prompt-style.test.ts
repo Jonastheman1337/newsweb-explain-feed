@@ -54,4 +54,13 @@ describe("prompt style guidance", () => {
     expect(developerPrompt).toContain("tilsvaret med i lead/body");
     expect(developerPrompt).toContain("Bruk publiseringstidspunktet");
   });
+
+  it("includes guardrails for jargon, attachments and repetition", () => {
+    const developerPrompt = createDeveloperPrompt("{}");
+
+    expect(developerPrompt).toContain("Før du leverer");
+    expect(developerPrompt).toContain("terminer");
+    expect(developerPrompt).toContain("Aldri skriv 'PDF'");
+    expect(developerPrompt).toContain("Ikke gjenta samme tall eller faktum");
+  });
 });

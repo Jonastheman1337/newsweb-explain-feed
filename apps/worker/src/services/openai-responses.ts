@@ -16,8 +16,16 @@ export type OpenAIResponsesClient = {
     create: (
       body: any,
       options?: { signal?: AbortSignal }
-    ) => Promise<{ output_text?: string | null }>;
+    ) => Promise<OpenAIJsonResponse>;
   };
+};
+
+type OpenAIJsonResponse = {
+  output_text?: string | null;
+  id?: string;
+  status?: string;
+  error?: unknown;
+  incomplete_details?: unknown;
 };
 
 export type OpenAIFileInput = {
@@ -48,18 +56,68 @@ export async function callOpenAIForJson(
   client: OpenAIResponsesClient,
   request: OpenAIJsonRequest
 ): Promise<string> {
-  const response = await callOpenAIResponse(client, request);
-  const content = response.output_text?.trim() ?? "";
-  if (!content) {
-    throw new Error(`OpenAI returned no output_text for ${request.schemaName}`);
+  const attempts = 2;
+  let lastResponseSummary = "";
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    const response = await callOpenAIResponse(client, request);
+    const content = response.output_text?.trim() ?? "";
+    if (content) {
+      return content;
+    }
+    lastResponseSummary = summarizeResponse(response);
   }
-  return content;
+
+  throw new Error(
+    [
+      `OpenAI returned no output_text for ${request.schemaName} after ${attempts} attempts`,
+      requestDiagnostics(request),
+      lastResponseSummary ? `lastResponse=${lastResponseSummary}` : null
+    ]
+      .filter(Boolean)
+      .join(" | ")
+  );
+}
+
+function requestDiagnostics(request: OpenAIJsonRequest): string {
+  const promptChars =
+    request.systemPrompt.length +
+    request.developerPrompt.length +
+    request.userPrompt.length;
+  return [
+    `model=${request.model}`,
+    `reasoning=${request.reasoningEffort}`,
+    `timeoutMs=${request.timeoutMs}`,
+    `maxOutputTokens=${request.maxOutputTokens}`,
+    `promptChars=${promptChars}`
+  ].join(" ");
+}
+
+function summarizeResponse(response: {
+  id?: string;
+  status?: string;
+  error?: unknown;
+  incomplete_details?: unknown;
+}): string {
+  const parts: string[] = [];
+  if (response.id) parts.push(`id=${response.id}`);
+  if (response.status) parts.push(`status=${response.status}`);
+  if (response.error != null) parts.push(`error=${truncateJson(response.error)}`);
+  if (response.incomplete_details != null) {
+    parts.push(`incomplete=${truncateJson(response.incomplete_details)}`);
+  }
+  return parts.join(" ");
+}
+
+function truncateJson(value: unknown): string {
+  const text = typeof value === "string" ? value : JSON.stringify(value);
+  return text.length > 240 ? `${text.slice(0, 237)}...` : text;
 }
 
 async function callOpenAIResponse(
   client: OpenAIResponsesClient,
   request: OpenAIJsonRequest
-): Promise<{ output_text?: string | null }> {
+): Promise<OpenAIJsonResponse> {
   try {
     return await client.responses.create(
       {
@@ -101,6 +159,8 @@ async function callOpenAIResponse(
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`OpenAI request failed for ${request.schemaName}: ${message}`);
+    throw new Error(
+      `OpenAI request failed for ${request.schemaName}: ${message} | ${requestDiagnostics(request)}`
+    );
   }
 }

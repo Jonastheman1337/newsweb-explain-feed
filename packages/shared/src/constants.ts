@@ -43,7 +43,8 @@ export const SKIP_REWRITE_CATEGORIES = new Set([
  */
 export const TRIAGE_CATEGORIES = new Set([
   "ANNEN INFORMASJONSPLIKTIG REGULATORISK INFORMASJON",
-  "IKKE-INFORMASJONSPLIKTIGE PRESSEMELDINGER"
+  "IKKE-INFORMASJONSPLIKTIGE PRESSEMELDINGER",
+  "FLAGGING"
 ]);
 
 export const YEARLY_REPORT_CATEGORIES = new Set([
@@ -94,4 +95,3 @@ export function needsNewsworthinessTriage(categories: string[]): boolean {
   }
   return categories.every((cat) => TRIAGE_CATEGORIES.has(cat));
 }
-

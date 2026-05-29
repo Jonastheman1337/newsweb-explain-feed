@@ -6,6 +6,18 @@ const MAX_TITLE_WORDS = 8;
 const MAX_SUMMARY_SENTENCES = 15;
 const MAX_VISIBLE_ARTICLE_CHARS = 1000;
 
+const VISIBLE_ATTACHMENT_REFERENCE_PATTERNS = [
+  /\bpdf(?:-en)?\b/i,
+  /\bvedlegg(?:et|ene)?\b/i,
+  /\bvedlagt(?:e)?\s+skjema\b/i,
+  /\bi vedlegget\b/i,
+  /\brapportkontekst(?:en)?\b/i,
+  /\banalysert(?:e)?\s+(?:tekst(?:en)?|materiale(?:t)?|rapportkontekst(?:en)?)\b/i,
+  /\bden\s+analyserte\s+(?:teksten|rapportkonteksten|materialet)\b/i,
+  /\bikke\s+(?:er\s+)?oppgitt\b/i,
+  /\bikke\s+opplyst\b/i
+];
+
 const CRITICISM_PATTERNS = [
   /\banklag/i,
   /\bbeskyld/i,
@@ -89,6 +101,14 @@ const CURRENCY_MARKER_GROUPS: Array<{
   }
 ];
 
+export type RewriteValidationSeverity = "blocking" | "warning";
+
+export type RewriteValidationIssue = {
+  code: string;
+  severity: RewriteValidationSeverity;
+  message: string;
+};
+
 export function countSentences(text: string): number {
   const trimmed = text.trim();
   if (!trimmed) {
@@ -147,6 +167,21 @@ function hasAnyPattern(text: string, patterns: RegExp[]): boolean {
   return patterns.some((pattern) => pattern.test(text));
 }
 
+function matchingPatterns(text: string, patterns: RegExp[]): string[] {
+  return patterns
+    .filter((pattern) => pattern.test(text))
+    .map((pattern) => pattern.source);
+}
+
+function addIssue(
+  issues: RewriteValidationIssue[],
+  code: string,
+  severity: RewriteValidationSeverity,
+  message: string
+): void {
+  issues.push({ code, severity, message });
+}
+
 function findUnexpectedCurrencyMarkers(
   rewrite: RewriteOutput,
   sourceText: string
@@ -183,45 +218,116 @@ function hasRevenueResultMixupRisk(
 
 export function validateRewriteOutput(
   rewrite: RewriteOutput,
-  payload: PromptPayload
-): { valid: boolean; errors: string[] } {
-  const errors: string[] = [];
+  payload: PromptPayload,
+  options?: { maxVisibleArticleChars?: number }
+): {
+  valid: boolean;
+  errors: string[];
+  issues: RewriteValidationIssue[];
+  blockingErrors: string[];
+  warnings: string[];
+} {
+  const issues: RewriteValidationIssue[] = [];
   const validationSourceText = buildValidationSourceText(payload);
+  const maxVisibleArticleChars =
+    options?.maxVisibleArticleChars ?? MAX_VISIBLE_ARTICLE_CHARS;
 
   const numberErrors = findUnexpectedNumbers(
     rewrite,
     validationSourceText
   );
   if (numberErrors.length > MAX_ALLOWED_UNEXPECTED_NUMBERS) {
-    errors.push(`Unexpected numbers: ${numberErrors.join(", ")}`);
+    addIssue(
+      issues,
+      "UNEXPECTED_NUMBERS",
+      "warning",
+      `Unexpected numbers: ${numberErrors.join(", ")}`
+    );
   }
 
   if (collectVisibleArticleFields(rewrite).some((field) => field.includes("%"))) {
-    errors.push("Visible article text uses %, write prosent instead.");
+    addIssue(
+      issues,
+      "VISIBLE_PERCENT_SIGN",
+      "warning",
+      "Visible article text uses %, write prosent instead."
+    );
+  }
+
+  const visibleMetaPatterns = matchingPatterns(
+    visibleArticleText(rewrite),
+    VISIBLE_ATTACHMENT_REFERENCE_PATTERNS
+  );
+  if (visibleMetaPatterns.length > 0) {
+    addIssue(
+      issues,
+      "VISIBLE_META_SOURCE_LANGUAGE",
+      "blocking",
+      "Visible article text refers to PDF/attachments, analyzed material, or missing source data; move limitations to source_limitations."
+    );
   }
 
   if (payload.hasAttachments && rewrite.source_limitations.length === 0) {
-    errors.push("Attachment exists but source_limitations is empty.");
+    addIssue(
+      issues,
+      "MISSING_ATTACHMENT_LIMITATION",
+      "warning",
+      "Attachment exists but source_limitations is empty."
+    );
   }
 
   if (payload.bodyText.trim().length < 80 && rewrite.source_limitations.length === 0) {
-    errors.push("Short source body without limitation note.");
+    addIssue(
+      issues,
+      "SHORT_SOURCE_WITHOUT_LIMITATION",
+      "warning",
+      "Short source body without limitation note."
+    );
   }
 
   if (countSummarySentences(rewrite) > MAX_SUMMARY_SENTENCES) {
-    errors.push(`Summary exceeds ${MAX_SUMMARY_SENTENCES} sentences.`);
+    addIssue(
+      issues,
+      "SUMMARY_TOO_LONG",
+      "warning",
+      `Summary exceeds ${MAX_SUMMARY_SENTENCES} sentences.`
+    );
   }
 
-  if (countVisibleArticleChars(rewrite) > MAX_VISIBLE_ARTICLE_CHARS) {
-    errors.push(`Visible article text exceeds ${MAX_VISIBLE_ARTICLE_CHARS} chars.`);
+  if (countVisibleArticleChars(rewrite) > maxVisibleArticleChars) {
+    addIssue(
+      issues,
+      "VISIBLE_ARTICLE_TOO_LONG",
+      "warning",
+      `Visible article text exceeds ${maxVisibleArticleChars} chars.`
+    );
   }
 
   if (countSentences(rewrite.company_sentence) !== 1) {
-    errors.push("company_sentence must contain exactly one sentence.");
+    addIssue(
+      issues,
+      "COMPANY_SENTENCE_COUNT",
+      "warning",
+      "company_sentence must contain exactly one sentence."
+    );
   }
 
   if (countWords(rewrite.title) > MAX_TITLE_WORDS) {
-    errors.push(`Title exceeds ${MAX_TITLE_WORDS} words.`);
+    addIssue(
+      issues,
+      "TITLE_TOO_LONG",
+      "warning",
+      `Title exceeds ${MAX_TITLE_WORDS} words.`
+    );
+  }
+
+  if (/:/.test(rewrite.title)) {
+    addIssue(
+      issues,
+      "COLON_HEAVY_TITLE",
+      "warning",
+      "Title uses a colon; prefer a normal sentence-style headline unless it introduces a list."
+    );
   }
 
   const unexpectedCurrencyMarkers = findUnexpectedCurrencyMarkers(
@@ -229,7 +335,10 @@ export function validateRewriteOutput(
     validationSourceText
   );
   if (unexpectedCurrencyMarkers.length > 0) {
-    errors.push(
+    addIssue(
+      issues,
+      "UNEXPECTED_CURRENCY",
+      "warning",
       `Visible article text uses currency not present in source: ${unexpectedCurrencyMarkers.join(", ")}.`
     );
   }
@@ -238,17 +347,36 @@ export function validateRewriteOutput(
     sourceRequiresRightOfReply(validationSourceText) &&
     !visibleArticleIncludesRightOfReply(rewrite)
   ) {
-    errors.push("Source contains criticism/accusation and a reply, but reply is missing from visible article text.");
+    addIssue(
+      issues,
+      "MISSING_RIGHT_OF_REPLY",
+      "warning",
+      "Source contains criticism/accusation and a reply, but reply is missing from visible article text."
+    );
   }
 
   if (hasRevenueResultMixupRisk(rewrite, validationSourceText)) {
-    errors.push(
+    addIssue(
+      issues,
+      "REVENUE_RESULT_MIXUP",
+      "warning",
       "Source only appears to mention revenue/income, but visible article text uses result/profit/loss terminology."
     );
   }
 
+  const errors = issues.map((issue) => issue.message);
+  const blockingErrors = issues
+    .filter((issue) => issue.severity === "blocking")
+    .map((issue) => issue.message);
+  const warnings = issues
+    .filter((issue) => issue.severity === "warning")
+    .map((issue) => issue.message);
+
   return {
-    valid: errors.length === 0,
-    errors
+    valid: issues.length === 0,
+    errors,
+    issues,
+    blockingErrors,
+    warnings
   };
 }

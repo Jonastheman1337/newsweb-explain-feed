@@ -91,6 +91,7 @@ Leseren er en privatinvestor som kanskje gar pa videregaende og er interessert i
 
 ${EDITORIAL_AUDIENCE}
 - Vi er ikke papegøyer som bare ramser opp tall. Vi finner nyhetshistorien i tallene.
+- Hvis tilgjengelig tekst bare sier at en rapport, presentasjon, prospekt eller skjema er publisert, og rapportutdraget ikke gir substansielle tall eller fakta, ikke lag en sak om manglende tall. Skriv ekstremt kort, sett importance til 'uviktig', og legg begrensningen i source_limitations.
 
 HVILKE TALL ER VIKTIGE?
 Bruk redaksjonelt skjonn — plukk ut det som er mest nyhetsverdig:
@@ -104,6 +105,7 @@ Bruk redaksjonelt skjonn — plukk ut det som er mest nyhetsverdig:
 - Utbytte — hvis et totalbelop er oppgitt, er det ofte svaert nyhetsverdig
 - Endring fra samme kvartal i fjor (YoY) der det er tilgjengelig
 - Guidanse/utsikter og eventuelle prognoser
+- Årsaker, markedsforhold, risiko og utsikter når kilden forklarer utviklingen
 - Strategiske nyheter, oppkjop eller store hendelser nevnt i rapporten
 
 Vaer fleksibel: Et selskap kan ha enorm omsetningsvekst men nesten null i resultat — det er interessant og saken bor reflektere det. Ikke led mekanisk med resultat for skatt hvis et annet tall forteller den egentlige historien.
@@ -119,6 +121,7 @@ Nar bade en borsmelding og en rapport er tilgjengelig, kombiner dem. Meldingen k
 TALL-DISIPLIN
 - Plukk ut 3-4 nokkeltall. Ikke rams opp alt rapporten inneholder.
 - De viktigste tallene for en aksjeeier er typisk: inntekter, driftsresultat/EBIT, resultat for skatt og utbytte.
+- Etter nøkkeltallene: se etter årsak, utsikter, markedskommentar, risiko eller hendelser etter kvartalsslutt. Ta med én kort forklarende setning hvis kilden gir dekning. Ikke la saken bli en ren talliste.
 - Unnga nisjetall som bruttofortjeneste, 'adjusted operating profit' og andre mellomlinjer med mindre de er selskapets eget nokkeltall.
 - Helårstall kan nevnes kort, men hold fokus på kvartalet.
 - Balansetall (gjeld, kontanter, egenkapital) bare nar de er nyheten (f.eks. likviditetskrise).
@@ -134,7 +137,7 @@ ${EDITORIAL_TITLE}
   Hvert punktlisteelement er et eget element i body-arrayen — IKKE en lang streng med alle punkter.
   Maks 3-4 kulepunkter. Velg de viktigste tallene, ikke rams opp alt.
   Gode titler: 'Subsea 7 femdobler resultatet', 'BW Offshore endte pa bunn av resultatguiding', 'Otovo vil hente inntil 191 millioner', 'Jinhui Shipping i minus i fjerde kvartal'.
-  Nar bade resultat og en annen nyhet (oppkjop, emisjon) presenteres samtidig, kan tittelen bruke tankestrek: 'Lavere inntekter for Odfjell Technology – gjor oppkjop'.
+  Nar bade resultat og en annen nyhet (oppkjop, emisjon) presenteres samtidig, kan tittelen bruke tankestrek sparsomt. Ikke bruk kolon hvis en normal tittel fungerer.
 - importance: 'viktig' kun ved store overraskelser eller klare kursdrivere. 'medium' for solide rapporter. 'uviktig' for rutine uten overraskelser.
 
 ${EDITORIAL_WRITING_STYLE}
@@ -202,7 +205,7 @@ export function createReportUserPrompt(payload: ReportPromptPayload): string {
   const parts: string[] = [
     "Lag en kort, publiserbar nyhetssak basert på kildene under.",
     "Skriv nyhetstekst, ikke sammendrag. Plukk ut de viktigste nøkkeltallene for en aksjeeier.",
-    "Rapportkilden under er valgt fra hele PDF-en: resultatoppstilling først, deretter relevante ledelses-/utsiktsider og eventuelle sider brukeren ba om.",
+    "Rapportkilden under er valgt fra rapporten: resultatoppstilling først, deretter relevante ledelses-/utsiktsider og eventuelle sider brukeren ba om.",
     "Bruk resultatoppstillingen som foretrukken kilde for inntekter, driftsresultat/EBIT og resultat før skatt.",
     "Hvis brukeren har bedt om et tema eller en side, bruk USER REQUESTED CONTEXT i rapportkilden aktivt.",
     "Skriv så enkelt at en videregåendeelev med interesse for finans forstår det.",
@@ -224,7 +227,7 @@ export function createReportUserPrompt(payload: ReportPromptPayload): string {
     );
     parts.push(
       "",
-      "KILDE 2 (KURATERT RAPPORTKONTEKST FRA PDF):",
+      "KILDE 2 (KURATERT RAPPORTKONTEKST):",
       "<<<",
       payload.reportText || "ikke oppgitt",
       ">>>"
@@ -232,7 +235,7 @@ export function createReportUserPrompt(payload: ReportPromptPayload): string {
   } else {
     parts.push(
       "",
-      "KILDE (KURATERT RAPPORTKONTEKST FRA PDF):",
+      "KILDE (KURATERT RAPPORTKONTEKST):",
       "<<<",
       payload.reportText || "ikke oppgitt",
       ">>>"
@@ -251,6 +254,7 @@ export function createReportRevisionUserPrompt(
     "Lag en revidert versjon av rapportnyheten under, basert pa instruksjonen.",
     "VIKTIG: Instruksjonen er styrende. Hvis den ber om ny vinkel, annet fokus, annen struktur, annen lengde eller stor omskriving, skal du endre alle berorte felt tydelig.",
     "Behold bare tekst som fortsatt passer med instruksjonen. Ikke gjor tilfeldige smaendringer for variasjon.",
+    "Hvis instruksjonen er smal og konkret, endrer du bare det som trengs. Sarlig ved 'fjern/kutt/dropp/ta bort dette: ...' skal du fjerne bare den angitte teksten og ellers bevare forrige versjon.",
     "Hvis instruksjonen er bred, kan du skrive om tittel, lead, body, key_facts, importance og source_spans sa mye som nodvendig.",
     "Returner HELE JSON-strukturen med alle felt, ogsa de som er uendret.",
     "",

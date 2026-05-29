@@ -37,6 +37,8 @@ try {
       "job_name" TEXT,
       "reason" TEXT NOT NULL,
       "status" TEXT NOT NULL,
+      "phase" TEXT,
+      "phase_updated_at" TIMESTAMP(3),
       "user_instruction" TEXT,
       "input_json" JSONB,
       "previous_rewrite_json" JSONB,
@@ -51,6 +53,12 @@ try {
       "finished_at" TIMESTAMP(3),
       CONSTRAINT "generation_runs_pkey" PRIMARY KEY ("id")
     );
+  `);
+
+  await prisma.$executeRawUnsafe(`
+    ALTER TABLE "generation_runs"
+      ADD COLUMN IF NOT EXISTS "phase" TEXT,
+      ADD COLUMN IF NOT EXISTS "phase_updated_at" TIMESTAMP(3);
   `);
 
   await prisma.$executeRawUnsafe(`
