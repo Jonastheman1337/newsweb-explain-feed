@@ -1,11 +1,13 @@
 "use client";
 
-import type { GenerationPhase, RewriteStatusResponse } from "@newsweb/shared";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useEditorialTelemetry } from "../lib/editorial-telemetry";
 import { E24Loader } from "./e24-loader";
-import { getGenerationPhaseLabel } from "./generation-steps";
+import {
+  GENERATION_STEP_DURATION_MS,
+  getGenerationSteps
+} from "./generation-steps";
 
 const POLL_INTERVAL_MS = 3000;
 const MAX_POLL_ATTEMPTS = 180;
@@ -22,6 +24,14 @@ type GenerateResponse = {
   version?: number | null;
 };
 
+type RewriteStatusResponse = {
+  ready?: boolean;
+  failed?: boolean;
+  version?: number | null;
+  generatedAt?: string | null;
+  jobState?: string | null;
+};
+
 type GenerateButtonProps = {
   messageId: number;
   label?: string;
@@ -32,14 +42,17 @@ type GenerateButtonProps = {
 export function GenerateButton({
   messageId,
   label,
+  hasAttachments,
   reasoningEffortOverride
 }: GenerateButtonProps) {
+  const PROGRESS_STEPS = getGenerationSteps(hasAttachments);
   const router = useRouter();
   const [status, setStatus] = useState<"idle" | "loading" | "polling" | "done" | "error">(
     "idle"
   );
-  const [phase, setPhase] = useState<GenerationPhase | null>(null);
+  const [progressStep, setProgressStep] = useState(0);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const progressRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const { buildTelemetry } = useEditorialTelemetry(messageId);
 
   const stopPolling = useCallback(() => {
@@ -47,7 +60,11 @@ export function GenerateButton({
       clearInterval(pollRef.current);
       pollRef.current = null;
     }
-    setPhase(null);
+    if (progressRef.current) {
+      clearInterval(progressRef.current);
+      progressRef.current = null;
+    }
+    setProgressStep(0);
   }, []);
 
   useEffect(() => {
@@ -141,7 +158,10 @@ export function GenerateButton({
       } catch { /* response body is optional */ }
 
       setStatus("polling");
-      setPhase("queued");
+      setProgressStep(0);
+      progressRef.current = setInterval(() => {
+        setProgressStep((prev) => Math.min(prev + 1, PROGRESS_STEPS.length - 1));
+      }, GENERATION_STEP_DURATION_MS);
 
       let attempts = 0;
       pollRef.current = setInterval(async () => {
@@ -149,7 +169,6 @@ export function GenerateButton({
         let data: RewriteStatusResponse | null = null;
         try {
           data = await fetchRewriteStatus(jobId);
-          setPhase(data?.phase ?? "queued");
           if (data?.ready && hasStatusChanged(data, versionBefore, generatedAtBefore)) {
             stopPolling();
             setStatus("done");
@@ -174,7 +193,7 @@ export function GenerateButton({
   if (status === "polling" || status === "done") {
     return (
       <span className="muted" style={{ display: "inline-flex", alignItems: "center", gap: "0.75rem" }}>
-        {getGenerationPhaseLabel(phase ?? "queued")}... <E24Loader />
+        {PROGRESS_STEPS[progressStep]}... <E24Loader />
       </span>
     );
   }

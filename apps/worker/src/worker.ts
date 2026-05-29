@@ -10,7 +10,6 @@ import {
   rewriteOutputJsonSchema,
   rewriteOutputSchema,
   shouldSkipRewrite,
-  type GenerationPhase,
   type RewriteOutput
 } from "@newsweb/shared";
 import { loadConfig } from "./config.js";
@@ -569,7 +568,7 @@ function statusForValidation(validation: {
 
 function phaseForRewriteStatus(
   status: "pending" | "needs_retry" | "failed" | "published" | "skipped"
-): GenerationPhase {
+) {
   if (status === "pending") return "finalizing";
   if (status === "needs_retry") return "queued";
   if (status === "published") return "published";

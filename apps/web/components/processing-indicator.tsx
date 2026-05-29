@@ -1,12 +1,10 @@
 "use client";
 
-import type { GenerationPhase, RewriteStatusResponse } from "@newsweb/shared";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { E24Loader } from "./e24-loader";
 import {
-  getGenerationPhaseLabel,
-  getGenerationStepIndex,
+  GENERATION_STEP_DURATION_MS,
   getGenerationSteps
 } from "./generation-steps";
 
@@ -19,21 +17,37 @@ export function ProcessingIndicator({ messageId, hasAttachments }: ProcessingInd
   const steps = getGenerationSteps(hasAttachments);
   const router = useRouter();
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const [phase, setPhase] = useState<GenerationPhase | null>("queued");
+  const [stepIndex, setStepIndex] = useState(0);
+  const [elapsed, setElapsed] = useState(0);
   const [failed, setFailed] = useState(false);
+
+  // Advance steps on a timer
+  useEffect(() => {
+    setStepIndex(0);
+    setElapsed(0);
+    const interval = setInterval(() => {
+      setElapsed((prev) => prev + 1000);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [steps.length]);
+
+  useEffect(() => {
+    setStepIndex(
+      Math.min(Math.floor(elapsed / GENERATION_STEP_DURATION_MS), steps.length - 1)
+    );
+  }, [elapsed, steps.length]);
 
   // Poll for completion
   useEffect(() => {
     let attempts = 0;
-    async function checkStatus() {
+    pollRef.current = setInterval(async () => {
       attempts++;
       try {
         const res = await fetch(`/api/notice/${messageId}/status`, {
           credentials: "include"
         });
         if (res.ok) {
-          const data = (await res.json()) as RewriteStatusResponse;
-          setPhase(data.phase ?? "queued");
+          const data = await res.json();
           if (data.ready) {
             clearInterval(pollRef.current!);
             pollRef.current = null;
@@ -55,10 +69,7 @@ export function ProcessingIndicator({ messageId, hasAttachments }: ProcessingInd
         pollRef.current = null;
         router.refresh();
       }
-    }
-
-    void checkStatus();
-    pollRef.current = setInterval(checkStatus, 5000);
+    }, 5000);
 
     return () => {
       if (pollRef.current) {
@@ -68,8 +79,10 @@ export function ProcessingIndicator({ messageId, hasAttachments }: ProcessingInd
     };
   }, [messageId, router]);
 
-  const stepIndex = getGenerationStepIndex(phase, hasAttachments);
-  const progress = stepIndex < 0 ? 0 : ((stepIndex + 1) / steps.length) * 100;
+  const progress = Math.min(
+    ((stepIndex / (steps.length - 1)) * 80) + (elapsed > 0 ? Math.min(elapsed / 500, 15) : 0),
+    95
+  );
 
   if (failed) {
     return (
@@ -84,11 +97,6 @@ export function ProcessingIndicator({ messageId, hasAttachments }: ProcessingInd
 
   return (
     <div className="processingWrap">
-      {stepIndex < 0 && (
-        <p className="muted" aria-live="polite">
-          {getGenerationPhaseLabel(phase)}...
-        </p>
-      )}
       <div className="processingSteps">
         {steps.map((step, i) => (
           <div

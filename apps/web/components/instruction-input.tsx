@@ -1,12 +1,14 @@
 "use client";
 
-import type { GenerationPhase, RewriteStatusResponse } from "@newsweb/shared";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useEditorialTelemetry } from "../lib/editorial-telemetry";
 import { E24Loader } from "./e24-loader";
-import { getGenerationPhaseLabel } from "./generation-steps";
+import {
+  GENERATION_STEP_DURATION_MS,
+  getGenerationSteps
+} from "./generation-steps";
 
 const POLL_INTERVAL_MS = 3000;
 const MAX_POLL_ATTEMPTS = 180;
@@ -23,13 +25,22 @@ type GenerateResponse = {
   version?: number | null;
 };
 
+type RewriteStatusResponse = {
+  ready?: boolean;
+  failed?: boolean;
+  version?: number | null;
+  generatedAt?: string | null;
+  jobState?: string | null;
+};
+
 type InstructionInputProps = {
   messageId: number;
   activeVersion?: number;
   hasAttachments?: boolean;
 };
 
-export function InstructionInput({ messageId, activeVersion }: InstructionInputProps) {
+export function InstructionInput({ messageId, activeVersion, hasAttachments }: InstructionInputProps) {
+  const PROGRESS_STEPS = getGenerationSteps(hasAttachments);
   const router = useRouter();
   const [text, setText] = useState("");
   const [xhighEnabled, setXhighEnabled] = useState(false);
@@ -53,14 +64,19 @@ export function InstructionInput({ messageId, activeVersion }: InstructionInputP
     resizeTextarea();
   }, [text, resizeTextarea]);
 
-  const [phase, setPhase] = useState<GenerationPhase | null>(null);
+  const [progressStep, setProgressStep] = useState(0);
+  const progressRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const stopPolling = useCallback(() => {
     if (pollRef.current) {
       clearInterval(pollRef.current);
       pollRef.current = null;
     }
-    setPhase(null);
+    if (progressRef.current) {
+      clearInterval(progressRef.current);
+      progressRef.current = null;
+    }
+    setProgressStep(0);
   }, []);
 
   useEffect(() => {
@@ -160,14 +176,16 @@ export function InstructionInput({ messageId, activeVersion }: InstructionInputP
 
       setStatus("polling");
       setText("");
-      setPhase("queued");
+      setProgressStep(0);
+      progressRef.current = setInterval(() => {
+        setProgressStep((prev) => Math.min(prev + 1, PROGRESS_STEPS.length - 1));
+      }, GENERATION_STEP_DURATION_MS);
       let attempts = 0;
       pollRef.current = setInterval(async () => {
         attempts++;
         let data: RewriteStatusResponse | null = null;
         try {
           data = await fetchRewriteStatus(jobId);
-          setPhase(data?.phase ?? "queued");
           if (data?.ready && statusChanged(data)) {
             stopPolling();
             setStatus("idle");
@@ -248,7 +266,7 @@ export function InstructionInput({ messageId, activeVersion }: InstructionInputP
           {status === "loading"
             ? "Sender ..."
             : status === "polling"
-              ? getGenerationPhaseLabel(phase ?? "queued") + "..."
+              ? PROGRESS_STEPS[progressStep] + "..."
               : (text.trim() ? "Generer ny versjon" : "Regenerer notis")}
         </button>
         <button

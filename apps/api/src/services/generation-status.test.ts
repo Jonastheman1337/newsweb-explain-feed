@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  GENERATION_PHASE_LABELS,
-  getGenerationStepPhases
-} from "@newsweb/shared";
-import {
   buildGenerationStatusPayload,
   chooseGenerationRun,
   deriveGenerationPhase
@@ -13,28 +9,6 @@ const oldDate = new Date("2026-05-29T08:00:00.000Z");
 const newDate = new Date("2026-05-29T08:01:00.000Z");
 
 describe("generation status", () => {
-  it("keeps shared phase labels and PDF ordering stable", () => {
-    expect(GENERATION_PHASE_LABELS.reading_notice).toBe("Leser original melding");
-    expect(GENERATION_PHASE_LABELS.reading_pdf_attachment).toBe(
-      "Leser PDF-vedlegg"
-    );
-    expect(getGenerationStepPhases(false)).toEqual([
-      "reading_notice",
-      "analyzing_content",
-      "writing_notice",
-      "checking_references",
-      "finalizing"
-    ]);
-    expect(getGenerationStepPhases(true)).toEqual([
-      "reading_notice",
-      "reading_pdf_attachment",
-      "analyzing_content",
-      "writing_notice",
-      "checking_references",
-      "finalizing"
-    ]);
-  });
-
   it("prefers a job-specific generation run over the latest message run", () => {
     const jobRun = {
       id: "run-for-job",

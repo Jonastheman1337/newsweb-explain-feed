@@ -1,9 +1,30 @@
 import {
   GENERATION_PHASE_LABELS,
-  getGenerationStepPhases,
   isGenerationPhase,
   type GenerationPhase
 } from "@newsweb/shared";
+
+export const GENERATION_STEP_DURATION_MS = 6000;
+
+const BASE_GENERATION_STEP_PHASES = [
+  "reading_notice",
+  "analyzing_content",
+  "writing_notice",
+  "checking_references",
+  "finalizing"
+] as const;
+
+const PDF_GENERATION_STEP_PHASE = "reading_pdf_attachment";
+
+function getGenerationStepPhases(hasAttachments?: boolean): readonly GenerationPhase[] {
+  return hasAttachments
+    ? [
+        BASE_GENERATION_STEP_PHASES[0],
+        PDF_GENERATION_STEP_PHASE,
+        ...BASE_GENERATION_STEP_PHASES.slice(1)
+      ]
+    : BASE_GENERATION_STEP_PHASES;
+}
 
 function normalizeStepPhase(phase: GenerationPhase | null): GenerationPhase | null {
   if (
