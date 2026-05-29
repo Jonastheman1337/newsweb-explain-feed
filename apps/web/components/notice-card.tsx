@@ -99,7 +99,7 @@ export function NoticeCard({ item }: NoticeCardProps) {
             {item.title}
           </Link>
         </h2>
-        <FeedProcessingIndicator hasAttachments={item.hasAttachments} />
+        <FeedProcessingIndicator messageId={item.messageId} />
         <div className="editableActions">
           <MaxAiLink messageId={item.messageId} />
           <span className="actionsRight">

@@ -1,36 +1,63 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import type { GenerationPhase, RewriteStatusResponse } from "@newsweb/shared";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
-import {
-  GENERATION_STEP_DURATION_MS,
-  getGenerationSteps
-} from "./generation-steps";
+import { getGenerationPhaseLabel } from "./generation-steps";
+
+const POLL_INTERVAL_MS = 3000;
 
 type FeedProcessingIndicatorProps = {
-  hasAttachments?: boolean;
+  messageId: number;
 };
 
-export function FeedProcessingIndicator({ hasAttachments }: FeedProcessingIndicatorProps) {
-  const steps = useMemo(() => getGenerationSteps(hasAttachments), [hasAttachments]);
-  const [stepIndex, setStepIndex] = useState(0);
+export function FeedProcessingIndicator({ messageId }: FeedProcessingIndicatorProps) {
+  const router = useRouter();
+  const [phase, setPhase] = useState<GenerationPhase | null>("queued");
 
   useEffect(() => {
-    setStepIndex(0);
-    const interval = setInterval(() => {
-      setStepIndex((prev) => Math.min(prev + 1, steps.length - 1));
-    }, GENERATION_STEP_DURATION_MS);
+    let stopped = false;
+    let interval: ReturnType<typeof setInterval> | null = null;
 
-    return () => clearInterval(interval);
-  }, [steps.length]);
+    async function checkStatus() {
+      try {
+        const res = await fetch(`/api/notice/${messageId}/status`, {
+          credentials: "include"
+        });
+        if (!res.ok || stopped) {
+          return;
+        }
+        const data = (await res.json()) as RewriteStatusResponse;
+        setPhase(data.phase ?? "queued");
+        if (data.ready || data.failed || data.jobState === "failed") {
+          stopped = true;
+          if (interval) {
+            clearInterval(interval);
+          }
+          router.refresh();
+        }
+      } catch {
+        /* keep polling */
+      }
+    }
 
-  const currentStep = steps[Math.min(stepIndex, steps.length - 1)] ?? "Ferdigstiller";
+    void checkStatus();
+    interval = setInterval(checkStatus, POLL_INTERVAL_MS);
+
+    return () => {
+      stopped = true;
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
+  }, [messageId, router]);
 
   return (
     <div className="feedProcessingStatus" role="status" aria-live="polite">
       <span className="feedProcessingRing" aria-hidden="true" />
-      <span key={currentStep} className="feedProcessingStep">
-        {currentStep}...
+      <span key={phase} className="feedProcessingStep">
+        {getGenerationPhaseLabel(phase)}...
       </span>
     </div>
   );
