@@ -36,6 +36,7 @@ export type ReferenceCoverageItem = {
 
 export type ReferenceCoverageReport = {
   totalSentences: number;
+  visibleArticleSentenceCount: number;
   groundedSentences: number;
   coveragePercent: number;
   items: ReferenceCoverageItem[];
@@ -63,7 +64,9 @@ const TRADE_ARITHMETIC_CONTEXT_PATTERNS = [
   /\b(?:kjøpt|kjop|kjøp|kjøper|purchased|acquired|solgt|sold)\b/i
 ];
 
-const MONEY_CONTEXT_PATTERNS = [/\b(?:nok|kroner|kr)\b/i];
+const MONEY_CONTEXT_PATTERNS = [
+  /\b(?:nok|kroner|kr|usd|dollars?|eur|euros?|gbp|pund|pounds?)\b/i
+];
 
 export const referenceCheckJsonSchema = {
   type: "object",
@@ -215,14 +218,22 @@ function isSimpleTradeArithmeticClaim(item: ReferenceCoverageItem): boolean {
   return false;
 }
 
-export function collectDraftSentences(rewrite: RewriteOutput): string[] {
-  const sections = [rewrite.lead, ...rewrite.body, rewrite.company_sentence];
+export function collectVisibleDraftSentences(rewrite: RewriteOutput): string[] {
+  const sections = [rewrite.lead, ...rewrite.body];
   return sections.flatMap(splitIntoSentences);
+}
+
+export function collectDraftSentences(rewrite: RewriteOutput): string[] {
+  return [
+    ...collectVisibleDraftSentences(rewrite),
+    ...splitIntoSentences(rewrite.company_sentence)
+  ];
 }
 
 export function buildCoverageReport(
   draftSentences: string[],
-  raw: ReferenceCheckResult
+  raw: ReferenceCheckResult,
+  options?: { visibleArticleSentenceCount?: number }
 ): ReferenceCoverageReport {
   const byIndex = new Map(raw.sentences.map((item) => [item.index, item]));
 
@@ -257,6 +268,8 @@ export function buildCoverageReport(
 
   return {
     totalSentences,
+    visibleArticleSentenceCount:
+      options?.visibleArticleSentenceCount ?? totalSentences,
     groundedSentences,
     coveragePercent,
     items,
@@ -287,6 +300,25 @@ export function assessReferenceCheckGate(
       reason: "Reference check found unsupported high-risk factual claims.",
       highRiskUnsupportedSentences
     };
+  }
+
+  if (
+    report.visibleArticleSentenceCount > 0 &&
+    report.visibleArticleSentenceCount <= 3
+  ) {
+    const unsupportedVisibleSentences = report.unsupportedSentences.filter(
+      (item) =>
+        item.index < report.visibleArticleSentenceCount &&
+        !isSimpleTradeArithmeticClaim(item)
+    );
+    if (unsupportedVisibleSentences.length > 0) {
+      return {
+        blocking: true,
+        reason:
+          "Reference check found unsupported visible sentence in short article.",
+        highRiskUnsupportedSentences: unsupportedVisibleSentences
+      };
+    }
   }
 
   if (report.coveragePercent < 75 && report.unsupportedSentences.length >= 2) {

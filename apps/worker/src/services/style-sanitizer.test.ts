@@ -22,7 +22,8 @@ function createRewrite(overrides?: Partial<RewriteOutput>): RewriteOutput {
     source_limitations: ["Vedlegg fra XHEL er ikke analysert."],
     confidence: "medium",
     importance: "medium",
-    source_spans: ["Norsk Titanium ASA melder oppdatering for FY25."]
+    source_spans: ["Norsk Titanium ASA melder oppdatering for FY25."],
+    ...overrides
   };
 }
 
@@ -49,6 +50,30 @@ describe("sanitizeRewriteStyle", () => {
     expect(result.stats.removedAsaSuffix).toBeGreaterThan(0);
     expect(result.stats.removedRegisteredMarks).toBeGreaterThan(0);
     expect(result.stats.replacedPercentSigns).toBeGreaterThan(0);
+  });
+
+  it("normalizes visible accounting acronyms to lowercase", () => {
+    const rewrite = createRewrite({
+      title: "Selskapet løfter EBIT",
+      lead: "Selskapet melder at EBITDA steg, mens EBITA falt.",
+      body: ["EBIT endte på 20 millioner kroner."],
+      key_facts: ["EBITDA opp", "EBITA ned"]
+    });
+
+    const result = sanitizeRewriteStyle(rewrite);
+    const visibleAndMetadata = [
+      result.rewrite.title,
+      result.rewrite.lead,
+      ...result.rewrite.body,
+      ...result.rewrite.key_facts
+    ].join(" ");
+
+    expect(visibleAndMetadata).not.toMatch(/\b(?:EBITDA|EBITA|EBIT)\b/);
+    expect(visibleAndMetadata).toContain("ebitda");
+    expect(visibleAndMetadata).toContain("ebita");
+    expect(visibleAndMetadata).toContain("ebit");
+    expect(result.stats.normalizedAccountingAcronyms).toBe(6);
+    expect(result.stats.changed).toBe(true);
   });
 
   it("keeps schema-safe minimum lengths", () => {

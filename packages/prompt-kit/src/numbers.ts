@@ -73,7 +73,7 @@ function normalizeNumberCore(
 
 function parseNumberToken(
   token: string
-): { display: string; key: string } | null {
+): { display: string; key: string; value: number; hasPercent: boolean } | null {
   const sanitized = sanitizeNumberToken(token);
   if (!sanitized || !/\d/.test(sanitized)) {
     return null;
@@ -106,7 +106,9 @@ function parseNumberToken(
       normalizedCore,
       hasPercent ? "pct" : "abs",
       String(fractionDigits)
-    ].join("|")
+    ].join("|"),
+    value: (negative ? -1 : 1) * Number(normalizedCore),
+    hasPercent
   };
 }
 
@@ -135,6 +137,105 @@ function collectSourceNumberKeys(text: string): Set<string> {
   return keys;
 }
 
+const tradeArithmeticContextPatterns = [
+  /\b(?:aksje|aksjer|shares?)\b/i,
+  /\b(?:kurs|snittpris|average price|price per share|per aksje)\b/i,
+  /\b(?:kjøpt|kjop|kjøp|kjøper|purchased|acquired|solgt|sold)\b/i
+];
+
+const moneyContextPatterns = [
+  /\b(?:nok|kroner|kr|usd|dollars?|eur|euros?|gbp|pund|pounds?)\b/i
+];
+
+function hasAnyPattern(text: string, patterns: RegExp[]): boolean {
+  return patterns.some((pattern) => pattern.test(text));
+}
+
+function roughlyEqual(left: number, right: number): boolean {
+  const tolerance = Math.max(1, Math.abs(right) * 0.002);
+  return Math.abs(left - right) <= tolerance;
+}
+
+function collectSourceNumberValues(text: string): number[] {
+  const tokens = text.match(numberTokenRegex) ?? [];
+  const values: number[] = [];
+
+  for (const token of tokens) {
+    const parsed = parseNumberToken(token);
+    if (parsed && !parsed.hasPercent) {
+      values.push(parsed.value);
+    }
+    const sanitizedToken = sanitizeNumberToken(token);
+    const unsignedToken = sanitizedToken.startsWith("-")
+      ? sanitizedToken.slice(1)
+      : sanitizedToken;
+    if (/^\d{1,3}[.,]\d{3}$/.test(unsignedToken)) {
+      values.push(Number(unsignedToken.replace(/[.,]/g, "")));
+    }
+
+    const parts = sanitizedToken.split(/[\s:/-]+/).filter((part) => /\d/.test(part));
+    if (parts.length > 1) {
+      for (const part of parts) {
+        const partParsed = parseNumberToken(part);
+        if (partParsed && !partParsed.hasPercent) {
+          values.push(partParsed.value);
+        }
+      }
+    }
+  }
+
+  return values;
+}
+
+function isSimpleTradeArithmeticNumber(
+  parsed: { display: string; value: number; hasPercent: boolean },
+  sourceText: string
+): boolean {
+  const unsignedDisplay = parsed.display.startsWith("-")
+    ? parsed.display.slice(1)
+    : parsed.display;
+  const targetValues = [
+    Math.abs(parsed.value),
+    /^\d{1,3}[.,]\d{3}$/.test(unsignedDisplay)
+      ? Number(unsignedDisplay.replace(/[.,]/g, ""))
+      : null
+  ].filter((value): value is number => value != null);
+
+  if (parsed.hasPercent || targetValues.every((value) => value < 1000)) {
+    return false;
+  }
+  if (
+    !hasAnyPattern(sourceText, tradeArithmeticContextPatterns) ||
+    !hasAnyPattern(sourceText, moneyContextPatterns)
+  ) {
+    return false;
+  }
+
+  const sourceNumbers = collectSourceNumberValues(sourceText).filter(
+    (value) => value > 0
+  );
+  for (let leftIndex = 0; leftIndex < sourceNumbers.length; leftIndex += 1) {
+    for (
+      let rightIndex = leftIndex + 1;
+      rightIndex < sourceNumbers.length;
+      rightIndex += 1
+    ) {
+      const left = sourceNumbers[leftIndex] ?? 0;
+      const right = sourceNumbers[rightIndex] ?? 0;
+      const larger = Math.max(left, right);
+      const smaller = Math.min(left, right);
+      if (larger < 100 || smaller <= 0 || smaller > 10_000) {
+        continue;
+      }
+      if (targetValues.some((target) => roughlyEqual(larger * smaller, target))) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
 export function findUnexpectedNumbers(
   rewrite: RewriteOutput,
   sourceText: string
@@ -149,6 +250,9 @@ export function findUnexpectedNumbers(
       continue;
     }
     if (!sourceNumberKeys.has(parsed.key)) {
+      if (isSimpleTradeArithmeticNumber(parsed, sourceText)) {
+        continue;
+      }
       unexpected.add(parsed.display);
     }
   }

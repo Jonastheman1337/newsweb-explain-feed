@@ -1,7 +1,7 @@
 import { findUnexpectedNumbers, type PromptPayload } from "@newsweb/prompt-kit";
 import type { RewriteOutput } from "@newsweb/shared";
 
-const MAX_ALLOWED_UNEXPECTED_NUMBERS = 2;
+const MAX_ALLOWED_UNEXPECTED_NUMBERS = 0;
 const MAX_TITLE_WORDS = 8;
 const MAX_SUMMARY_SENTENCES = 15;
 const MAX_VISIBLE_ARTICLE_CHARS = 1000;
@@ -102,6 +102,7 @@ const JARGON_GUARDRAILS: Array<{
   code: string;
   pattern: RegExp;
   explanationPattern?: RegExp;
+  explanationWindowChars?: number;
   message: string;
 }> = [
   {
@@ -124,8 +125,13 @@ const JARGON_GUARDRAILS: Array<{
   },
   {
     code: "UNEXPLAINED_NAMED_TRANSACTION",
-    pattern: /\b[A-ZÆØÅ][A-Za-zÆØÅæøå0-9-]+-transaksjonen\b/,
-    message: "Visible article text names a transaction without explaining what it is."
+    pattern:
+      /\b[A-ZÆØÅ][A-Za-zÆØÅæøå0-9-]+-(?:transaksjonen|plattformen|avtalen|prosjektet|programmet|løsningen)\b/,
+    explanationPattern:
+      /\b(?:gjelder|handler om|knyttet til|er|var|som)\b.{0,80}\b(?:kj[oø]p(?:et)?|salg(?:et)?|transaksjon(?:en)?|handel(?:en)?|oppkj[oø]p(?:et)?|programvare(?:plattform)?|plattform|produkt|prosjekt|avtale|l[oø]sning|system|teknologi|tjeneste|anlegg|samarbeid)\b/i,
+    explanationWindowChars: 160,
+    message:
+      "Visible article text names a transaction, platform, project, or other source-specific label without explaining what it is."
   }
 ];
 
@@ -344,10 +350,28 @@ function jargonGuardrailIssues(rewrite: RewriteOutput): Array<{
 }> {
   const visibleText = visibleArticleText(rewrite);
   return JARGON_GUARDRAILS.filter((guardrail) => {
-    if (!guardrail.pattern.test(visibleText)) return false;
-    return guardrail.explanationPattern
-      ? !guardrail.explanationPattern.test(visibleText)
-      : true;
+    const flags = guardrail.pattern.flags.includes("g")
+      ? guardrail.pattern.flags
+      : `${guardrail.pattern.flags}g`;
+    const matcher = new RegExp(guardrail.pattern.source, flags);
+
+    for (const match of visibleText.matchAll(matcher)) {
+      if (!guardrail.explanationPattern) {
+        return true;
+      }
+      const matchIndex = match.index ?? 0;
+      const explanationScope =
+        guardrail.explanationWindowChars == null
+          ? visibleText
+          : visibleText.slice(
+              matchIndex,
+              matchIndex + guardrail.explanationWindowChars
+            );
+      if (!guardrail.explanationPattern.test(explanationScope)) {
+        return true;
+      }
+    }
+    return false;
   }).map((guardrail) => ({
     code: guardrail.code,
     message: guardrail.message

@@ -10,11 +10,11 @@ function createRewrite(overrides?: Partial<RewriteOutput>): RewriteOutput {
     title: "Kort oppdatering",
     lead: "Selskapet lanserer en ny teknologiplattform i dag.",
     body: [
-      "Teknologien gjor det mulig a redusere materialsvinn og energibruk.",
+      "Teknologien gjør det mulig å redusere materialsvinn og energibruk.",
       "Dette bidrar til bedre kapitalutnyttelse for kundene.",
-      "Selskapet vil starte kommersiell produksjon i andre halvaar."
+      "Selskapet vil starte kommersiell produksjon i andre halvår."
     ],
-    company_sentence: "Test ASA er et norsk selskap notert pa Oslo Bors.",
+    company_sentence: "Test ASA er et norsk selskap notert på Oslo Børs.",
     key_facts: ["Punkt 1", "Punkt 2", "Punkt 3"],
     negative_or_surprising: [],
     excluded_hype: [],
@@ -31,15 +31,15 @@ describe("findAttributionRisks", () => {
     const rewrite = createRewrite();
     const risks = findAttributionRisks(rewrite);
     expect(risks.length).toBeGreaterThanOrEqual(2);
-    expect(risks[0]?.sentence).toContain("gjor det mulig");
+    expect(risks[0]?.sentence).toContain("gjør det mulig");
   });
 
   it("flags attributed claims that still lack hedging", () => {
     const rewrite = createRewrite({
       body: [
-        "Teknologien ifolge selskapet gjor det mulig a redusere materialsvinn og energibruk.",
-        "Dette ifolge selskapet bidrar til bedre kapitalutnyttelse for kundene.",
-        "Selskapet vil starte kommersiell produksjon i andre halvaar."
+        "Teknologien gjør det mulig å redusere materialsvinn og energibruk, ifølge selskapet.",
+        "Dette bidrar til bedre kapitalutnyttelse for kundene, ifølge selskapet.",
+        "Selskapet vil starte kommersiell produksjon i andre halvår."
       ]
     });
     const risks = findAttributionRisks(rewrite);
@@ -50,9 +50,9 @@ describe("findAttributionRisks", () => {
   it("accepts hedged and attributed effect claims", () => {
     const rewrite = createRewrite({
       body: [
-        "Teknologien skal ifolge selskapet gjor det mulig a redusere materialsvinn og energibruk.",
+        "Teknologien kan ifølge selskapet gjøre det mulig å redusere materialsvinn og energibruk.",
         "Dette kan bidra til bedre kapitalutnyttelse, hevdes det.",
-        "Selskapet vil starte kommersiell produksjon i andre halvaar."
+        "Selskapet vil starte kommersiell produksjon i andre halvår."
       ]
     });
     const risks = findAttributionRisks(rewrite);
@@ -65,7 +65,7 @@ describe("buildAttributionCorrectionInstruction", () => {
     const rewrite = createRewrite();
     const risks = findAttributionRisks(rewrite);
     const instruction = buildAttributionCorrectionInstruction(risks);
-    expect(instruction).toContain("Setninger som ma omskrives");
-    expect(instruction).toContain("ifolge selskapet");
+    expect(instruction).toContain("Setninger som må omskrives");
+    expect(instruction).toContain("ifølge selskapet");
   });
 });

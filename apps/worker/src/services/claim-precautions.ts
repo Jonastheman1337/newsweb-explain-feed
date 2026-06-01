@@ -1,5 +1,6 @@
 import type { RewriteOutput } from "@newsweb/shared";
 import { collectDraftSentences } from "./reference-check.js";
+import { normalizeGuardrailText } from "./text-normalization.js";
 
 export type AttributionRisk = {
   index: number;
@@ -23,11 +24,13 @@ const ATTRIBUTION_MARKERS = [
 
 const ASSERTIVE_EFFECT_PATTERNS = [
   "gjor det mulig",
+  "gjore det mulig",
   "bidrar til",
   "bidrar",
   "vil bidra",
   "muliggjor",
   "forer til",
+  "fore til",
   "sikrer",
   "styrker",
   "forbedrer",
@@ -56,7 +59,7 @@ export function findAttributionRisks(rewrite: RewriteOutput): AttributionRisk[] 
 
   for (let index = 0; index < sentences.length; index += 1) {
     const sentence = sentences[index] ?? "";
-    const normalized = sentence.toLowerCase();
+    const normalized = normalizeGuardrailText(sentence);
     const looksLikeEffectClaim = hasAny(normalized, ASSERTIVE_EFFECT_PATTERNS);
     const hasAttribution = hasAny(normalized, ATTRIBUTION_MARKERS);
     const hasHedging = hasAny(normalized, HEDGING_MARKERS);
@@ -94,17 +97,17 @@ export function buildAttributionCorrectionInstruction(
     [
       `Setning ${risk.index + 1}: ${risk.sentence}`,
       `Problem: ${risk.reason}`,
-      "Krav: Omskriv med tydelig attribusjon (f.eks. 'ifolge selskapet') og forbehold (f.eks. 'kan', 'hevdes det')."
+      "Krav: Omskriv med tydelig attribusjon (f.eks. 'ifølge selskapet') og forbehold (f.eks. 'kan', 'hevdes det')."
     ].join("\n")
   );
 
   return [
-    "Lag et nytt korrigert utkast basert pa samme kildetekst.",
-    "Bastante effekt- eller verdipastander ma ikke sta som objektive fakta.",
-    "Bruk alltid attribusjon og nokternt forbehold: 'ifolge selskapet', 'ifolge borsmeldingen', 'kan', 'hevdes det'.",
+    "Lag et nytt korrigert utkast basert på samme kildetekst.",
+    "Bastante effekt- eller verdipåstander må ikke stå som objektive fakta.",
+    "Bruk alltid attribusjon og nøkternt forbehold: 'ifølge selskapet', 'ifølge børsmeldingen', 'kan', 'hevdes det'.",
     "Behold fakta, tall og struktur, men juster formuleringene.",
     "",
-    "Setninger som ma omskrives:",
+    "Setninger som må omskrives:",
     lines.join("\n\n")
   ].join("\n");
 }

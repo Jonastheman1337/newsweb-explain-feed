@@ -6,7 +6,7 @@ export const rewriteImportanceSchema = z.enum(["viktig", "medium", "uviktig"]);
 export const rewriteOutputSchema = z.object({
   title: z.string().min(6).max(140),
   lead: z.string().min(20).max(350),
-  body: z.array(z.string().min(10).max(600)).min(1).max(8),
+  body: z.array(z.string().min(10).max(600)).min(0).max(8),
   company_sentence: z.string().min(10).max(220),
   key_facts: z.array(z.string().min(5).max(300)).min(1).max(8),
   negative_or_surprising: z.array(z.string().min(5).max(300)).max(6),
@@ -51,7 +51,7 @@ export const rewriteOutputJsonSchema = {
     lead: { type: "string", minLength: 20, maxLength: 350 },
     body: {
       type: "array",
-      minItems: 1,
+      minItems: 0,
       maxItems: 8,
       items: { type: "string", minLength: 10, maxLength: 600 }
     },

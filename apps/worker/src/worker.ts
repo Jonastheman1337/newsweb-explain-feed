@@ -60,6 +60,7 @@ import {
   buildCorrectionInstruction,
   buildCoverageReport,
   collectDraftSentences,
+  collectVisibleDraftSentences,
   assessReferenceCheckGate,
   referenceCheckJsonSchema,
   referenceCheckResultSchema,
@@ -485,6 +486,7 @@ function referenceCoverageJson(
   if (!coverage) return null;
   return {
     totalSentences: coverage.totalSentences,
+    visibleArticleSentenceCount: coverage.visibleArticleSentenceCount,
     groundedSentences: coverage.groundedSentences,
     coveragePercent: coverage.coveragePercent,
     sentenceReviews: coverage.items.map((item) => ({
@@ -594,6 +596,178 @@ function rewriteJsonForValidation(
 }
 
 type RewriteValidationResult = ReturnType<typeof validateRewriteWithRevisionCompliance>;
+
+const HIGH_RISK_VALIDATION_WARNING_CODES = new Set([
+  "UNEXPECTED_NUMBERS",
+  "UNEXPECTED_CURRENCY",
+  "REVENUE_RESULT_MIXUP",
+  "MISSING_RIGHT_OF_REPLY",
+  "UNEXPLAINED_NAMED_TRANSACTION"
+]);
+
+type ValidationRepairAudit = {
+  applied: boolean;
+  issueCodes: string[];
+  initialWarnings: string[];
+  finalWarnings: string[];
+  error: string | null;
+};
+
+function emptyValidationRepairAudit(): ValidationRepairAudit {
+  return {
+    applied: false,
+    issueCodes: [],
+    initialWarnings: [],
+    finalWarnings: [],
+    error: null
+  };
+}
+
+function highRiskValidationWarningIssues(
+  validation: RewriteValidationResult
+): RewriteValidationIssue[] {
+  return validation.issues.filter(
+    (issue) =>
+      issue.severity === "warning" &&
+      HIGH_RISK_VALIDATION_WARNING_CODES.has(issue.code)
+  );
+}
+
+function validationIssueMessages(issues: RewriteValidationIssue[]): string[] {
+  return issues.map((issue) => issue.message);
+}
+
+function uniqueIssueCodes(issues: RewriteValidationIssue[]): string[] {
+  return [...new Set(issues.map((issue) => issue.code))];
+}
+
+function buildHighRiskValidationRepairInstruction(
+  issues: RewriteValidationIssue[]
+): string {
+  const issueLines = issues.map((issue) => {
+    const codeInstruction =
+      issue.code === "UNEXPECTED_NUMBERS"
+        ? "Fjern tall som ikke finnes eksplisitt i kilden. Ikke legg til estimater eller valutaomregninger."
+        : issue.code === "UNEXPECTED_CURRENCY"
+          ? "Bruk bare valuta som finnes eksplisitt i kilden. Ikke regn om til kroner eller annen valuta."
+          : issue.code === "REVENUE_RESULT_MIXUP"
+            ? "Ikke bruk resultat, overskudd eller tap hvis kilden bare omtaler inntekter eller omsetning."
+            : issue.code === "MISSING_RIGHT_OF_REPLY"
+              ? "Ta med tilsvar, avvisning eller bestridelse fra kilden i lead/body."
+              : issue.code === "UNEXPLAINED_NAMED_TRANSACTION"
+                ? "Forklar kort hva det navngitte prosjektet, plattformen eller transaksjonen er med dekning i kilden, eller generaliser/dropp navnet."
+              : "Rett problemet uten a legge til nye fakta.";
+    return [`${issue.code}: ${issue.message}`, `Krav: ${codeInstruction}`].join(
+      "\n"
+    );
+  });
+
+  return [
+    "Lag et nytt korrigert utkast basert pa samme kildetekst.",
+    "Rett bare valideringsproblemene under. Ikke legg til fakta, tall eller valuta som ikke finnes i kilden.",
+    "Behold nyhetsvinkel, struktur og lengde sa langt det er mulig.",
+    "",
+    "Valideringsproblemer som ma rettes:",
+    issueLines.join("\n\n")
+  ].join("\n");
+}
+
+function promoteHighRiskValidationWarnings(
+  validation: RewriteValidationResult
+): RewriteValidationResult {
+  const issues = validation.issues.map((issue) =>
+    issue.severity === "warning" &&
+    HIGH_RISK_VALIDATION_WARNING_CODES.has(issue.code)
+      ? { ...issue, severity: "blocking" as const }
+      : issue
+  );
+  const errors = issues.map((issue) => issue.message);
+  const blockingErrors = issues
+    .filter((issue) => issue.severity === "blocking")
+    .map((issue) => issue.message);
+  const warnings = issues
+    .filter((issue) => issue.severity === "warning")
+    .map((issue) => issue.message);
+
+  return {
+    ...validation,
+    valid: issues.length === 0,
+    errors,
+    issues,
+    blockingErrors,
+    warnings
+  };
+}
+
+async function applyHighRiskValidationRepair<TPayload extends PromptPayload>({
+  payload,
+  rewrite,
+  validation,
+  revisionInstructionForPrompt,
+  reasoningEffort,
+  modelCalls,
+  callRewrite
+}: {
+  payload: TPayload;
+  rewrite: RewriteOutput;
+  validation: RewriteValidationResult;
+  revisionInstructionForPrompt?: string;
+  reasoningEffort: OpenAIReasoningEffort;
+  modelCalls: ModelCallLog[];
+  callRewrite: (
+    payload: TPayload,
+    revisionInstruction?: string,
+    previousOutput?: RewriteOutput,
+    reasoningEffort?: OpenAIReasoningEffort
+  ) => Promise<{ rewrite: RewriteOutput; promptChars: number; modelCall: ModelCallLog }>;
+}): Promise<{
+  rewrite: RewriteOutput;
+  promptChars: number;
+  audit: ValidationRepairAudit;
+}> {
+  const issues = highRiskValidationWarningIssues(validation);
+  const audit: ValidationRepairAudit = {
+    applied: false,
+    issueCodes: uniqueIssueCodes(issues),
+    initialWarnings: validationIssueMessages(issues),
+    finalWarnings: [],
+    error: null
+  };
+
+  if (issues.length === 0) {
+    return { rewrite, promptChars: 0, audit };
+  }
+
+  const instruction = buildHighRiskValidationRepairInstruction(issues);
+  const combinedInstruction = [revisionInstructionForPrompt, instruction]
+    .filter(Boolean)
+    .join("\n\n");
+
+  try {
+    const result = await callRewrite(
+      payload,
+      combinedInstruction,
+      rewrite,
+      reasoningEffort
+    );
+    modelCalls.push(result.modelCall);
+    return {
+      rewrite: result.rewrite,
+      promptChars: result.promptChars,
+      audit: { ...audit, applied: true }
+    };
+  } catch (error) {
+    const promptChars = collectFailedModelCall(error, modelCalls);
+    return {
+      rewrite,
+      promptChars,
+      audit: {
+        ...audit,
+        error: error instanceof Error ? error.message : String(error)
+      }
+    };
+  }
+}
 
 function applyReferenceCheckGate(
   validation: RewriteValidationResult,
@@ -932,11 +1106,13 @@ async function callModelReferenceCheck(
   promptChars: number;
   modelCall: ModelCallLog | null;
 }> {
+  const visibleDraftSentences = collectVisibleDraftSentences(draftRewrite);
   const draftSentences = collectDraftSentences(draftRewrite);
   if (draftSentences.length === 0) {
     return {
       coverage: {
         totalSentences: 0,
+        visibleArticleSentenceCount: 0,
         groundedSentences: 0,
         coveragePercent: 100,
         items: [],
@@ -986,7 +1162,9 @@ async function callModelReferenceCheck(
 
   const parsed = referenceCheckResultSchema.parse(JSON.parse(result.content));
   return {
-    coverage: buildCoverageReport(draftSentences, parsed),
+    coverage: buildCoverageReport(draftSentences, parsed, {
+      visibleArticleSentenceCount: visibleDraftSentences.length
+    }),
     promptChars: result.promptChars,
     modelCall: result.modelCall
   };
@@ -1458,6 +1636,7 @@ async function processReportRewrite(
   let attributionRiskCount = 0;
   let styleSanitization: ReturnType<typeof sanitizeRewriteStyle>["stats"] | null = null;
   let editorialReview: EditorialReviewAudit | null = null;
+  let validationRepair: ValidationRepairAudit = emptyValidationRepairAudit();
   const modelCalls: ModelCallLog[] = [...(revisionOptions.modelCalls ?? [])];
   const reportReasoningEffort =
     revisionOptions.reasoningEffortOverride ??
@@ -1600,7 +1779,7 @@ async function processReportRewrite(
     rewrite = styleResult.rewrite;
     styleSanitization = styleResult.stats;
 
-    const validationResult = validateRewriteWithRevisionCompliance(
+    let validationResult = validateRewriteWithRevisionCompliance(
       rewrite,
       reportReferencePayload,
       {
@@ -1609,6 +1788,88 @@ async function processReportRewrite(
         attachmentTextAvailable
       }
     );
+
+    const validationRepairResult = await applyHighRiskValidationRepair({
+      payload: reportPayload,
+      rewrite,
+      validation: validationResult,
+      revisionInstructionForPrompt,
+      reasoningEffort: reportReasoningEffort,
+      modelCalls,
+      callRewrite: callModelReportRewrite
+    });
+    rewrite = validationRepairResult.rewrite;
+    promptChars += validationRepairResult.promptChars;
+    validationRepair = validationRepairResult.audit;
+
+    if (validationRepair.applied) {
+      const postRepairAttributionRisks = findAttributionRisks(rewrite);
+      attributionRiskCount = postRepairAttributionRisks.length;
+      const postRepairAttributionInstruction =
+        buildAttributionCorrectionInstruction(postRepairAttributionRisks);
+      if (postRepairAttributionInstruction) {
+        const combinedAttribution = [
+          revisionInstructionForPrompt,
+          postRepairAttributionInstruction
+        ]
+          .filter(Boolean)
+          .join("\n\n");
+        const correctedForAttribution = await callModelReportRewrite(
+          reportPayload,
+          combinedAttribution,
+          rewrite,
+          reportReasoningEffort
+        );
+        modelCalls.push(correctedForAttribution.modelCall);
+        promptChars += correctedForAttribution.promptChars;
+        rewrite = correctedForAttribution.rewrite;
+        attributionCorrectionApplied = true;
+        attributionRiskCount = findAttributionRisks(rewrite).length;
+      }
+
+      const postRepairImportanceResult = applyImportanceHighBar(rewrite, payload);
+      rewrite = postRepairImportanceResult.rewrite;
+      importanceAdjusted =
+        importanceAdjusted || postRepairImportanceResult.adjusted;
+      importanceAdjustReason =
+        postRepairImportanceResult.reason ?? importanceAdjustReason;
+
+      const postRepairStyleResult = sanitizeRewriteStyle(rewrite);
+      rewrite = postRepairStyleResult.rewrite;
+      styleSanitization = postRepairStyleResult.stats;
+
+      try {
+        const repairedReferenceCheck = await callModelReferenceCheck(
+          reportReferencePayload,
+          rewrite,
+          reportReasoningEffort
+        );
+        if (repairedReferenceCheck.modelCall) {
+          modelCalls.push(repairedReferenceCheck.modelCall);
+        }
+        promptChars += repairedReferenceCheck.promptChars;
+        finalCoverage = repairedReferenceCheck.coverage;
+        checkerError = null;
+      } catch (error) {
+        promptChars += collectFailedModelCall(error, modelCalls);
+        checkerError = error instanceof Error ? error.message : String(error);
+      }
+
+      validationResult = validateRewriteWithRevisionCompliance(
+        rewrite,
+        reportReferencePayload,
+        {
+          instruction: revisionOptions.userInstruction,
+          previousOutput: revisionOptions.previousOutput,
+          attachmentTextAvailable
+        }
+      );
+    }
+
+    validationRepair.finalWarnings = validationIssueMessages(
+      highRiskValidationWarningIssues(validationResult)
+    );
+    validationResult = promoteHighRiskValidationWarnings(validationResult);
     const referenceGate = assessReferenceCheckGate(
       checkerError ? null : finalCoverage ?? initialCoverage
     );
@@ -1652,6 +1913,7 @@ async function processReportRewrite(
         },
         styleSanitization,
         editorialReview,
+        validationRepair,
         referenceCheck: {
           enabled: true,
           checkerError,
@@ -1825,6 +2087,7 @@ async function processYearlyReportRewrite(
   let attributionRiskCount = 0;
   let styleSanitization: ReturnType<typeof sanitizeRewriteStyle>["stats"] | null = null;
   let editorialReview: EditorialReviewAudit | null = null;
+  let validationRepair: ValidationRepairAudit = emptyValidationRepairAudit();
   const modelCalls: ModelCallLog[] = [...(revisionOptions.modelCalls ?? [])];
   const reportReasoningEffort =
     revisionOptions.reasoningEffortOverride ??
@@ -1959,11 +2222,89 @@ async function processYearlyReportRewrite(
     rewrite = styleResult.rewrite;
     styleSanitization = styleResult.stats;
 
-    const validationResult = validateRewriteWithRevisionCompliance(rewrite, payload, {
+    let validationResult = validateRewriteWithRevisionCompliance(rewrite, payload, {
       instruction: revisionOptions.userInstruction,
       previousOutput: revisionOptions.previousOutput,
       attachmentTextAvailable
     });
+
+    const validationRepairResult = await applyHighRiskValidationRepair({
+      payload: yearlyPayload,
+      rewrite,
+      validation: validationResult,
+      revisionInstructionForPrompt,
+      reasoningEffort: reportReasoningEffort,
+      modelCalls,
+      callRewrite: callModelYearlyReportRewrite
+    });
+    rewrite = validationRepairResult.rewrite;
+    promptChars += validationRepairResult.promptChars;
+    validationRepair = validationRepairResult.audit;
+
+    if (validationRepair.applied) {
+      const postRepairAttributionRisks = findAttributionRisks(rewrite);
+      attributionRiskCount = postRepairAttributionRisks.length;
+      const postRepairAttributionInstruction =
+        buildAttributionCorrectionInstruction(postRepairAttributionRisks);
+      if (postRepairAttributionInstruction) {
+        const combinedAttribution = [
+          revisionInstructionForPrompt,
+          postRepairAttributionInstruction
+        ]
+          .filter(Boolean)
+          .join("\n\n");
+        const correctedForAttribution = await callModelYearlyReportRewrite(
+          yearlyPayload,
+          combinedAttribution,
+          rewrite,
+          reportReasoningEffort
+        );
+        modelCalls.push(correctedForAttribution.modelCall);
+        promptChars += correctedForAttribution.promptChars;
+        rewrite = correctedForAttribution.rewrite;
+        attributionCorrectionApplied = true;
+        attributionRiskCount = findAttributionRisks(rewrite).length;
+      }
+
+      const postRepairImportanceResult = applyImportanceHighBar(rewrite, payload);
+      rewrite = postRepairImportanceResult.rewrite;
+      importanceAdjusted =
+        importanceAdjusted || postRepairImportanceResult.adjusted;
+      importanceAdjustReason =
+        postRepairImportanceResult.reason ?? importanceAdjustReason;
+
+      const postRepairStyleResult = sanitizeRewriteStyle(rewrite);
+      rewrite = postRepairStyleResult.rewrite;
+      styleSanitization = postRepairStyleResult.stats;
+
+      try {
+        const repairedReferenceCheck = await callModelReferenceCheck(
+          refPayload,
+          rewrite,
+          reportReasoningEffort
+        );
+        if (repairedReferenceCheck.modelCall) {
+          modelCalls.push(repairedReferenceCheck.modelCall);
+        }
+        promptChars += repairedReferenceCheck.promptChars;
+        finalCoverage = repairedReferenceCheck.coverage;
+        checkerError = null;
+      } catch (error) {
+        promptChars += collectFailedModelCall(error, modelCalls);
+        checkerError = error instanceof Error ? error.message : String(error);
+      }
+
+      validationResult = validateRewriteWithRevisionCompliance(rewrite, payload, {
+        instruction: revisionOptions.userInstruction,
+        previousOutput: revisionOptions.previousOutput,
+        attachmentTextAvailable
+      });
+    }
+
+    validationRepair.finalWarnings = validationIssueMessages(
+      highRiskValidationWarningIssues(validationResult)
+    );
+    validationResult = promoteHighRiskValidationWarnings(validationResult);
     const referenceGate = assessReferenceCheckGate(
       checkerError ? null : finalCoverage ?? initialCoverage
     );
@@ -2004,6 +2345,7 @@ async function processYearlyReportRewrite(
         },
         styleSanitization,
         editorialReview,
+        validationRepair,
         referenceCheck: {
           enabled: true,
           checkerError,
@@ -2885,6 +3227,7 @@ const rewriteWorker = new Worker<RewriteJobData>(
       let styleSanitization: ReturnType<typeof sanitizeRewriteStyle>["stats"] | null =
         null;
       let editorialReview: EditorialReviewAudit | null = null;
+      let validationRepair: ValidationRepairAudit = emptyValidationRepairAudit();
       const modelCalls: ModelCallLog[] = [...preRewriteModelCalls];
       const rewriteReasoningEffort =
         job.data.reasoningEffortOverride ?? config.OPENAI_DEFAULT_REASONING_EFFORT;
@@ -2930,14 +3273,12 @@ const rewriteWorker = new Worker<RewriteJobData>(
         promptChars += initialDraftResult.promptChars;
         hiddenDraft = initialDraftResult.rewrite;
         let rewrite = hiddenDraft;
+        const refPayload = payload.pdfSupplementText
+          ? { ...payload, bodyText: payload.bodyText + "\n\n" + payload.pdfSupplementText }
+          : payload;
 
         try {
           await setGenerationPhase(logPrisma, generationRunId, "checking_references");
-          // Include PDF supplement text in reference check so facts from
-          // attached PDFs are considered grounded (not just the body text)
-          const refPayload = payload.pdfSupplementText
-            ? { ...payload, bodyText: payload.bodyText + "\n\n" + payload.pdfSupplementText }
-            : payload;
 
           const initialReferenceCheck = await callModelReferenceCheck(
             refPayload,
@@ -3030,11 +3371,89 @@ const rewriteWorker = new Worker<RewriteJobData>(
         rewrite = styleResult.rewrite;
         styleSanitization = styleResult.stats;
 
-        const validationResult = validateRewriteWithRevisionCompliance(rewrite, payload, {
+        let validationResult = validateRewriteWithRevisionCompliance(rewrite, payload, {
           instruction: job.data.instruction,
           previousOutput,
           attachmentTextAvailable
         });
+
+        const validationRepairResult = await applyHighRiskValidationRepair({
+          payload,
+          rewrite,
+          validation: validationResult,
+          revisionInstructionForPrompt,
+          reasoningEffort: correctionReasoningEffort,
+          modelCalls,
+          callRewrite: callModelRewrite
+        });
+        rewrite = validationRepairResult.rewrite;
+        promptChars += validationRepairResult.promptChars;
+        validationRepair = validationRepairResult.audit;
+
+        if (validationRepair.applied) {
+          const postRepairAttributionRisks = findAttributionRisks(rewrite);
+          attributionRiskCount = postRepairAttributionRisks.length;
+          const postRepairAttributionInstruction =
+            buildAttributionCorrectionInstruction(postRepairAttributionRisks);
+          if (postRepairAttributionInstruction) {
+            const combinedAttribution = [
+              revisionInstructionForPrompt,
+              postRepairAttributionInstruction
+            ]
+              .filter(Boolean)
+              .join("\n\n");
+            const correctedForAttribution = await callModelRewrite(
+              payload,
+              combinedAttribution,
+              rewrite,
+              correctionReasoningEffort
+            );
+            modelCalls.push(correctedForAttribution.modelCall);
+            promptChars += correctedForAttribution.promptChars;
+            rewrite = correctedForAttribution.rewrite;
+            attributionCorrectionApplied = true;
+            attributionRiskCount = findAttributionRisks(rewrite).length;
+          }
+
+          const postRepairImportanceResult = applyImportanceHighBar(rewrite, payload);
+          rewrite = postRepairImportanceResult.rewrite;
+          importanceAdjusted =
+            importanceAdjusted || postRepairImportanceResult.adjusted;
+          importanceAdjustReason =
+            postRepairImportanceResult.reason ?? importanceAdjustReason;
+
+          const postRepairStyleResult = sanitizeRewriteStyle(rewrite);
+          rewrite = postRepairStyleResult.rewrite;
+          styleSanitization = postRepairStyleResult.stats;
+
+          try {
+            const repairedReferenceCheck = await callModelReferenceCheck(
+              refPayload,
+              rewrite,
+              rewriteReasoningEffort
+            );
+            if (repairedReferenceCheck.modelCall) {
+              modelCalls.push(repairedReferenceCheck.modelCall);
+            }
+            promptChars += repairedReferenceCheck.promptChars;
+            finalCoverage = repairedReferenceCheck.coverage;
+            checkerError = null;
+          } catch (error) {
+            promptChars += collectFailedModelCall(error, modelCalls);
+            checkerError = error instanceof Error ? error.message : String(error);
+          }
+
+          validationResult = validateRewriteWithRevisionCompliance(rewrite, payload, {
+            instruction: job.data.instruction,
+            previousOutput,
+            attachmentTextAvailable
+          });
+        }
+
+        validationRepair.finalWarnings = validationIssueMessages(
+          highRiskValidationWarningIssues(validationResult)
+        );
+        validationResult = promoteHighRiskValidationWarnings(validationResult);
         const referenceGate = assessReferenceCheckGate(
           checkerError ? null : finalCoverage ?? initialCoverage
         );
@@ -3067,6 +3486,7 @@ const rewriteWorker = new Worker<RewriteJobData>(
             promptChars,
             styleSanitization,
             editorialReview,
+            validationRepair,
             referenceCheck: {
               enabled: true,
               checkerError,

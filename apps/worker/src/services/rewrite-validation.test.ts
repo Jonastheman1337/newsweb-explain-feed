@@ -1,5 +1,9 @@
 import type { PromptPayload } from "@newsweb/prompt-kit";
-import type { RewriteOutput } from "@newsweb/shared";
+import {
+  rewriteOutputJsonSchema,
+  rewriteOutputSchema,
+  type RewriteOutput
+} from "@newsweb/shared";
 import { describe, expect, it } from "vitest";
 import {
   countVisibleArticleChars,
@@ -85,23 +89,36 @@ describe("countVisibleArticleChars", () => {
   });
 });
 
+describe("rewrite output schema", () => {
+  it("allows lead-only rewrites with an empty body", () => {
+    const parsed = rewriteOutputSchema.safeParse(createRewrite({ body: [] }));
+
+    expect(parsed.success).toBe(true);
+    expect(rewriteOutputJsonSchema.properties.body.minItems).toBe(0);
+  });
+});
+
 describe("validateRewriteOutput", () => {
-  it("allows up to two unexpected number tokens", () => {
+  it("warns on one unexpected number token", () => {
     const payload = createPayload();
     const rewrite = createRewrite({
       lead: "Selskapet la frem kvartalstall med nye detaljer.",
       body: [
         "Omsetningen i kvartalet var 101 i denne omtalen.",
-        "Resultatet i perioden var 21 ifolge omtalen.",
         "Meldingen oppgir ingen ny guiding."
       ]
     });
 
     const result = validateRewriteOutput(rewrite, payload);
-    expect(result.valid).toBe(true);
+    expect(result.valid).toBe(false);
+    expect(result.issues).toContainEqual({
+      code: "UNEXPECTED_NUMBERS",
+      severity: "warning",
+      message: "Unexpected numbers: 101"
+    });
   });
 
-  it("fails when more than two unexpected number tokens appear", () => {
+  it("warns with all unexpected number tokens", () => {
     const payload = createPayload();
     const rewrite = createRewrite({
       lead: "Selskapet la frem kvartalstall med nye detaljer.",
@@ -113,10 +130,7 @@ describe("validateRewriteOutput", () => {
     });
 
     const result = validateRewriteOutput(rewrite, payload);
-    expect(result.valid).toBe(false);
-    expect(result.errors.some((error) => error.startsWith("Unexpected numbers:"))).toBe(
-      true
-    );
+    expect(result.errors).toContain("Unexpected numbers: 101, 21, 303");
   });
 
   it("uses PDF supplement text when validating numbers", () => {
@@ -135,6 +149,28 @@ describe("validateRewriteOutput", () => {
 
     const result = validateRewriteOutput(rewrite, payload);
     expect(result.errors.some((error) => error.startsWith("Unexpected numbers:"))).toBe(
+      false
+    );
+  });
+
+  it("allows simple source-derived insider trade totals", () => {
+    const payload = createPayload({
+      title: "Mandatory notification of trade",
+      bodyText:
+        "Lorenz AS has acquired 10.000 shares at an average price of NOK 3,43 per share."
+    });
+    const rewrite = createRewrite({
+      title: "Lorenz kjøper aksjer",
+      lead:
+        "Lorenz har kjøpt aksjer for 34.300 kroner, ifølge en børsmelding.",
+      body: [],
+      key_facts: ["Kjøpt for 34.300 kroner"],
+      source_spans: ["10.000 shares", "NOK 3,43 per share"]
+    });
+
+    const result = validateRewriteOutput(rewrite, payload);
+
+    expect(result.issues.some((issue) => issue.code === "UNEXPECTED_NUMBERS")).toBe(
       false
     );
   });
@@ -298,6 +334,29 @@ describe("validateRewriteOutput", () => {
     );
   });
 
+  it("allows converted currency when the source explicitly includes it", () => {
+    const payload = createPayload({
+      bodyText:
+        "Selskapet melder at inntektene var 10 millioner dollar, tilsvarende 105 millioner kroner."
+    });
+    const rewrite = createRewrite({
+      lead:
+        "Selskapet melder om inntekter på 10 millioner dollar, tilsvarende 105 millioner kroner.",
+      body: ["Meldingen oppgir ikke andre tall."],
+      key_facts: ["Inntekter 10 millioner dollar", "Tilsvarer 105 millioner kroner"],
+      source_spans: ["10 millioner dollar", "105 millioner kroner"]
+    });
+
+    const result = validateRewriteOutput(rewrite, payload);
+
+    expect(result.issues.some((issue) => issue.code === "UNEXPECTED_CURRENCY")).toBe(
+      false
+    );
+    expect(result.issues.some((issue) => issue.code === "UNEXPECTED_NUMBERS")).toBe(
+      false
+    );
+  });
+
   it("does not treat Swedish kroner as unexpected NOK currency", () => {
     const payload = createPayload({
       bodyText:
@@ -454,6 +513,37 @@ describe("validateRewriteOutput", () => {
     expect(
       result.issues.some((issue) => issue.code === "UNEXPLAINED_NAMED_TRANSACTION")
     ).toBe(true);
+  });
+
+  it("warns on unexplained named platforms and project labels", () => {
+    const payload = createPayload();
+    const rewrite = createRewrite({
+      lead: "Selskapet viser til Endurance-plattformen i kvartalet.",
+      body: ["Kostnadene er knyttet til Atlas-prosjektet."]
+    });
+
+    const result = validateRewriteOutput(rewrite, payload);
+
+    expect(
+      result.issues.some((issue) => issue.code === "UNEXPLAINED_NAMED_TRANSACTION")
+    ).toBe(true);
+  });
+
+  it("allows named platforms when the visible text explains them", () => {
+    const payload = createPayload();
+    const rewrite = createRewrite({
+      lead:
+        "Selskapet viser til Endurance-plattformen, som er en programvareplattform for salg og kundeoppfølging.",
+      body: [
+        "Evo-transaksjonen gjelder kjøpet av en installatørportefølje i Europa."
+      ]
+    });
+
+    const result = validateRewriteOutput(rewrite, payload);
+
+    expect(
+      result.issues.some((issue) => issue.code === "UNEXPLAINED_NAMED_TRANSACTION")
+    ).toBe(false);
   });
 
   it("does not warn on ebitda when the full context is included", () => {

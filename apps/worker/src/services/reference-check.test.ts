@@ -75,7 +75,8 @@ describe("assessReferenceCheckGate", () => {
             sourceEvidence: "notert i Oslo"
           }
         ]
-      }
+      },
+      { visibleArticleSentenceCount: 0 }
     );
 
     const result = assessReferenceCheckGate(report);
@@ -104,12 +105,43 @@ describe("assessReferenceCheckGate", () => {
             sourceEvidence: ""
           }
         ]
-      }
+      },
+      { visibleArticleSentenceCount: 1 }
     );
 
     const result = assessReferenceCheckGate(report);
 
     expect(result.blocking).toBe(false);
+  });
+
+  it("blocks one unsupported visible sentence in a short article", () => {
+    const report = buildCoverageReport(
+      ["Selskapet la frem tall.", "Dette gir bedre kapitalutnyttelse."],
+      {
+        sentences: [
+          {
+            index: 0,
+            sentence: "Selskapet la frem tall.",
+            grounded: true,
+            interpretation: "Dekket.",
+            sourceEvidence: "la frem tall"
+          },
+          {
+            index: 1,
+            sentence: "Dette gir bedre kapitalutnyttelse.",
+            grounded: false,
+            interpretation: "Effekten er ikke dekket.",
+            sourceEvidence: ""
+          }
+        ]
+      },
+      { visibleArticleSentenceCount: 2 }
+    );
+
+    const result = assessReferenceCheckGate(report);
+
+    expect(result.blocking).toBe(true);
+    expect(result.reason).toContain("short article");
   });
 
   it("does not block simple insider-trade totals derived from source inputs", () => {
@@ -130,7 +162,8 @@ describe("assessReferenceCheckGate", () => {
               "Lorenz AS has acquired 10.000 shares at an average price of NOK 3,43 per share."
           }
         ]
-      }
+      },
+      { visibleArticleSentenceCount: 1 }
     );
 
     const result = assessReferenceCheckGate(report);
@@ -165,7 +198,8 @@ describe("assessReferenceCheckGate", () => {
             sourceEvidence: ""
           }
         ]
-      }
+      },
+      { visibleArticleSentenceCount: 0 }
     );
 
     const result = assessReferenceCheckGate(report);

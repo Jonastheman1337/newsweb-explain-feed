@@ -64,6 +64,24 @@ describe("applyImportanceHighBar", () => {
     expect(result.adjusted).toBe(false);
   });
 
+  it("keeps 'viktig' on Norwegian severe signals", () => {
+    for (const bodyText of [
+      "Selskapet melder om et oppkjøp av en konkurrent.",
+      "Selskapet gjennomfører en rettet emisjon etter børsslutt."
+    ]) {
+      const payload = createPayload({
+        title: "Selskapet melder viktig hendelse",
+        bodyText
+      });
+      const rewrite = createRewrite({ importance: "viktig" });
+
+      const result = applyImportanceHighBar(rewrite, payload);
+
+      expect(result.rewrite.importance).toBe("viktig");
+      expect(result.adjusted).toBe(false);
+    }
+  });
+
   it("downgrades routine medium notice to uviktig", () => {
     const payload = createPayload({
       title: "Share repurchases on 27.2.2026",
@@ -74,5 +92,24 @@ describe("applyImportanceHighBar", () => {
     const result = applyImportanceHighBar(rewrite, payload);
     expect(result.rewrite.importance).toBe("uviktig");
     expect(result.adjusted).toBe(true);
+  });
+
+  it("downgrades Norwegian routine medium notices to uviktig", () => {
+    for (const bodyText of [
+      "Selskapet publiserer kvartalsrapport for første kvartal.",
+      "Dette er en meldepliktig handel fra en primærinnsider.",
+      "Selskapet opplyser at årsrapport publisert i dag."
+    ]) {
+      const payload = createPayload({
+        title: "Rutinemelding",
+        bodyText
+      });
+      const rewrite = createRewrite({ importance: "medium" });
+
+      const result = applyImportanceHighBar(rewrite, payload);
+
+      expect(result.rewrite.importance).toBe("uviktig");
+      expect(result.adjusted).toBe(true);
+    }
   });
 });

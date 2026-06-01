@@ -61,7 +61,7 @@ const sampleYearlyPayload: YearlyReportPromptPayload = {
 
 describe("OpenAI prompt contract", () => {
   it("bumps the prompt version for the editorial guardrail update", () => {
-    expect(PROMPT_VERSION).toBe("v5.4.0");
+    expect(PROMPT_VERSION).toBe("v5.6.0");
   });
 
   it("does not embed the JSON schema in the developer prompt", () => {
@@ -78,6 +78,8 @@ describe("OpenAI prompt contract", () => {
     expect(result).toContain("avlyst reparasjonsemisjon");
     expect(result).toContain("fullmakt");
     expect(result).toContain("stemme på vegne av andre aksjonærer");
+    expect(result).toContain("Endurance-plattformen");
+    expect(result).toContain("Forklar hver navngitte label");
     expect(result).toContain("1,3 milliarder kroner");
     expect(result).toContain("styrke likviditeten");
     expect(result).toContain("låneendringer");
@@ -91,6 +93,14 @@ describe("OpenAI prompt contract", () => {
     expect(result).toContain("Fullmakt til generalforsamling");
     expect(result).toContain("Ren tegningspåminnelse");
     expect(result).toContain("Meldingen inneholder ingen nye vilkår");
+  });
+
+  it("asks for varied early attribution instead of repeated stock endings", () => {
+    const result = createDeveloperPrompt();
+
+    expect(result).toContain("ikke la hver sak ende med samme standardhale");
+    expect(result).toContain("Kildehenvisningen kan sta i andre setning");
+    expect(result).toContain("gar det frem av meldingen");
   });
 });
 
@@ -180,10 +190,20 @@ describe("createReportRevisionUserPrompt", () => {
     const result = createReportDeveloperPrompt();
 
     expect(result).toContain("ikke det største isolerte tallet");
+    expect(result).toContain("Lead skal fortelle utviklingen eller spenningen");
+    expect(result).toContain("Ikke bruk 'fikk et resultat på X, mot Y'");
     expect(result).toContain("små per-aksje-beløp");
     expect(result).toContain("driftsresultat (ebit)");
     expect(result).toContain("ebitda");
     expect(result).toContain("første kvartal' to ganger");
+  });
+
+  it("forbids report bullet preambles in the examples and instructions", () => {
+    const result = createReportDeveloperPrompt();
+
+    expect(result).toContain("Start punktlisten direkte med forste kulepunkt");
+    expect(result).toContain("Ikke lag et eget body-element");
+    expect(result.match(/\"Dette er noen/g)).toBeNull();
   });
 
   it("keeps report source context and user instruction in revision mode", () => {

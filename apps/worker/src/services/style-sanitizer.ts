@@ -15,6 +15,7 @@ export type StyleSanitizationStats = {
   replacedPercentSigns: number;
   normalizedBillionPhrases: number;
   normalizedExactBillionAmounts: number;
+  normalizedAccountingAcronyms: number;
 };
 
 export type StyleSanitizationResult = {
@@ -93,6 +94,11 @@ function sanitizeText(text: string, stats: StyleSanitizationStats): string {
     return " prosent";
   });
 
+  result = result.replace(/\b(EBITDA|EBITA|EBIT)\b/g, (match: string) => {
+    stats.normalizedAccountingAcronyms += 1;
+    return match.toLowerCase();
+  });
+
   result = result.replace(
     /\b(\d{1,3}(?:[ .]\d{3}){3,}|\d{10,})\s+kroner\b/gi,
     (match: string, rawAmount: string) => {
@@ -155,7 +161,8 @@ export function sanitizeRewriteStyle(rewrite: RewriteOutput): StyleSanitizationR
     removedAsaSuffix: 0,
     replacedPercentSigns: 0,
     normalizedBillionPhrases: 0,
-    normalizedExactBillionAmounts: 0
+    normalizedExactBillionAmounts: 0,
+    normalizedAccountingAcronyms: 0
   };
 
   const sanitized: RewriteOutput = {
@@ -177,7 +184,8 @@ export function sanitizeRewriteStyle(rewrite: RewriteOutput): StyleSanitizationR
     stats.removedAsaSuffix > 0 ||
     stats.replacedPercentSigns > 0 ||
     stats.normalizedBillionPhrases > 0 ||
-    stats.normalizedExactBillionAmounts > 0;
+    stats.normalizedExactBillionAmounts > 0 ||
+    stats.normalizedAccountingAcronyms > 0;
 
   return {
     rewrite: sanitized,

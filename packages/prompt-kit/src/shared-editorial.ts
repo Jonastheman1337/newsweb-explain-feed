@@ -34,7 +34,7 @@ export const EDITORIAL_LANGUAGE = `SPRAK OG FORENKLING
 - Unnga lange, tunge setninger. Bryt dem opp.
 - Produktnavn og tekniske betegnelser fra kilden er ofte uforståelige for leseren. Forklar kort hva produktet eller teknologien gjør, eller generaliser.
 - Før du leverer: finn alle fagord, produktnavn, forkortelser og tekniske uttrykk en vanlig privatinvestor kan snuble i. Hvis ordet er nødvendig, forklar det naturlig i samme eller neste setning. Hvis du ikke kan forklare det kort med kilden som grunnlag, generaliser eller dropp ordet.
-- Navngitte transaksjoner og interne prosjektnavn må forklares kort hvis de brukes. Ikke skriv bare 'Evo-transaksjonen' eller lignende uten å si hva transaksjonen gjelder.
+- Navngitte transaksjoner, plattformer, produktnavn og interne prosjektnavn må forklares kort hvis de brukes. Forklar hver navngitte label, ikke bare en annen i samme setning. Ikke skriv bare 'Evo-transaksjonen' eller 'Endurance-plattformen'; si hva transaksjonen eller plattformen gjelder, eller generaliser.
 - Eksempler: Forklar ord som 'terminer', 'tegningsretter', 'reparasjonsemisjon', 'innkvartering', 'AAV', 'uttrykkssystem' og 'genuttrykk' hvis de må brukes. Ikke anta at leseren vet hva de betyr.
 - Bransje- og energiforkortelser ma forklares naturlig forste gang: 'Awilco, som frakter flytende naturgass (LNG)'. Etter forste forklaring kan forkortelsen brukes alene.
 - Forenkle teknisk sprak fra kilden. Bruk «» for a vise at du parafraserer selskapets egne ord.
@@ -84,7 +84,8 @@ export const EDITORIAL_NO_MARKET_COMMENTARY = `INGEN KURSKOMMENTAR ELLER INVESTE
 - Ikke forklar det som allerede er apenbart fra konteksten.`;
 
 export const EDITORIAL_ATTRIBUTION = `ATTRIBUSJON OG FORBEHOLD
-- Kildehenvisning SKAL inn i forste eller andre setning: 'ifolge en borsmelding', 'viser kvartalsrapporten', 'melder selskapet'. Leseren ma vite hvor informasjonen kommer fra med en gang.
+- Kildehenvisning SKAL inn i forste eller andre setning. Leseren ma vite hvor informasjonen kommer fra med en gang, men ikke la hver sak ende med samme standardhale.
+- Varier plassering og kildeord naturlig: 'ifolge borsmeldingen', 'selskapet opplyser', 'skriver selskapet', 'melder selskapet', 'gar det frem av meldingen', 'rapporten viser', 'kvartalsrapporten viser'. Kildehenvisningen kan sta i andre setning nar forste setning blir sterkere uten den.
 - Attribuer selskapets egne pastander: 'melder selskapet', 'ifolge borsmeldingen', 'skriver selskapet'.
 - I title, lead og body: Aldri skriv 'PDF', 'vedlegg', 'vedlagte skjema', 'i vedlegget', 'rapportkontekst', 'analysert tekst/materiale' eller 'ikke oppgitt'. Hvis opplysningen kommer fra ekstra kildetekst, attribuer nøytralt: 'selskapet skriver', 'selskapet opplyser' eller 'ifølge meldingen'.
 - Effekt- eller verdipastander krever forbehold: 'kan', 'ifolge selskapet'.
