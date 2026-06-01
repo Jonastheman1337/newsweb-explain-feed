@@ -138,6 +138,7 @@ const config = loadConfig();
 const openAIClient = createOpenAIClient(config.OPENAI_API_KEY);
 
 const connection = parseRedisUrl(config.REDIS_URL);
+const MAX_REFERENCE_REPAIR_ATTEMPTS = 3;
 const redisPub = new Redis(config.REDIS_URL, { maxRetriesPerRequest: null });
 const ingestQueue = new Queue<IngestJobData>(QUEUE_NAMES.ingest, { connection });
 const rewriteQueue = new Queue<RewriteJobData>(QUEUE_NAMES.rewrite, { connection });
@@ -1250,6 +1251,183 @@ async function callModelYearlyReportRewrite(
   };
 }
 
+type ReferenceRepairHistoryEntry = {
+  checkNumber: number;
+  correctionAttempt: number;
+  coveragePercent: number;
+  unsupportedSentenceCount: number;
+  highRiskUnsupportedSentenceCount: number;
+  blocking: boolean;
+  blockingReason: string | null;
+  unsupportedSentences: Array<{
+    index: number;
+    sentence: string;
+    interpretation: string;
+  }>;
+};
+
+async function applyReferenceCheckRepair<TPayload extends PromptPayload>({
+  referencePayload,
+  rewritePayload,
+  rewrite,
+  revisionInstructionForPrompt,
+  rewriteReasoningEffort,
+  correctionReasoningEffort,
+  existingCorrectionAttempts = 0,
+  modelCalls,
+  callRewrite
+}: {
+  referencePayload: PromptPayload;
+  rewritePayload: TPayload;
+  rewrite: RewriteOutput;
+  revisionInstructionForPrompt?: string;
+  rewriteReasoningEffort: OpenAIReasoningEffort;
+  correctionReasoningEffort: OpenAIReasoningEffort;
+  existingCorrectionAttempts?: number;
+  modelCalls: ModelCallLog[];
+  callRewrite: (
+    payload: TPayload,
+    revisionInstruction?: string,
+    previousOutput?: RewriteOutput,
+    reasoningEffort?: OpenAIReasoningEffort
+  ) => Promise<{
+    rewrite: RewriteOutput;
+    promptChars: number;
+    modelCall: ModelCallLog;
+  }>;
+}): Promise<{
+  rewrite: RewriteOutput;
+  promptChars: number;
+  checkerError: string | null;
+  correctionAttempts: number;
+  initialCoverage: ReferenceCoverageReport | null;
+  finalCoverage: ReferenceCoverageReport | null;
+  repairHistory: ReferenceRepairHistoryEntry[];
+}> {
+  let currentRewrite = rewrite;
+  let promptChars = 0;
+  let correctionAttempts = 0;
+  let initialCoverage: ReferenceCoverageReport | null = null;
+  let finalCoverage: ReferenceCoverageReport | null = null;
+  const repairHistory: ReferenceRepairHistoryEntry[] = [];
+
+  while (true) {
+    let referenceCheck: Awaited<ReturnType<typeof callModelReferenceCheck>>;
+    try {
+      referenceCheck = await callModelReferenceCheck(
+        referencePayload,
+        currentRewrite,
+        rewriteReasoningEffort
+      );
+    } catch (error) {
+      promptChars += collectFailedModelCall(error, modelCalls);
+      return {
+        rewrite: currentRewrite,
+        promptChars,
+        checkerError: null,
+        correctionAttempts,
+        initialCoverage,
+        finalCoverage,
+        repairHistory
+      };
+    }
+
+    if (referenceCheck.modelCall) {
+      modelCalls.push(referenceCheck.modelCall);
+    }
+    promptChars += referenceCheck.promptChars;
+    initialCoverage ??= referenceCheck.coverage;
+    finalCoverage = referenceCheck.coverage;
+
+    const gate = assessReferenceCheckGate(referenceCheck.coverage);
+    repairHistory.push({
+      checkNumber: repairHistory.length + 1,
+      correctionAttempt: existingCorrectionAttempts + correctionAttempts,
+      coveragePercent: referenceCheck.coverage.coveragePercent,
+      unsupportedSentenceCount: referenceCheck.coverage.unsupportedSentences.length,
+      highRiskUnsupportedSentenceCount:
+        gate.highRiskUnsupportedSentences.length,
+      blocking: gate.blocking,
+      blockingReason: gate.reason,
+      unsupportedSentences: referenceCheck.coverage.unsupportedSentences.map(
+        (item) => ({
+          index: item.index,
+          sentence: item.sentence,
+          interpretation: item.interpretation
+        })
+      )
+    });
+
+    const totalCorrectionAttempts =
+      existingCorrectionAttempts + correctionAttempts;
+    const correctionInstruction = buildCorrectionInstruction(
+      referenceCheck.coverage,
+      {
+        attempt: totalCorrectionAttempts + 1,
+        maxAttempts: MAX_REFERENCE_REPAIR_ATTEMPTS
+      }
+    );
+
+    if (!correctionInstruction) {
+      return {
+        rewrite: currentRewrite,
+        promptChars,
+        checkerError: null,
+        correctionAttempts,
+        initialCoverage,
+        finalCoverage,
+        repairHistory
+      };
+    }
+
+    if (
+      totalCorrectionAttempts >= MAX_REFERENCE_REPAIR_ATTEMPTS ||
+      (!gate.blocking && correctionAttempts > 0)
+    ) {
+      return {
+        rewrite: currentRewrite,
+        promptChars,
+        checkerError: null,
+        correctionAttempts,
+        initialCoverage,
+        finalCoverage,
+        repairHistory
+      };
+    }
+
+    const combinedCorrection = [
+      revisionInstructionForPrompt,
+      correctionInstruction
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+
+    try {
+      const correctedResult = await callRewrite(
+        rewritePayload,
+        combinedCorrection,
+        currentRewrite,
+        correctionReasoningEffort
+      );
+      modelCalls.push(correctedResult.modelCall);
+      promptChars += correctedResult.promptChars;
+      currentRewrite = correctedResult.rewrite;
+      correctionAttempts += 1;
+    } catch (error) {
+      promptChars += collectFailedModelCall(error, modelCalls);
+      return {
+        rewrite: currentRewrite,
+        promptChars,
+        checkerError: error instanceof Error ? error.message : String(error),
+        correctionAttempts,
+        initialCoverage,
+        finalCoverage,
+        repairHistory
+      };
+    }
+  }
+}
+
 type EditorialReviewAudit = {
   enabled: boolean;
   repairApplied: boolean;
@@ -1627,6 +1805,8 @@ async function processReportRewrite(
   let promptChars = revisionOptions.promptChars ?? 0;
   let checkerError: string | null = null;
   let correctionApplied = false;
+  let referenceCorrectionAttempts = 0;
+  let referenceRepairHistory: ReferenceRepairHistoryEntry[] = [];
   let initialCoverage: ReferenceCoverageReport | null = null;
   let finalCoverage: ReferenceCoverageReport | null = null;
   let hiddenDraft: RewriteOutput | null = null;
@@ -1637,6 +1817,7 @@ async function processReportRewrite(
   let styleSanitization: ReturnType<typeof sanitizeRewriteStyle>["stats"] | null = null;
   let editorialReview: EditorialReviewAudit | null = null;
   let validationRepair: ValidationRepairAudit = emptyValidationRepairAudit();
+  let needsFinalReferenceRepair = false;
   const modelCalls: ModelCallLog[] = [...(revisionOptions.modelCalls ?? [])];
   const reportReasoningEffort =
     revisionOptions.reasoningEffortOverride ??
@@ -1676,60 +1857,32 @@ async function processReportRewrite(
     hiddenDraft = initialDraftResult.rewrite;
     let rewrite = hiddenDraft;
 
-    try {
-      await setGenerationPhase(
-        logPrisma,
-        revisionOptions.generationRunId,
-        "checking_references"
-      );
-      const initialReferenceCheck = await callModelReferenceCheck(
-        reportReferencePayload,
-        rewrite,
-        reportReasoningEffort
-      );
-      if (initialReferenceCheck.modelCall) {
-        modelCalls.push(initialReferenceCheck.modelCall);
-      }
-      promptChars += initialReferenceCheck.promptChars;
-      initialCoverage = initialReferenceCheck.coverage;
-      finalCoverage = initialReferenceCheck.coverage;
-
-      const correctionInstruction = buildCorrectionInstruction(
-        initialReferenceCheck.coverage
-      );
-      if (correctionInstruction) {
-        const combinedCorrection = [
-          revisionInstructionForPrompt,
-          correctionInstruction
-        ]
-          .filter(Boolean)
-          .join("\n\n");
-        const correctedResult = await callModelReportRewrite(
-          reportPayload,
-          combinedCorrection,
-          rewrite,
-          reportReasoningEffort
-        );
-        modelCalls.push(correctedResult.modelCall);
-        promptChars += correctedResult.promptChars;
-        rewrite = correctedResult.rewrite;
-        correctionApplied = true;
-
-        const finalReferenceCheck = await callModelReferenceCheck(
-          reportReferencePayload,
-          rewrite,
-          reportReasoningEffort
-        );
-        if (finalReferenceCheck.modelCall) {
-          modelCalls.push(finalReferenceCheck.modelCall);
-        }
-        promptChars += finalReferenceCheck.promptChars;
-        finalCoverage = finalReferenceCheck.coverage;
-      }
-    } catch (error) {
-      promptChars += collectFailedModelCall(error, modelCalls);
-      checkerError = error instanceof Error ? error.message : String(error);
-    }
+    await setGenerationPhase(
+      logPrisma,
+      revisionOptions.generationRunId,
+      "checking_references"
+    );
+    const referenceRepair = await applyReferenceCheckRepair({
+      referencePayload: reportReferencePayload,
+      rewritePayload: reportPayload,
+      rewrite,
+      revisionInstructionForPrompt,
+      rewriteReasoningEffort: reportReasoningEffort,
+      correctionReasoningEffort: reportReasoningEffort,
+      modelCalls,
+      callRewrite: callModelReportRewrite
+    });
+    rewrite = referenceRepair.rewrite;
+    promptChars += referenceRepair.promptChars;
+    checkerError = referenceRepair.checkerError;
+    correctionApplied = referenceRepair.correctionAttempts > 0;
+    referenceCorrectionAttempts += referenceRepair.correctionAttempts;
+    referenceRepairHistory = [
+      ...referenceRepairHistory,
+      ...referenceRepair.repairHistory
+    ];
+    initialCoverage = referenceRepair.initialCoverage;
+    finalCoverage = referenceRepair.finalCoverage;
 
     await setGenerationPhase(logPrisma, revisionOptions.generationRunId, "finalizing");
     const attributionRisks = findAttributionRisks(rewrite);
@@ -1754,6 +1907,7 @@ async function processReportRewrite(
       rewrite = correctedForAttribution.rewrite;
       attributionCorrectionApplied = true;
       attributionRiskCount = findAttributionRisks(rewrite).length;
+      needsFinalReferenceRepair = true;
     }
 
     const editorialReviewResult = await applyEditorialRevisionReviewRepair({
@@ -1769,6 +1923,9 @@ async function processReportRewrite(
     rewrite = editorialReviewResult.rewrite;
     promptChars += editorialReviewResult.promptChars;
     editorialReview = editorialReviewResult.audit;
+    if (editorialReview?.repairApplied) {
+      needsFinalReferenceRepair = true;
+    }
 
     const importanceResult = applyImportanceHighBar(rewrite, payload);
     rewrite = importanceResult.rewrite;
@@ -1778,6 +1935,37 @@ async function processReportRewrite(
     const styleResult = sanitizeRewriteStyle(rewrite);
     rewrite = styleResult.rewrite;
     styleSanitization = styleResult.stats;
+    if (styleResult.stats.changed) {
+      needsFinalReferenceRepair = true;
+    }
+
+    if (needsFinalReferenceRepair) {
+      const finalReferenceRepair = await applyReferenceCheckRepair({
+        referencePayload: reportReferencePayload,
+        rewritePayload: reportPayload,
+        rewrite,
+        revisionInstructionForPrompt,
+        rewriteReasoningEffort: reportReasoningEffort,
+        correctionReasoningEffort: reportReasoningEffort,
+        existingCorrectionAttempts: referenceCorrectionAttempts,
+        modelCalls,
+        callRewrite: callModelReportRewrite
+      });
+      rewrite = finalReferenceRepair.rewrite;
+      promptChars += finalReferenceRepair.promptChars;
+      checkerError = finalReferenceRepair.checkerError;
+      correctionApplied =
+        correctionApplied || finalReferenceRepair.correctionAttempts > 0;
+      referenceCorrectionAttempts += finalReferenceRepair.correctionAttempts;
+      referenceRepairHistory = [
+        ...referenceRepairHistory,
+        ...finalReferenceRepair.repairHistory
+      ];
+      finalCoverage =
+        finalReferenceRepair.finalCoverage ??
+        finalReferenceRepair.initialCoverage ??
+        finalCoverage;
+    }
 
     let validationResult = validateRewriteWithRevisionCompliance(
       rewrite,
@@ -1838,22 +2026,32 @@ async function processReportRewrite(
       rewrite = postRepairStyleResult.rewrite;
       styleSanitization = postRepairStyleResult.stats;
 
-      try {
-        const repairedReferenceCheck = await callModelReferenceCheck(
-          reportReferencePayload,
-          rewrite,
-          reportReasoningEffort
-        );
-        if (repairedReferenceCheck.modelCall) {
-          modelCalls.push(repairedReferenceCheck.modelCall);
-        }
-        promptChars += repairedReferenceCheck.promptChars;
-        finalCoverage = repairedReferenceCheck.coverage;
-        checkerError = null;
-      } catch (error) {
-        promptChars += collectFailedModelCall(error, modelCalls);
-        checkerError = error instanceof Error ? error.message : String(error);
-      }
+      const repairedReferenceRepair = await applyReferenceCheckRepair({
+        referencePayload: reportReferencePayload,
+        rewritePayload: reportPayload,
+        rewrite,
+        revisionInstructionForPrompt,
+        rewriteReasoningEffort: reportReasoningEffort,
+        correctionReasoningEffort: reportReasoningEffort,
+        existingCorrectionAttempts: referenceCorrectionAttempts,
+        modelCalls,
+        callRewrite: callModelReportRewrite
+      });
+      rewrite = repairedReferenceRepair.rewrite;
+      promptChars += repairedReferenceRepair.promptChars;
+      checkerError = repairedReferenceRepair.checkerError;
+      correctionApplied =
+        correctionApplied || repairedReferenceRepair.correctionAttempts > 0;
+      referenceCorrectionAttempts +=
+        repairedReferenceRepair.correctionAttempts;
+      referenceRepairHistory = [
+        ...referenceRepairHistory,
+        ...repairedReferenceRepair.repairHistory
+      ];
+      finalCoverage =
+        repairedReferenceRepair.finalCoverage ??
+        repairedReferenceRepair.initialCoverage ??
+        finalCoverage;
 
       validationResult = validateRewriteWithRevisionCompliance(
         rewrite,
@@ -1918,6 +2116,8 @@ async function processReportRewrite(
           enabled: true,
           checkerError,
           correctionApplied,
+          correctionAttempts: referenceCorrectionAttempts,
+          repairHistory: referenceRepairHistory,
           attributionCorrectionApplied,
           attributionRiskCount,
           initialCoveragePercent: initialCoverage?.coveragePercent ?? null,
@@ -2078,6 +2278,8 @@ async function processYearlyReportRewrite(
   let promptChars = revisionOptions.promptChars ?? 0;
   let checkerError: string | null = null;
   let correctionApplied = false;
+  let referenceCorrectionAttempts = 0;
+  let referenceRepairHistory: ReferenceRepairHistoryEntry[] = [];
   let initialCoverage: ReferenceCoverageReport | null = null;
   let finalCoverage: ReferenceCoverageReport | null = null;
   let hiddenDraft: RewriteOutput | null = null;
@@ -2088,6 +2290,7 @@ async function processYearlyReportRewrite(
   let styleSanitization: ReturnType<typeof sanitizeRewriteStyle>["stats"] | null = null;
   let editorialReview: EditorialReviewAudit | null = null;
   let validationRepair: ValidationRepairAudit = emptyValidationRepairAudit();
+  let needsFinalReferenceRepair = false;
   const modelCalls: ModelCallLog[] = [...(revisionOptions.modelCalls ?? [])];
   const reportReasoningEffort =
     revisionOptions.reasoningEffortOverride ??
@@ -2119,60 +2322,32 @@ async function processYearlyReportRewrite(
       sourceBodyChars: combinedText.length
     };
 
-    try {
-      await setGenerationPhase(
-        logPrisma,
-        revisionOptions.generationRunId,
-        "checking_references"
-      );
-      const initialReferenceCheck = await callModelReferenceCheck(
-        refPayload,
-        rewrite,
-        reportReasoningEffort
-      );
-      if (initialReferenceCheck.modelCall) {
-        modelCalls.push(initialReferenceCheck.modelCall);
-      }
-      promptChars += initialReferenceCheck.promptChars;
-      initialCoverage = initialReferenceCheck.coverage;
-      finalCoverage = initialReferenceCheck.coverage;
-
-      const correctionInstruction = buildCorrectionInstruction(
-        initialReferenceCheck.coverage
-      );
-      if (correctionInstruction) {
-        const combinedCorrection = [
-          revisionInstructionForPrompt,
-          correctionInstruction
-        ]
-          .filter(Boolean)
-          .join("\n\n");
-        const correctedResult = await callModelYearlyReportRewrite(
-          yearlyPayload,
-          combinedCorrection,
-          rewrite,
-          reportReasoningEffort
-        );
-        modelCalls.push(correctedResult.modelCall);
-        promptChars += correctedResult.promptChars;
-        rewrite = correctedResult.rewrite;
-        correctionApplied = true;
-
-        const finalReferenceCheck = await callModelReferenceCheck(
-          refPayload,
-          rewrite,
-          reportReasoningEffort
-        );
-        if (finalReferenceCheck.modelCall) {
-          modelCalls.push(finalReferenceCheck.modelCall);
-        }
-        promptChars += finalReferenceCheck.promptChars;
-        finalCoverage = finalReferenceCheck.coverage;
-      }
-    } catch (error) {
-      promptChars += collectFailedModelCall(error, modelCalls);
-      checkerError = error instanceof Error ? error.message : String(error);
-    }
+    await setGenerationPhase(
+      logPrisma,
+      revisionOptions.generationRunId,
+      "checking_references"
+    );
+    const referenceRepair = await applyReferenceCheckRepair({
+      referencePayload: refPayload,
+      rewritePayload: yearlyPayload,
+      rewrite,
+      revisionInstructionForPrompt,
+      rewriteReasoningEffort: reportReasoningEffort,
+      correctionReasoningEffort: reportReasoningEffort,
+      modelCalls,
+      callRewrite: callModelYearlyReportRewrite
+    });
+    rewrite = referenceRepair.rewrite;
+    promptChars += referenceRepair.promptChars;
+    checkerError = referenceRepair.checkerError;
+    correctionApplied = referenceRepair.correctionAttempts > 0;
+    referenceCorrectionAttempts += referenceRepair.correctionAttempts;
+    referenceRepairHistory = [
+      ...referenceRepairHistory,
+      ...referenceRepair.repairHistory
+    ];
+    initialCoverage = referenceRepair.initialCoverage;
+    finalCoverage = referenceRepair.finalCoverage;
 
     await setGenerationPhase(logPrisma, revisionOptions.generationRunId, "finalizing");
     const attributionRisks = findAttributionRisks(rewrite);
@@ -2197,6 +2372,7 @@ async function processYearlyReportRewrite(
       rewrite = correctedForAttribution.rewrite;
       attributionCorrectionApplied = true;
       attributionRiskCount = findAttributionRisks(rewrite).length;
+      needsFinalReferenceRepair = true;
     }
 
     const editorialReviewResult = await applyEditorialRevisionReviewRepair({
@@ -2212,6 +2388,9 @@ async function processYearlyReportRewrite(
     rewrite = editorialReviewResult.rewrite;
     promptChars += editorialReviewResult.promptChars;
     editorialReview = editorialReviewResult.audit;
+    if (editorialReview?.repairApplied) {
+      needsFinalReferenceRepair = true;
+    }
 
     const importanceResult = applyImportanceHighBar(rewrite, payload);
     rewrite = importanceResult.rewrite;
@@ -2221,6 +2400,37 @@ async function processYearlyReportRewrite(
     const styleResult = sanitizeRewriteStyle(rewrite);
     rewrite = styleResult.rewrite;
     styleSanitization = styleResult.stats;
+    if (styleResult.stats.changed) {
+      needsFinalReferenceRepair = true;
+    }
+
+    if (needsFinalReferenceRepair) {
+      const finalReferenceRepair = await applyReferenceCheckRepair({
+        referencePayload: refPayload,
+        rewritePayload: yearlyPayload,
+        rewrite,
+        revisionInstructionForPrompt,
+        rewriteReasoningEffort: reportReasoningEffort,
+        correctionReasoningEffort: reportReasoningEffort,
+        existingCorrectionAttempts: referenceCorrectionAttempts,
+        modelCalls,
+        callRewrite: callModelYearlyReportRewrite
+      });
+      rewrite = finalReferenceRepair.rewrite;
+      promptChars += finalReferenceRepair.promptChars;
+      checkerError = finalReferenceRepair.checkerError;
+      correctionApplied =
+        correctionApplied || finalReferenceRepair.correctionAttempts > 0;
+      referenceCorrectionAttempts += finalReferenceRepair.correctionAttempts;
+      referenceRepairHistory = [
+        ...referenceRepairHistory,
+        ...finalReferenceRepair.repairHistory
+      ];
+      finalCoverage =
+        finalReferenceRepair.finalCoverage ??
+        finalReferenceRepair.initialCoverage ??
+        finalCoverage;
+    }
 
     let validationResult = validateRewriteWithRevisionCompliance(rewrite, payload, {
       instruction: revisionOptions.userInstruction,
@@ -2277,22 +2487,32 @@ async function processYearlyReportRewrite(
       rewrite = postRepairStyleResult.rewrite;
       styleSanitization = postRepairStyleResult.stats;
 
-      try {
-        const repairedReferenceCheck = await callModelReferenceCheck(
-          refPayload,
-          rewrite,
-          reportReasoningEffort
-        );
-        if (repairedReferenceCheck.modelCall) {
-          modelCalls.push(repairedReferenceCheck.modelCall);
-        }
-        promptChars += repairedReferenceCheck.promptChars;
-        finalCoverage = repairedReferenceCheck.coverage;
-        checkerError = null;
-      } catch (error) {
-        promptChars += collectFailedModelCall(error, modelCalls);
-        checkerError = error instanceof Error ? error.message : String(error);
-      }
+      const repairedReferenceRepair = await applyReferenceCheckRepair({
+        referencePayload: refPayload,
+        rewritePayload: yearlyPayload,
+        rewrite,
+        revisionInstructionForPrompt,
+        rewriteReasoningEffort: reportReasoningEffort,
+        correctionReasoningEffort: reportReasoningEffort,
+        existingCorrectionAttempts: referenceCorrectionAttempts,
+        modelCalls,
+        callRewrite: callModelYearlyReportRewrite
+      });
+      rewrite = repairedReferenceRepair.rewrite;
+      promptChars += repairedReferenceRepair.promptChars;
+      checkerError = repairedReferenceRepair.checkerError;
+      correctionApplied =
+        correctionApplied || repairedReferenceRepair.correctionAttempts > 0;
+      referenceCorrectionAttempts +=
+        repairedReferenceRepair.correctionAttempts;
+      referenceRepairHistory = [
+        ...referenceRepairHistory,
+        ...repairedReferenceRepair.repairHistory
+      ];
+      finalCoverage =
+        repairedReferenceRepair.finalCoverage ??
+        repairedReferenceRepair.initialCoverage ??
+        finalCoverage;
 
       validationResult = validateRewriteWithRevisionCompliance(rewrite, payload, {
         instruction: revisionOptions.userInstruction,
@@ -2350,6 +2570,8 @@ async function processYearlyReportRewrite(
           enabled: true,
           checkerError,
           correctionApplied,
+          correctionAttempts: referenceCorrectionAttempts,
+          repairHistory: referenceRepairHistory,
           attributionCorrectionApplied,
           attributionRiskCount,
           initialCoveragePercent: initialCoverage?.coveragePercent ?? null,
@@ -3217,6 +3439,8 @@ const rewriteWorker = new Worker<RewriteJobData>(
       let promptChars = preRewritePromptChars;
       let checkerError: string | null = null;
       let correctionApplied = false;
+      let referenceCorrectionAttempts = 0;
+      let referenceRepairHistory: ReferenceRepairHistoryEntry[] = [];
       let initialCoverage: ReferenceCoverageReport | null = null;
       let finalCoverage: ReferenceCoverageReport | null = null;
       let hiddenDraft: RewriteOutput | null = null;
@@ -3228,6 +3452,7 @@ const rewriteWorker = new Worker<RewriteJobData>(
         null;
       let editorialReview: EditorialReviewAudit | null = null;
       let validationRepair: ValidationRepairAudit = emptyValidationRepairAudit();
+      let needsFinalReferenceRepair = false;
       const modelCalls: ModelCallLog[] = [...preRewriteModelCalls];
       const rewriteReasoningEffort =
         job.data.reasoningEffortOverride ?? config.OPENAI_DEFAULT_REASONING_EFFORT;
@@ -3277,54 +3502,28 @@ const rewriteWorker = new Worker<RewriteJobData>(
           ? { ...payload, bodyText: payload.bodyText + "\n\n" + payload.pdfSupplementText }
           : payload;
 
-        try {
-          await setGenerationPhase(logPrisma, generationRunId, "checking_references");
-
-          const initialReferenceCheck = await callModelReferenceCheck(
-            refPayload,
-            rewrite,
-            rewriteReasoningEffort
-          );
-          if (initialReferenceCheck.modelCall) {
-            modelCalls.push(initialReferenceCheck.modelCall);
-          }
-          promptChars += initialReferenceCheck.promptChars;
-          initialCoverage = initialReferenceCheck.coverage;
-          finalCoverage = initialReferenceCheck.coverage;
-
-          const correctionInstruction = buildCorrectionInstruction(
-            initialReferenceCheck.coverage
-          );
-          if (correctionInstruction) {
-            const combinedCorrection = [revisionInstructionForPrompt, correctionInstruction]
-              .filter(Boolean)
-              .join("\n\n");
-            const correctedResult = await callModelRewrite(
-              payload,
-              combinedCorrection,
-              rewrite,
-              correctionReasoningEffort
-            );
-            modelCalls.push(correctedResult.modelCall);
-            promptChars += correctedResult.promptChars;
-            rewrite = correctedResult.rewrite;
-            correctionApplied = true;
-
-            const finalReferenceCheck = await callModelReferenceCheck(
-              refPayload,
-              rewrite,
-              rewriteReasoningEffort
-            );
-            if (finalReferenceCheck.modelCall) {
-              modelCalls.push(finalReferenceCheck.modelCall);
-            }
-            promptChars += finalReferenceCheck.promptChars;
-            finalCoverage = finalReferenceCheck.coverage;
-          }
-        } catch (error) {
-          promptChars += collectFailedModelCall(error, modelCalls);
-          checkerError = error instanceof Error ? error.message : String(error);
-        }
+        await setGenerationPhase(logPrisma, generationRunId, "checking_references");
+        const referenceRepair = await applyReferenceCheckRepair({
+          referencePayload: refPayload,
+          rewritePayload: payload,
+          rewrite,
+          revisionInstructionForPrompt,
+          rewriteReasoningEffort,
+          correctionReasoningEffort,
+          modelCalls,
+          callRewrite: callModelRewrite
+        });
+        rewrite = referenceRepair.rewrite;
+        promptChars += referenceRepair.promptChars;
+        checkerError = referenceRepair.checkerError;
+        correctionApplied = referenceRepair.correctionAttempts > 0;
+        referenceCorrectionAttempts += referenceRepair.correctionAttempts;
+        referenceRepairHistory = [
+          ...referenceRepairHistory,
+          ...referenceRepair.repairHistory
+        ];
+        initialCoverage = referenceRepair.initialCoverage;
+        finalCoverage = referenceRepair.finalCoverage;
 
         await setGenerationPhase(logPrisma, generationRunId, "finalizing");
         const attributionRisks = findAttributionRisks(rewrite);
@@ -3346,6 +3545,7 @@ const rewriteWorker = new Worker<RewriteJobData>(
           rewrite = correctedForAttribution.rewrite;
           attributionCorrectionApplied = true;
           attributionRiskCount = findAttributionRisks(rewrite).length;
+          needsFinalReferenceRepair = true;
         }
 
         const editorialReviewResult = await applyEditorialRevisionReviewRepair({
@@ -3361,6 +3561,9 @@ const rewriteWorker = new Worker<RewriteJobData>(
         rewrite = editorialReviewResult.rewrite;
         promptChars += editorialReviewResult.promptChars;
         editorialReview = editorialReviewResult.audit;
+        if (editorialReview?.repairApplied) {
+          needsFinalReferenceRepair = true;
+        }
 
         const importanceResult = applyImportanceHighBar(rewrite, payload);
         rewrite = importanceResult.rewrite;
@@ -3370,6 +3573,37 @@ const rewriteWorker = new Worker<RewriteJobData>(
         const styleResult = sanitizeRewriteStyle(rewrite);
         rewrite = styleResult.rewrite;
         styleSanitization = styleResult.stats;
+        if (styleResult.stats.changed) {
+          needsFinalReferenceRepair = true;
+        }
+
+        if (needsFinalReferenceRepair) {
+          const finalReferenceRepair = await applyReferenceCheckRepair({
+            referencePayload: refPayload,
+            rewritePayload: payload,
+            rewrite,
+            revisionInstructionForPrompt,
+            rewriteReasoningEffort,
+            correctionReasoningEffort,
+            existingCorrectionAttempts: referenceCorrectionAttempts,
+            modelCalls,
+            callRewrite: callModelRewrite
+          });
+          rewrite = finalReferenceRepair.rewrite;
+          promptChars += finalReferenceRepair.promptChars;
+          checkerError = finalReferenceRepair.checkerError;
+          correctionApplied =
+            correctionApplied || finalReferenceRepair.correctionAttempts > 0;
+          referenceCorrectionAttempts += finalReferenceRepair.correctionAttempts;
+          referenceRepairHistory = [
+            ...referenceRepairHistory,
+            ...finalReferenceRepair.repairHistory
+          ];
+          finalCoverage =
+            finalReferenceRepair.finalCoverage ??
+            finalReferenceRepair.initialCoverage ??
+            finalCoverage;
+        }
 
         let validationResult = validateRewriteWithRevisionCompliance(rewrite, payload, {
           instruction: job.data.instruction,
@@ -3426,22 +3660,32 @@ const rewriteWorker = new Worker<RewriteJobData>(
           rewrite = postRepairStyleResult.rewrite;
           styleSanitization = postRepairStyleResult.stats;
 
-          try {
-            const repairedReferenceCheck = await callModelReferenceCheck(
-              refPayload,
-              rewrite,
-              rewriteReasoningEffort
-            );
-            if (repairedReferenceCheck.modelCall) {
-              modelCalls.push(repairedReferenceCheck.modelCall);
-            }
-            promptChars += repairedReferenceCheck.promptChars;
-            finalCoverage = repairedReferenceCheck.coverage;
-            checkerError = null;
-          } catch (error) {
-            promptChars += collectFailedModelCall(error, modelCalls);
-            checkerError = error instanceof Error ? error.message : String(error);
-          }
+          const repairedReferenceRepair = await applyReferenceCheckRepair({
+            referencePayload: refPayload,
+            rewritePayload: payload,
+            rewrite,
+            revisionInstructionForPrompt,
+            rewriteReasoningEffort,
+            correctionReasoningEffort,
+            existingCorrectionAttempts: referenceCorrectionAttempts,
+            modelCalls,
+            callRewrite: callModelRewrite
+          });
+          rewrite = repairedReferenceRepair.rewrite;
+          promptChars += repairedReferenceRepair.promptChars;
+          checkerError = repairedReferenceRepair.checkerError;
+          correctionApplied =
+            correctionApplied || repairedReferenceRepair.correctionAttempts > 0;
+          referenceCorrectionAttempts +=
+            repairedReferenceRepair.correctionAttempts;
+          referenceRepairHistory = [
+            ...referenceRepairHistory,
+            ...repairedReferenceRepair.repairHistory
+          ];
+          finalCoverage =
+            repairedReferenceRepair.finalCoverage ??
+            repairedReferenceRepair.initialCoverage ??
+            finalCoverage;
 
           validationResult = validateRewriteWithRevisionCompliance(rewrite, payload, {
             instruction: job.data.instruction,
@@ -3491,6 +3735,8 @@ const rewriteWorker = new Worker<RewriteJobData>(
               enabled: true,
               checkerError,
               correctionApplied,
+              correctionAttempts: referenceCorrectionAttempts,
+              repairHistory: referenceRepairHistory,
               attributionCorrectionApplied,
               attributionRiskCount,
               initialCoveragePercent: initialCoverage?.coveragePercent ?? null,
@@ -3581,6 +3827,8 @@ const rewriteWorker = new Worker<RewriteJobData>(
                 enabled: true,
                 checkerError,
                 correctionApplied,
+                correctionAttempts: referenceCorrectionAttempts,
+                repairHistory: referenceRepairHistory,
                 attributionCorrectionApplied,
                 attributionRiskCount,
                 importanceAdjusted,
@@ -3622,6 +3870,8 @@ const rewriteWorker = new Worker<RewriteJobData>(
               enabled: true,
               checkerError,
               correctionApplied,
+              correctionAttempts: referenceCorrectionAttempts,
+              repairHistory: referenceRepairHistory,
               attributionCorrectionApplied,
               attributionRiskCount,
               importanceAdjusted,

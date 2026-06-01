@@ -337,7 +337,8 @@ export function assessReferenceCheckGate(
 }
 
 export function buildCorrectionInstruction(
-  report: ReferenceCoverageReport
+  report: ReferenceCoverageReport,
+  options: { attempt?: number; maxAttempts?: number } = {}
 ): string | null {
   if (report.unsupportedSentences.length === 0) {
     return null;
@@ -352,10 +353,20 @@ export function buildCorrectionInstruction(
     ].join("\n");
   });
 
+  const attempt =
+    options.attempt && options.maxAttempts
+      ? `Referansereparasjon ${options.attempt} av ${options.maxAttempts}.`
+      : "Referansereparasjon.";
+
   return [
+    attempt,
     "Lag et nytt korrigert utkast basert pa samme kildetekst.",
+    "Referansesjekkerens tilbakemelding under er fasit for hva som mangler dekning.",
     "Alle setninger i lead, body og company_sentence ma ha tydelig dekning i kilden.",
-    "Fjern eller omskriv setninger som ikke har dekning.",
+    "For hver setning uten dekning: slett faktaen helt, eller omskriv den kun med tekst/fakta som finnes i feltet 'Hva som finnes i kilden'.",
+    "Ikke bytt til en naer synonym formulering hvis dekningen fortsatt er indirekte.",
+    "Ikke forklar generelle begreper, bransjer eller konsekvenser med mindre dette star eksplisitt i kilden.",
+    "Hvis company_sentence er vanskelig a dekke noyaktig, gjor den kortere eller mer generell, eller fjern den hvis skjemaet tillater det.",
     "Ikke legg til nye fakta.",
     "",
     "Setninger uten dekning i forrige utkast:",
