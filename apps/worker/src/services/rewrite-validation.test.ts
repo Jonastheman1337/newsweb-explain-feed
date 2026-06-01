@@ -331,4 +331,56 @@ describe("validateRewriteOutput", () => {
       "Source only appears to mention revenue/income, but visible article text uses result/profit/loss terminology."
     );
   });
+
+  it("warns when the same visible number is repeated three or more times", () => {
+    const payload = createPayload({
+      bodyText:
+        "Selskapet opplyser at inntektene var 100 millioner kroner og resultatet var 20 millioner kroner."
+    });
+    const rewrite = createRewrite({
+      lead: "Inntektene var 100 millioner kroner.",
+      body: [
+        "Omsetningen var 100 millioner kroner.",
+        "Selskapet gjentar at inntektene var 100 millioner kroner."
+      ]
+    });
+
+    const result = validateRewriteOutput(rewrite, payload);
+
+    expect(result.issues.some((issue) => issue.code === "REPEATED_VISIBLE_NUMBER")).toBe(
+      true
+    );
+  });
+
+  it("warns on unexplained proforma and named transactions", () => {
+    const payload = createPayload();
+    const rewrite = createRewrite({
+      lead: "Selskapet viser til proforma-tall for kvartalet.",
+      body: ["Resultatet løftes av Evo-transaksjonen."]
+    });
+
+    const result = validateRewriteOutput(rewrite, payload);
+
+    expect(result.issues.some((issue) => issue.code === "UNEXPLAINED_PROFORMA")).toBe(
+      true
+    );
+    expect(
+      result.issues.some((issue) => issue.code === "UNEXPLAINED_NAMED_TRANSACTION")
+    ).toBe(true);
+  });
+
+  it("does not warn on ebitda when the full context is included", () => {
+    const payload = createPayload();
+    const rewrite = createRewrite({
+      lead:
+        "Driftsresultatet før renter, skatt, av- og nedskrivninger (ebitda) var 48 millioner.",
+      body: ["Resultatet før skatt var 25 millioner."]
+    });
+
+    const result = validateRewriteOutput(rewrite, payload);
+
+    expect(result.issues.some((issue) => issue.code === "UNEXPLAINED_EBITDA")).toBe(
+      false
+    );
+  });
 });

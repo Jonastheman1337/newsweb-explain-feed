@@ -71,6 +71,40 @@ const RESULT_PATTERNS = [
   /\bebit(?:da)?\b/i
 ];
 
+const VISIBLE_NUMBER_PATTERN =
+  /\b\d{1,3}(?:[ .]\d{3})*(?:,\d+)?\b|\b\d+(?:,\d+)?\b/g;
+
+const JARGON_GUARDRAILS: Array<{
+  code: string;
+  pattern: RegExp;
+  explanationPattern?: RegExp;
+  message: string;
+}> = [
+  {
+    code: "UNEXPLAINED_PROFORMA",
+    pattern: /\bpro[\s-]?forma\b/i,
+    explanationPattern: /\b(?:som om|justert|sammenlign|hypotetisk)\b/i,
+    message: "Visible article text uses proforma/pro forma without reader context."
+  },
+  {
+    code: "UNEXPLAINED_EBITDA",
+    pattern: /\bebitda\b/i,
+    explanationPattern: /\b(?:før|for)\s+renter,\s*skatt,\s*av- og nedskrivninger\b/i,
+    message: "Visible article text uses ebitda without the full result-measure context."
+  },
+  {
+    code: "UNEXPLAINED_LOAN_CHANGES",
+    pattern: /\bl[åa]neendringer\b/i,
+    explanationPattern: /\b(?:utsetter|forfall|vilkår|vilkar|gjeld|frist|likviditet)\b/i,
+    message: "Visible article text uses låneendringer without saying concretely what changes."
+  },
+  {
+    code: "UNEXPLAINED_NAMED_TRANSACTION",
+    pattern: /\b[A-ZÆØÅ][A-Za-zÆØÅæøå0-9-]+-transaksjonen\b/,
+    message: "Visible article text names a transaction without explaining what it is."
+  }
+];
+
 const CURRENCY_MARKER_GROUPS: Array<{
   label: string;
   patterns: RegExp[];
@@ -214,6 +248,45 @@ function hasRevenueResultMixupRisk(
     !hasAnyPattern(sourceText, RESULT_PATTERNS) &&
     hasAnyPattern(visibleArticleText(rewrite), RESULT_PATTERNS)
   );
+}
+
+function normalizeVisibleNumberToken(token: string): string | null {
+  const normalized = token.replace(/[ .]/g, "").replace(",", ".");
+  if (!/\d/.test(normalized)) return null;
+  if (/^(?:19|20)\d{2}$/.test(normalized)) return null;
+  return normalized;
+}
+
+function repeatedVisibleNumbers(rewrite: RewriteOutput): string[] {
+  const counts = new Map<string, number>();
+  for (const field of [rewrite.lead, ...rewrite.body]) {
+    for (const match of field.matchAll(VISIBLE_NUMBER_PATTERN)) {
+      const normalized = normalizeVisibleNumberToken(match[0]);
+      if (!normalized) continue;
+      counts.set(normalized, (counts.get(normalized) ?? 0) + 1);
+    }
+  }
+
+  return [...counts.entries()]
+    .filter(([, count]) => count >= 3)
+    .map(([value]) => value)
+    .sort();
+}
+
+function jargonGuardrailIssues(rewrite: RewriteOutput): Array<{
+  code: string;
+  message: string;
+}> {
+  const visibleText = visibleArticleText(rewrite);
+  return JARGON_GUARDRAILS.filter((guardrail) => {
+    if (!guardrail.pattern.test(visibleText)) return false;
+    return guardrail.explanationPattern
+      ? !guardrail.explanationPattern.test(visibleText)
+      : true;
+  }).map((guardrail) => ({
+    code: guardrail.code,
+    message: guardrail.message
+  }));
 }
 
 export function validateRewriteOutput(
@@ -362,6 +435,20 @@ export function validateRewriteOutput(
       "warning",
       "Source only appears to mention revenue/income, but visible article text uses result/profit/loss terminology."
     );
+  }
+
+  const repeatedNumbers = repeatedVisibleNumbers(rewrite);
+  if (repeatedNumbers.length > 0) {
+    addIssue(
+      issues,
+      "REPEATED_VISIBLE_NUMBER",
+      "warning",
+      `Visible article text repeats the same number three or more times: ${repeatedNumbers.join(", ")}.`
+    );
+  }
+
+  for (const issue of jargonGuardrailIssues(rewrite)) {
+    addIssue(issues, issue.code, "warning", issue.message);
   }
 
   const errors = issues.map((issue) => issue.message);

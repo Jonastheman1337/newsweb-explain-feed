@@ -46,7 +46,11 @@ export type TriageResult = {
 };
 
 export type DeterministicTriageSkip = TriageResult & {
-  kind: "document-only" | "routine-reminder";
+  kind:
+    | "document-only"
+    | "routine-reminder"
+    | "public-sector-results"
+    | "small-routine-bond";
 };
 
 export type TriageCallFn = (
@@ -95,8 +99,83 @@ const REMINDER_OUTCOME_PATTERNS = [
   /\b(?:resultat|driftsresultat|inntekter|omsetning|utbytte|contract|kontrakt)\b/i
 ];
 
+const PUBLIC_SECTOR_RESULT_PATTERNS = [
+  /\bkommune\b/i,
+  /\bfylkeskommune\b/i,
+  /\bmunicipal(?:ity)?\b/i
+];
+
+const RESULT_REPORT_PATTERNS = [
+  /\b\d+\.\s*tertial\b/i,
+  /\btertial\s+\d{4}\b/i,
+  /\b(?:tertial|kvartal|quarter|interim|financial)\s+(?:report|rapport)\b/i,
+  /\b(?:resultat|regnskap|årsrapport|arsrapport|annual report)\b/i
+];
+
+const PUBLIC_SECTOR_MARKET_EVENT_PATTERNS = [
+  /\bobligasjonslån\b/i,
+  /\bbond\b/i,
+  /\bemisjon\b/i,
+  /\bcapital raise\b/i,
+  /\bdefault\b/i,
+  /\b(?:downgrade|upgrade|rating)\b/i
+];
+
+const ROUTINE_BOND_PATTERNS = [
+  /\b(?:vellykket\s+)?utstedelse av .*obligasjonslån\b/i,
+  /\bvurderer utstedelse av .*obligasjonslån\b/i,
+  /\b(?:successful )?issue of .*bond\b/i,
+  /\bcontemplates? (?:the )?issuance of .*bond\b/i
+];
+
+const BILLION_NOK = 1_000_000_000;
+
 function hasAnyPattern(text: string, patterns: RegExp[]): boolean {
   return patterns.some((pattern) => pattern.test(text));
+}
+
+function parseNumberToken(raw: string): number | null {
+  const normalized = raw.replace(/\s/g, "").replace(/\./g, "").replace(",", ".");
+  if (!/^\d+(?:\.\d+)?$/.test(normalized)) return null;
+  const value = Number(normalized);
+  return Number.isFinite(value) ? value : null;
+}
+
+function maxNokAmount(text: string): number | null {
+  const matches: number[] = [];
+
+  const billionPatterns = [
+    /\bbnok\s*(\d+(?:[.,]\d+)?)\b/gi,
+    /\bnok\s*(\d+(?:[.,]\d+)?)\s*(?:milliarder|mrd\.?|billion)\b/gi,
+    /\b(\d+(?:[.,]\d+)?)\s*(?:milliarder|mrd\.?|billion)\s*(?:kroner|nok)\b/gi
+  ];
+  for (const pattern of billionPatterns) {
+    for (const match of text.matchAll(pattern)) {
+      const value = parseNumberToken(match[1] ?? "");
+      if (value != null) matches.push(value * BILLION_NOK);
+    }
+  }
+
+  const millionPatterns = [
+    /\bmnok\s*(\d{1,3}(?:[ .]\d{3})+|\d+(?:[.,]\d+)?)\b/gi,
+    /\bnok\s*(\d{1,3}(?:[ .]\d{3})+|\d+(?:[.,]\d+)?)\s*(?:millioner|mill\.?|million)\b/gi,
+    /\b(\d{1,3}(?:[ .]\d{3})+|\d+(?:[.,]\d+)?)\s*(?:millioner|mill\.?|million)\s*(?:kroner|nok)\b/gi
+  ];
+  for (const pattern of millionPatterns) {
+    for (const match of text.matchAll(pattern)) {
+      const value = parseNumberToken(match[1] ?? "");
+      if (value != null) matches.push(value * 1_000_000);
+    }
+  }
+
+  const exactKronerPattern =
+    /\b(\d{1,3}(?:[ .]\d{3})+|\d{7,})\s*(?:kroner|nok)\b/gi;
+  for (const match of text.matchAll(exactKronerPattern)) {
+    const value = parseNumberToken(match[1] ?? "");
+    if (value != null) matches.push(value);
+  }
+
+  return matches.length ? Math.max(...matches) : null;
 }
 
 export function getDeterministicTriageSkip(
@@ -127,6 +206,33 @@ export function getDeterministicTriageSkip(
       kind: "routine-reminder",
       reason:
         "Tilgjengelig tekst er en rutinemessig påminnelse om tegningsperiode/frister uten nytt utfall eller nye vilkår."
+    };
+  }
+
+  if (
+    hasAnyPattern(text, PUBLIC_SECTOR_RESULT_PATTERNS) &&
+    hasAnyPattern(text, RESULT_REPORT_PATTERNS) &&
+    !hasAnyPattern(text, PUBLIC_SECTOR_MARKET_EVENT_PATTERNS)
+  ) {
+    return {
+      newsworthy: false,
+      kind: "public-sector-results",
+      reason:
+        "Rutinemessig kommune-/offentlig resultatsak uten konkret kapitalmarkedshendelse eller substansielle tall."
+    };
+  }
+
+  const nokAmount = maxNokAmount(text);
+  if (
+    nokAmount != null &&
+    nokAmount < BILLION_NOK &&
+    hasAnyPattern(text, ROUTINE_BOND_PATTERNS)
+  ) {
+    return {
+      newsworthy: false,
+      kind: "small-routine-bond",
+      reason:
+        "Rutinemessig obligasjonsutstedelse under én milliard kroner uten sterkere nyhetspoeng."
     };
   }
 

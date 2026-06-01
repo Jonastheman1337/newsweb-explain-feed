@@ -91,4 +91,30 @@ describe("sanitizeRewriteStyle", () => {
     expect(result.rewrite.body[0]).toContain("250 millioner kroner");
     expect(result.stats.normalizedBillionPhrases).toBe(0);
   });
+
+  it("normalizes exact billion-scale kroner totals", () => {
+    const rewrite = createRewrite();
+    rewrite.title = "Austevoll betaler 1.317.662.931 kroner";
+    rewrite.lead = "Austevoll Seafood betaler 1.317.662.931 kroner i utbytte.";
+    rewrite.body = ["Beløpet er 2 000 000 000 kroner i et annet eksempel."];
+
+    const result = sanitizeRewriteStyle(rewrite);
+
+    expect(result.rewrite.title).toContain("1,3 milliarder kroner");
+    expect(result.rewrite.lead).toContain("1,3 milliarder kroner");
+    expect(result.rewrite.body[0]).toContain("2 milliarder kroner");
+    expect(result.stats.normalizedExactBillionAmounts).toBe(3);
+  });
+
+  it("leaves exact kroner totals below one billion unchanged", () => {
+    const rewrite = createRewrite();
+    rewrite.title = "HAV Group-styremedlem kjøper for 448.760 kroner";
+    rewrite.lead = "Kamato kjøper aksjer for 448.760 kroner.";
+
+    const result = sanitizeRewriteStyle(rewrite);
+
+    expect(result.rewrite.title).toContain("448.760 kroner");
+    expect(result.rewrite.lead).toContain("448.760 kroner");
+    expect(result.stats.normalizedExactBillionAmounts).toBe(0);
+  });
 });

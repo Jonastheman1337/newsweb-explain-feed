@@ -12,18 +12,25 @@ type CapturedCall = {
 function createMockClient({
   calls,
   outputText,
-  error
+  error,
+  response
 }: {
   calls?: CapturedCall[];
   outputText?: string | null;
   error?: Error;
+  response?: {
+    id?: string;
+    status?: string;
+    error?: unknown;
+    incomplete_details?: unknown;
+  };
 }): OpenAIResponsesClient {
   return {
     responses: {
       create: async (body, options) => {
         calls?.push({ body, options });
         if (error) throw error;
-        return { output_text: outputText };
+        return { output_text: outputText, ...response };
       }
     }
   };
@@ -77,9 +84,24 @@ describe("callOpenAIForJson", () => {
     const client = createMockClient({ calls, outputText: "" });
 
     await expect(callOpenAIForJson(client, baseRequest)).rejects.toThrow(
-      /no output_text.*after 2 attempts.*model=gpt-5\.5.*promptChars=19/
+      /no output_text.*after 2 attempts.*model=gpt-5\.5.*promptChars=19.*emptyResponses=attempt1=empty_response_metadata ; attempt2=empty_response_metadata/
     );
     expect(calls).toHaveLength(2);
+  });
+
+  it("keeps empty response metadata in no-output diagnostics", async () => {
+    const client = createMockClient({
+      outputText: "",
+      response: {
+        id: "resp_123",
+        status: "incomplete",
+        incomplete_details: { reason: "max_output_tokens" }
+      }
+    });
+
+    await expect(callOpenAIForJson(client, baseRequest)).rejects.toThrow(
+      /attempt1=id=resp_123 status=incomplete incomplete=.*max_output_tokens/
+    );
   });
 
   it("wraps API errors with the schema name", async () => {

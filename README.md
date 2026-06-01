@@ -166,6 +166,25 @@ The app includes a protected read-only admin view at `/admin/signals` with
 filters for date range, message ID, action/status, and CSV export. Use direct
 SQL for deeper inspection or bulk debugging.
 
+For production signal reviews, prefer the scripted pull first:
+
+```bash
+node scripts/pull-signals.mjs --from 2026-05-28 --to 2026-06-01
+```
+
+The script reads `RENDER_API` from `.env`, discovers the live Render service,
+logs in with the service's configured `LOGIN_USERNAME`/`LOGIN_PASSWORD`, exports
+all `/admin/signals` CSV tabs, and writes a JSON artifact under `tmp/`.
+Dates are interpreted as `Europe/Oslo` local calendar days, then over-fetched
+from the UTC-only admin export and filtered back to the requested local range.
+This avoids missing rows around midnight, which can happen when using the admin
+page's raw `from`/`to` date filters directly.
+
+Use the artifact's `summary.feedback`, `summary.edits`, `summary.titles`,
+`summary.problematicGenerations`, `summary.generationErrorGroups`, and
+`summary.referenceCheckerErrors` first. Only fall back to direct SQL when the
+script fails or a row needs fields not included in the CSV export.
+
 Set the log DB URL in your shell:
 
 ```bash

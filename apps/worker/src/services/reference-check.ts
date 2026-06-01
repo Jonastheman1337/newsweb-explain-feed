@@ -33,6 +33,21 @@ export type ReferenceCoverageReport = {
   unsupportedSentences: ReferenceCoverageItem[];
 };
 
+export type ReferenceCheckGateResult = {
+  blocking: boolean;
+  reason: string | null;
+  highRiskUnsupportedSentences: ReferenceCoverageItem[];
+};
+
+const HIGH_RISK_UNSUPPORTED_PATTERNS = [
+  /\d/,
+  /\b(?:resultat|inntekt|inntekter|omsetning|driftsresultat|ebit|ebitda|utbytte)\b/i,
+  /\b(?:kroner|dollar|euro|million|millioner|milliard|milliarder|prosent)\b/i,
+  /\b(?:kontrakt|avtale|oppkjøp|oppkjop|emisjon|fusjon|transaksjon|salg|kjøp|kjop)\b/i,
+  /\b(?:gjeld|lån|lan|obligasjon|forfall|vilkår|vilkar|guiding|utsikter)\b/i,
+  /\b(?:styrker|forbedrer|sikrer|reduserer|øker|oker|bidrar|kan gi|kan bidra)\b/i
+];
+
 export const referenceCheckJsonSchema = {
   type: "object",
   additionalProperties: false,
@@ -126,6 +141,44 @@ export function buildCoverageReport(
     coveragePercent,
     items,
     unsupportedSentences
+  };
+}
+
+export function assessReferenceCheckGate(
+  report: ReferenceCoverageReport | null
+): ReferenceCheckGateResult {
+  if (!report || report.unsupportedSentences.length === 0) {
+    return {
+      blocking: false,
+      reason: null,
+      highRiskUnsupportedSentences: []
+    };
+  }
+
+  const highRiskUnsupportedSentences = report.unsupportedSentences.filter((item) =>
+    HIGH_RISK_UNSUPPORTED_PATTERNS.some((pattern) => pattern.test(item.sentence))
+  );
+
+  if (highRiskUnsupportedSentences.length > 0) {
+    return {
+      blocking: true,
+      reason: "Reference check found unsupported high-risk factual claims.",
+      highRiskUnsupportedSentences
+    };
+  }
+
+  if (report.coveragePercent < 75 && report.unsupportedSentences.length >= 2) {
+    return {
+      blocking: true,
+      reason: "Reference check coverage is below 75 percent after correction.",
+      highRiskUnsupportedSentences
+    };
+  }
+
+  return {
+    blocking: false,
+    reason: null,
+    highRiskUnsupportedSentences
   };
 }
 

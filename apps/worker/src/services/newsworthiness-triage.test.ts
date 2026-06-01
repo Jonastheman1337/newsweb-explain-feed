@@ -127,6 +127,63 @@ describe("getDeterministicTriageSkip", () => {
 
     expect(result).toBeNull();
   });
+
+  it("skips public-sector result reports without capital-market events", () => {
+    const result = getDeterministicTriageSkip(
+      "STVKO: 1. tertial 2026 Stavanger kommune",
+      "Stavanger kommune legger frem rapport for 1. tertial 2026 med ordinære resultattall.",
+      ["ANNEN INFORMASJONSPLIKTIG REGULATORISK INFORMASJON"],
+      true
+    );
+
+    expect(result?.newsworthy).toBe(false);
+    expect(result?.kind).toBe("public-sector-results");
+  });
+
+  it("keeps public-sector notices with a capital-market event", () => {
+    const result = getDeterministicTriageSkip(
+      "Stavanger kommune vurderer obligasjonslån",
+      "Stavanger kommune vurderer å utstede et obligasjonslån på 1,2 milliarder kroner.",
+      ["ANNEN INFORMASJONSPLIKTIG REGULATORISK INFORMASJON"],
+      false
+    );
+
+    expect(result).toBeNull();
+  });
+
+  it("skips small routine bond issuances under one billion kroner", () => {
+    const result = getDeterministicTriageSkip(
+      "SBSB: Vellykket utstedelse av fondsobligasjonslån",
+      "Stadsbygd Sparebank har utstedt et fondsobligasjonslån på 75 millioner kroner.",
+      ["ANNEN INFORMASJONSPLIKTIG REGULATORISK INFORMASJON"],
+      false
+    );
+
+    expect(result?.newsworthy).toBe(false);
+    expect(result?.kind).toBe("small-routine-bond");
+  });
+
+  it("keeps routine bond issuances at or above one billion kroner", () => {
+    const result = getDeterministicTriageSkip(
+      "Vellykket utstedelse av obligasjonslån",
+      "Selskapet har utstedt et obligasjonslån på 1 milliard kroner.",
+      ["ANNEN INFORMASJONSPLIKTIG REGULATORISK INFORMASJON"],
+      false
+    );
+
+    expect(result).toBeNull();
+  });
+
+  it("parses NOK million amounts without treating them as billions", () => {
+    const result = getDeterministicTriageSkip(
+      "Successful issue of bond",
+      "The bank has issued a bond of NOK 750 million.",
+      ["ANNEN INFORMASJONSPLIKTIG REGULATORISK INFORMASJON"],
+      false
+    );
+
+    expect(result?.kind).toBe("small-routine-bond");
+  });
 });
 
 describe("TRIAGE_PROMPT", () => {

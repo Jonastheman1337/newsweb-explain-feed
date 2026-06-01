@@ -72,6 +72,9 @@ describe("prompt style guidance", () => {
     expect(developerPrompt).toContain("1,3 milliarder kroner");
     expect(developerPrompt).toContain("stemme på vegne av andre aksjonærer");
     expect(developerPrompt).toContain("styrke likviditeten");
+    expect(developerPrompt).toContain("nettoresultat");
+    expect(developerPrompt).toContain("Evo-transaksjonen");
+    expect(developerPrompt).toContain("tøft");
   });
 
   it("includes report-specific angle and accounting guidance", () => {

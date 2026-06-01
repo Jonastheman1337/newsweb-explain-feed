@@ -60,8 +60,10 @@ import {
   buildCorrectionInstruction,
   buildCoverageReport,
   collectDraftSentences,
+  assessReferenceCheckGate,
   referenceCheckJsonSchema,
   referenceCheckResultSchema,
+  type ReferenceCheckGateResult,
   type ReferenceCoverageReport
 } from "./services/reference-check.js";
 import {
@@ -589,6 +591,40 @@ function rewriteJsonForValidation(
     message: validation.blockingErrors.join("; "),
     blockedRewrite: rewrite as unknown as Prisma.InputJsonValue
   } as Prisma.InputJsonValue;
+}
+
+type RewriteValidationResult = ReturnType<typeof validateRewriteWithRevisionCompliance>;
+
+function applyReferenceCheckGate(
+  validation: RewriteValidationResult,
+  gate: ReferenceCheckGateResult
+): RewriteValidationResult {
+  if (!gate.blocking) {
+    return validation;
+  }
+
+  const issue: RewriteValidationIssue = {
+    code: "REFERENCE_CHECK_UNSUPPORTED_FACTS",
+    severity: "blocking",
+    message: `${gate.reason} High-risk unsupported sentences: ${gate.highRiskUnsupportedSentences.length}.`
+  };
+  const issues = [...validation.issues, issue];
+  const errors = issues.map((item) => item.message);
+  const blockingErrors = issues
+    .filter((item) => item.severity === "blocking")
+    .map((item) => item.message);
+  const warnings = issues
+    .filter((item) => item.severity === "warning")
+    .map((item) => item.message);
+
+  return {
+    ...validation,
+    valid: false,
+    errors,
+    issues,
+    blockingErrors,
+    warnings
+  };
 }
 
 async function startGenerationRun(
@@ -1563,7 +1599,7 @@ async function processReportRewrite(
     rewrite = styleResult.rewrite;
     styleSanitization = styleResult.stats;
 
-    const validation = validateRewriteWithRevisionCompliance(
+    const validationResult = validateRewriteWithRevisionCompliance(
       rewrite,
       reportReferencePayload,
       {
@@ -1572,6 +1608,10 @@ async function processReportRewrite(
         attachmentTextAvailable
       }
     );
+    const referenceGate = assessReferenceCheckGate(
+      checkerError ? null : finalCoverage ?? initialCoverage
+    );
+    const validation = applyReferenceCheckGate(validationResult, referenceGate);
     const rewriteStatus = statusForValidation(validation);
     const persistedRewriteJson = rewriteJsonForValidation(rewrite, validation);
 
@@ -1624,6 +1664,10 @@ async function processReportRewrite(
             null,
           importanceAdjusted,
           importanceAdjustReason,
+          blocking: referenceGate.blocking,
+          blockingReason: referenceGate.reason,
+          highRiskUnsupportedSentenceCount:
+            referenceGate.highRiskUnsupportedSentences.length,
           initialCoverage: referenceCoverageJson(initialCoverage),
           finalCoverage: referenceCoverageJson(finalCoverage ?? initialCoverage),
           totalSentences:
@@ -1914,11 +1958,15 @@ async function processYearlyReportRewrite(
     rewrite = styleResult.rewrite;
     styleSanitization = styleResult.stats;
 
-    const validation = validateRewriteWithRevisionCompliance(rewrite, payload, {
+    const validationResult = validateRewriteWithRevisionCompliance(rewrite, payload, {
       instruction: revisionOptions.userInstruction,
       previousOutput: revisionOptions.previousOutput,
       attachmentTextAvailable
     });
+    const referenceGate = assessReferenceCheckGate(
+      checkerError ? null : finalCoverage ?? initialCoverage
+    );
+    const validation = applyReferenceCheckGate(validationResult, referenceGate);
     const rewriteStatus = statusForValidation(validation);
     const persistedRewriteJson = rewriteJsonForValidation(rewrite, validation);
 
@@ -1968,6 +2016,10 @@ async function processYearlyReportRewrite(
             null,
           importanceAdjusted,
           importanceAdjustReason,
+          blocking: referenceGate.blocking,
+          blockingReason: referenceGate.reason,
+          highRiskUnsupportedSentenceCount:
+            referenceGate.highRiskUnsupportedSentences.length,
           initialCoverage: referenceCoverageJson(initialCoverage),
           finalCoverage: referenceCoverageJson(finalCoverage ?? initialCoverage),
           totalSentences:
@@ -2975,11 +3027,15 @@ const rewriteWorker = new Worker<RewriteJobData>(
         rewrite = styleResult.rewrite;
         styleSanitization = styleResult.stats;
 
-        const validation = validateRewriteWithRevisionCompliance(rewrite, payload, {
+        const validationResult = validateRewriteWithRevisionCompliance(rewrite, payload, {
           instruction: job.data.instruction,
           previousOutput,
           attachmentTextAvailable
         });
+        const referenceGate = assessReferenceCheckGate(
+          checkerError ? null : finalCoverage ?? initialCoverage
+        );
+        const validation = applyReferenceCheckGate(validationResult, referenceGate);
         const rewriteStatus = statusForValidation(validation);
         const persistedRewriteJson = rewriteJsonForValidation(rewrite, validation);
 
@@ -3021,6 +3077,10 @@ const rewriteWorker = new Worker<RewriteJobData>(
                 null,
               importanceAdjusted,
               importanceAdjustReason,
+              blocking: referenceGate.blocking,
+              blockingReason: referenceGate.reason,
+              highRiskUnsupportedSentenceCount:
+                referenceGate.highRiskUnsupportedSentences.length,
               initialCoverage: referenceCoverageJson(initialCoverage),
               finalCoverage: referenceCoverageJson(finalCoverage ?? initialCoverage),
               totalSentences:

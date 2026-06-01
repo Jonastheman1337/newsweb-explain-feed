@@ -14,6 +14,7 @@ export type StyleSanitizationStats = {
   removedAsaSuffix: number;
   replacedPercentSigns: number;
   normalizedBillionPhrases: number;
+  normalizedExactBillionAmounts: number;
 };
 
 export type StyleSanitizationResult = {
@@ -53,6 +54,17 @@ function formatBillionFromMillions(millionAmount: number): string {
     .replace(".", ",")} milliarder`;
 }
 
+function formatBillionFromKroner(kronerAmount: number): string {
+  if (kronerAmount === 1_000_000_000) {
+    return "én milliard";
+  }
+  const billions = kronerAmount / 1_000_000_000;
+  if (Number.isInteger(billions)) {
+    return `${billions} milliarder`;
+  }
+  return `${billions.toFixed(1).replace(".", ",").replace(/,0$/, "")} milliarder`;
+}
+
 function sanitizeText(text: string, stats: StyleSanitizationStats): string {
   let result = text;
 
@@ -80,6 +92,18 @@ function sanitizeText(text: string, stats: StyleSanitizationStats): string {
     stats.replacedPercentSigns += 1;
     return " prosent";
   });
+
+  result = result.replace(
+    /\b(\d{1,3}(?:[ .]\d{3}){3,}|\d{10,})\s+kroner\b/gi,
+    (match: string, rawAmount: string) => {
+      const kronerAmount = parseNorwegianInteger(rawAmount);
+      if (kronerAmount == null || kronerAmount < 1_000_000_000) {
+        return match;
+      }
+      stats.normalizedExactBillionAmounts += 1;
+      return `${formatBillionFromKroner(kronerAmount)} kroner`;
+    }
+  );
 
   result = result.replace(
     /\b(\d{1,3}(?:[ .]\d{3})+|\d{4,})\s+millioner(?:\s+kroner)?\b/gi,
@@ -130,7 +154,8 @@ export function sanitizeRewriteStyle(rewrite: RewriteOutput): StyleSanitizationR
     expandedMarketCodes: 0,
     removedAsaSuffix: 0,
     replacedPercentSigns: 0,
-    normalizedBillionPhrases: 0
+    normalizedBillionPhrases: 0,
+    normalizedExactBillionAmounts: 0
   };
 
   const sanitized: RewriteOutput = {
@@ -151,7 +176,8 @@ export function sanitizeRewriteStyle(rewrite: RewriteOutput): StyleSanitizationR
     stats.expandedMarketCodes > 0 ||
     stats.removedAsaSuffix > 0 ||
     stats.replacedPercentSigns > 0 ||
-    stats.normalizedBillionPhrases > 0;
+    stats.normalizedBillionPhrases > 0 ||
+    stats.normalizedExactBillionAmounts > 0;
 
   return {
     rewrite: sanitized,

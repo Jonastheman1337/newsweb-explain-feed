@@ -57,7 +57,7 @@ export async function callOpenAIForJson(
   request: OpenAIJsonRequest
 ): Promise<string> {
   const attempts = 2;
-  let lastResponseSummary = "";
+  const emptyResponseSummaries: string[] = [];
 
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     const response = await callOpenAIResponse(client, request);
@@ -65,14 +65,19 @@ export async function callOpenAIForJson(
     if (content) {
       return content;
     }
-    lastResponseSummary = summarizeResponse(response);
+    const summary = summarizeResponse(response);
+    emptyResponseSummaries.push(
+      `attempt${attempt}=${summary || "empty_response_metadata"}`
+    );
   }
 
   throw new Error(
     [
       `OpenAI returned no output_text for ${request.schemaName} after ${attempts} attempts`,
       requestDiagnostics(request),
-      lastResponseSummary ? `lastResponse=${lastResponseSummary}` : null
+      emptyResponseSummaries.length
+        ? `emptyResponses=${emptyResponseSummaries.join(" ; ")}`
+        : null
     ]
       .filter(Boolean)
       .join(" | ")

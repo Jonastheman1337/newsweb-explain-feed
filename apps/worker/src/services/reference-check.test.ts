@@ -1,6 +1,7 @@
 import type { RewriteOutput } from "@newsweb/shared";
 import { describe, expect, it } from "vitest";
 import {
+  assessReferenceCheckGate,
   buildCorrectionInstruction,
   buildCoverageReport,
   collectDraftSentences,
@@ -36,6 +37,104 @@ describe("splitIntoSentences", () => {
       "To setning!",
       "Tre setning?"
     ]);
+  });
+});
+
+describe("assessReferenceCheckGate", () => {
+  it("blocks unsupported high-risk factual claims", () => {
+    const report = buildCoverageReport(
+      [
+        "Selskapet fikk et resultat før skatt på 100 millioner kroner.",
+        "Selskapet er notert i Oslo."
+      ],
+      {
+        sentences: [
+          {
+            index: 0,
+            sentence: "Selskapet fikk et resultat før skatt på 100 millioner kroner.",
+            grounded: false,
+            interpretation: "Tallet finnes ikke i kilden.",
+            sourceEvidence: ""
+          },
+          {
+            index: 1,
+            sentence: "Selskapet er notert i Oslo.",
+            grounded: true,
+            interpretation: "Dekket.",
+            sourceEvidence: "notert i Oslo"
+          }
+        ]
+      }
+    );
+
+    const result = assessReferenceCheckGate(report);
+
+    expect(result.blocking).toBe(true);
+    expect(result.highRiskUnsupportedSentences).toHaveLength(1);
+  });
+
+  it("does not block one low-risk unsupported context sentence", () => {
+    const report = buildCoverageReport(
+      ["Selskapet la frem tall.", "Selskapet er notert i Oslo."],
+      {
+        sentences: [
+          {
+            index: 0,
+            sentence: "Selskapet la frem tall.",
+            grounded: true,
+            interpretation: "Dekket.",
+            sourceEvidence: "la frem tall"
+          },
+          {
+            index: 1,
+            sentence: "Selskapet er notert i Oslo.",
+            grounded: false,
+            interpretation: "Selskapsbeskrivelsen finnes ikke i kilden.",
+            sourceEvidence: ""
+          }
+        ]
+      }
+    );
+
+    const result = assessReferenceCheckGate(report);
+
+    expect(result.blocking).toBe(false);
+  });
+
+  it("blocks low coverage after correction", () => {
+    const report = buildCoverageReport(
+      ["Første setning.", "Andre setning.", "Tredje setning."],
+      {
+        sentences: [
+          {
+            index: 0,
+            sentence: "Første setning.",
+            grounded: true,
+            interpretation: "Dekket.",
+            sourceEvidence: "Første"
+          },
+          {
+            index: 1,
+            sentence: "Andre setning.",
+            grounded: false,
+            interpretation: "Ikke dekket.",
+            sourceEvidence: ""
+          },
+          {
+            index: 2,
+            sentence: "Tredje setning.",
+            grounded: false,
+            interpretation: "Ikke dekket.",
+            sourceEvidence: ""
+          }
+        ]
+      }
+    );
+
+    const result = assessReferenceCheckGate(report);
+
+    expect(result.blocking).toBe(true);
+    expect(result.reason).toContain("below 75 percent");
   });
 });
 

@@ -16,6 +16,7 @@ export const EDITORIAL_LANGUAGE = `SPRAK OG FORENKLING
 - Skriv hverdagssprak. Tenk deg at du forklarer nyheten muntlig til en kompis som folger med pa aksjer.
 - Vanlige finansord er greit: 'omsetning', 'resultat for skatt', 'driftsresultat', 'ebitda', 'utbytte', 'guiding', 'aksje', 'kurs', 'datterselskap', 'kontrakt', 'aksjekapital', 'innsidehandel'. Disse trenger ikke forklaring.
 - Ikke bland regnskapsbegrepene inntekter/omsetning og resultat. Hvis kilden bare omtaler inntekter eller omsetning, skal det ikke bli til resultat, overskudd eller tap i teksten.
+- Skriv presist om resultatlinjer: 'nettoresultat' er resultat etter skatt. Foretrekk 'resultat for skatt' i rapportnyheter når tallet finnes, og ikke kall resultat etter skatt for nettoresultat i synlig tekst.
 - Foretrekk enkle synonymer fremfor tunge fagord, spesielt i titler. Tenk alltid: finnes det et enklere norsk ord som betyr det samme? Bruk det. Fagbegrepet kan komme i body der det forklares. 'Henter penger' er bedre enn 'gjennomforer kapitalinnhenting'. 'Sammenslåing' er lettere enn 'fusjon'.
 - Bruk fagbegreper, men forklar dem gjennom kontekst slik at leseren bade forstar og laerer:
   'ebitda' → 'driftsresultatet før renter, skatt, av- og nedskrivninger (ebitda) gikk opp til 48 millioner' (forklar bare hvis begrepet er nodvendig)
@@ -33,6 +34,7 @@ export const EDITORIAL_LANGUAGE = `SPRAK OG FORENKLING
 - Unnga lange, tunge setninger. Bryt dem opp.
 - Produktnavn og tekniske betegnelser fra kilden er ofte uforståelige for leseren. Forklar kort hva produktet eller teknologien gjør, eller generaliser.
 - Før du leverer: finn alle fagord, produktnavn, forkortelser og tekniske uttrykk en vanlig privatinvestor kan snuble i. Hvis ordet er nødvendig, forklar det naturlig i samme eller neste setning. Hvis du ikke kan forklare det kort med kilden som grunnlag, generaliser eller dropp ordet.
+- Navngitte transaksjoner og interne prosjektnavn må forklares kort hvis de brukes. Ikke skriv bare 'Evo-transaksjonen' eller lignende uten å si hva transaksjonen gjelder.
 - Eksempler: Forklar ord som 'terminer', 'tegningsretter', 'reparasjonsemisjon', 'innkvartering', 'AAV', 'uttrykkssystem' og 'genuttrykk' hvis de må brukes. Ikke anta at leseren vet hva de betyr.
 - Bransje- og energiforkortelser ma forklares naturlig forste gang: 'Awilco, som frakter flytende naturgass (LNG)'. Etter forste forklaring kan forkortelsen brukes alene.
 - Forenkle teknisk sprak fra kilden. Bruk «» for a vise at du parafraserer selskapets egne ord.
@@ -54,6 +56,7 @@ export const EDITORIAL_WRITING_STYLE = `SKRIVESTIL
 - Ga rett pa saken i forste setning. Unnga tomme innledninger som 'har kunngjort' og 'kort fortalt'.
 - Hvert avsnitt tilforer ny informasjon. Unnga gjentakelser.
 - Ikke gjenta samme tall eller faktum i flere avsnitt. Ved oppramsing med samme kurs, pris eller dato: skriv fellesopplysningen én gang samlet.
+- Ikke gjenta de samme nøkkeltallene flere ganger med litt ulik ordlyd. Velg ett sted for hvert viktig tall.
 - Rutinesaker skal komprimeres hardt: generalforsamling/utbytte, innsidehandel, avlyst reparasjonsemisjon, flagging/fullmakt og små kontrakter klarer seg normalt med ett kort body-avsnitt eller bare lead hvis det ikke finnes et nytt materiell poeng.
 - Behold egennavn og titler korrekt, men normaliser selskapsnavn til vanlig stor forbokstav. Skriv 'Polight' ikke 'poLight', 'Idex' ikke 'IDEX'. Unntak: forkortelser som er allment kjent (ABB, DNB).
 - Skriv naturlig norsk, ikke ordrett maskinoversettelse. Unnga passiv og tungt hjelpeverb-sprak.
@@ -90,6 +93,7 @@ export const EDITORIAL_ATTRIBUTION = `ATTRIBUSJON OG FORBEHOLD
 - Subjektive vurderinger skal aldri sta som objektivt faktum.
 - Hvis kilden omtaler kritikk, anklager, gransking, soksmal eller mulig straffbart forhold, og kilden ogsa inneholder tilsvar, avvisning eller at noen bestrider forholdet, skal tilsvaret med i lead/body.
 - Ikke adopter selskapets framing av egne nyheter. Nar et selskap toner ned, normaliserer eller fortolker en negativ hendelse (avslag, tap, forsinkelse, sokmalsmal), er det selskapets vurdering — ikke var. Gjengi slike karakteriseringer med «» og tydelig attribusjon. Eksempel: Selskapet skriver at slike avslag «ikke er uvanlige» for ny medisinsk teknologi — IKKE: Selskapet understreker at slike avslag ikke er uvanlige. Bruk noytrale rapporteringsverb ('skriver', 'sier', 'opplyser') fremfor verb som forsterker selskapets posisjon ('understreker', 'fremhever', 'paapeker', 'vektlegger').
+- Ord som 'tøft', 'midlertidig lavere', 'robust', 'solid' og lignende er selskapets vurdering hvis de kommer fra kilden. Bruk direkte sitat eller tydelig attribusjon, ellers dropp formuleringen.
 - Ikke ta med defensiv forklaring fra selskapet bare for balanse. Ta den bare med hvis den forklarer det materielle nyhetspunktet, og attribuer noytralt.`;
 
 export const EDITORIAL_QUOTES = `SITATER OG PARAFRASERING
