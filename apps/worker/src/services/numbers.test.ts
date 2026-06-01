@@ -99,6 +99,32 @@ describe("findUnexpectedNumbers", () => {
     expect(missing).toEqual([]);
   });
 
+  it("accepts Norwegian thousands separators when source uses unseparated integers", () => {
+    const rewrite: RewriteOutput = {
+      title: "Lavere inntekter for Loch Duart",
+      lead: "Selskapet fikk lavere inntekter etter redusert hostet tonnasje.",
+      body: [
+        "Selskapet hostet 8.142 tonn GWT i regnskapsaret, opp fra 5.620 tonn aret for."
+      ],
+      company_sentence: "Loch Duart rapporterer om hostet tonnasje og fiskedodelighet.",
+      key_facts: ["Hostet 8.142 tonn GWT", "Opp fra 5.620 tonn"],
+      negative_or_surprising: [],
+      excluded_hype: [],
+      source_limitations: [],
+      confidence: "medium",
+      importance: "medium",
+      source_spans: [
+        "with 8142T GWT harvested, a rise from 5620T GWT in the prior year"
+      ]
+    };
+
+    const source =
+      "The report states that 8142T GWT was harvested, a rise from 5620T GWT in the prior year.";
+
+    const missing = findUnexpectedNumbers(rewrite, source);
+    expect(missing).toEqual([]);
+  });
+
   it("treats percent signs and prosent wording as the same number", () => {
     const rewrite: RewriteOutput = {
       title: "Marginen steg",

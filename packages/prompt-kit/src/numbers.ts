@@ -126,6 +126,33 @@ function clockTimeNumberKeys(text: string): Set<string> {
   return keys;
 }
 
+function integerThousandsEquivalentKey(parsed: {
+  display: string;
+  hasPercent: boolean;
+}): string | null {
+  if (parsed.hasPercent) {
+    return null;
+  }
+
+  const negative = parsed.display.startsWith("-");
+  const unsigned = negative ? parsed.display.slice(1) : parsed.display;
+  if (!/^\d{1,3}(?:[.,]\d{3})+$/.test(unsigned)) {
+    return null;
+  }
+
+  const integer = unsigned.replace(/[.,]/g, "").replace(/^0+(?=\d)/, "") || "0";
+  return [negative ? "-" : "+", integer, "abs", "0"].join("|");
+}
+
+function rewriteNumberKeys(parsed: {
+  display: string;
+  key: string;
+  hasPercent: boolean;
+}): string[] {
+  const equivalentKey = integerThousandsEquivalentKey(parsed);
+  return equivalentKey ? [parsed.key, equivalentKey] : [parsed.key];
+}
+
 function collectSourceNumberKeys(text: string): Set<string> {
   const tokens = text.match(numberTokenRegex) ?? [];
   const keys = clockTimeNumberKeys(text);
@@ -263,7 +290,7 @@ export function findUnexpectedNumbers(
     if (!parsed) {
       continue;
     }
-    if (!sourceNumberKeys.has(parsed.key)) {
+    if (!rewriteNumberKeys(parsed).some((key) => sourceNumberKeys.has(key))) {
       if (isSimpleTradeArithmeticNumber(parsed, sourceText)) {
         continue;
       }
