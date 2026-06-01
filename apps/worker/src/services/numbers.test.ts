@@ -77,6 +77,28 @@ describe("findUnexpectedNumbers", () => {
     expect(missing).toEqual([]);
   });
 
+  it("accepts Norwegian clock punctuation when source uses colon time", () => {
+    const rewrite: RewriteOutput = {
+      title: "Webcast torsdag morgen",
+      lead: "Selskapet holder webcast torsdag 4. juni klokken 9.30.",
+      body: ["Presentasjonen holdes på engelsk."],
+      company_sentence: "Test AS utvikler medisinsk teknologi.",
+      key_facts: ["Webcast klokken 9.30"],
+      negative_or_surprising: [],
+      excluded_hype: [],
+      source_limitations: [],
+      confidence: "medium",
+      importance: "uviktig",
+      source_spans: ["webcast at 9:30 AM CET"]
+    };
+
+    const source =
+      "The company will host a webcast on Thursday, 4 June 2026, at 9:30 AM CET.";
+
+    const missing = findUnexpectedNumbers(rewrite, source);
+    expect(missing).toEqual([]);
+  });
+
   it("treats percent signs and prosent wording as the same number", () => {
     const rewrite: RewriteOutput = {
       title: "Marginen steg",

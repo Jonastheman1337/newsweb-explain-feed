@@ -1,6 +1,7 @@
 import type { RewriteOutput } from "@newsweb/shared";
 
 const numberTokenRegex = /-?\d[\d\s.,:%/-]*(?:\s*(?:prosent|percent))?/gi;
+const clockTimeRegex = /\b([01]?\d|2[0-3])[:.](\d{2})\b/g;
 
 function sanitizeNumberToken(token: string): string {
   const trimmed = token.trim();
@@ -112,9 +113,22 @@ function parseNumberToken(
   };
 }
 
+function clockTimeNumberKeys(text: string): Set<string> {
+  const keys = new Set<string>();
+  for (const match of text.matchAll(clockTimeRegex)) {
+    const hour = Number(match[1]);
+    const minute = match[2] ?? "";
+    if (!Number.isInteger(hour) || !/^\d{2}$/.test(minute)) {
+      continue;
+    }
+    keys.add(`+|${hour}.${minute}|abs|2`);
+  }
+  return keys;
+}
+
 function collectSourceNumberKeys(text: string): Set<string> {
   const tokens = text.match(numberTokenRegex) ?? [];
-  const keys = new Set<string>();
+  const keys = clockTimeNumberKeys(text);
 
   for (const token of tokens) {
     const parsed = parseNumberToken(token);
