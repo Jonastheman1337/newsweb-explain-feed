@@ -140,6 +140,19 @@ describe("getDeterministicTriageSkip", () => {
     expect(result?.kind).toBe("public-sector-results");
   });
 
+  it("skips public-sector annual reports when municipality is only in issuer name", () => {
+    const result = getDeterministicTriageSkip(
+      "HGSKO: Årsmelding 2025",
+      "Revisjonsberetningen viser ordinære regnskapstall for året.",
+      ["ANNEN INFORMASJONSPLIKTIG REGULATORISK INFORMASJON"],
+      true,
+      "Haugesund kommune"
+    );
+
+    expect(result?.newsworthy).toBe(false);
+    expect(result?.kind).toBe("public-sector-results");
+  });
+
   it("keeps public-sector notices with a capital-market event", () => {
     const result = getDeterministicTriageSkip(
       "Stavanger kommune vurderer obligasjonslån",

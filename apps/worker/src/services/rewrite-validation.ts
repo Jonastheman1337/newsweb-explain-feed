@@ -71,8 +71,32 @@ const RESULT_PATTERNS = [
   /\bebit(?:da)?\b/i
 ];
 
+const REPORT_NOTICE_PATTERNS = [
+  /\b(?:annual|interim|quarterly|financial)\s+report\b/i,
+  /\bq[1-4]\s+(?:fy)?\d{2,4}\s+(?:report|presentation)\b/i,
+  /\b(?:årsrapport|arsrapport|årsmelding|arsmelding|kvartalsrapport|delårsrapport|halvårsrapport)\b/i,
+  /\u00e5rsrapport|\u00e5rsmelding|del\u00e5rsrapport|halv\u00e5rsrapport/i
+];
+
+const GENERIC_REPORT_PUBLICATION_PATTERNS = [
+  /\b(?:publiserer|publisert|offentliggjort|released|published)\b.{0,90}\b(?:rapport|årsrapport|årsmelding|annual report|interim report|quarterly report)\b/i,
+  /\b(?:rapport|årsrapport|årsmelding|annual report|interim report|quarterly report)\b.{0,90}\b(?:publiserer|publisert|offentliggjort|released|published)\b/i,
+  /\b(?:publiserer|publisert|offentliggjort|released|published)\b.{0,90}(?:\u00e5rsrapport|\u00e5rsmelding)/i,
+  /(?:\u00e5rsrapport|\u00e5rsmelding).{0,90}\b(?:publiserer|publisert|offentliggjort|released|published)\b/i
+];
+
+const CONCRETE_REPORT_FACT_PATTERNS = [
+  /\b(?:inntekter|omsetning|revenue|revenues|sales)\b.{0,90}\d/i,
+  /\b(?:resultat|overskudd|tap|profit|loss|earnings|ebit|ebitda)\b.{0,90}\d/i,
+  /\b(?:kontantstrøm|kontantstrom|cash flow|guiding|utsikter|outlook|utbytte|dividend)\b.{0,90}\d/i,
+  /\d.{0,50}\b(?:million|millioner|milliard|milliarder|kroner|dollar|euro|prosent|percent)\b/i
+];
+
 const VISIBLE_NUMBER_PATTERN =
   /\b\d{1,3}(?:[ .]\d{3})*(?:,\d+)?\b|\b\d+(?:,\d+)?\b/g;
+
+const DATE_MONTH_PATTERN =
+  /^\.\s*(?:jan(?:uar)?|feb(?:ruar)?|mars|apr(?:il)?|mai|jun(?:i)?|jul(?:i)?|aug(?:ust)?|sep(?:tember)?|okt(?:ober)?|nov(?:ember)?|des(?:ember)?|january|february|march|april|may|june|july|august|september|october|november|december)\b/i;
 
 const JARGON_GUARDRAILS: Array<{
   code: string;
@@ -111,7 +135,14 @@ const CURRENCY_MARKER_GROUPS: Array<{
 }> = [
   {
     label: "NOK/kroner",
-    patterns: [/\bnok\b/i, /\bmnok\b/i, /\bbnok\b/i, /\bkr\b/i, /\bkron(?:e|er)\b/i]
+    patterns: [
+      /\bnok\b/i,
+      /\bmnok\b/i,
+      /\bbnok\b/i,
+      /\bkr\b/i,
+      /\bnorske kroner\b/i,
+      /(?<!svenske )(?<!danske )\bkron(?:e|er)\b/i
+    ]
   },
   {
     label: "USD/dollar",
@@ -127,11 +158,11 @@ const CURRENCY_MARKER_GROUPS: Array<{
   },
   {
     label: "SEK/svenske kroner",
-    patterns: [/\bsek\b/i, /\bsvenske kroner\b/i]
+    patterns: [/\bsek\b/i, /\bsvenske kroner\b/i, /\bswedish kronor\b/i]
   },
   {
     label: "DKK/danske kroner",
-    patterns: [/\bdkk\b/i, /\bdanske kroner\b/i]
+    patterns: [/\bdkk\b/i, /\bdanske kroner\b/i, /\bdanish kroner\b/i]
   }
 ];
 
@@ -250,6 +281,30 @@ function hasRevenueResultMixupRisk(
   );
 }
 
+function isReportLikePayload(payload: PromptPayload): boolean {
+  return hasAnyPattern(
+    [payload.title, payload.categories.join(" "), payload.bodyText].join("\n"),
+    REPORT_NOTICE_PATTERNS
+  );
+}
+
+function isGenericReportPublicationRewrite(
+  rewrite: RewriteOutput,
+  payload: PromptPayload
+): boolean {
+  if (!isReportLikePayload(payload)) {
+    return false;
+  }
+
+  const titleAndLead = [rewrite.title, rewrite.lead].join("\n");
+  if (!hasAnyPattern(titleAndLead, GENERIC_REPORT_PUBLICATION_PATTERNS)) {
+    return false;
+  }
+
+  const visibleBody = [rewrite.lead, ...rewrite.body].join("\n");
+  return !hasAnyPattern(visibleBody, CONCRETE_REPORT_FACT_PATTERNS);
+}
+
 function normalizeVisibleNumberToken(token: string): string | null {
   const normalized = token.replace(/[ .]/g, "").replace(",", ".");
   if (!/\d/.test(normalized)) return null;
@@ -257,10 +312,20 @@ function normalizeVisibleNumberToken(token: string): string | null {
   return normalized;
 }
 
+function isDateDayNumber(field: string, index: number, rawToken: string): boolean {
+  if (!/^\d{1,2}$/.test(rawToken.trim())) {
+    return false;
+  }
+  return DATE_MONTH_PATTERN.test(field.slice(index + rawToken.length));
+}
+
 function repeatedVisibleNumbers(rewrite: RewriteOutput): string[] {
   const counts = new Map<string, number>();
   for (const field of [rewrite.lead, ...rewrite.body]) {
     for (const match of field.matchAll(VISIBLE_NUMBER_PATTERN)) {
+      if (match.index != null && isDateDayNumber(field, match.index, match[0])) {
+        continue;
+      }
       const normalized = normalizeVisibleNumberToken(match[0]);
       if (!normalized) continue;
       counts.set(normalized, (counts.get(normalized) ?? 0) + 1);
@@ -337,6 +402,15 @@ export function validateRewriteOutput(
       "VISIBLE_META_SOURCE_LANGUAGE",
       "blocking",
       "Visible article text refers to PDF/attachments, analyzed material, or missing source data; move limitations to source_limitations."
+    );
+  }
+
+  if (isGenericReportPublicationRewrite(rewrite, payload)) {
+    addIssue(
+      issues,
+      "GENERIC_REPORT_PUBLICATION",
+      "blocking",
+      "Report notice was rewritten as a generic report-publication story without concrete report facts."
     );
   }
 

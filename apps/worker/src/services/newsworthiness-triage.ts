@@ -109,7 +109,9 @@ const RESULT_REPORT_PATTERNS = [
   /\b\d+\.\s*tertial\b/i,
   /\btertial\s+\d{4}\b/i,
   /\b(?:tertial|kvartal|quarter|interim|financial)\s+(?:report|rapport)\b/i,
-  /\b(?:resultat|regnskap|årsrapport|arsrapport|annual report)\b/i
+  /\b(?:resultat|regnskap|årsrapport|arsrapport|annual report)\b/i,
+  /\b(?:\u00e5rsrapport|arsrapport|\u00e5rsmelding|arsmelding|annual report)\b/i,
+  /\u00e5rsrapport|\u00e5rsmelding/i
 ];
 
 const PUBLIC_SECTOR_MARKET_EVENT_PATTERNS = [
@@ -182,9 +184,15 @@ export function getDeterministicTriageSkip(
   title: string,
   bodyText: string,
   _categories: string[],
-  _hasAttachments?: boolean
+  _hasAttachments?: boolean,
+  issuerName?: string,
+  sourceBodyText?: string
 ): DeterministicTriageSkip | null {
-  const text = `${title}\n${bodyText}`.trim();
+  const text = [title, issuerName, bodyText].filter(Boolean).join("\n").trim();
+  const marketEventText = [title, sourceBodyText ?? bodyText]
+    .filter(Boolean)
+    .join("\n")
+    .trim();
   const hasDocumentOnlySignal = hasAnyPattern(text, DOCUMENT_ONLY_PATTERNS);
   const hasSubstantiveFacts = hasAnyPattern(bodyText, SUBSTANTIVE_FACT_PATTERNS);
 
@@ -212,7 +220,7 @@ export function getDeterministicTriageSkip(
   if (
     hasAnyPattern(text, PUBLIC_SECTOR_RESULT_PATTERNS) &&
     hasAnyPattern(text, RESULT_REPORT_PATTERNS) &&
-    !hasAnyPattern(text, PUBLIC_SECTOR_MARKET_EVENT_PATTERNS)
+    !hasAnyPattern(marketEventText, PUBLIC_SECTOR_MARKET_EVENT_PATTERNS)
   ) {
     return {
       newsworthy: false,

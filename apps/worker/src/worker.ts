@@ -952,6 +952,7 @@ async function callModelReferenceCheck(
   const developerPrompt = [
     "Vurder hver setning i utkastet separat.",
     "Sett grounded=true kun hvis setningen har eksplisitt dekning i referanseteksten.",
+    "Enkle regnestykker er dekket hvis alle inputtallene finnes eksplisitt i referanseteksten, for eksempel antall aksjer multiplisert med pris per aksje.",
     "Ikke bruk bakgrunnskunnskap utenfor referanseteksten.",
     "Hvis en setning inneholder subjektive vurderinger eller verdisprak (f.eks. 'milepael', 'styrker posisjon', 'betydelig') uten tydelig attribusjon til kilden/selskapet, skal grounded settes til false.",
     "Paatander om effekt, betydning eller kommersiell verdi ma enten ha direkte dekning i kilden og attribusjon, eller markeres som ikke dekket.",
@@ -2777,7 +2778,9 @@ const rewriteWorker = new Worker<RewriteJobData>(
           source.title,
           [source.bodyText, payload.pdfSupplementText ?? ""].filter(Boolean).join("\n\n"),
           categories,
-          source.hasAttachments
+          source.hasAttachments,
+          source.issuerName,
+          source.bodyText
         );
         if (deterministicSkip) {
           console.log(

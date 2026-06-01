@@ -298,6 +298,73 @@ describe("validateRewriteOutput", () => {
     );
   });
 
+  it("does not treat Swedish kroner as unexpected NOK currency", () => {
+    const payload = createPayload({
+      bodyText:
+        "Selskapet melder at kontrakten har en verdi på SEK 50 million."
+    });
+    const rewrite = createRewrite({
+      lead: "Selskapet har fått en kontrakt på 50 millioner svenske kroner.",
+      body: ["Meldingen oppgir ikke andre tall."]
+    });
+
+    const result = validateRewriteOutput(rewrite, payload);
+
+    expect(
+      result.issues.some(
+        (issue) =>
+          issue.code === "UNEXPECTED_CURRENCY" &&
+          issue.message.includes("NOK/kroner")
+      )
+    ).toBe(false);
+  });
+
+  it("blocks generic report-publication rewrites without concrete report facts", () => {
+    const payload = createPayload({
+      title: "VDI: Vantage Drilling International Ltd. 2025 Annual Report",
+      bodyText: "The 2025 annual report has been published and is attached.",
+      hasAttachments: true
+    });
+    const rewrite = createRewrite({
+      title: "Vantage Drilling publiserer årsrapport",
+      lead:
+        "Offshoreriggselskapet Vantage Drilling har publisert årsrapporten for 2025, ifølge en børsmelding.",
+      body: [
+        "I rapporten peker selskapet på risiko knyttet til liten riggflåte, få kunder og korte borekontrakter."
+      ],
+      source_limitations: ["Kun et utdrag av rapporten er analysert"]
+    });
+
+    const result = validateRewriteOutput(rewrite, payload);
+
+    expect(result.issues).toContainEqual({
+      code: "GENERIC_REPORT_PUBLICATION",
+      severity: "blocking",
+      message:
+        "Report notice was rewritten as a generic report-publication story without concrete report facts."
+    });
+  });
+
+  it("allows report rewrites that include concrete report facts", () => {
+    const payload = createPayload({
+      title: "ARLES: Quarterly Report Arles I B.V. Q2",
+      bodyText:
+        "Result before tax was EUR -18.1m, compared with EBT of EUR -5.8m in Q2 2024-2025."
+    });
+    const rewrite = createRewrite({
+      title: "Arles øker kvartalstapet",
+      lead:
+        "Arles I øker tapet i andre kvartal, viser delårsrapporten. Resultat før skatt endte på minus 18,1 millioner euro, mot minus 5,8 millioner året før.",
+      body: ["Inntektene falt til 79,8 millioner euro, fra 83,4 millioner året før."]
+    });
+
+    const result = validateRewriteOutput(rewrite, payload);
+
+    expect(
+      result.issues.some((issue) => issue.code === "GENERIC_REPORT_PUBLICATION")
+    ).toBe(false);
+  });
+
   it("flags missing right of reply when the source includes accusations and denial", () => {
     const payload = createPayload({
       bodyText:
@@ -350,6 +417,26 @@ describe("validateRewriteOutput", () => {
     expect(result.issues.some((issue) => issue.code === "REPEATED_VISIBLE_NUMBER")).toBe(
       true
     );
+  });
+
+  it("does not count calendar dates as repeated visible numbers", () => {
+    const payload = createPayload({
+      bodyText:
+        "Norges Bank vil utstede 3 milliarder kroner. Auksjonen skjer 3. juni."
+    });
+    const rewrite = createRewrite({
+      lead: "Norges Bank vil utstede 3 milliarder kroner.",
+      body: [
+        "Auksjonen skjer 3. juni.",
+        "Beløpet er på 3 milliarder kroner."
+      ]
+    });
+
+    const result = validateRewriteOutput(rewrite, payload);
+
+    expect(
+      result.issues.some((issue) => issue.code === "REPEATED_VISIBLE_NUMBER")
+    ).toBe(false);
   });
 
   it("warns on unexplained proforma and named transactions", () => {

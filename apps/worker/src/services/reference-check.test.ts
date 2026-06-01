@@ -38,6 +38,17 @@ describe("splitIntoSentences", () => {
       "Tre setning?"
     ]);
   });
+
+  it("does not split Norwegian calendar dates into sentence fragments", () => {
+    expect(
+      splitIntoSentences(
+        "Handelen ble gjort på Oslo Børs 1. juni. Hun betalte 287,60 kroner per aksje."
+      )
+    ).toEqual([
+      "Handelen ble gjort på Oslo Børs 1. juni.",
+      "Hun betalte 287,60 kroner per aksje."
+    ]);
+  });
 });
 
 describe("assessReferenceCheckGate", () => {
@@ -91,6 +102,32 @@ describe("assessReferenceCheckGate", () => {
             grounded: false,
             interpretation: "Selskapsbeskrivelsen finnes ikke i kilden.",
             sourceEvidence: ""
+          }
+        ]
+      }
+    );
+
+    const result = assessReferenceCheckGate(report);
+
+    expect(result.blocking).toBe(false);
+  });
+
+  it("does not block simple insider-trade totals derived from source inputs", () => {
+    const report = buildCoverageReport(
+      [
+        "Lorenz har kjøpt 10.000 aksjer i Codelab Capital for 34.300 kroner, ifølge en børsmelding."
+      ],
+      {
+        sentences: [
+          {
+            index: 0,
+            sentence:
+              "Lorenz har kjøpt 10.000 aksjer i Codelab Capital for 34.300 kroner, ifølge en børsmelding.",
+            grounded: false,
+            interpretation:
+              "Kilden oppgir antall aksjer og kurs per aksje, men ikke totalbeløpet eksplisitt.",
+            sourceEvidence:
+              "Lorenz AS has acquired 10.000 shares at an average price of NOK 3,43 per share."
           }
         ]
       }

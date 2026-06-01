@@ -2,6 +2,15 @@ import type { RewriteOutput } from "@newsweb/shared";
 import { z } from "zod";
 
 const sentenceBoundaryRegex = /(?<=[.!?])\s+/;
+const protectedPeriod = "<NEWSWEB_PERIOD>";
+const monthNamePattern =
+  "jan(?:uar)?|feb(?:ruar)?|mars|apr(?:il)?|mai|jun(?:i)?|jul(?:i)?|aug(?:ust)?|sep(?:tember)?|okt(?:ober)?|nov(?:ember)?|des(?:ember)?|january|february|march|april|may|june|july|august|september|october|november|december";
+const dateWithMonthRegex = new RegExp(
+  `\\b(\\d{1,2})\\.\\s+(${monthNamePattern})\\b`,
+  "gi"
+);
+const abbreviationRegex =
+  /\b(ca|cirka|kl|nr|mill|mrd|bln|bn|dr|prof|st|vs)\.\s+/gi;
 
 export const referenceCheckSentenceSchema = z.object({
   index: z.number().int().min(0),
@@ -48,6 +57,14 @@ const HIGH_RISK_UNSUPPORTED_PATTERNS = [
   /\b(?:styrker|forbedrer|sikrer|reduserer|øker|oker|bidrar|kan gi|kan bidra)\b/i
 ];
 
+const TRADE_ARITHMETIC_CONTEXT_PATTERNS = [
+  /\b(?:aksje|aksjer|shares?)\b/i,
+  /\b(?:kurs|snittpris|average price|price per share|per aksje)\b/i,
+  /\b(?:kjøpt|kjop|kjøp|kjøper|purchased|acquired|solgt|sold)\b/i
+];
+
+const MONEY_CONTEXT_PATTERNS = [/\b(?:nok|kroner|kr)\b/i];
+
 export const referenceCheckJsonSchema = {
   type: "object",
   additionalProperties: false,
@@ -83,16 +100,119 @@ function normalizeSentence(sentence: string): string {
   return sentence.replace(/\s+/g, " ").trim();
 }
 
+function protectSentenceInternalPeriods(text: string): string {
+  return text
+    .replace(dateWithMonthRegex, (_match, day: string, month: string) => {
+      return `${day}${protectedPeriod} ${month}`;
+    })
+    .replace(abbreviationRegex, (_match, abbreviation: string) => {
+      return `${abbreviation}${protectedPeriod} `;
+    });
+}
+
+function restoreProtectedPeriods(text: string): string {
+  return text.replaceAll(protectedPeriod, ".");
+}
+
 export function splitIntoSentences(text: string): string[] {
   const trimmed = text.trim();
   if (!trimmed) {
     return [];
   }
 
-  const chunks = trimmed.split(sentenceBoundaryRegex);
+  const chunks = protectSentenceInternalPeriods(trimmed).split(sentenceBoundaryRegex);
   return chunks
-    .map((chunk) => normalizeSentence(chunk))
+    .map((chunk) => normalizeSentence(restoreProtectedPeriods(chunk)))
     .filter((chunk) => chunk.length > 0);
+}
+
+function parseLocalizedNumber(raw: string): number | null {
+  let normalized = raw.replace(/\s/g, "");
+  const negative = normalized.startsWith("-");
+  if (negative) {
+    normalized = normalized.slice(1);
+  }
+
+  if (normalized.includes(",") && normalized.includes(".")) {
+    normalized = normalized.replace(/\./g, "").replace(",", ".");
+  } else if (normalized.includes(",")) {
+    normalized = normalized.replace(",", ".");
+  } else if (normalized.includes(".")) {
+    const parts = normalized.split(".");
+    const last = parts[parts.length - 1] ?? "";
+    if (parts.length > 2 || last.length === 3) {
+      normalized = parts.join("");
+    }
+  }
+
+  if (!/^\d+(?:\.\d+)?$/.test(normalized)) {
+    return null;
+  }
+
+  const value = Number(normalized);
+  if (!Number.isFinite(value)) {
+    return null;
+  }
+  return negative ? -value : value;
+}
+
+function extractNumbers(text: string): number[] {
+  const matches = text.match(
+    /-?\d{1,3}(?:[ .]\d{3})*(?:[,.]\d+)?|-?\d+(?:[,.]\d+)?/g
+  );
+  return (matches ?? [])
+    .map((match) => parseLocalizedNumber(match))
+    .filter((value): value is number => value != null);
+}
+
+function hasAnyPattern(text: string, patterns: RegExp[]): boolean {
+  return patterns.some((pattern) => pattern.test(text));
+}
+
+function roughlyEqual(left: number, right: number): boolean {
+  const tolerance = Math.max(1, Math.abs(right) * 0.002);
+  return Math.abs(left - right) <= tolerance;
+}
+
+function isSimpleTradeArithmeticClaim(item: ReferenceCoverageItem): boolean {
+  const sentence = item.sentence;
+  const evidence = item.sourceEvidence;
+  if (!evidence) {
+    return false;
+  }
+
+  const combined = `${sentence}\n${evidence}`;
+  if (
+    !hasAnyPattern(combined, TRADE_ARITHMETIC_CONTEXT_PATTERNS) ||
+    !hasAnyPattern(combined, MONEY_CONTEXT_PATTERNS)
+  ) {
+    return false;
+  }
+
+  const sentenceNumbers = extractNumbers(sentence).filter((value) => value >= 1000);
+  const evidenceNumbers = extractNumbers(evidence).filter((value) => value > 0);
+  for (const target of sentenceNumbers) {
+    for (let leftIndex = 0; leftIndex < evidenceNumbers.length; leftIndex += 1) {
+      for (
+        let rightIndex = leftIndex + 1;
+        rightIndex < evidenceNumbers.length;
+        rightIndex += 1
+      ) {
+        const left = evidenceNumbers[leftIndex] ?? 0;
+        const right = evidenceNumbers[rightIndex] ?? 0;
+        const larger = Math.max(left, right);
+        const smaller = Math.min(left, right);
+        if (larger < 100 || smaller <= 0 || smaller > 10_000) {
+          continue;
+        }
+        if (roughlyEqual(larger * smaller, target)) {
+          return true;
+        }
+      }
+    }
+  }
+
+  return false;
 }
 
 export function collectDraftSentences(rewrite: RewriteOutput): string[] {
@@ -155,8 +275,10 @@ export function assessReferenceCheckGate(
     };
   }
 
-  const highRiskUnsupportedSentences = report.unsupportedSentences.filter((item) =>
-    HIGH_RISK_UNSUPPORTED_PATTERNS.some((pattern) => pattern.test(item.sentence))
+  const highRiskUnsupportedSentences = report.unsupportedSentences.filter(
+    (item) =>
+      !isSimpleTradeArithmeticClaim(item) &&
+      HIGH_RISK_UNSUPPORTED_PATTERNS.some((pattern) => pattern.test(item.sentence))
   );
 
   if (highRiskUnsupportedSentences.length > 0) {
