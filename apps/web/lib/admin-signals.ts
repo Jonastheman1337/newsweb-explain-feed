@@ -30,6 +30,12 @@ export type NoticeSummary = {
 
 type SourceDb = "primary" | "log";
 
+type EventContext = {
+  promptVersion: string | null;
+  model: string | null;
+  actionSource: string | null;
+};
+
 export type FeedbackSignal = {
   id: string;
   eventId: string | null;
@@ -37,6 +43,9 @@ export type FeedbackSignal = {
   version: number | null;
   text: string;
   createdAt: string;
+  promptVersion: string | null;
+  model: string | null;
+  actionSource: string | null;
   notice: NoticeSummary | null;
 };
 
@@ -50,6 +59,9 @@ export type EditSignal = {
   originalBody: string;
   editedBody: string;
   copiedAt: string;
+  promptVersion: string | null;
+  model: string | null;
+  actionSource: string | null;
   notice: NoticeSummary | null;
 };
 
@@ -64,6 +76,9 @@ export type TitleSignal = {
   selectedWasOriginal: boolean | null;
   suggestions: string[];
   createdAt: string;
+  promptVersion: string | null;
+  model: string | null;
+  actionSource: string | null;
   notice: NoticeSummary | null;
 };
 
@@ -101,6 +116,7 @@ export type GenerationSignal = {
   reasoningEffortOverride: string | null;
   modelCalls: ModelCallSignal[];
   referenceCheck: ReferenceCheckSignal | null;
+  outputJson: Prisma.JsonValue | null;
   validationJson: Prisma.JsonValue | null;
   errorText: string | null;
   errorGroup: string | null;
@@ -343,6 +359,39 @@ async function fetchNoticeMap(messageIds: Array<number | null | undefined>) {
   );
 }
 
+async function fetchEventContextMap(
+  eventIds: Array<string | null | undefined>
+): Promise<Map<string, EventContext>> {
+  const uniqueIds = Array.from(
+    new Set(eventIds.filter((id): id is string => typeof id === "string" && id.length > 0))
+  );
+  const map = new Map<string, EventContext>();
+  if (!uniqueIds.length) return map;
+
+  const result = await readLogSources(async (client) => {
+    return client.userActionEvent.findMany({
+      where: { id: { in: uniqueIds } },
+      select: {
+        id: true,
+        promptVersion: true,
+        model: true,
+        actionSource: true
+      }
+    });
+  });
+
+  for (const row of result.rows) {
+    if (map.has(row.id)) continue;
+    map.set(row.id, {
+      promptVersion: row.promptVersion,
+      model: row.model,
+      actionSource: row.actionSource
+    });
+  }
+
+  return map;
+}
+
 async function readLogSources<T>(
   query: (client: PrismaClient, sourceDb: SourceDb) => Promise<T[]>
 ): Promise<{ rows: T[]; warnings: string[] }> {
@@ -400,12 +449,19 @@ async function getFeedback(query: SignalsQuery): Promise<FeedbackSignal[]> {
     }
   });
   const noticeMap = await fetchNoticeMap(rows.map((row) => row.messageId));
+  const eventContextMap = await fetchEventContextMap(rows.map((row) => row.eventId));
 
-  return rows.map((row) => ({
-    ...row,
-    createdAt: row.createdAt.toISOString(),
-    notice: noticeMap.get(row.messageId) ?? null
-  }));
+  return rows.map((row) => {
+    const eventContext = row.eventId ? eventContextMap.get(row.eventId) : null;
+    return {
+      ...row,
+      createdAt: row.createdAt.toISOString(),
+      promptVersion: eventContext?.promptVersion ?? null,
+      model: eventContext?.model ?? null,
+      actionSource: eventContext?.actionSource ?? null,
+      notice: noticeMap.get(row.messageId) ?? null
+    };
+  });
 }
 
 async function getEdits(query: SignalsQuery): Promise<EditSignal[]> {
@@ -431,12 +487,19 @@ async function getEdits(query: SignalsQuery): Promise<EditSignal[]> {
     }
   });
   const noticeMap = await fetchNoticeMap(rows.map((row) => row.messageId));
+  const eventContextMap = await fetchEventContextMap(rows.map((row) => row.eventId));
 
-  return rows.map((row) => ({
-    ...row,
-    copiedAt: row.copiedAt.toISOString(),
-    notice: noticeMap.get(row.messageId) ?? null
-  }));
+  return rows.map((row) => {
+    const eventContext = row.eventId ? eventContextMap.get(row.eventId) : null;
+    return {
+      ...row,
+      copiedAt: row.copiedAt.toISOString(),
+      promptVersion: eventContext?.promptVersion ?? null,
+      model: eventContext?.model ?? null,
+      actionSource: eventContext?.actionSource ?? null,
+      notice: noticeMap.get(row.messageId) ?? null
+    };
+  });
 }
 
 async function getTitles(query: SignalsQuery): Promise<TitleSignal[]> {
@@ -464,13 +527,20 @@ async function getTitles(query: SignalsQuery): Promise<TitleSignal[]> {
     }
   });
   const noticeMap = await fetchNoticeMap(rows.map((row) => row.messageId));
+  const eventContextMap = await fetchEventContextMap(rows.map((row) => row.eventId));
 
-  return rows.map((row) => ({
-    ...row,
-    suggestions: asStringArray(row.suggestions),
-    createdAt: row.createdAt.toISOString(),
-    notice: noticeMap.get(row.messageId) ?? null
-  }));
+  return rows.map((row) => {
+    const eventContext = row.eventId ? eventContextMap.get(row.eventId) : null;
+    return {
+      ...row,
+      suggestions: asStringArray(row.suggestions),
+      createdAt: row.createdAt.toISOString(),
+      promptVersion: eventContext?.promptVersion ?? null,
+      model: eventContext?.model ?? null,
+      actionSource: eventContext?.actionSource ?? null,
+      notice: noticeMap.get(row.messageId) ?? null
+    };
+  });
 }
 
 async function getEvents(query: SignalsQuery): Promise<{ rows: EventSignal[]; warnings: string[] }> {
@@ -552,6 +622,7 @@ async function getGenerations(
         promptVersion: true,
         promptChars: true,
         inputJson: true,
+        outputJson: true,
         validationJson: true,
         errorText: true,
         requestedAt: true,
@@ -565,6 +636,7 @@ async function getGenerations(
       reasoningEffortOverride: extractReasoningEffortOverride(row.inputJson),
       modelCalls: extractModelCalls(row.inputJson),
       referenceCheck: extractReferenceCheck(row.validationJson),
+      outputJson: row.outputJson,
       requestedAt: row.requestedAt.toISOString(),
       startedAt: row.startedAt?.toISOString() ?? null,
       finishedAt: row.finishedAt?.toISOString() ?? null,
@@ -679,14 +751,27 @@ export async function getSignalsCsv(query: SignalsQuery): Promise<string> {
 
   if (data.tab === "feedback") {
     return toCsv(
-      ["created_at", "message_id", "version", "notice", "text", "event_id"],
+      [
+        "created_at",
+        "message_id",
+        "version",
+        "notice",
+        "text",
+        "event_id",
+        "prompt_version",
+        "model",
+        "action_source"
+      ],
       data.rows.map((row) => [
         row.createdAt,
         row.messageId,
         row.version,
         noticeLabel(row.notice, row.messageId),
         row.text,
-        row.eventId
+        row.eventId,
+        row.promptVersion,
+        row.model,
+        row.actionSource
       ])
     );
   }
@@ -702,7 +787,10 @@ export async function getSignalsCsv(query: SignalsQuery): Promise<string> {
         "edited_title",
         "original_body",
         "edited_body",
-        "event_id"
+        "event_id",
+        "prompt_version",
+        "model",
+        "action_source"
       ],
       data.rows.map((row) => [
         row.copiedAt,
@@ -713,7 +801,10 @@ export async function getSignalsCsv(query: SignalsQuery): Promise<string> {
         row.editedTitle,
         row.originalBody,
         row.editedBody,
-        row.eventId
+        row.eventId,
+        row.promptVersion,
+        row.model,
+        row.actionSource
       ])
     );
   }
@@ -730,7 +821,10 @@ export async function getSignalsCsv(query: SignalsQuery): Promise<string> {
         "selected_index",
         "selected_was_original",
         "suggestions",
-        "event_id"
+        "event_id",
+        "prompt_version",
+        "model",
+        "action_source"
       ],
       data.rows.map((row) => [
         row.createdAt,
@@ -742,7 +836,10 @@ export async function getSignalsCsv(query: SignalsQuery): Promise<string> {
         row.selectedIndex,
         row.selectedWasOriginal,
         row.suggestions.join(" | "),
-        row.eventId
+        row.eventId,
+        row.promptVersion,
+        row.model,
+        row.actionSource
       ])
     );
   }
@@ -803,6 +900,7 @@ export async function getSignalsCsv(query: SignalsQuery): Promise<string> {
       "model_calls",
       "reference_check_summary",
       "reference_check_json",
+      "output_json",
       "validation_json",
       "started_at",
       "finished_at",
@@ -828,6 +926,7 @@ export async function getSignalsCsv(query: SignalsQuery): Promise<string> {
       jsonText(row.modelCalls as unknown as Prisma.JsonValue),
       row.referenceCheck?.summary ?? null,
       jsonText(row.referenceCheck?.detailJson ?? null),
+      jsonText(row.outputJson),
       jsonText(row.validationJson),
       row.startedAt,
       row.finishedAt,
