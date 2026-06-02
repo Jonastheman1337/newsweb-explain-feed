@@ -153,6 +153,49 @@ describe("validateRewriteOutput", () => {
     );
   });
 
+  it("allows exact report numbers with source-spaced and rewrite-dotted thousands", () => {
+    const payload = createPayload({
+      title: "BELUX: BEELUX S.A R.L.: Financial Statements for 2025",
+      bodyText: "Financial Statements for 2025",
+      hasAttachments: true,
+      pdfSupplementText: [
+        "PROFIT (LOSS) BEFORE TAX 2025/12 1 402 704 2024/12 7 064 970",
+        "Operating revenue 48 858 000 59 268 000",
+        "PROFIT (LOSS) FROM OPERATIONS 982 426 7 492 653",
+        "PROFIT AFTER TAX 5 173 704 5 635 970"
+      ].join("\n")
+    });
+    const rewrite = createRewrite({
+      title: "BeeLux-resultat for skatt faller",
+      lead:
+        "BeeLux fikk et resultat for skatt pa 1.402.704 euro i 2025, ned fra 7.064.970 euro aret for.",
+      body: [
+        "Driftsinntektene falt til 48.858.000 euro fra 59.268.000 euro.",
+        "Driftsresultatet falt til 982.426 euro, mot 7.492.653 euro i 2024.",
+        "Resultatet etter skatt endte pa 5.173.704 euro, ned fra 5.635.970 euro."
+      ],
+      company_sentence: "BeeLux er et Luxembourg-registrert selskap.",
+      key_facts: [
+        "Resultat for skatt 1.402.704 euro",
+        "Driftsinntekter 48.858.000 euro",
+        "Resultat etter skatt 5.173.704 euro"
+      ],
+      negative_or_surprising: ["Resultat for skatt falt fra aret for"],
+      source_limitations: ["Selve borsmeldingen viser til arsregnskapet."],
+      source_spans: [
+        "PROFIT (LOSS) BEFORE TAX 1 402 704 7 064 970",
+        "Operating revenue 48 858 000 59 268 000",
+        "PROFIT AFTER TAX 5 173 704 5 635 970"
+      ]
+    });
+
+    const result = validateRewriteOutput(rewrite, payload);
+
+    expect(
+      result.issues.some((issue) => issue.code === "UNEXPECTED_NUMBERS")
+    ).toBe(false);
+  });
+
   it("allows simple source-derived insider trade totals", () => {
     const payload = createPayload({
       title: "Mandatory notification of trade",

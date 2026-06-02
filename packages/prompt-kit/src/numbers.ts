@@ -1,6 +1,7 @@
 import type { RewriteOutput } from "@newsweb/shared";
 
-const numberTokenRegex = /-?\d[\d\s.,:%/-]*(?:\s*(?:prosent|percent))?/gi;
+const numberTokenRegex =
+  /-?(?:\d{1,3}(?: \d{3})+(?:[,.]\d+)?(?!\d)|\d{1,3}(?:\.\d{3})+(?:,\d+)?(?!\d)|\d{1,3}(?:,\d{3})+(?:\.\d+)?(?!\d)|\d+(?:[,.]\d+)?)(?:\s*(?:%|prosent|percent))?/gi;
 const clockTimeRegex = /\b([01]?\d|2[0-3])[:.](\d{2})\b/g;
 
 function sanitizeNumberToken(token: string): string {
@@ -113,6 +114,10 @@ function parseNumberToken(
   };
 }
 
+function collectNumberTokens(text: string): string[] {
+  return [...text.matchAll(numberTokenRegex)].map((match) => match[0]);
+}
+
 function clockTimeNumberKeys(text: string): Set<string> {
   const keys = new Set<string>();
   for (const match of text.matchAll(clockTimeRegex)) {
@@ -154,7 +159,7 @@ function rewriteNumberKeys(parsed: {
 }
 
 function collectSourceNumberKeys(text: string): Set<string> {
-  const tokens = text.match(numberTokenRegex) ?? [];
+  const tokens = collectNumberTokens(text);
   const keys = clockTimeNumberKeys(text);
 
   for (const token of tokens) {
@@ -198,7 +203,7 @@ function roughlyEqual(left: number, right: number): boolean {
 }
 
 function collectSourceNumberValues(text: string): number[] {
-  const tokens = text.match(numberTokenRegex) ?? [];
+  const tokens = collectNumberTokens(text);
   const values: number[] = [];
 
   for (const token of tokens) {
@@ -282,7 +287,7 @@ export function findUnexpectedNumbers(
   sourceText: string
 ): string[] {
   const sourceNumberKeys = collectSourceNumberKeys(sourceText);
-  const rewriteTokens = JSON.stringify(rewrite).match(numberTokenRegex) ?? [];
+  const rewriteTokens = collectNumberTokens(JSON.stringify(rewrite));
   const unexpected = new Set<string>();
 
   for (const token of rewriteTokens) {
