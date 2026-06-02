@@ -2,6 +2,23 @@ import { findUnexpectedNumbers } from "@newsweb/prompt-kit";
 import type { RewriteOutput } from "@newsweb/shared";
 import { describe, expect, it } from "vitest";
 
+function createRewrite(overrides: Partial<RewriteOutput>): RewriteOutput {
+  return {
+    title: "Selskapet melder oppdatering",
+    lead: "Selskapet melder om nye detaljer.",
+    body: [],
+    company_sentence: "Test AS er selskapet bak meldingen.",
+    key_facts: [],
+    negative_or_surprising: [],
+    excluded_hype: [],
+    source_limitations: [],
+    confidence: "medium",
+    importance: "medium",
+    source_spans: [],
+    ...overrides
+  };
+}
+
 describe("findUnexpectedNumbers", () => {
   it("flags numbers that are missing from source", () => {
     const rewrite: RewriteOutput = {
@@ -110,6 +127,114 @@ describe("findUnexpectedNumbers", () => {
 
     const missing = findUnexpectedNumbers(rewrite, source);
     expect(missing).toContain("1.402.705");
+  });
+
+  it("accepts rounded billion kroner amounts derived from exact source totals", () => {
+    const rewrite = createRewrite({
+      title: "Norse Atlantic far ja til emisjon",
+      lead:
+        "Norse Atlantic far generalforsamlingens ja til a oke aksjekapitalen med 1,02 milliarder kroner.",
+      key_facts: ["Kapitalforhoyelse pa 1,02 milliarder kroner"],
+      source_spans: ["The share capital is increased with NOK 1,019,832,000.00"]
+    });
+
+    const source =
+      "The share capital is increased with NOK 1,019,832,000.00 in connection with a rights issue.";
+
+    const missing = findUnexpectedNumbers(rewrite, source);
+    expect(missing).toEqual([]);
+  });
+
+  it("accepts rounded billion share counts derived from exact source totals", () => {
+    const rewrite = createRewrite({
+      title: "Norse Atlantic far ja til emisjon",
+      lead: "Det skal utstedes 2,04 milliarder nye aksjer.",
+      key_facts: ["2,04 milliarder nye aksjer"],
+      source_spans: ["issuance of 2,039,664,000 new shares"]
+    });
+
+    const source =
+      "The share capital increase is made by the issuance of 2,039,664,000 new shares.";
+
+    const missing = findUnexpectedNumbers(rewrite, source);
+    expect(missing).toEqual([]);
+  });
+
+  it("accepts rounded million kroner amounts derived from exact source totals", () => {
+    const rewrite = createRewrite({
+      title: "Selskapet henter kapital",
+      lead: "Selskapet henter 750 millioner kroner.",
+      key_facts: ["Henter 750 millioner kroner"],
+      source_spans: ["gross proceeds of NOK 750,000,000"]
+    });
+
+    const source =
+      "The private placement will raise gross proceeds of NOK 750,000,000.";
+
+    const missing = findUnexpectedNumbers(rewrite, source);
+    expect(missing).toEqual([]);
+  });
+
+  it("accepts source million amounts rewritten as billion amounts", () => {
+    const rewrite = createRewrite({
+      title: "Vegfinans utsteder lan",
+      lead: "Vegfinans har utstedt nye obligasjoner pa 1 milliard kroner.",
+      key_facts: ["Lan pa 1 milliard kroner"],
+      source_spans: ["issued bonds for 1.000 millioner kroner"]
+    });
+
+    const source =
+      "Vegfinans has issued bonds for 1.000 millioner kroner under the framework.";
+
+    const missing = findUnexpectedNumbers(rewrite, source);
+    expect(missing).toEqual([]);
+  });
+
+  it("rejects incorrect rounded billion amounts from exact source totals", () => {
+    const rewrite = createRewrite({
+      title: "Norse Atlantic far ja til emisjon",
+      lead:
+        "Norse Atlantic far generalforsamlingens ja til a oke aksjekapitalen med 1,20 milliarder kroner.",
+      key_facts: ["Kapitalforhoyelse pa 1,20 milliarder kroner"],
+      source_spans: ["The share capital is increased with NOK 1,019,832,000.00"]
+    });
+
+    const source =
+      "The share capital is increased with NOK 1,019,832,000.00 in connection with a rights issue.";
+
+    const missing = findUnexpectedNumbers(rewrite, source);
+    expect(missing).toContain("1,20");
+  });
+
+  it("rejects rounded scaled amounts when the source and rewrite units differ", () => {
+    const rewrite = createRewrite({
+      title: "Selskapet henter kapital",
+      lead: "Selskapet henter 1,02 milliarder kroner.",
+      key_facts: ["Henter 1,02 milliarder kroner"],
+      source_spans: ["gross proceeds of USD 1,019,832,000.00"]
+    });
+
+    const source =
+      "The private placement will raise gross proceeds of USD 1,019,832,000.00.";
+
+    const missing = findUnexpectedNumbers(rewrite, source);
+    expect(missing).toContain("1,02");
+  });
+
+  it("rejects bare integer billion wording for non-integer exact source totals", () => {
+    const rewrite = createRewrite({
+      title: "Norse Atlantic far ja til emisjon",
+      lead:
+        "Norse Atlantic far generalforsamlingens ja til a oke aksjekapitalen med 1 milliard kroner.",
+      key_facts: ["Kapitalforhoyelse pa 1 milliard kroner"],
+      source_spans: ["The share capital is increased with NOK 1,019,832,000.00"]
+    });
+
+    const source =
+      "The share capital is increased with NOK 1,019,832,000.00 in connection with a rights issue.";
+
+    const missing = findUnexpectedNumbers(rewrite, source);
+    expect(missing).toContain("1");
   });
 
   it("accepts rounded million figures from explicitly thousand-scaled report tables", () => {

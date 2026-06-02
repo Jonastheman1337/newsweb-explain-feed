@@ -63,7 +63,14 @@ function formatBillionFromKroner(kronerAmount: number): string {
   if (Number.isInteger(billions)) {
     return `${billions} milliarder`;
   }
-  return `${billions.toFixed(1).replace(".", ",").replace(/,0$/, "")} milliarder`;
+  const oneDecimal = Number(billions.toFixed(1));
+  const fractionDigits = Number.isInteger(oneDecimal) ? 2 : 1;
+  const formatted = billions
+    .toFixed(fractionDigits)
+    .replace(/0+$/g, "")
+    .replace(/\.$/g, "")
+    .replace(".", ",");
+  return `${formatted} milliarder`;
 }
 
 function sanitizeText(text: string, stats: StyleSanitizationStats): string {

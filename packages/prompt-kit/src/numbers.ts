@@ -6,6 +6,8 @@ const clockTimeRegex = /\b([01]?\d|2[0-3])[:.](\d{2})\b/g;
 const SOURCE_SCALE_CONTEXT_CHARS = 1400;
 const SOURCE_SCALE_FORWARD_CONTEXT_CHARS = 300;
 const REWRITE_UNIT_CONTEXT_CHARS = 48;
+const NUMBER_UNIT_CONTEXT_BEFORE_CHARS = 56;
+const NUMBER_UNIT_CONTEXT_AFTER_CHARS = 88;
 
 const CURRENCY_SCALE_CONTEXT =
   "(?:usd|u\\.s\\.\\s*dollars?|us\\s*dollars?|us\\$|dollars?|nok|eur|euro|gbp|sek|dkk|kroner)";
@@ -29,15 +31,21 @@ const EXPLICIT_THOUSANDS_SCALE_PATTERNS = [
   )
 ];
 const REWRITE_MILLION_CONTEXT_PATTERN = /\b(?:mill\.|million(?:er)?)\b/i;
+const REWRITE_BILLION_CONTEXT_PATTERN =
+  /\b(?:mrd\.?|milliard(?:er)?|billion(?:s)?)\b/i;
 
 type NumberTokenMatch = {
   token: string;
   index: number;
 };
 
+type ScaledNumberUnit = "nok" | "usd" | "eur" | "gbp" | "sek" | "dkk" | "shares";
+type ScaledNumberScale = "million" | "billion";
+
 type SourceNumberIndex = {
   exactKeys: Set<string>;
   scaledMillionKeys: Set<string>;
+  scaledUnitKeys: Set<string>;
 };
 
 function sanitizeNumberToken(token: string): string {
@@ -192,6 +200,27 @@ function integerThousandsEquivalentKey(parsed: {
   return [negative ? "-" : "+", integer, "abs", "0"].join("|");
 }
 
+function integerThousandsEquivalentValue(parsed: {
+  display: string;
+  hasPercent: boolean;
+}): number | null {
+  if (parsed.hasPercent) {
+    return null;
+  }
+
+  const negative = parsed.display.startsWith("-");
+  const unsigned = negative ? parsed.display.slice(1) : parsed.display;
+  if (!/^\d{1,3}(?:[.,]\d{3})+$/.test(unsigned)) {
+    return null;
+  }
+
+  const integer = Number(unsigned.replace(/[.,]/g, ""));
+  if (!Number.isFinite(integer)) {
+    return null;
+  }
+  return (negative ? -1 : 1) * integer;
+}
+
 function rewriteNumberKeys(parsed: {
   display: string;
   key: string;
@@ -228,6 +257,78 @@ function hasRewriteMillionContext(
     index + token.length + REWRITE_UNIT_CONTEXT_CHARS
   );
   return REWRITE_MILLION_CONTEXT_PATTERN.test(text.slice(start, end));
+}
+
+function rewriteScaleContext(
+  text: string,
+  index: number,
+  token: string
+): ScaledNumberScale | null {
+  const start = Math.max(0, index - REWRITE_UNIT_CONTEXT_CHARS);
+  const end = Math.min(
+    text.length,
+    index + token.length + REWRITE_UNIT_CONTEXT_CHARS
+  );
+  const context = text.slice(start, end);
+  if (REWRITE_BILLION_CONTEXT_PATTERN.test(context)) {
+    return "billion";
+  }
+  if (REWRITE_MILLION_CONTEXT_PATTERN.test(context)) {
+    return "million";
+  }
+  return null;
+}
+
+function sourceScaleContext(
+  text: string,
+  index: number,
+  token: string
+): ScaledNumberScale | null {
+  return rewriteScaleContext(text, index, token);
+}
+
+function numberUnitContext(text: string, index: number, token: string): string {
+  const before = text.slice(
+    Math.max(0, index - NUMBER_UNIT_CONTEXT_BEFORE_CHARS),
+    index
+  );
+  const after = text.slice(
+    index + token.length,
+    Math.min(text.length, index + token.length + NUMBER_UNIT_CONTEXT_AFTER_CHARS)
+  );
+  return `${before} ${after}`;
+}
+
+function detectScaledNumberUnit(
+  text: string,
+  index: number,
+  token: string
+): ScaledNumberUnit | null {
+  const context = numberUnitContext(text, index, token);
+
+  if (/\b(?:sek|svenske kroner|swedish kronor)\b/i.test(context)) {
+    return "sek";
+  }
+  if (/\b(?:dkk|danske kroner|danish kroner)\b/i.test(context)) {
+    return "dkk";
+  }
+  if (/\b(?:usd|u\.s\.\s*dollars?|us\s*dollars?|us\$|dollars?|\$)\b/i.test(context)) {
+    return "usd";
+  }
+  if (/\b(?:eur|euros?|euro)\b/i.test(context)) {
+    return "eur";
+  }
+  if (/\b(?:gbp|pund|pounds?)\b/i.test(context)) {
+    return "gbp";
+  }
+  if (/\b(?:nok|norske kroner|kroner|kr)\b/i.test(context)) {
+    return "nok";
+  }
+  if (/\b(?:aksje|aksjer|shares)\b/i.test(context)) {
+    return "shares";
+  }
+
+  return null;
 }
 
 function isYearLikeNumber(value: number): boolean {
@@ -281,9 +382,18 @@ function roundedNumberKey(value: number, fractionDigits: number): string {
   return [sign, normalized, "abs", String(fractionDigits)].join("|");
 }
 
-function roundToOneDecimal(value: number): number {
+function roundToFractionDigits(value: number, fractionDigits: number): number {
   const sign = value < 0 ? -1 : 1;
-  return sign * Math.round((Math.abs(value) + Number.EPSILON) * 10) / 10;
+  const multiplier = 10 ** fractionDigits;
+  return (
+    sign *
+    Math.round((Math.abs(value) + Number.EPSILON) * multiplier) /
+      multiplier
+  );
+}
+
+function roundToOneDecimal(value: number): number {
+  return roundToFractionDigits(value, 1);
 }
 
 function scaledMillionKeysForSourceToken(
@@ -306,10 +416,68 @@ function scaledMillionKeysForSourceToken(
   return [...keys];
 }
 
+function scaledUnitIndexKey(
+  scale: ScaledNumberScale,
+  unit: ScaledNumberUnit,
+  key: string
+): string {
+  return `${scale}|${unit}|${key}`;
+}
+
+function scaledUnitKeysForSourceValue(
+  value: number,
+  scale: ScaledNumberScale
+): string[] {
+  const divisor = scale === "billion" ? 1_000_000_000 : 1_000_000;
+  const scaledValue = value / divisor;
+  if (Math.abs(scaledValue) < 1) {
+    return [];
+  }
+
+  const keys = new Set<string>();
+  for (const fractionDigits of [1, 2, 3]) {
+    keys.add(
+      roundedNumberKey(
+        roundToFractionDigits(scaledValue, fractionDigits),
+        fractionDigits
+      )
+    );
+  }
+
+  const roundedInteger = Math.round(scaledValue);
+  if (Math.abs(scaledValue - roundedInteger) < 1e-9) {
+    keys.add(roundedNumberKey(roundedInteger, 0));
+  }
+
+  return [...keys];
+}
+
+function sourceNumberValueVariants(parsed: {
+  display: string;
+  value: number;
+  hasPercent: boolean;
+}): number[] {
+  if (parsed.hasPercent) {
+    return [];
+  }
+
+  const values = new Set<number>([parsed.value]);
+  const integerEquivalent = integerThousandsEquivalentValue(parsed);
+  if (integerEquivalent != null) {
+    values.add(integerEquivalent);
+  }
+  return [...values];
+}
+
+function scaleDivisor(scale: ScaledNumberScale): number {
+  return scale === "billion" ? 1_000_000_000 : 1_000_000;
+}
+
 function collectSourceNumberIndex(text: string): SourceNumberIndex {
   const tokens = collectNumberTokenMatches(text);
   const exactKeys = clockTimeNumberKeys(text);
   const scaledMillionKeys = new Set<string>();
+  const scaledUnitKeys = new Set<string>();
 
   for (const token of tokens) {
     const parsed = parseNumberToken(token.token);
@@ -318,6 +486,23 @@ function collectSourceNumberIndex(text: string): SourceNumberIndex {
       if (hasExplicitThousandsScaleContext(text, token.index, token.token)) {
         for (const key of scaledMillionKeysForSourceToken(parsed, token.token)) {
           scaledMillionKeys.add(key);
+        }
+      }
+      const unit = detectScaledNumberUnit(text, token.index, token.token);
+      if (unit) {
+        const sourceScale = sourceScaleContext(text, token.index, token.token);
+        for (const sourceValue of sourceNumberValueVariants(parsed)) {
+          const absoluteValues = [sourceValue];
+          if (sourceScale != null) {
+            absoluteValues.push(sourceValue * scaleDivisor(sourceScale));
+          }
+          for (const absoluteValue of absoluteValues) {
+            for (const scale of ["million", "billion"] as const) {
+              for (const key of scaledUnitKeysForSourceValue(absoluteValue, scale)) {
+                scaledUnitKeys.add(scaledUnitIndexKey(scale, unit, key));
+              }
+            }
+          }
         }
       }
     }
@@ -334,7 +519,7 @@ function collectSourceNumberIndex(text: string): SourceNumberIndex {
     }
   }
 
-  return { exactKeys, scaledMillionKeys };
+  return { exactKeys, scaledMillionKeys, scaledUnitKeys };
 }
 
 const tradeArithmeticContextPatterns = [
@@ -457,7 +642,21 @@ export function findUnexpectedNumbers(
     const hasScaledMillionMatch =
       hasRewriteMillionContext(rewriteText, token.index, token.token) &&
       rewriteKeys.some((key) => sourceNumberIndex.scaledMillionKeys.has(key));
-    if (!hasExactMatch && !hasScaledMillionMatch) {
+    const rewriteScale = rewriteScaleContext(rewriteText, token.index, token.token);
+    const rewriteUnit = detectScaledNumberUnit(
+      rewriteText,
+      token.index,
+      token.token
+    );
+    const hasScaledUnitMatch =
+      rewriteScale != null &&
+      rewriteUnit != null &&
+      rewriteKeys.some((key) =>
+        sourceNumberIndex.scaledUnitKeys.has(
+          scaledUnitIndexKey(rewriteScale, rewriteUnit, key)
+        )
+      );
+    if (!hasExactMatch && !hasScaledMillionMatch && !hasScaledUnitMatch) {
       if (isSimpleTradeArithmeticNumber(parsed, sourceText)) {
         continue;
       }
