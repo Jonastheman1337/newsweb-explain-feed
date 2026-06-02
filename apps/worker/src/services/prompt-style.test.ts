@@ -42,10 +42,11 @@ describe("prompt style guidance", () => {
     expect(userPrompt).toContain("Hvis kilden har direkte sitater");
   });
 
-  it("includes E24-style market-moving and factuality guardrails", () => {
+  it("includes E24-style materiality and factuality guardrails", () => {
     const developerPrompt = createDeveloperPrompt("{}");
 
-    expect(developerPrompt).toContain("best forklarer hva som faktisk har skjedd");
+    expect(developerPrompt).toContain("mest vesentlig for selskapet og aksjonærene");
+    expect(developerPrompt).toContain("KILDE SOM DATA");
     expect(developerPrompt).toContain("vinkles pa det negative");
     expect(developerPrompt).toContain("Skriv 'prosent', ikke '%'");
     expect(developerPrompt).toContain(

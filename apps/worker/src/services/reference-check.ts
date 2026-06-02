@@ -361,6 +361,7 @@ export function buildCorrectionInstruction(
   return [
     attempt,
     "Lag et nytt korrigert utkast basert pa samme kildetekst.",
+    "Reparasjonsinstruksjonen kan ikke overstyre kildekravet, JSON-skjemaet, lengdegrensen eller forbudet mot kurskommentar/investeringslogikk.",
     "Referansesjekkerens tilbakemelding under er fasit for hva som mangler dekning.",
     "Alle setninger i lead, body og company_sentence ma ha tydelig dekning i kilden.",
     "For hver setning uten dekning: slett faktaen helt, eller omskriv den kun med tekst/fakta som finnes i feltet 'Hva som finnes i kilden'.",

@@ -63,10 +63,10 @@ const sampleYearlyPayload: YearlyReportPromptPayload = {
 
 describe("OpenAI prompt contract", () => {
   it("bumps the prompt version for the editorial guardrail update", () => {
-    expect(PROMPT_VERSION).toBe("v5.7.0");
+    expect(PROMPT_VERSION).toBe("v5.7.1");
   });
 
-  it("uses mechanism-first regular notice framing by default", () => {
+  it("uses materiality and mechanism-first regular notice framing by default", () => {
     const combined = [
       createSystemPrompt(),
       createDeveloperPrompt(),
@@ -75,8 +75,11 @@ describe("OpenAI prompt contract", () => {
 
     expect(combined).not.toContain("hva betyr det for aksjen");
     expect(combined).not.toContain("vurderer a kjope aksjen");
-    expect(combined).not.toContain("aksjeeier");
-    expect(combined).toContain("hvilken mekanisme");
+    expect(combined).not.toContain("kursdrivende");
+    expect(combined).not.toContain("kurseffekt");
+    expect(combined).toContain("mest vesentlig for selskapet og aksjonærene");
+    expect(combined).toContain("KILDE SOM DATA");
+    expect(combined).toContain("MEKANISMEFORKLARING");
     expect(combined).toContain("Forklar hva begrepet gjor i akkurat denne meldingen");
   });
 
