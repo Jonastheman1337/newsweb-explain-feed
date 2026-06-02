@@ -3,6 +3,42 @@ import type { RewriteOutput } from "@newsweb/shared";
 const numberTokenRegex =
   /-?(?:\d{1,3}(?: \d{3})+(?:[,.]\d+)?(?!\d)|\d{1,3}(?:\.\d{3})+(?:,\d+)?(?!\d)|\d{1,3}(?:,\d{3})+(?:\.\d+)?(?!\d)|\d+(?:[,.]\d+)?)(?:\s*(?:%|prosent|percent))?/gi;
 const clockTimeRegex = /\b([01]?\d|2[0-3])[:.](\d{2})\b/g;
+const SOURCE_SCALE_CONTEXT_CHARS = 1400;
+const SOURCE_SCALE_FORWARD_CONTEXT_CHARS = 300;
+const REWRITE_UNIT_CONTEXT_CHARS = 48;
+
+const CURRENCY_SCALE_CONTEXT =
+  "(?:usd|u\\.s\\.\\s*dollars?|us\\s*dollars?|us\\$|dollars?|nok|eur|euro|gbp|sek|dkk|kroner)";
+const THOUSANDS_SCALE_CONTEXT = "(?:thousands?|tusen|['’]?000s?)";
+const EXPLICIT_THOUSANDS_SCALE_PATTERNS = [
+  new RegExp(
+    `\\b(?:amounts?|figures?|values?|numbers?)\\b.{0,80}\\b(?:in|presented\\s+in|shown\\s+in|stated\\s+in|reported\\s+in|expressed\\s+in)\\b.{0,50}\\b(?:${CURRENCY_SCALE_CONTEXT}\\s*)?${THOUSANDS_SCALE_CONTEXT}\\b`,
+    "i"
+  ),
+  new RegExp(
+    `\\b(?:in|presented\\s+in|shown\\s+in|stated\\s+in|reported\\s+in|expressed\\s+in)\\b.{0,50}\\b(?:${CURRENCY_SCALE_CONTEXT}\\s*)?${THOUSANDS_SCALE_CONTEXT}\\b`,
+    "i"
+  ),
+  new RegExp(
+    `\\b${CURRENCY_SCALE_CONTEXT}\\s*${THOUSANDS_SCALE_CONTEXT}\\b`,
+    "i"
+  ),
+  new RegExp(
+    `\\b${THOUSANDS_SCALE_CONTEXT}\\s+of\\s+${CURRENCY_SCALE_CONTEXT}\\b`,
+    "i"
+  )
+];
+const REWRITE_MILLION_CONTEXT_PATTERN = /\b(?:mill\.|million(?:er)?)\b/i;
+
+type NumberTokenMatch = {
+  token: string;
+  index: number;
+};
+
+type SourceNumberIndex = {
+  exactKeys: Set<string>;
+  scaledMillionKeys: Set<string>;
+};
 
 function sanitizeNumberToken(token: string): string {
   const trimmed = token.trim();
@@ -114,8 +150,15 @@ function parseNumberToken(
   };
 }
 
+function collectNumberTokenMatches(text: string): NumberTokenMatch[] {
+  return [...text.matchAll(numberTokenRegex)].map((match) => ({
+    token: match[0],
+    index: match.index ?? 0
+  }));
+}
+
 function collectNumberTokens(text: string): string[] {
-  return [...text.matchAll(numberTokenRegex)].map((match) => match[0]);
+  return collectNumberTokenMatches(text).map((match) => match.token);
 }
 
 function clockTimeNumberKeys(text: string): Set<string> {
@@ -158,29 +201,140 @@ function rewriteNumberKeys(parsed: {
   return equivalentKey ? [parsed.key, equivalentKey] : [parsed.key];
 }
 
-function collectSourceNumberKeys(text: string): Set<string> {
-  const tokens = collectNumberTokens(text);
-  const keys = clockTimeNumberKeys(text);
+function hasExplicitThousandsScaleContext(
+  text: string,
+  index: number,
+  token: string
+): boolean {
+  const start = Math.max(0, index - SOURCE_SCALE_CONTEXT_CHARS);
+  const end = Math.min(
+    text.length,
+    index + token.length + SOURCE_SCALE_FORWARD_CONTEXT_CHARS
+  );
+  const context = text.slice(start, end);
+  return EXPLICIT_THOUSANDS_SCALE_PATTERNS.some((pattern) =>
+    pattern.test(context)
+  );
+}
+
+function hasRewriteMillionContext(
+  text: string,
+  index: number,
+  token: string
+): boolean {
+  const start = Math.max(0, index - REWRITE_UNIT_CONTEXT_CHARS);
+  const end = Math.min(
+    text.length,
+    index + token.length + REWRITE_UNIT_CONTEXT_CHARS
+  );
+  return REWRITE_MILLION_CONTEXT_PATTERN.test(text.slice(start, end));
+}
+
+function isYearLikeNumber(value: number): boolean {
+  return Number.isInteger(value) && value >= 1900 && value <= 2099;
+}
+
+function sourceThousandsToMillionValue(
+  parsed: { display: string; hasPercent: boolean },
+  token: string
+): number | null {
+  if (parsed.hasPercent) {
+    return null;
+  }
+
+  const sanitized = sanitizeNumberToken(token);
+  const negative = sanitized.startsWith("-");
+  const unsigned = negative ? sanitized.slice(1) : sanitized;
+  let rawInteger: string | null = null;
+
+  if (/^\d{1,3}[,.]\d{3}$/.test(unsigned)) {
+    rawInteger = unsigned.replace(/[,.]/g, "");
+  } else if (/^\d{1,3}(?:[,.]\d{3}){2,}$/.test(unsigned)) {
+    rawInteger = unsigned.replace(/[,.]/g, "");
+  } else if (/^\d{1,3}(?: \d{3})+$/.test(unsigned)) {
+    rawInteger = unsigned.replace(/ /g, "");
+  } else if (/^\d{4,}$/.test(unsigned)) {
+    rawInteger = unsigned;
+  }
+
+  if (!rawInteger) {
+    return null;
+  }
+
+  const thousandsValue = Number(rawInteger);
+  if (!Number.isFinite(thousandsValue) || isYearLikeNumber(thousandsValue)) {
+    return null;
+  }
+
+  const millionValue = thousandsValue / 1000;
+  if (Math.abs(millionValue) < 1) {
+    return null;
+  }
+
+  return (negative ? -1 : 1) * millionValue;
+}
+
+function roundedNumberKey(value: number, fractionDigits: number): string {
+  const sign = value < 0 ? "-" : "+";
+  const absValue = Math.abs(value);
+  const normalized = absValue.toFixed(fractionDigits).replace(/^0+(?=\d)/, "") || "0";
+  return [sign, normalized, "abs", String(fractionDigits)].join("|");
+}
+
+function roundToOneDecimal(value: number): number {
+  const sign = value < 0 ? -1 : 1;
+  return sign * Math.round((Math.abs(value) + Number.EPSILON) * 10) / 10;
+}
+
+function scaledMillionKeysForSourceToken(
+  parsed: { display: string; hasPercent: boolean },
+  token: string
+): string[] {
+  const millionValue = sourceThousandsToMillionValue(parsed, token);
+  if (millionValue == null) {
+    return [];
+  }
+
+  const keys = new Set<string>();
+  keys.add(roundedNumberKey(roundToOneDecimal(millionValue), 1));
+
+  const roundedInteger = Math.round(millionValue);
+  if (Math.abs(millionValue - roundedInteger) < 1e-9) {
+    keys.add(roundedNumberKey(roundedInteger, 0));
+  }
+
+  return [...keys];
+}
+
+function collectSourceNumberIndex(text: string): SourceNumberIndex {
+  const tokens = collectNumberTokenMatches(text);
+  const exactKeys = clockTimeNumberKeys(text);
+  const scaledMillionKeys = new Set<string>();
 
   for (const token of tokens) {
-    const parsed = parseNumberToken(token);
+    const parsed = parseNumberToken(token.token);
     if (parsed) {
-      keys.add(parsed.key);
+      exactKeys.add(parsed.key);
+      if (hasExplicitThousandsScaleContext(text, token.index, token.token)) {
+        for (const key of scaledMillionKeysForSourceToken(parsed, token.token)) {
+          scaledMillionKeys.add(key);
+        }
+      }
     }
 
-    const sanitized = sanitizeNumberToken(token);
+    const sanitized = sanitizeNumberToken(token.token);
     const parts = sanitized.split(/[\s:/-]+/).filter((part) => /\d/.test(part));
     if (parts.length > 1) {
       for (const part of parts) {
         const partParsed = parseNumberToken(part);
         if (partParsed) {
-          keys.add(partParsed.key);
+          exactKeys.add(partParsed.key);
         }
       }
     }
   }
 
-  return keys;
+  return { exactKeys, scaledMillionKeys };
 }
 
 const tradeArithmeticContextPatterns = [
@@ -286,16 +440,24 @@ export function findUnexpectedNumbers(
   rewrite: RewriteOutput,
   sourceText: string
 ): string[] {
-  const sourceNumberKeys = collectSourceNumberKeys(sourceText);
-  const rewriteTokens = collectNumberTokens(JSON.stringify(rewrite));
+  const sourceNumberIndex = collectSourceNumberIndex(sourceText);
+  const rewriteText = JSON.stringify(rewrite);
+  const rewriteTokens = collectNumberTokenMatches(rewriteText);
   const unexpected = new Set<string>();
 
   for (const token of rewriteTokens) {
-    const parsed = parseNumberToken(token);
+    const parsed = parseNumberToken(token.token);
     if (!parsed) {
       continue;
     }
-    if (!rewriteNumberKeys(parsed).some((key) => sourceNumberKeys.has(key))) {
+    const rewriteKeys = rewriteNumberKeys(parsed);
+    const hasExactMatch = rewriteKeys.some((key) =>
+      sourceNumberIndex.exactKeys.has(key)
+    );
+    const hasScaledMillionMatch =
+      hasRewriteMillionContext(rewriteText, token.index, token.token) &&
+      rewriteKeys.some((key) => sourceNumberIndex.scaledMillionKeys.has(key));
+    if (!hasExactMatch && !hasScaledMillionMatch) {
       if (isSimpleTradeArithmeticNumber(parsed, sourceText)) {
         continue;
       }

@@ -112,6 +112,123 @@ describe("findUnexpectedNumbers", () => {
     expect(missing).toContain("1.402.705");
   });
 
+  it("accepts rounded million figures from explicitly thousand-scaled report tables", () => {
+    const rewrite: RewriteOutput = {
+      title: "CMM oker inntektene",
+      lead:
+        "CMM okte inntektene til 33,6 millioner dollar i kvartalet, fra 12,1 millioner dollar aret for.",
+      body: [
+        "Driftsresultatet var 3,1 millioner dollar, mot 3,2 millioner i samme kvartal i fjor.",
+        "Resultatet for skatt steg til 6,2 millioner dollar, fra 4,0 millioner aret for."
+      ],
+      company_sentence: "CMM har flere fartoykontrakter med Petrobras.",
+      key_facts: [
+        "Inntekter 33,6 millioner dollar",
+        "Driftsresultat 3,1 millioner dollar",
+        "Resultat for skatt 6,2 millioner dollar"
+      ],
+      negative_or_surprising: [],
+      excluded_hype: [],
+      source_limitations: [],
+      confidence: "high",
+      importance: "medium",
+      source_spans: [
+        "Revenue 33,613 12,118",
+        "Operating Profit 3,100 3,244",
+        "Result before corporate income tax 6,232 4,027"
+      ]
+    };
+
+    const source = [
+      "Consolidated statement of income",
+      "(in USD thousands)",
+      "Revenue 33,613 12,118",
+      "Operating Profit 3,100 3,244",
+      "Result before corporate income tax 6,232 4,027"
+    ].join("\n");
+
+    const missing = findUnexpectedNumbers(rewrite, source);
+    expect(missing).toEqual([]);
+  });
+
+  it("rejects rounded million figures when the table scale is not explicit", () => {
+    const rewrite: RewriteOutput = {
+      title: "CMM oker inntektene",
+      lead:
+        "CMM okte inntektene til 33,6 millioner dollar i kvartalet, fra 12,1 millioner dollar aret for.",
+      body: ["Driftsresultatet var 3,1 millioner dollar."],
+      company_sentence: "CMM har flere fartoykontrakter med Petrobras.",
+      key_facts: ["Inntekter 33,6 millioner dollar"],
+      negative_or_surprising: [],
+      excluded_hype: [],
+      source_limitations: [],
+      confidence: "high",
+      importance: "medium",
+      source_spans: ["Revenue 33,613 12,118"]
+    };
+
+    const source = [
+      "Consolidated statement of income",
+      "Revenue 33,613 12,118",
+      "Operating Profit 3,100 3,244"
+    ].join("\n");
+
+    const missing = findUnexpectedNumbers(rewrite, source);
+    expect(missing).toContain("33,6");
+  });
+
+  it("rejects incorrectly rounded million figures from thousand-scaled tables", () => {
+    const rewrite: RewriteOutput = {
+      title: "CMM oker inntektene",
+      lead:
+        "CMM okte inntektene til 33,7 millioner dollar i kvartalet, fra 12,1 millioner dollar aret for.",
+      body: [],
+      company_sentence: "CMM har flere fartoykontrakter med Petrobras.",
+      key_facts: ["Inntekter 33,7 millioner dollar"],
+      negative_or_surprising: [],
+      excluded_hype: [],
+      source_limitations: [],
+      confidence: "high",
+      importance: "medium",
+      source_spans: ["Revenue 33,613 12,118"]
+    };
+
+    const source = [
+      "Consolidated statement of income",
+      "Amounts are in USD thousands",
+      "Revenue 33,613 12,118"
+    ].join("\n");
+
+    const missing = findUnexpectedNumbers(rewrite, source);
+    expect(missing).toContain("33,7");
+  });
+
+  it("rejects scaled table matches when rewrite text omits the million unit", () => {
+    const rewrite: RewriteOutput = {
+      title: "CMM oker inntektene",
+      lead:
+        "CMM okte inntektene til 33,6 dollar i kvartalet, fra 12,1 dollar aret for.",
+      body: [],
+      company_sentence: "CMM har flere fartoykontrakter med Petrobras.",
+      key_facts: ["Inntekter 33,6 dollar"],
+      negative_or_surprising: [],
+      excluded_hype: [],
+      source_limitations: [],
+      confidence: "high",
+      importance: "medium",
+      source_spans: ["Revenue 33,613 12,118"]
+    };
+
+    const source = [
+      "Consolidated statement of income",
+      "Amounts are in USD thousands",
+      "Revenue 33,613 12,118"
+    ].join("\n");
+
+    const missing = findUnexpectedNumbers(rewrite, source);
+    expect(missing).toContain("33,6");
+  });
+
   it("normalizes punctuation around date tokens", () => {
     const rewrite: RewriteOutput = {
       title: "Rapportdato bekreftet",

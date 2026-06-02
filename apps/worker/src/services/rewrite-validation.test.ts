@@ -196,6 +196,49 @@ describe("validateRewriteOutput", () => {
     ).toBe(false);
   });
 
+  it("allows rounded million figures from explicitly thousand-scaled report tables", () => {
+    const payload = createPayload({
+      title: "CMMB: Compagnie Maritime Monegasque OSV B.V. Q1 2026 Interim Report",
+      bodyText: "Q1 2026 Interim Report",
+      hasAttachments: true,
+      pdfSupplementText: [
+        "Consolidated statement of income",
+        "Amounts are in USD thousands",
+        "Revenue 33,613 12,118",
+        "Operating Profit 3,100 3,244",
+        "Result before corporate income tax 6,232 4,027"
+      ].join("\n")
+    });
+    const rewrite = createRewrite({
+      title: "CMM oker inntektene",
+      lead:
+        "CMM okte inntektene til 33,6 millioner dollar i kvartalet, fra 12,1 millioner dollar aret for.",
+      body: [
+        "Driftsresultatet var 3,1 millioner dollar, mot 3,2 millioner i samme kvartal i fjor.",
+        "Resultatet for skatt steg til 6,2 millioner dollar, fra 4,0 millioner aret for."
+      ],
+      company_sentence: "CMM har flere fartoykontrakter med Petrobras.",
+      key_facts: [
+        "Inntekter 33,6 millioner dollar",
+        "Driftsresultat 3,1 millioner dollar",
+        "Resultat for skatt 6,2 millioner dollar"
+      ],
+      negative_or_surprising: [],
+      source_limitations: ["Kun et utdrag av rapporten er analysert."],
+      source_spans: [
+        "Revenue 33,613 12,118",
+        "Operating Profit 3,100 3,244",
+        "Result before corporate income tax 6,232 4,027"
+      ]
+    });
+
+    const result = validateRewriteOutput(rewrite, payload);
+
+    expect(
+      result.issues.some((issue) => issue.code === "UNEXPECTED_NUMBERS")
+    ).toBe(false);
+  });
+
   it("allows simple source-derived insider trade totals", () => {
     const payload = createPayload({
       title: "Mandatory notification of trade",
