@@ -76,6 +76,7 @@ describe("mapDbItemToFeedItem", () => {
     );
 
     expect(item?.processing).toBe(false);
+    expect(item?.rewriteVersion).toBe(1);
     expect(item?.title).toBe("Publisert versjon 1");
     expect(item?.attachments).toEqual([
       {
@@ -93,6 +94,7 @@ describe("mapDbItemToFeedItem", () => {
     );
 
     expect(item?.processing).toBe(true);
+    expect(item?.rewriteVersion).toBe(1);
     expect(item?.notGenerated).toBe(false);
     expect(item?.title).toBe("Original tittel");
   });
@@ -101,6 +103,7 @@ describe("mapDbItemToFeedItem", () => {
     const item = mapDbItemToFeedItem(feedItem([]) as never);
 
     expect(item?.notGenerated).toBe(true);
+    expect(item?.rewriteVersion).toBe(null);
     expect(item?.processing).toBe(false);
     expect(item?.title).toBe("Original tittel");
   });

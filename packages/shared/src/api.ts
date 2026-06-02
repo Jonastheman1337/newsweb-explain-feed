@@ -36,6 +36,7 @@ export const feedItemSchema = z.object({
   messageId: z.number().int(),
   publishedAt: z.string().datetime(),
   visibilityStatus: z.string(),
+  rewriteVersion: z.number().int().positive().nullable(),
   title: z.string(),
   issuerName: z.string(),
   issuerSign: z.string(),

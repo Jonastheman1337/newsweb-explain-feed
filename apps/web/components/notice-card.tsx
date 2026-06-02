@@ -180,6 +180,7 @@ export function NoticeCard({ item }: NoticeCardProps) {
             messageId={item.messageId}
             originalTitle={item.title}
             originalBody={articleBody}
+            activeVersion={item.rewriteVersion ?? undefined}
             className={showSplit && isImportant ? "cardImportantCol" : undefined}
             dateline={
               <div className="muted">

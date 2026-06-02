@@ -10,6 +10,7 @@ const baseItem: FeedItem = {
   messageId: 123,
   publishedAt: "2026-05-29T06:00:00.000Z",
   visibilityStatus: "published",
+  rewriteVersion: null,
   title: "Original tittel",
   issuerName: "Test ASA",
   issuerSign: "TEST",
