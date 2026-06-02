@@ -45,7 +45,7 @@ describe("prompt style guidance", () => {
   it("includes E24-style market-moving and factuality guardrails", () => {
     const developerPrompt = createDeveloperPrompt("{}");
 
-    expect(developerPrompt).toContain("kursdrivende");
+    expect(developerPrompt).toContain("best forklarer hva som faktisk har skjedd");
     expect(developerPrompt).toContain("vinkles pa det negative");
     expect(developerPrompt).toContain("Skriv 'prosent', ikke '%'");
     expect(developerPrompt).toContain(

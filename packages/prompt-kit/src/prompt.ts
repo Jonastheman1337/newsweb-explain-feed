@@ -2,7 +2,6 @@ import type { RewriteOutput } from "@newsweb/shared";
 
 import {
   EDITORIAL_ATTRIBUTION,
-  EDITORIAL_AUDIENCE,
   EDITORIAL_AVOID,
   EDITORIAL_IMPORTANCE,
   EDITORIAL_LANGUAGE,
@@ -14,7 +13,7 @@ import {
   EDITORIAL_WRITING_STYLE
 } from "./shared-editorial.js";
 
-export const PROMPT_VERSION = "v5.6.0";
+export const PROMPT_VERSION = "v5.7.0";
 
 export type PromptPayload = {
   messageId: number;
@@ -32,8 +31,34 @@ export type PromptPayload = {
   pdfSupplementAttachmentId?: number;
 };
 
+const AUDIENCE_MECHANISM_AUDIENCE = `HVEM SKRIVER VI FOR?
+- Finansielt interesserte lesere i en nyhetssetting, ikke et investeringsnotat.
+- De vil raskt forsta hva selskapet har meldt, hvilken mekanisme som er viktig, og hvilke folger som star direkte i meldingen.
+- Vi vurderer ikke aksjen og gir ikke kurslogikk. Vi gjor meldingen lettere a forsta.
+- Mye i en borsmelding eller kvartalsrapport er stoy. Kutt det som ikke hjelper leseren a forsta hendelsen.`;
+
+const MECHANISM_FIRST_RULE = [
+  "MEKANISMEFORKLARING",
+  "- Forklar hva begrepet gjor i akkurat denne meldingen, ikke gi en leksikondefinisjon.",
+  "- Forklar hvorfor strukturen er med, hva den endrer, og hvordan den fungerer innenfor fakta i kilden.",
+  "- Ikke gjor forklaringen mer analytisk, spekulativ eller radgivende."
+].join("\n");
+
+function removeStockAdviceTension(prompt: string): string {
+  return prompt
+    .replaceAll("hva skjedde, og hva betyr det for aksjen?", "hva har skjedd, og hvilken mekanisme er viktig?")
+    .replaceAll("for en som eier eller vurderer a kjope aksjen", "for en leser som vil forsta meldingen")
+    .replaceAll("Det viktigste for aksjeeieren kommer forst", "Det viktigste for forstaelsen kommer forst")
+    .replaceAll("hva betyr det for aksjen og selskapet?", "hva har skjedd, og hva betyr det direkte for selskapet?")
+    .replaceAll("Privatinvestorer som eier eller vurderer a kjope aksjen.", "Finansielt interesserte lesere.")
+    .replaceAll("Velg det nyhetspoenget som mest sannsynlig er kursdrivende. Hvis en negativ opplysning er det viktigste for aksjeeieren, skal tittelen vinkles pa det negative.", "Velg nyhetspoenget som best forklarer hva som faktisk har skjedd. Hvis en negativ opplysning er det viktigste for forstaelsen, skal tittelen vinkles pa det negative.")
+    .replaceAll("for en aksjeeier", "for leseren")
+    .replaceAll("aksjeeieren", "leseren")
+    .replaceAll("aksjeeier", "leser");
+}
+
 export function createSystemPrompt(): string {
-  return [
+  const basePrompt = [
     "Du er nyhetsjournalist i E24-redaksjonen.",
     "Du skriver korte borsnyheter pa norsk Bokmal for en travel leser som scanner nyheter pa mobilen.",
     "Leseren er en privatinvestor — kanskje en student eller nybegynner — som vil vite: hva skjedde, og hva betyr det for aksjen?",
@@ -50,6 +75,14 @@ export function createSystemPrompt(): string {
     "Bruk kun informasjon som star eksplisitt i kilden.",
     "Ikke spekuler, ikke overdriv, og ikke legg til tall eller fakta."
   ].join(" ");
+
+  return [
+    removeStockAdviceTension(basePrompt).replace(
+      "Skriv sa enkelt at en videregaendeelev med interesse for finans forstar teksten uten a google noe.",
+      "Skriv klart for en travel, finansielt interessert leser uten a skrive ned til leseren."
+    ),
+    MECHANISM_FIRST_RULE
+  ].join("\n\n");
 }
 
 const STYLE_EXAMPLES = `
@@ -82,11 +115,11 @@ Materiell hendelse (2 body-avsnitt):
 `.trim();
 
 export function createDeveloperPrompt(_schemaJson?: string): string {
-  return `OPPGAVE
+  const basePrompt = `OPPGAVE
 Lag en kort nyhetssak i E24-stil. Ikke et referat, men en publiserbar nyhet.
 Leseren er en privatinvestor som kanskje gar pa videregaende og er interessert i finans. Vanlige finansord som 'datterselskap', 'kontrakt' og 'aksjekapital' er greit, men tyngre jargong ma forklares gjennom kontekst.
 
-${EDITORIAL_AUDIENCE}
+${AUDIENCE_MECHANISM_AUDIENCE}
 - Vi er ikke papegøyer som bare omformulerer borsmeldingen. Vi plukker ut det viktige, overraskende eller dramatiske.
 - Ikke prøv å løfte rutineinformasjon over nyhetsterskelen. Hvis tilgjengelig tekst bare sier at et dokument, en presentasjon eller et skjema er publisert, er det støy: skriv ekstremt kort, sett importance til 'uviktig' og legg manglende grunnlag i source_limitations.
 - Rene påminnelser om tegningsperiode, siste tegningsdag eller oppstart av tegningsperiode er støy hvis de ikke inneholder nye vilkår, proveny, resultat eller konsekvens.
@@ -131,6 +164,19 @@ Bruk kun tall og fakta som finnes i kilden.
 Hvis meldingen viser til ekstra dokumenter som ikke er analysert, legg inn begrensningen i source_limitations. Ikke vis dette i title, lead eller body.
 
 ${EDITORIAL_NORWEGIAN}`;
+
+  return [
+    removeStockAdviceTension(basePrompt)
+      .replace(
+        "Leseren er en privatinvestor som kanskje gar pa videregaende og er interessert i finans.",
+        "Leseren er finansielt interessert og leser dette som nyheter, ikke som investeringsrad."
+      )
+      .replace(
+        "Tone: noytral, enkel, lett a forsta for en privatinvestor uten profesjonell finansbakgrunn.",
+        "Tone: noytral, enkel og presis for en finansielt interessert leser uten profesjonell nisjekunnskap."
+      ),
+    MECHANISM_FIRST_RULE
+  ].join("\n\n");
 }
 
 export function createUserPrompt(payload: PromptPayload): string {
@@ -176,7 +222,15 @@ export function createUserPrompt(payload: PromptPayload): string {
     );
   }
 
-  return parts.join("\n");
+  return removeStockAdviceTension(parts.join("\n"))
+    .replace(
+      "Skriv nyhetstekst, ikke sammendrag. Plukk ut det viktigste for leseren.",
+      "Skriv nyhetstekst, ikke sammendrag. Plukk ut det som hjelper leseren a forsta hva selskapet har meldt og hvilken mekanisme som betyr noe."
+    )
+    .replace(
+      "Skriv sa enkelt at en videregaendeelev med interesse for finans forstar det. Unnga tung jargong",
+      "Skriv klart for en travel, finansielt interessert leser. Unnga tung jargong"
+    );
 }
 
 export function formatRewriteForRevisionPrompt(previousOutput: RewriteOutput): string {

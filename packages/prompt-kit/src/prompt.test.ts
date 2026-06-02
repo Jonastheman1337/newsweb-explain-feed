@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   PROMPT_VERSION,
   createDeveloperPrompt,
+  createSystemPrompt,
+  createUserPrompt,
   createRevisionUserPrompt,
   type PromptPayload
 } from "./prompt.js";
@@ -61,7 +63,21 @@ const sampleYearlyPayload: YearlyReportPromptPayload = {
 
 describe("OpenAI prompt contract", () => {
   it("bumps the prompt version for the editorial guardrail update", () => {
-    expect(PROMPT_VERSION).toBe("v5.6.0");
+    expect(PROMPT_VERSION).toBe("v5.7.0");
+  });
+
+  it("uses mechanism-first regular notice framing by default", () => {
+    const combined = [
+      createSystemPrompt(),
+      createDeveloperPrompt(),
+      createUserPrompt(samplePayload)
+    ].join("\n");
+
+    expect(combined).not.toContain("hva betyr det for aksjen");
+    expect(combined).not.toContain("vurderer a kjope aksjen");
+    expect(combined).not.toContain("aksjeeier");
+    expect(combined).toContain("hvilken mekanisme");
+    expect(combined).toContain("Forklar hva begrepet gjor i akkurat denne meldingen");
   });
 
   it("does not embed the JSON schema in the developer prompt", () => {
