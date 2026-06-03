@@ -24,9 +24,6 @@ export default async function ProtectedLayout({
           <Link href="/feed" className="ghostButton">
             Feed
           </Link>
-          <Link href="/admin/signals" className="ghostButton">
-            Signals
-          </Link>
           <NotificationToggle />
           <ThemeToggle />
         </span>
