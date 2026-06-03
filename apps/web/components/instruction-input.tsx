@@ -149,6 +149,7 @@ export function InstructionInput({ messageId, activeVersion, hasAttachments }: I
       const fetchOptions: RequestInit = {
         method: "POST",
         credentials: "include",
+        keepalive: true,
         headers: { "Content-Type": "application/json" },
       };
       const requestBody = {

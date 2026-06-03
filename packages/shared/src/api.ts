@@ -61,7 +61,8 @@ export const feedItemSchema = z.object({
   notGenerated: z.boolean().default(false),
   skipped: z.boolean().default(false),
   failed: z.boolean().default(false),
-  processing: z.boolean().default(false)
+  processing: z.boolean().default(false),
+  regenerating: z.boolean().default(false)
 });
 
 export const feedResponseSchema = z.object({

@@ -262,6 +262,10 @@ a {
   animation: feedProcessingTextFade 0.45s ease;
 }
 
+.feedRegenerationStatus .feedProcessingStatus {
+  margin-top: 0.45rem;
+}
+
 .cardSkipped {
   opacity: 0.5;
   box-shadow: none;
@@ -351,6 +355,12 @@ a {
 
 .processingWrap {
   margin: 0.75rem 0;
+}
+
+.regenerationStatus {
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--line);
 }
 
 .processingSteps {

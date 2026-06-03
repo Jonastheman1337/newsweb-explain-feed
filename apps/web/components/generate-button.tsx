@@ -136,6 +136,7 @@ export function GenerateButton({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
+        keepalive: true,
         body: JSON.stringify({
           ...(reasoningEffortOverride ? { reasoningEffortOverride } : {}),
           telemetry: buildTelemetry({

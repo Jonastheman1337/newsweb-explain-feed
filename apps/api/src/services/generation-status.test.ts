@@ -80,4 +80,60 @@ describe("generation status", () => {
       phaseUpdatedAt: "2026-05-29T08:01:00.000Z"
     });
   });
+
+  it("keeps active regenerations not ready even while an older rewrite is published", () => {
+    expect(
+      buildGenerationStatusPayload({
+        generationRun: {
+          id: "run-2",
+          status: "queued",
+          phase: "queued",
+          phaseUpdatedAt: newDate
+        },
+        rewrite: {
+          status: "published",
+          generatedAt: oldDate,
+          version: 1
+        },
+        jobState: "waiting"
+      })
+    ).toEqual({
+      ready: false,
+      failed: false,
+      generatedAt: "2026-05-29T08:00:00.000Z",
+      version: 1,
+      jobState: "waiting",
+      generationRunId: "run-2",
+      phase: "queued",
+      phaseUpdatedAt: "2026-05-29T08:01:00.000Z"
+    });
+  });
+
+  it("reports a failed regeneration when the latest run failed over an older rewrite", () => {
+    expect(
+      buildGenerationStatusPayload({
+        generationRun: {
+          id: "run-2",
+          status: "failed",
+          phase: "failed",
+          phaseUpdatedAt: newDate
+        },
+        rewrite: {
+          status: "published",
+          generatedAt: oldDate,
+          version: 1
+        },
+        jobState: "failed"
+      })
+    ).toEqual({
+      ready: false,
+      failed: true,
+      generatedAt: "2026-05-29T08:00:00.000Z",
+      version: 1,
+      jobState: "failed",
+      generationRunId: "run-2",
+      phase: "failed",
+      phaseUpdatedAt: "2026-05-29T08:01:00.000Z"
+    });
+  });
 });

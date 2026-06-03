@@ -2,10 +2,46 @@ import {
   feedQuerySchema,
   feedResponseSchema
 } from "@newsweb/shared";
-import { prisma } from "@newsweb/shared/db";
+import { logPrisma, prisma } from "@newsweb/shared/db";
 import type { Prisma } from "@prisma/client";
 import type { FastifyPluginAsync } from "fastify";
 import { mapDbItemToFeedItem } from "../services/feed-item-mapper.js";
+import { isGenerationRunActive } from "../services/generation-status.js";
+
+async function findRegeneratingMessageIds(messageIds: number[]): Promise<Set<number>> {
+  if (messageIds.length === 0) {
+    return new Set();
+  }
+
+  const runs = await logPrisma.generationRun.findMany({
+    where: {
+      messageId: { in: messageIds },
+      reason: { in: ["new-message", "manual-reprocess"] }
+    },
+    orderBy: { requestedAt: "desc" },
+    select: {
+      messageId: true,
+      id: true,
+      status: true,
+      phase: true,
+      phaseUpdatedAt: true
+    }
+  });
+
+  const activeIds = new Set<number>();
+  const seenIds = new Set<number>();
+  for (const run of runs) {
+    if (seenIds.has(run.messageId)) {
+      continue;
+    }
+    seenIds.add(run.messageId);
+    if (isGenerationRunActive(run)) {
+      activeIds.add(run.messageId);
+    }
+  }
+
+  return activeIds;
+}
 
 export const feedRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get(
@@ -106,8 +142,18 @@ export const feedRoutes: FastifyPluginAsync = async (fastify) => {
       const hasNext = items.length > query.limit;
       const slice = hasNext ? items.slice(0, query.limit) : items;
 
+      const regeneratingMessageIds = await findRegeneratingMessageIds(
+        slice.map((item) => item.messageId)
+      );
+
       const responseItems = slice
-        .map(mapDbItemToFeedItem)
+        .map((item) => {
+          const mapped = mapDbItemToFeedItem(item);
+          if (!mapped || !regeneratingMessageIds.has(mapped.messageId)) {
+            return mapped;
+          }
+          return { ...mapped, regenerating: true };
+        })
         .filter((item): item is NonNullable<typeof item> => item !== null);
 
       const payload = {

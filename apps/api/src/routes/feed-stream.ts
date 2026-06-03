@@ -42,11 +42,20 @@ export function applyFeedUpdateState(
       notGenerated: true,
       skipped: false,
       failed: false,
-      processing: false
+      processing: false,
+      regenerating: false
     };
   }
 
   if (state === "processing") {
+    if (item.rewriteVersion != null && !item.notGenerated && !item.skipped && !item.failed) {
+      return {
+        ...item,
+        processing: false,
+        regenerating: true
+      };
+    }
+
     return {
       ...item,
       lead: "",
@@ -58,7 +67,8 @@ export function applyFeedUpdateState(
       notGenerated: false,
       skipped: false,
       failed: false,
-      processing: true
+      processing: true,
+      regenerating: false
     };
   }
 

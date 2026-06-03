@@ -1,4 +1,9 @@
-import type { FeedQuery, FeedResponse, RewriteOutput } from "@newsweb/shared";
+import type {
+  FeedQuery,
+  FeedResponse,
+  RewriteOutput,
+  RewriteStatusResponse
+} from "@newsweb/shared";
 import { getApiBaseUrl } from "./api-base-url";
 
 const API_BASE_URL = getApiBaseUrl();
@@ -95,6 +100,13 @@ type NoticeResponse =
 
 export async function getNotice(token: string | null | undefined, messageId: number) {
   return apiGet<NoticeResponse>(token, `/notice/${messageId}`);
+}
+
+export async function getNoticeStatus(
+  token: string | null | undefined,
+  messageId: number
+) {
+  return apiGet<RewriteStatusResponse>(token, `/notice/${messageId}/status`);
 }
 
 export async function getMetaFilters(token: string | null | undefined) {

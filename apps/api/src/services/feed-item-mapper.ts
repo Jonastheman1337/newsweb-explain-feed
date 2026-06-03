@@ -43,7 +43,8 @@ function sourceOnlyFeedItem(
     notGenerated: flags.notGenerated ?? false,
     skipped: flags.skipped ?? false,
     failed: flags.failed ?? false,
-    processing: flags.processing ?? false
+    processing: flags.processing ?? false,
+    regenerating: false
   };
 }
 
@@ -98,6 +99,7 @@ export function mapDbItemToFeedItem(item: FeedItemWithRelations): FeedItem | nul
     notGenerated: false,
     skipped: false,
     failed: false,
-    processing: false
+    processing: false,
+    regenerating: false
   };
 }

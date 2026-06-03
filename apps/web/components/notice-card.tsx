@@ -200,6 +200,11 @@ export function NoticeCard({ item }: NoticeCardProps) {
           >
             <MaxAiLink messageId={item.messageId} />
           </EditableRewrite>
+          {item.regenerating && (
+            <div className="feedRegenerationStatus">
+              <FeedProcessingIndicator hasAttachments={item.hasAttachments} />
+            </div>
+          )}
         </div>
         {showSplit && (
           <div className="cardSourcePanel">

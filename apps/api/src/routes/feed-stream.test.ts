@@ -28,7 +28,8 @@ const baseItem: FeedItem = {
   notGenerated: false,
   skipped: false,
   failed: true,
-  processing: false
+  processing: false,
+  regenerating: false
 };
 
 describe("feed stream updates", () => {
@@ -41,5 +42,22 @@ describe("feed stream updates", () => {
 
   it("emits failed items from the mapped database state", () => {
     expect(applyFeedUpdateState(baseItem, "failed")).toEqual(baseItem);
+  });
+
+  it("marks published items as regenerating instead of replacing the article", () => {
+    const publishedItem = {
+      ...baseItem,
+      rewriteVersion: 1,
+      title: "Publisert tittel",
+      lead: "Ingress",
+      body: ["Brodtekst"],
+      failed: false
+    };
+
+    expect(applyFeedUpdateState(publishedItem, "processing")).toEqual({
+      ...publishedItem,
+      processing: false,
+      regenerating: true
+    });
   });
 });
