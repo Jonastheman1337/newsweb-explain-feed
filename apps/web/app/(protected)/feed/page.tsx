@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { BackButton } from "../../../components/back-button";
+import { FeedSearchUrlReset } from "../../../components/feed-search-url-reset";
 import { LiveFeedList } from "../../../components/live-feed-list";
 import { SearchableSelect } from "../../../components/searchable-select";
 import { getFeed, getMetaFilters } from "../../../lib/api";
@@ -103,7 +104,7 @@ export default async function FeedPage({ searchParams }: FeedPageProps) {
   return (
     <section>
       <form className="panel filterGrid" method="get">
-        <input type="text" name="q" placeholder="Sok i tittel eller tekst" defaultValue={params.q} />
+        <input type="text" name="q" placeholder="Sok i tittel eller tekst" defaultValue="" />
         <SearchableSelect
           name="market"
           placeholder="Alle markeder"
@@ -136,6 +137,7 @@ export default async function FeedPage({ searchParams }: FeedPageProps) {
         />
         <button type="submit">Oppdater feed</button>
       </form>
+      {normalized.q ? <FeedSearchUrlReset /> : null}
 
       <div className="feedList">
         {feedUnavailable ? (
@@ -179,7 +181,6 @@ export default async function FeedPage({ searchParams }: FeedPageProps) {
                 market: normalized.market,
                 category: normalized.category,
                 issuer: normalized.issuer,
-                q: normalized.q,
                 limit: params.limit
               },
               { cursor: feed.nextCursor }
