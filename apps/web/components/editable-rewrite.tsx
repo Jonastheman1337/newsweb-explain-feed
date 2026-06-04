@@ -3,6 +3,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -104,8 +105,12 @@ function getToolbarPosition(range: Range): { top: number; left: number } {
 }
 
 function getRangeLinkHref(range: Range, root: HTMLElement | null): string {
-  let node: Node | null = range.startContainer;
-  if (node.nodeType === Node.TEXT_NODE) {
+  const anchor = getClosestLink(range.startContainer, root);
+  return anchor?.href ?? "";
+}
+
+function getClosestLink(node: Node | null, root: HTMLElement | null): HTMLAnchorElement | null {
+  if (node?.nodeType === Node.TEXT_NODE) {
     node = node.parentNode;
   }
 
@@ -114,15 +119,105 @@ function getRangeLinkHref(range: Range, root: HTMLElement | null): string {
       node.nodeType === Node.ELEMENT_NODE &&
       (node as Element).tagName.toLowerCase() === "a"
     ) {
-      return (node as HTMLAnchorElement).href;
+      return node as HTMLAnchorElement;
     }
     node = node.parentNode;
   }
 
-  return "";
+  return null;
+}
+
+function unwrapLinks(container: ParentNode) {
+  for (const anchor of Array.from(container.querySelectorAll("a"))) {
+    const parent = anchor.parentNode;
+    if (!parent) continue;
+
+    while (anchor.firstChild) {
+      parent.insertBefore(anchor.firstChild, anchor);
+    }
+    parent.removeChild(anchor);
+  }
+}
+
+function insertLinkForRange(range: Range, root: HTMLElement | null, href: string): boolean {
+  if (!root || !isNodeInside(root, range.commonAncestorContainer)) {
+    return false;
+  }
+  if (!range.toString().trim()) {
+    return false;
+  }
+
+  const existingAnchor = getClosestLink(range.startContainer, root);
+  if (existingAnchor && existingAnchor.contains(range.endContainer)) {
+    existingAnchor.setAttribute("href", href);
+    return true;
+  }
+
+  try {
+    const doc = root.ownerDocument;
+    const anchor = doc.createElement("a");
+    anchor.setAttribute("href", href);
+
+    const fragment = range.extractContents();
+    unwrapLinks(fragment);
+    anchor.appendChild(fragment);
+
+    if (!anchor.textContent?.trim()) {
+      return false;
+    }
+
+    range.insertNode(anchor);
+
+    const selection = window.getSelection();
+    if (selection) {
+      const nextRange = doc.createRange();
+      nextRange.selectNodeContents(anchor);
+      selection.removeAllRanges();
+      selection.addRange(nextRange);
+    }
+
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function runRichTextCommand(command: string, value?: string): boolean {
+  try {
+    document.execCommand("styleWithCSS", false, "false");
+  } catch {
+    // Unsupported in some browsers; the sanitizer still normalizes styled spans.
+  }
+
+  return document.execCommand(command, false, value);
+}
+
+function copyNoticeWithCopyEvent(plainText: string, html: string): boolean {
+  if (typeof document === "undefined") return false;
+
+  let handled = false;
+  function handleCopy(event: ClipboardEvent) {
+    event.clipboardData?.setData("text/html", html);
+    event.clipboardData?.setData("text/plain", plainText);
+    event.preventDefault();
+    handled = true;
+  }
+
+  document.addEventListener("copy", handleCopy);
+  try {
+    return document.execCommand("copy") && handled;
+  } catch {
+    return false;
+  } finally {
+    document.removeEventListener("copy", handleCopy);
+  }
 }
 
 async function copyNoticeToClipboard(plainText: string, html: string) {
+  if (copyNoticeWithCopyEvent(plainText, html)) {
+    return;
+  }
+
   if (
     navigator.clipboard?.write &&
     typeof ClipboardItem !== "undefined"
@@ -136,7 +231,7 @@ async function copyNoticeToClipboard(plainText: string, html: string) {
       ]);
       return;
     } catch {
-      // Fall back to plain text below.
+      // Fall through to the plain text clipboard API below.
     }
   }
 
@@ -158,7 +253,6 @@ export function EditableRewrite({
     () => plainTextToRichHtml(originalBody),
     [originalBody]
   );
-  const initialBodyHtmlRef = useRef(originalBodyHtml);
   const [editedTitle, setEditedTitle] = useState(originalTitle);
   const [editedBody, setEditedBody] = useState(originalBody);
   const [editedBodyHtml, setEditedBodyHtml] = useState(originalBodyHtml);
@@ -172,8 +266,10 @@ export function EditableRewrite({
   const toolbarRef = useRef<HTMLDivElement>(null);
   const linkInputRef = useRef<HTMLInputElement>(null);
   const selectionRangeRef = useRef<Range | null>(null);
+  const lastBodyRangeRef = useRef<Range | null>(null);
   const isSelectingRef = useRef(false);
   const isToolbarInteractingRef = useRef(false);
+  const toolbarActionHandledRef = useRef(false);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const storedDraftRef = useRef<RewriteDraft | null>(null);
   const linkModeRef = useRef(false);
@@ -218,6 +314,8 @@ export function EditableRewrite({
   const hideToolbar = useCallback(() => {
     isToolbarInteractingRef.current = false;
     selectionRangeRef.current = null;
+    lastBodyRangeRef.current = null;
+    toolbarActionHandledRef.current = false;
     hideToolbarElement();
     if (linkModeRef.current) {
       linkModeRef.current = false;
@@ -301,6 +399,7 @@ export function EditableRewrite({
     }
 
     selectionRangeRef.current = range.cloneRange();
+    lastBodyRangeRef.current = range.cloneRange();
     showToolbarForRange(range);
   }, []);
 
@@ -308,10 +407,14 @@ export function EditableRewrite({
     const liveRange = getBodySelectionRange(bodyRef.current);
     if (liveRange) {
       selectionRangeRef.current = liveRange.cloneRange();
+      lastBodyRangeRef.current = liveRange.cloneRange();
       return liveRange;
     }
 
-    return getCachedBodyRange(bodyRef.current, selectionRangeRef.current);
+    return (
+      getCachedBodyRange(bodyRef.current, selectionRangeRef.current) ??
+      getCachedBodyRange(bodyRef.current, lastBodyRangeRef.current)
+    );
   }
 
   function restoreBodySelection(): boolean {
@@ -347,7 +450,7 @@ export function EditableRewrite({
       selectionRangeRef.current = range.cloneRange();
       if (!restoreBodySelection()) return;
 
-      document.execCommand(command, false);
+      runRichTextCommand(command);
       syncBodyState();
       updateToolbarFromSelection();
     } finally {
@@ -363,9 +466,11 @@ export function EditableRewrite({
     }
 
     selectionRangeRef.current = range.cloneRange();
+    lastBodyRangeRef.current = range.cloneRange();
     setLinkValue(getRangeLinkHref(range, bodyRef.current));
+    showToolbarForRange(range);
     linkModeRef.current = true;
-    isToolbarInteractingRef.current = false;
+    isToolbarInteractingRef.current = true;
     setLinkMode(true);
   }
 
@@ -379,7 +484,16 @@ export function EditableRewrite({
     }
 
     enterDraftMode();
-    document.execCommand("createLink", false, href);
+    const selection = window.getSelection();
+    const range =
+      selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
+    const inserted =
+      range && insertLinkForRange(range, bodyRef.current, href);
+
+    if (!inserted) {
+      runRichTextCommand("createLink", href);
+    }
+
     syncBodyState();
     hideToolbar();
   }
@@ -398,12 +512,12 @@ export function EditableRewrite({
     if (html) {
       const safeHtml = sanitizeRichHtml(html);
       if (safeHtml) {
-        document.execCommand("insertHTML", false, safeHtml);
+        runRichTextCommand("insertHTML", safeHtml);
       } else if (text) {
-        document.execCommand("insertText", false, text);
+        runRichTextCommand("insertText", text);
       }
     } else if (text) {
-      document.execCommand("insertText", false, text);
+      runRichTextCommand("insertText", text);
     }
 
     syncBodyState();
@@ -426,10 +540,37 @@ export function EditableRewrite({
     }
   }
 
+  function handleToolbarActionMouseDown(
+    event: ReactMouseEvent<HTMLButtonElement>,
+    action: () => void
+  ) {
+    event.preventDefault();
+    event.stopPropagation();
+    toolbarActionHandledRef.current = true;
+    isToolbarInteractingRef.current = true;
+    action();
+  }
+
+  function handleToolbarActionClick(
+    event: ReactMouseEvent<HTMLButtonElement>,
+    action: () => void
+  ) {
+    event.preventDefault();
+    if (event.detail !== 0 && toolbarActionHandledRef.current) {
+      toolbarActionHandledRef.current = false;
+      return;
+    }
+
+    toolbarActionHandledRef.current = false;
+    isToolbarInteractingRef.current = true;
+    action();
+  }
+
   function handleBodyMouseDown() {
     if (linkModeRef.current) return;
     isSelectingRef.current = true;
     selectionRangeRef.current = null;
+    lastBodyRangeRef.current = null;
     hideToolbarElement();
   }
 
@@ -524,7 +665,7 @@ export function EditableRewrite({
   }, []);
 
   // Reset when the AI output/version changes, preferring a saved local draft.
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (saveTimerRef.current) {
       clearTimeout(saveTimerRef.current);
       saveTimerRef.current = null;
@@ -554,9 +695,9 @@ export function EditableRewrite({
     messageId,
     originalBody,
     originalBodyHtml,
-    originalTitle,
-    setDisplayedRewrite
-  ]);
+      originalTitle,
+      setDisplayedRewrite
+    ]);
 
   useEffect(() => {
     if (viewMode !== "draft") return;
@@ -720,13 +861,13 @@ export function EditableRewrite({
         ref={titleRef}
         className="editableTitle"
         contentEditable
+        tabIndex={0}
         suppressContentEditableWarning
         onInput={(e) => {
           enterDraftMode();
           setEditedTitle(e.currentTarget.textContent ?? "");
         }}
       >
-        {originalTitle}
       </h2>
       {titleSuggestions.dropdown}
       {dateline}
@@ -738,6 +879,7 @@ export function EditableRewrite({
         role="textbox"
         aria-multiline="true"
         aria-label="Rediger notistekst"
+        tabIndex={0}
         spellCheck
         onInput={handleBodyInput}
         onPaste={handleBodyPaste}
@@ -745,7 +887,6 @@ export function EditableRewrite({
         onMouseUp={handleBodyMouseUp}
         onKeyUp={handleBodyKeyUp}
         onKeyDown={handleBodyKeyDown}
-        dangerouslySetInnerHTML={{ __html: initialBodyHtmlRef.current }}
       />
       <div
         ref={toolbarRef}
@@ -786,8 +927,12 @@ export function EditableRewrite({
               type="button"
               title="Fet"
               aria-label="Fet"
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={() => applyFormat("bold")}
+              onMouseDown={(event) =>
+                handleToolbarActionMouseDown(event, () => applyFormat("bold"))
+              }
+              onClick={(event) =>
+                handleToolbarActionClick(event, () => applyFormat("bold"))
+              }
             >
               <strong>B</strong>
             </button>
@@ -796,8 +941,12 @@ export function EditableRewrite({
               type="button"
               title="Kursiv"
               aria-label="Kursiv"
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={() => applyFormat("italic")}
+              onMouseDown={(event) =>
+                handleToolbarActionMouseDown(event, () => applyFormat("italic"))
+              }
+              onClick={(event) =>
+                handleToolbarActionClick(event, () => applyFormat("italic"))
+              }
             >
               <em>I</em>
             </button>
@@ -806,8 +955,16 @@ export function EditableRewrite({
               type="button"
               title="Punktliste"
               aria-label="Punktliste"
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={() => applyFormat("insertUnorderedList")}
+              onMouseDown={(event) =>
+                handleToolbarActionMouseDown(event, () =>
+                  applyFormat("insertUnorderedList")
+                )
+              }
+              onClick={(event) =>
+                handleToolbarActionClick(event, () =>
+                  applyFormat("insertUnorderedList")
+                )
+              }
             >
               <svg className="richEditToolIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M8 6h13" />
@@ -823,8 +980,16 @@ export function EditableRewrite({
               type="button"
               title="Nummerert liste"
               aria-label="Nummerert liste"
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={() => applyFormat("insertOrderedList")}
+              onMouseDown={(event) =>
+                handleToolbarActionMouseDown(event, () =>
+                  applyFormat("insertOrderedList")
+                )
+              }
+              onClick={(event) =>
+                handleToolbarActionClick(event, () =>
+                  applyFormat("insertOrderedList")
+                )
+              }
             >
               <svg className="richEditToolIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M10 6h11" />
@@ -840,8 +1005,15 @@ export function EditableRewrite({
               type="button"
               title="Lenke"
               aria-label="Lenke"
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={openLinkInput}
+              onMouseDown={(event) =>
+                handleToolbarActionMouseDown(event, openLinkInput)
+              }
+              onClick={(event) => {
+                event.preventDefault();
+                toolbarActionHandledRef.current = false;
+                isToolbarInteractingRef.current = true;
+                openLinkInput();
+              }}
             >
               <svg className="richEditToolIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M10 13a5 5 0 0 0 7.1 0l2-2a5 5 0 0 0-7.1-7.1l-1.1 1.1" />
