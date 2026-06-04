@@ -1,7 +1,24 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ClipboardEvent as ReactClipboardEvent,
+  type FormEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode
+} from "react";
 import { useEditorialTelemetry } from "../lib/editorial-telemetry";
+import {
+  createNoticeClipboardHtml,
+  normalizeLinkHref,
+  plainTextToRichHtml,
+  richHtmlToPlainText,
+  sanitizeRichHtml
+} from "../lib/rich-text";
 import {
   deleteRewriteDraft,
   getRewriteDraft,
@@ -22,6 +39,114 @@ type EditableRewriteProps = {
   className?: string;
 };
 
+type DraftState = {
+  messageId: number;
+  version?: number | null;
+  title: string;
+  body: string;
+  bodyHtml: string;
+  originalTitle: string;
+  originalBody: string;
+  originalBodyHtml: string;
+  viewMode: "draft" | "original";
+};
+
+type ToolbarState = {
+  visible: boolean;
+  top: number;
+  left: number;
+};
+
+const HIDDEN_TOOLBAR: ToolbarState = {
+  visible: false,
+  top: 0,
+  left: 0
+};
+
+function draftValue(title: string, body: string, bodyHtml: string): string {
+  return `${title}\u0000${body}\u0000${bodyHtml}`;
+}
+
+function isNodeInside(root: Node | null, node: Node | null): boolean {
+  return !!root && !!node && (node === root || root.contains(node));
+}
+
+function getBodySelectionRange(root: HTMLElement | null): Range | null {
+  if (!root) return null;
+
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
+    return null;
+  }
+
+  if (
+    !isNodeInside(root, selection.anchorNode) ||
+    !isNodeInside(root, selection.focusNode)
+  ) {
+    return null;
+  }
+
+  const range = selection.getRangeAt(0);
+  if (!range.toString().trim()) return null;
+  return range;
+}
+
+function getToolbarPosition(range: Range): Pick<ToolbarState, "top" | "left"> {
+  const rect = range.getBoundingClientRect();
+  const center = rect.left + rect.width / 2;
+  const toolbarHalfWidth = 112;
+  const left = Math.min(
+    Math.max(center, toolbarHalfWidth),
+    Math.max(toolbarHalfWidth, window.innerWidth - toolbarHalfWidth)
+  );
+  const top = rect.top > 44 ? rect.top - 40 : rect.bottom + 8;
+
+  return {
+    left,
+    top: Math.max(8, top)
+  };
+}
+
+function getRangeLinkHref(range: Range, root: HTMLElement | null): string {
+  let node: Node | null = range.startContainer;
+  if (node.nodeType === Node.TEXT_NODE) {
+    node = node.parentNode;
+  }
+
+  while (node && root && isNodeInside(root, node)) {
+    if (
+      node.nodeType === Node.ELEMENT_NODE &&
+      (node as Element).tagName.toLowerCase() === "a"
+    ) {
+      return (node as HTMLAnchorElement).href;
+    }
+    node = node.parentNode;
+  }
+
+  return "";
+}
+
+async function copyNoticeToClipboard(plainText: string, html: string) {
+  if (
+    navigator.clipboard?.write &&
+    typeof ClipboardItem !== "undefined"
+  ) {
+    try {
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          "text/html": new Blob([html], { type: "text/html" }),
+          "text/plain": new Blob([plainText], { type: "text/plain" })
+        })
+      ]);
+      return;
+    } catch {
+      // Fall back to plain text below.
+    }
+  }
+
+  await navigator.clipboard.writeText(plainText);
+}
+
 export function EditableRewrite({
   messageId,
   originalTitle,
@@ -33,47 +158,92 @@ export function EditableRewrite({
   panelTitle,
   className,
 }: EditableRewriteProps) {
+  const originalBodyHtml = useMemo(
+    () => plainTextToRichHtml(originalBody),
+    [originalBody]
+  );
+  const initialBodyHtmlRef = useRef(originalBodyHtml);
   const [editedTitle, setEditedTitle] = useState(originalTitle);
   const [editedBody, setEditedBody] = useState(originalBody);
+  const [editedBodyHtml, setEditedBodyHtml] = useState(originalBodyHtml);
   const [storedDraft, setStoredDraft] = useState<RewriteDraft | null>(null);
   const [viewMode, setViewMode] = useState<"draft" | "original">("draft");
   const [copied, setCopied] = useState(false);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [toolbar, setToolbar] = useState<ToolbarState>(HIDDEN_TOOLBAR);
+  const [linkMode, setLinkMode] = useState(false);
+  const [linkValue, setLinkValue] = useState("");
+  const bodyRef = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLHeadingElement>(null);
+  const toolbarRef = useRef<HTMLDivElement>(null);
+  const linkInputRef = useRef<HTMLInputElement>(null);
+  const selectionRangeRef = useRef<Range | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const storedDraftRef = useRef<RewriteDraft | null>(null);
+  const linkModeRef = useRef(false);
   const lastSavedValueRef = useRef("");
-  const latestDraftStateRef = useRef({
+  const latestDraftStateRef = useRef<DraftState>({
     messageId,
     version: activeVersion,
     title: originalTitle,
     body: originalBody,
+    bodyHtml: originalBodyHtml,
     originalTitle,
     originalBody,
-    viewMode: "draft" as "draft" | "original"
+    originalBodyHtml,
+    viewMode: "draft"
   });
   const { buildTelemetry } = useEditorialTelemetry(messageId, activeVersion);
 
-  const setDisplayedRewrite = useCallback((title: string, body: string) => {
+  function setStoredDraftValue(draft: RewriteDraft | null) {
+    storedDraftRef.current = draft;
+    setStoredDraft(draft);
+  }
+
+  const hideToolbar = useCallback(() => {
+    setToolbar(HIDDEN_TOOLBAR);
+    setLinkMode(false);
+    setLinkValue("");
+  }, []);
+
+  const readBodyState = useCallback(() => {
+    const html = sanitizeRichHtml(bodyRef.current?.innerHTML ?? editedBodyHtml);
+    return {
+      body: richHtmlToPlainText(html),
+      bodyHtml: html
+    };
+  }, [editedBodyHtml]);
+
+  const syncBodyState = useCallback(() => {
+    const next = readBodyState();
+    setEditedBody(next.body);
+    setEditedBodyHtml(next.bodyHtml);
+    return next;
+  }, [readBodyState]);
+
+  const setDisplayedRewrite = useCallback((title: string, body: string, bodyHtml?: string) => {
+    const nextHtml = sanitizeRichHtml(bodyHtml ?? plainTextToRichHtml(body));
+
     setEditedTitle(title);
     setEditedBody(body);
+    setEditedBodyHtml(nextHtml);
+
     if (titleRef.current && titleRef.current.textContent !== title) {
       titleRef.current.textContent = title;
     }
+    if (bodyRef.current && bodyRef.current.innerHTML !== nextHtml) {
+      bodyRef.current.innerHTML = nextHtml;
+    }
   }, []);
-
-  function draftValue(title: string, body: string): string {
-    return `${title}\u0000${body}`;
-  }
 
   function persistDraftState(
     state = latestDraftStateRef.current,
     updateState = true
   ): RewriteDraft | null {
-    if (state.viewMode !== "draft") return storedDraft;
+    if (state.viewMode !== "draft") return storedDraftRef.current;
 
-    const currentValue = draftValue(state.title, state.body);
+    const currentValue = draftValue(state.title, state.body, state.bodyHtml);
     if (currentValue === lastSavedValueRef.current) {
-      return storedDraft;
+      return storedDraftRef.current;
     }
 
     const draft = saveRewriteDraft({
@@ -81,15 +251,128 @@ export function EditableRewrite({
       version: state.version,
       title: state.title,
       body: state.body,
+      bodyHtml: state.bodyHtml,
       originalTitle: state.originalTitle,
-      originalBody: state.originalBody
+      originalBody: state.originalBody,
+      originalBodyHtml: state.originalBodyHtml
     });
     if (updateState) {
-      setStoredDraft(draft);
+      setStoredDraftValue(draft);
     }
     lastSavedValueRef.current = currentValue;
     return draft;
   }
+
+  const updateToolbarFromSelection = useCallback(() => {
+    if (linkModeRef.current) return;
+
+    const range = getBodySelectionRange(bodyRef.current);
+    if (!range) {
+      setToolbar(HIDDEN_TOOLBAR);
+      return;
+    }
+
+    selectionRangeRef.current = range.cloneRange();
+    setToolbar({
+      visible: true,
+      ...getToolbarPosition(range)
+    });
+  }, []);
+
+  function restoreBodySelection(): boolean {
+    const range = selectionRangeRef.current;
+    const root = bodyRef.current;
+    if (!range || !root) return false;
+
+    const selection = window.getSelection();
+    if (!selection) return false;
+
+    root.focus({ preventScroll: true });
+    selection.removeAllRanges();
+    selection.addRange(range);
+    return true;
+  }
+
+  function enterDraftMode() {
+    if (viewMode === "original") {
+      setViewMode("draft");
+    }
+  }
+
+  function applyFormat(command: "bold" | "italic" | "insertUnorderedList" | "insertOrderedList") {
+    enterDraftMode();
+    if (!restoreBodySelection()) return;
+
+    document.execCommand(command, false);
+    syncBodyState();
+    updateToolbarFromSelection();
+  }
+
+  function openLinkInput() {
+    const range = getBodySelectionRange(bodyRef.current) ?? selectionRangeRef.current;
+    if (!range) return;
+
+    selectionRangeRef.current = range.cloneRange();
+    setLinkValue(getRangeLinkHref(range, bodyRef.current));
+    setLinkMode(true);
+  }
+
+  function handleLinkSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const href = normalizeLinkHref(linkValue);
+    if (!href || !restoreBodySelection()) {
+      linkInputRef.current?.focus();
+      return;
+    }
+
+    enterDraftMode();
+    document.execCommand("createLink", false, href);
+    syncBodyState();
+    hideToolbar();
+  }
+
+  function handleBodyInput() {
+    enterDraftMode();
+    syncBodyState();
+  }
+
+  function handleBodyPaste(event: ReactClipboardEvent<HTMLDivElement>) {
+    event.preventDefault();
+    enterDraftMode();
+
+    const html = event.clipboardData.getData("text/html");
+    const text = event.clipboardData.getData("text/plain");
+    if (html) {
+      const safeHtml = sanitizeRichHtml(html);
+      if (safeHtml) {
+        document.execCommand("insertHTML", false, safeHtml);
+      } else if (text) {
+        document.execCommand("insertText", false, text);
+      }
+    } else if (text) {
+      document.execCommand("insertText", false, text);
+    }
+
+    syncBodyState();
+    updateToolbarFromSelection();
+  }
+
+  function handleBodyKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+      event.preventDefault();
+      openLinkInput();
+    }
+  }
+
+  useEffect(() => {
+    linkModeRef.current = linkMode;
+  }, [linkMode]);
+
+  useEffect(() => {
+    if (!linkMode) return;
+    requestAnimationFrame(() => linkInputRef.current?.focus());
+  }, [linkMode]);
 
   useEffect(() => {
     latestDraftStateRef.current = {
@@ -97,19 +380,52 @@ export function EditableRewrite({
       version: activeVersion,
       title: editedTitle,
       body: editedBody,
+      bodyHtml: editedBodyHtml,
       originalTitle,
       originalBody,
+      originalBodyHtml,
       viewMode
     };
   }, [
     activeVersion,
     editedBody,
+    editedBodyHtml,
     editedTitle,
     messageId,
     originalBody,
+    originalBodyHtml,
     originalTitle,
     viewMode
   ]);
+
+  useEffect(() => {
+    function handleSelectionChange() {
+      updateToolbarFromSelection();
+    }
+
+    function handleDocumentMouseDown(event: MouseEvent) {
+      const target = event.target as Node | null;
+      if (
+        isNodeInside(bodyRef.current, target) ||
+        isNodeInside(toolbarRef.current, target)
+      ) {
+        return;
+      }
+      hideToolbar();
+    }
+
+    document.addEventListener("selectionchange", handleSelectionChange);
+    document.addEventListener("mousedown", handleDocumentMouseDown);
+    window.addEventListener("resize", updateToolbarFromSelection);
+    window.addEventListener("scroll", updateToolbarFromSelection, true);
+
+    return () => {
+      document.removeEventListener("selectionchange", handleSelectionChange);
+      document.removeEventListener("mousedown", handleDocumentMouseDown);
+      window.removeEventListener("resize", updateToolbarFromSelection);
+      window.removeEventListener("scroll", updateToolbarFromSelection, true);
+    };
+  }, [hideToolbar, updateToolbarFromSelection]);
 
   useEffect(() => {
     return () => {
@@ -132,21 +448,34 @@ export function EditableRewrite({
       messageId,
       version: activeVersion,
       originalTitle,
-      originalBody
+      originalBody,
+      originalBodyHtml
     });
     const nextTitle = draft?.title ?? originalTitle;
     const nextBody = draft?.body ?? originalBody;
+    const nextBodyHtml = sanitizeRichHtml(
+      draft?.bodyHtml ?? plainTextToRichHtml(nextBody)
+    );
 
-    setStoredDraft(draft);
+    setStoredDraftValue(draft);
     setViewMode("draft");
-    setDisplayedRewrite(nextTitle, nextBody);
-    lastSavedValueRef.current = draftValue(nextTitle, nextBody);
-  }, [activeVersion, messageId, originalBody, originalTitle, setDisplayedRewrite]);
+    hideToolbar();
+    setDisplayedRewrite(nextTitle, nextBody, nextBodyHtml);
+    lastSavedValueRef.current = draftValue(nextTitle, nextBody, nextBodyHtml);
+  }, [
+    activeVersion,
+    hideToolbar,
+    messageId,
+    originalBody,
+    originalBodyHtml,
+    originalTitle,
+    setDisplayedRewrite
+  ]);
 
   useEffect(() => {
     if (viewMode !== "draft") return;
 
-    const currentValue = draftValue(editedTitle, editedBody);
+    const currentValue = draftValue(editedTitle, editedBody, editedBodyHtml);
     if (currentValue === lastSavedValueRef.current) return;
 
     if (saveTimerRef.current) {
@@ -159,8 +488,10 @@ export function EditableRewrite({
         version: activeVersion,
         title: editedTitle,
         body: editedBody,
+        bodyHtml: editedBodyHtml,
         originalTitle,
         originalBody,
+        originalBodyHtml,
         viewMode
       });
       saveTimerRef.current = null;
@@ -175,41 +506,40 @@ export function EditableRewrite({
   }, [
     activeVersion,
     editedBody,
+    editedBodyHtml,
     editedTitle,
     messageId,
     originalBody,
+    originalBodyHtml,
     originalTitle,
     viewMode
   ]);
 
-  // Auto-resize textarea to fit content
-  const resizeTextarea = useCallback(() => {
-    const ta = textareaRef.current;
-    if (ta) {
-      ta.style.height = "auto";
-      ta.style.height = ta.scrollHeight + "px";
-    }
-  }, []);
-
-  useEffect(() => {
-    resizeTextarea();
-  }, [editedBody, resizeTextarea]);
-
-  useEffect(() => {
-    window.addEventListener("resize", resizeTextarea);
-    return () => window.removeEventListener("resize", resizeTextarea);
-  }, [resizeTextarea]);
-
   async function handleCopy() {
-    persistDraftState();
+    const currentBody = syncBodyState();
+    persistDraftState({
+      messageId,
+      version: activeVersion,
+      title: editedTitle,
+      body: currentBody.body,
+      bodyHtml: currentBody.bodyHtml,
+      originalTitle,
+      originalBody,
+      originalBodyHtml,
+      viewMode
+    });
 
-    const text = editedTitle + "\n\n" + editedBody;
-    await navigator.clipboard.writeText(text);
+    const text = `${editedTitle}\n\n${currentBody.body}`;
+    const html = createNoticeClipboardHtml(editedTitle, currentBody.bodyHtml);
+    await copyNoticeToClipboard(text, html);
 
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
 
-    const hasEdits = editedTitle !== originalTitle || editedBody !== originalBody;
+    const hasEdits =
+      editedTitle !== originalTitle ||
+      currentBody.body !== originalBody ||
+      currentBody.bodyHtml !== originalBodyHtml;
 
     fetch(`/api/notice/${messageId}/edit-log`, {
       method: "POST",
@@ -219,7 +549,7 @@ export function EditableRewrite({
         originalTitle,
         originalBody,
         editedTitle,
-        editedBody,
+        editedBody: currentBody.body,
         hasEdits,
         telemetry: buildTelemetry({
           actionSource: "editable_rewrite"
@@ -230,42 +560,46 @@ export function EditableRewrite({
     });
   }
 
-  function enterDraftMode() {
-    if (viewMode === "original") {
-      setViewMode("draft");
-    }
-  }
-
   function handleToggleDraftView() {
     if (viewMode === "original") {
       const draft =
-        storedDraft ??
+        storedDraftRef.current ??
         getRewriteDraft({
           messageId,
           version: activeVersion,
           originalTitle,
-          originalBody
+          originalBody,
+          originalBodyHtml
         });
       const nextTitle = draft?.title ?? originalTitle;
       const nextBody = draft?.body ?? originalBody;
+      const nextBodyHtml = sanitizeRichHtml(
+        draft?.bodyHtml ?? plainTextToRichHtml(nextBody)
+      );
 
-      setStoredDraft(draft);
+      setStoredDraftValue(draft);
       setViewMode("draft");
-      setDisplayedRewrite(nextTitle, nextBody);
-      lastSavedValueRef.current = draftValue(nextTitle, nextBody);
+      setDisplayedRewrite(nextTitle, nextBody, nextBodyHtml);
+      lastSavedValueRef.current = draftValue(nextTitle, nextBody, nextBodyHtml);
       return;
     }
 
+    hideToolbar();
     setViewMode("original");
-    setDisplayedRewrite(originalTitle, originalBody);
+    setDisplayedRewrite(originalTitle, originalBody, originalBodyHtml);
   }
 
   function handleResetDraft() {
     deleteRewriteDraft({ messageId, version: activeVersion });
-    setStoredDraft(null);
+    setStoredDraftValue(null);
     setViewMode("draft");
-    setDisplayedRewrite(originalTitle, originalBody);
-    lastSavedValueRef.current = draftValue(originalTitle, originalBody);
+    hideToolbar();
+    setDisplayedRewrite(originalTitle, originalBody, originalBodyHtml);
+    lastSavedValueRef.current = draftValue(
+      originalTitle,
+      originalBody,
+      originalBodyHtml
+    );
   }
 
   const titleSuggestions = useTitleSuggestions({
@@ -310,16 +644,128 @@ export function EditableRewrite({
       </h2>
       {titleSuggestions.dropdown}
       {dateline}
-      <textarea
-        ref={textareaRef}
+      <div
+        ref={bodyRef}
         className="editableBody"
-        value={editedBody}
-        onChange={(e) => {
-          enterDraftMode();
-          setEditedBody(e.target.value);
-        }}
-        rows={1}
+        contentEditable
+        suppressContentEditableWarning
+        role="textbox"
+        aria-multiline="true"
+        aria-label="Rediger notistekst"
+        spellCheck
+        onInput={handleBodyInput}
+        onPaste={handleBodyPaste}
+        onMouseUp={updateToolbarFromSelection}
+        onKeyUp={updateToolbarFromSelection}
+        onKeyDown={handleBodyKeyDown}
+        dangerouslySetInnerHTML={{ __html: initialBodyHtmlRef.current }}
       />
+      {toolbar.visible && (
+        <div
+          ref={toolbarRef}
+          className={`richEditToolbar${linkMode ? " richEditToolbarLink" : ""}`}
+          style={{ top: toolbar.top, left: toolbar.left }}
+        >
+          {linkMode ? (
+            <form className="richEditLinkForm" onSubmit={handleLinkSubmit}>
+              <input
+                ref={linkInputRef}
+                className="richEditLinkInput"
+                value={linkValue}
+                onChange={(event) => setLinkValue(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") {
+                    event.preventDefault();
+                    hideToolbar();
+                  }
+                }}
+                placeholder="https://"
+                aria-label="Lenke"
+              />
+              <button
+                className="richEditToolButton"
+                type="submit"
+                title="Sett inn lenke"
+                aria-label="Sett inn lenke"
+              >
+                <svg className="richEditToolIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="m20 6-11 11-5-5" />
+                </svg>
+              </button>
+            </form>
+          ) : (
+            <>
+              <button
+                className="richEditToolButton"
+                type="button"
+                title="Fet"
+                aria-label="Fet"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => applyFormat("bold")}
+              >
+                <strong>B</strong>
+              </button>
+              <button
+                className="richEditToolButton"
+                type="button"
+                title="Kursiv"
+                aria-label="Kursiv"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => applyFormat("italic")}
+              >
+                <em>I</em>
+              </button>
+              <button
+                className="richEditToolButton"
+                type="button"
+                title="Punktliste"
+                aria-label="Punktliste"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => applyFormat("insertUnorderedList")}
+              >
+                <svg className="richEditToolIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M8 6h13" />
+                  <path d="M8 12h13" />
+                  <path d="M8 18h13" />
+                  <path d="M3 6h.01" />
+                  <path d="M3 12h.01" />
+                  <path d="M3 18h.01" />
+                </svg>
+              </button>
+              <button
+                className="richEditToolButton"
+                type="button"
+                title="Nummerert liste"
+                aria-label="Nummerert liste"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => applyFormat("insertOrderedList")}
+              >
+                <svg className="richEditToolIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M10 6h11" />
+                  <path d="M10 12h11" />
+                  <path d="M10 18h11" />
+                  <path d="M4 6h1v4" />
+                  <path d="M4 10h2" />
+                  <path d="M4 14h2l-2 4h2" />
+                </svg>
+              </button>
+              <button
+                className="richEditToolButton"
+                type="button"
+                title="Lenke"
+                aria-label="Lenke"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={openLinkInput}
+              >
+                <svg className="richEditToolIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M10 13a5 5 0 0 0 7.1 0l2-2a5 5 0 0 0-7.1-7.1l-1.1 1.1" />
+                  <path d="M14 11a5 5 0 0 0-7.1 0l-2 2a5 5 0 0 0 7.1 7.1l1.1-1.1" />
+                </svg>
+              </button>
+            </>
+          )}
+        </div>
+      )}
       <div className="editableActions">
         {children}
         <span className="actionsRight">

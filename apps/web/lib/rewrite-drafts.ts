@@ -3,6 +3,7 @@
 export type RewriteDraft = {
   title: string;
   body: string;
+  bodyHtml?: string;
   updatedAt: string;
 };
 
@@ -32,10 +33,20 @@ export function getRewriteDraftKey(messageId: number, version?: number | null): 
 export function isSameAsOriginal(args: {
   title: string;
   body: string;
+  bodyHtml?: string | null;
   originalTitle: string;
   originalBody: string;
+  originalBodyHtml?: string | null;
 }): boolean {
-  return args.title === args.originalTitle && args.body === args.originalBody;
+  const sameText =
+    args.title === args.originalTitle && args.body === args.originalBody;
+  if (!sameText) return false;
+
+  if (args.bodyHtml != null || args.originalBodyHtml != null) {
+    return (args.bodyHtml ?? null) === (args.originalBodyHtml ?? null);
+  }
+
+  return true;
 }
 
 function parseDraft(value: string | null): RewriteDraft | null {
@@ -50,6 +61,8 @@ function parseDraft(value: string | null): RewriteDraft | null {
     return {
       title: parsed.title,
       body: parsed.body,
+      bodyHtml:
+        typeof parsed.bodyHtml === "string" ? parsed.bodyHtml : undefined,
       updatedAt:
         typeof parsed.updatedAt === "string"
           ? parsed.updatedAt
@@ -74,6 +87,7 @@ export function getRewriteDraft(args: {
   version?: number | null;
   originalTitle?: string;
   originalBody?: string;
+  originalBodyHtml?: string;
 }): RewriteDraft | null {
   const storage = getDraftStorage();
   if (!storage) return null;
@@ -90,10 +104,16 @@ export function getRewriteDraft(args: {
     isSameAsOriginal({
       title: draft.title,
       body: draft.body,
+      bodyHtml: draft.bodyHtml,
       originalTitle: args.originalTitle,
-      originalBody: args.originalBody
+      originalBody: args.originalBody,
+      originalBodyHtml: args.originalBodyHtml
     })
   ) {
+    if (draft.bodyHtml != null && args.originalBodyHtml == null) {
+      return draft;
+    }
+
     storage.removeItem(key);
     emitDraftChange(args.messageId, args.version as number, false);
     return null;
@@ -116,8 +136,10 @@ export function saveRewriteDraft(args: {
   version?: number | null;
   title: string;
   body: string;
+  bodyHtml?: string;
   originalTitle: string;
   originalBody: string;
+  originalBodyHtml?: string;
 }): RewriteDraft | null {
   const storage = getDraftStorage();
   if (!storage) return null;
@@ -129,8 +151,10 @@ export function saveRewriteDraft(args: {
     isSameAsOriginal({
       title: args.title,
       body: args.body,
+      bodyHtml: args.bodyHtml,
       originalTitle: args.originalTitle,
-      originalBody: args.originalBody
+      originalBody: args.originalBody,
+      originalBodyHtml: args.originalBodyHtml
     })
   ) {
     storage.removeItem(key);
@@ -141,6 +165,7 @@ export function saveRewriteDraft(args: {
   const draft = {
     title: args.title,
     body: args.body,
+    bodyHtml: args.bodyHtml,
     updatedAt: new Date().toISOString()
   };
   try {
