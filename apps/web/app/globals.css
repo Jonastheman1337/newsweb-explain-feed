@@ -750,6 +750,10 @@ a {
   transform: translateX(-50%);
 }
 
+.richEditToolbar:not([data-visible="true"]) {
+  display: none;
+}
+
 .richEditToolButton {
   display: inline-flex;
   align-items: center;

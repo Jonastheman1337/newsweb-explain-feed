@@ -51,18 +51,6 @@ type DraftState = {
   viewMode: "draft" | "original";
 };
 
-type ToolbarState = {
-  visible: boolean;
-  top: number;
-  left: number;
-};
-
-const HIDDEN_TOOLBAR: ToolbarState = {
-  visible: false,
-  top: 0,
-  left: 0
-};
-
 function draftValue(title: string, body: string, bodyHtml: string): string {
   return `${title}\u0000${body}\u0000${bodyHtml}`;
 }
@@ -91,7 +79,7 @@ function getBodySelectionRange(root: HTMLElement | null): Range | null {
   return range;
 }
 
-function getToolbarPosition(range: Range): Pick<ToolbarState, "top" | "left"> {
+function getToolbarPosition(range: Range): { top: number; left: number } {
   const rect = range.getBoundingClientRect();
   const center = rect.left + rect.width / 2;
   const toolbarHalfWidth = 112;
@@ -169,7 +157,6 @@ export function EditableRewrite({
   const [storedDraft, setStoredDraft] = useState<RewriteDraft | null>(null);
   const [viewMode, setViewMode] = useState<"draft" | "original">("draft");
   const [copied, setCopied] = useState(false);
-  const [toolbar, setToolbar] = useState<ToolbarState>(HIDDEN_TOOLBAR);
   const [linkMode, setLinkMode] = useState(false);
   const [linkValue, setLinkValue] = useState("");
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -200,11 +187,32 @@ export function EditableRewrite({
     setStoredDraft(draft);
   }
 
+  function hideToolbarElement() {
+    const toolbarElement = toolbarRef.current;
+    if (!toolbarElement) return;
+
+    delete toolbarElement.dataset.visible;
+    toolbarElement.style.top = "";
+    toolbarElement.style.left = "";
+  }
+
+  function showToolbarForRange(range: Range) {
+    const toolbarElement = toolbarRef.current;
+    if (!toolbarElement) return;
+
+    const position = getToolbarPosition(range);
+    toolbarElement.style.top = `${position.top}px`;
+    toolbarElement.style.left = `${position.left}px`;
+    toolbarElement.dataset.visible = "true";
+  }
+
   const hideToolbar = useCallback(() => {
     selectionRangeRef.current = null;
-    setToolbar(HIDDEN_TOOLBAR);
-    setLinkMode(false);
-    setLinkValue("");
+    hideToolbarElement();
+    if (linkModeRef.current) {
+      setLinkMode(false);
+      setLinkValue("");
+    }
   }, []);
 
   const readBodyState = useCallback(() => {
@@ -271,15 +279,12 @@ export function EditableRewrite({
     const range = getBodySelectionRange(bodyRef.current);
     if (!range) {
       selectionRangeRef.current = null;
-      setToolbar(HIDDEN_TOOLBAR);
+      hideToolbarElement();
       return;
     }
 
     selectionRangeRef.current = range.cloneRange();
-    setToolbar({
-      visible: true,
-      ...getToolbarPosition(range)
-    });
+    showToolbarForRange(range);
   }, []);
 
   function restoreBodySelection(): boolean {
@@ -383,7 +388,7 @@ export function EditableRewrite({
     if (linkModeRef.current) return;
     isSelectingRef.current = true;
     selectionRangeRef.current = null;
-    setToolbar(HIDDEN_TOOLBAR);
+    hideToolbarElement();
   }
 
   function handleBodyMouseUp() {
@@ -700,112 +705,109 @@ export function EditableRewrite({
         onKeyDown={handleBodyKeyDown}
         dangerouslySetInnerHTML={{ __html: initialBodyHtmlRef.current }}
       />
-      {toolbar.visible && (
-        <div
-          ref={toolbarRef}
-          className={`richEditToolbar${linkMode ? " richEditToolbarLink" : ""}`}
-          style={{ top: toolbar.top, left: toolbar.left }}
-        >
-          {linkMode ? (
-            <form className="richEditLinkForm" onSubmit={handleLinkSubmit}>
-              <input
-                ref={linkInputRef}
-                className="richEditLinkInput"
-                value={linkValue}
-                onChange={(event) => setLinkValue(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Escape") {
-                    event.preventDefault();
-                    hideToolbar();
-                  }
-                }}
-                placeholder="https://"
-                aria-label="Lenke"
-              />
-              <button
-                className="richEditToolButton"
-                type="submit"
-                title="Sett inn lenke"
-                aria-label="Sett inn lenke"
-              >
-                <svg className="richEditToolIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="m20 6-11 11-5-5" />
-                </svg>
-              </button>
-            </form>
-          ) : (
-            <>
-              <button
-                className="richEditToolButton"
-                type="button"
-                title="Fet"
-                aria-label="Fet"
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => applyFormat("bold")}
-              >
-                <strong>B</strong>
-              </button>
-              <button
-                className="richEditToolButton"
-                type="button"
-                title="Kursiv"
-                aria-label="Kursiv"
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => applyFormat("italic")}
-              >
-                <em>I</em>
-              </button>
-              <button
-                className="richEditToolButton"
-                type="button"
-                title="Punktliste"
-                aria-label="Punktliste"
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => applyFormat("insertUnorderedList")}
-              >
-                <svg className="richEditToolIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M8 6h13" />
-                  <path d="M8 12h13" />
-                  <path d="M8 18h13" />
-                  <path d="M3 6h.01" />
-                  <path d="M3 12h.01" />
-                  <path d="M3 18h.01" />
-                </svg>
-              </button>
-              <button
-                className="richEditToolButton"
-                type="button"
-                title="Nummerert liste"
-                aria-label="Nummerert liste"
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => applyFormat("insertOrderedList")}
-              >
-                <svg className="richEditToolIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M10 6h11" />
-                  <path d="M10 12h11" />
-                  <path d="M10 18h11" />
-                  <path d="M4 6h1v4" />
-                  <path d="M4 10h2" />
-                  <path d="M4 14h2l-2 4h2" />
-                </svg>
-              </button>
-              <button
-                className="richEditToolButton"
-                type="button"
-                title="Lenke"
-                aria-label="Lenke"
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={openLinkInput}
-              >
-                <svg className="richEditToolIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M10 13a5 5 0 0 0 7.1 0l2-2a5 5 0 0 0-7.1-7.1l-1.1 1.1" />
-                  <path d="M14 11a5 5 0 0 0-7.1 0l-2 2a5 5 0 0 0 7.1 7.1l1.1-1.1" />
-                </svg>
-              </button>
-            </>
-          )}
-        </div>
-      )}
+      <div
+        ref={toolbarRef}
+        className={`richEditToolbar${linkMode ? " richEditToolbarLink" : ""}`}
+      >
+        {linkMode ? (
+          <form className="richEditLinkForm" onSubmit={handleLinkSubmit}>
+            <input
+              ref={linkInputRef}
+              className="richEditLinkInput"
+              value={linkValue}
+              onChange={(event) => setLinkValue(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") {
+                  event.preventDefault();
+                  hideToolbar();
+                }
+              }}
+              placeholder="https://"
+              aria-label="Lenke"
+            />
+            <button
+              className="richEditToolButton"
+              type="submit"
+              title="Sett inn lenke"
+              aria-label="Sett inn lenke"
+            >
+              <svg className="richEditToolIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="m20 6-11 11-5-5" />
+              </svg>
+            </button>
+          </form>
+        ) : (
+          <>
+            <button
+              className="richEditToolButton"
+              type="button"
+              title="Fet"
+              aria-label="Fet"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => applyFormat("bold")}
+            >
+              <strong>B</strong>
+            </button>
+            <button
+              className="richEditToolButton"
+              type="button"
+              title="Kursiv"
+              aria-label="Kursiv"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => applyFormat("italic")}
+            >
+              <em>I</em>
+            </button>
+            <button
+              className="richEditToolButton"
+              type="button"
+              title="Punktliste"
+              aria-label="Punktliste"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => applyFormat("insertUnorderedList")}
+            >
+              <svg className="richEditToolIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M8 6h13" />
+                <path d="M8 12h13" />
+                <path d="M8 18h13" />
+                <path d="M3 6h.01" />
+                <path d="M3 12h.01" />
+                <path d="M3 18h.01" />
+              </svg>
+            </button>
+            <button
+              className="richEditToolButton"
+              type="button"
+              title="Nummerert liste"
+              aria-label="Nummerert liste"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => applyFormat("insertOrderedList")}
+            >
+              <svg className="richEditToolIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M10 6h11" />
+                <path d="M10 12h11" />
+                <path d="M10 18h11" />
+                <path d="M4 6h1v4" />
+                <path d="M4 10h2" />
+                <path d="M4 14h2l-2 4h2" />
+              </svg>
+            </button>
+            <button
+              className="richEditToolButton"
+              type="button"
+              title="Lenke"
+              aria-label="Lenke"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={openLinkInput}
+            >
+              <svg className="richEditToolIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M10 13a5 5 0 0 0 7.1 0l2-2a5 5 0 0 0-7.1-7.1l-1.1 1.1" />
+                <path d="M14 11a5 5 0 0 0-7.1 0l-2 2a5 5 0 0 0 7.1 7.1l1.1-1.1" />
+              </svg>
+            </button>
+          </>
+        )}
+      </div>
       <div className="editableActions">
         {children}
         <span className="actionsRight">
