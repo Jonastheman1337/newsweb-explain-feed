@@ -39,7 +39,7 @@ describe("findUnexpectedNumbers", () => {
     const source = [
       "rights issue of 2,039,664,000 new shares in the Company",
       "at a subscription price of NOK 0.50 per Offer Share",
-      "raising gross proceeds of NOK 1,019,832,000"
+      "raising gross proceeds of NOK 1,019,832,000 (the NOK equivalent of approximately USD 110 million)"
     ].join("\n");
 
     expect(findUnexpectedNumbers(rewrite, source)).toEqual([]);

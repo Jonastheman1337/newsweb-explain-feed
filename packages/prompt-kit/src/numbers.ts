@@ -50,6 +50,40 @@ type SourceNumberIndex = {
   scaledUnitKeys: Set<string>;
 };
 
+const SCALED_NUMBER_UNIT_PATTERNS: Array<{
+  unit: ScaledNumberUnit;
+  pattern: RegExp;
+}> = [
+  {
+    unit: "sek",
+    pattern: /\b(?:sek|svenske kroner|swedish kronor)\b/gi
+  },
+  {
+    unit: "dkk",
+    pattern: /\b(?:dkk|danske kroner|danish kroner)\b/gi
+  },
+  {
+    unit: "usd",
+    pattern: /\b(?:usd|u\.s\.\s*dollars?|us\s*dollars?|us\$|dollars?)\b|\$/gi
+  },
+  {
+    unit: "eur",
+    pattern: /\b(?:eur|euros?|euro)\b/gi
+  },
+  {
+    unit: "gbp",
+    pattern: /\b(?:gbp|pund|pounds?)\b/gi
+  },
+  {
+    unit: "nok",
+    pattern: /\b(?:nok|norske kroner|kroner|kr)\b/gi
+  },
+  {
+    unit: "shares",
+    pattern: /\b(?:aksje|aksjer|shares)\b/gi
+  }
+];
+
 function sanitizeNumberToken(token: string): string {
   const trimmed = token.trim();
   const withoutLeading = trimmed.replace(/^[^\d-]+/, "");
@@ -304,7 +338,31 @@ function sourceScaleContext(
   return rewriteScaleContext(text, index, token);
 }
 
-function numberUnitContext(text: string, index: number, token: string): string {
+function closestUnitDistance(
+  context: string,
+  pattern: RegExp,
+  direction: "before" | "after"
+): number | null {
+  const matcher = new RegExp(pattern.source, pattern.flags);
+  let closest: number | null = null;
+  for (const match of context.matchAll(matcher)) {
+    const matchIndex = match.index ?? 0;
+    const distance =
+      direction === "before"
+        ? context.length - (matchIndex + match[0].length)
+        : matchIndex;
+    if (closest == null || distance < closest) {
+      closest = distance;
+    }
+  }
+  return closest;
+}
+
+function detectScaledNumberUnit(
+  text: string,
+  index: number,
+  token: string
+): ScaledNumberUnit | null {
   const before = text.slice(
     Math.max(0, index - NUMBER_UNIT_CONTEXT_BEFORE_CHARS),
     index
@@ -313,39 +371,26 @@ function numberUnitContext(text: string, index: number, token: string): string {
     index + token.length,
     Math.min(text.length, index + token.length + NUMBER_UNIT_CONTEXT_AFTER_CHARS)
   );
-  return `${before} ${after}`;
-}
+  let nearest: { unit: ScaledNumberUnit; distance: number } | null = null;
 
-function detectScaledNumberUnit(
-  text: string,
-  index: number,
-  token: string
-): ScaledNumberUnit | null {
-  const context = numberUnitContext(text, index, token);
-
-  if (/\b(?:sek|svenske kroner|swedish kronor)\b/i.test(context)) {
-    return "sek";
-  }
-  if (/\b(?:dkk|danske kroner|danish kroner)\b/i.test(context)) {
-    return "dkk";
-  }
-  if (/\b(?:usd|u\.s\.\s*dollars?|us\s*dollars?|us\$|dollars?|\$)\b/i.test(context)) {
-    return "usd";
-  }
-  if (/\b(?:eur|euros?|euro)\b/i.test(context)) {
-    return "eur";
-  }
-  if (/\b(?:gbp|pund|pounds?)\b/i.test(context)) {
-    return "gbp";
-  }
-  if (/\b(?:nok|norske kroner|kroner|kr)\b/i.test(context)) {
-    return "nok";
-  }
-  if (/\b(?:aksje|aksjer|shares)\b/i.test(context)) {
-    return "shares";
+  for (const { unit, pattern } of SCALED_NUMBER_UNIT_PATTERNS) {
+    const beforeDistance = closestUnitDistance(before, pattern, "before");
+    const afterDistance = closestUnitDistance(after, pattern, "after");
+    const distance =
+      beforeDistance == null
+        ? afterDistance
+        : afterDistance == null
+          ? beforeDistance
+          : Math.min(beforeDistance, afterDistance);
+    if (distance == null) {
+      continue;
+    }
+    if (!nearest || distance < nearest.distance) {
+      nearest = { unit, distance };
+    }
   }
 
-  return null;
+  return nearest?.unit ?? null;
 }
 
 function isYearLikeNumber(value: number): boolean {
