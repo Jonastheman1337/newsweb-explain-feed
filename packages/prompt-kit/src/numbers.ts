@@ -33,6 +33,8 @@ const EXPLICIT_THOUSANDS_SCALE_PATTERNS = [
 const REWRITE_MILLION_CONTEXT_PATTERN = /\b(?:mill\.|million(?:er)?)\b/i;
 const REWRITE_BILLION_CONTEXT_PATTERN =
   /\b(?:mrd\.?|milliard(?:er)?|billion(?:s)?)\b/i;
+const SHARED_PERCENT_RANGE_AFTER_PATTERN =
+  /^\s*(?:-|–|—|til|to|and|og)\s*-?\d+(?:[,.]\d+)?\s*(?:%|prosent|percent)\b/i;
 
 type NumberTokenMatch = {
   token: string;
@@ -228,6 +230,21 @@ function rewriteNumberKeys(parsed: {
 }): string[] {
   const equivalentKey = integerThousandsEquivalentKey(parsed);
   return equivalentKey ? [parsed.key, equivalentKey] : [parsed.key];
+}
+
+function percentEquivalentKey(parsed: { key: string }): string {
+  const [sign, normalizedCore, , fractionDigits] = parsed.key.split("|");
+  return [sign, normalizedCore, "pct", fractionDigits].join("|");
+}
+
+function hasSharedPercentRangeAfter(
+  text: string,
+  index: number,
+  token: string
+): boolean {
+  return SHARED_PERCENT_RANGE_AFTER_PATTERN.test(
+    text.slice(index + token.length, index + token.length + 60)
+  );
 }
 
 function hasExplicitThousandsScaleContext(
@@ -483,6 +500,12 @@ function collectSourceNumberIndex(text: string): SourceNumberIndex {
     const parsed = parseNumberToken(token.token);
     if (parsed) {
       exactKeys.add(parsed.key);
+      if (
+        !parsed.hasPercent &&
+        hasSharedPercentRangeAfter(text, token.index, token.token)
+      ) {
+        exactKeys.add(percentEquivalentKey(parsed));
+      }
       if (hasExplicitThousandsScaleContext(text, token.index, token.token)) {
         for (const key of scaledMillionKeysForSourceToken(parsed, token.token)) {
           scaledMillionKeys.add(key);
@@ -656,7 +679,16 @@ export function findUnexpectedNumbers(
           scaledUnitIndexKey(rewriteScale, rewriteUnit, key)
         )
       );
-    if (!hasExactMatch && !hasScaledMillionMatch && !hasScaledUnitMatch) {
+    const hasSharedPercentRangeMatch =
+      !parsed.hasPercent &&
+      hasSharedPercentRangeAfter(rewriteText, token.index, token.token) &&
+      sourceNumberIndex.exactKeys.has(percentEquivalentKey(parsed));
+    if (
+      !hasExactMatch &&
+      !hasScaledMillionMatch &&
+      !hasScaledUnitMatch &&
+      !hasSharedPercentRangeMatch
+    ) {
       if (isSimpleTradeArithmeticNumber(parsed, sourceText)) {
         continue;
       }
