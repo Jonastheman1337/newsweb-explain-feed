@@ -177,6 +177,7 @@ export function EditableRewrite({
   const toolbarRef = useRef<HTMLDivElement>(null);
   const linkInputRef = useRef<HTMLInputElement>(null);
   const selectionRangeRef = useRef<Range | null>(null);
+  const isSelectingRef = useRef(false);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const storedDraftRef = useRef<RewriteDraft | null>(null);
   const linkModeRef = useRef(false);
@@ -200,6 +201,7 @@ export function EditableRewrite({
   }
 
   const hideToolbar = useCallback(() => {
+    selectionRangeRef.current = null;
     setToolbar(HIDDEN_TOOLBAR);
     setLinkMode(false);
     setLinkValue("");
@@ -264,10 +266,11 @@ export function EditableRewrite({
   }
 
   const updateToolbarFromSelection = useCallback(() => {
-    if (linkModeRef.current) return;
+    if (linkModeRef.current || isSelectingRef.current) return;
 
     const range = getBodySelectionRange(bodyRef.current);
     if (!range) {
+      selectionRangeRef.current = null;
       setToolbar(HIDDEN_TOOLBAR);
       return;
     }
@@ -283,6 +286,7 @@ export function EditableRewrite({
     const range = selectionRangeRef.current;
     const root = bodyRef.current;
     if (!range || !root) return false;
+    if (!isNodeInside(root, range.commonAncestorContainer)) return false;
 
     const selection = window.getSelection();
     if (!selection) return false;
@@ -301,6 +305,13 @@ export function EditableRewrite({
 
   function applyFormat(command: "bold" | "italic" | "insertUnorderedList" | "insertOrderedList") {
     enterDraftMode();
+    const range = getBodySelectionRange(bodyRef.current);
+    if (!range) {
+      hideToolbar();
+      return;
+    }
+
+    selectionRangeRef.current = range.cloneRange();
     if (!restoreBodySelection()) return;
 
     document.execCommand(command, false);
@@ -309,8 +320,11 @@ export function EditableRewrite({
   }
 
   function openLinkInput() {
-    const range = getBodySelectionRange(bodyRef.current) ?? selectionRangeRef.current;
-    if (!range) return;
+    const range = getBodySelectionRange(bodyRef.current);
+    if (!range) {
+      hideToolbar();
+      return;
+    }
 
     selectionRangeRef.current = range.cloneRange();
     setLinkValue(getRangeLinkHref(range, bodyRef.current));
@@ -365,6 +379,22 @@ export function EditableRewrite({
     }
   }
 
+  function handleBodyMouseDown() {
+    if (linkModeRef.current) return;
+    isSelectingRef.current = true;
+    selectionRangeRef.current = null;
+    setToolbar(HIDDEN_TOOLBAR);
+  }
+
+  function handleBodyMouseUp() {
+    isSelectingRef.current = false;
+    requestAnimationFrame(updateToolbarFromSelection);
+  }
+
+  function handleBodyKeyUp() {
+    requestAnimationFrame(updateToolbarFromSelection);
+  }
+
   useEffect(() => {
     linkModeRef.current = linkMode;
   }, [linkMode]);
@@ -400,7 +430,8 @@ export function EditableRewrite({
 
   useEffect(() => {
     function handleSelectionChange() {
-      updateToolbarFromSelection();
+      if (isSelectingRef.current || linkModeRef.current) return;
+      requestAnimationFrame(updateToolbarFromSelection);
     }
 
     function handleDocumentMouseDown(event: MouseEvent) {
@@ -414,14 +445,22 @@ export function EditableRewrite({
       hideToolbar();
     }
 
+    function handleDocumentMouseUp() {
+      if (!isSelectingRef.current) return;
+      isSelectingRef.current = false;
+      requestAnimationFrame(updateToolbarFromSelection);
+    }
+
     document.addEventListener("selectionchange", handleSelectionChange);
     document.addEventListener("mousedown", handleDocumentMouseDown);
+    document.addEventListener("mouseup", handleDocumentMouseUp);
     window.addEventListener("resize", updateToolbarFromSelection);
     window.addEventListener("scroll", updateToolbarFromSelection, true);
 
     return () => {
       document.removeEventListener("selectionchange", handleSelectionChange);
       document.removeEventListener("mousedown", handleDocumentMouseDown);
+      document.removeEventListener("mouseup", handleDocumentMouseUp);
       window.removeEventListener("resize", updateToolbarFromSelection);
       window.removeEventListener("scroll", updateToolbarFromSelection, true);
     };
@@ -655,8 +694,9 @@ export function EditableRewrite({
         spellCheck
         onInput={handleBodyInput}
         onPaste={handleBodyPaste}
-        onMouseUp={updateToolbarFromSelection}
-        onKeyUp={updateToolbarFromSelection}
+        onMouseDown={handleBodyMouseDown}
+        onMouseUp={handleBodyMouseUp}
+        onKeyUp={handleBodyKeyUp}
         onKeyDown={handleBodyKeyDown}
         dangerouslySetInnerHTML={{ __html: initialBodyHtmlRef.current }}
       />
