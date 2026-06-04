@@ -9,6 +9,7 @@ import {
   type ClipboardEvent as ReactClipboardEvent,
   type FormEvent,
   type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
   type ReactNode
 } from "react";
 import { useEditorialTelemetry } from "../lib/editorial-telemetry";
@@ -75,6 +76,13 @@ function getBodySelectionRange(root: HTMLElement | null): Range | null {
   }
 
   const range = selection.getRangeAt(0);
+  if (!range.toString().trim()) return null;
+  return range;
+}
+
+function getCachedBodyRange(root: HTMLElement | null, range: Range | null): Range | null {
+  if (!root || !range) return null;
+  if (!isNodeInside(root, range.commonAncestorContainer)) return null;
   if (!range.toString().trim()) return null;
   return range;
 }
@@ -165,6 +173,7 @@ export function EditableRewrite({
   const linkInputRef = useRef<HTMLInputElement>(null);
   const selectionRangeRef = useRef<Range | null>(null);
   const isSelectingRef = useRef(false);
+  const isToolbarInteractingRef = useRef(false);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const storedDraftRef = useRef<RewriteDraft | null>(null);
   const linkModeRef = useRef(false);
@@ -207,9 +216,11 @@ export function EditableRewrite({
   }
 
   const hideToolbar = useCallback(() => {
+    isToolbarInteractingRef.current = false;
     selectionRangeRef.current = null;
     hideToolbarElement();
     if (linkModeRef.current) {
+      linkModeRef.current = false;
       setLinkMode(false);
       setLinkValue("");
     }
@@ -278,14 +289,30 @@ export function EditableRewrite({
 
     const range = getBodySelectionRange(bodyRef.current);
     if (!range) {
-      selectionRangeRef.current = null;
-      hideToolbarElement();
+      const cachedRange = getCachedBodyRange(
+        bodyRef.current,
+        selectionRangeRef.current
+      );
+      if (!cachedRange || !isToolbarInteractingRef.current) {
+        selectionRangeRef.current = null;
+        hideToolbarElement();
+      }
       return;
     }
 
     selectionRangeRef.current = range.cloneRange();
     showToolbarForRange(range);
   }, []);
+
+  function getActionRange(): Range | null {
+    const liveRange = getBodySelectionRange(bodyRef.current);
+    if (liveRange) {
+      selectionRangeRef.current = liveRange.cloneRange();
+      return liveRange;
+    }
+
+    return getCachedBodyRange(bodyRef.current, selectionRangeRef.current);
+  }
 
   function restoreBodySelection(): boolean {
     const range = selectionRangeRef.current;
@@ -309,23 +336,27 @@ export function EditableRewrite({
   }
 
   function applyFormat(command: "bold" | "italic" | "insertUnorderedList" | "insertOrderedList") {
-    enterDraftMode();
-    const range = getBodySelectionRange(bodyRef.current);
-    if (!range) {
-      hideToolbar();
-      return;
+    try {
+      enterDraftMode();
+      const range = getActionRange();
+      if (!range) {
+        hideToolbar();
+        return;
+      }
+
+      selectionRangeRef.current = range.cloneRange();
+      if (!restoreBodySelection()) return;
+
+      document.execCommand(command, false);
+      syncBodyState();
+      updateToolbarFromSelection();
+    } finally {
+      isToolbarInteractingRef.current = false;
     }
-
-    selectionRangeRef.current = range.cloneRange();
-    if (!restoreBodySelection()) return;
-
-    document.execCommand(command, false);
-    syncBodyState();
-    updateToolbarFromSelection();
   }
 
   function openLinkInput() {
-    const range = getBodySelectionRange(bodyRef.current);
+    const range = getActionRange();
     if (!range) {
       hideToolbar();
       return;
@@ -333,6 +364,8 @@ export function EditableRewrite({
 
     selectionRangeRef.current = range.cloneRange();
     setLinkValue(getRangeLinkHref(range, bodyRef.current));
+    linkModeRef.current = true;
+    isToolbarInteractingRef.current = false;
     setLinkMode(true);
   }
 
@@ -381,6 +414,15 @@ export function EditableRewrite({
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
       event.preventDefault();
       openLinkInput();
+    }
+  }
+
+  function handleToolbarMouseDown(event: ReactMouseEvent<HTMLDivElement>) {
+    isToolbarInteractingRef.current = true;
+    const target = event.target instanceof Element ? event.target : null;
+
+    if (target?.tagName.toLowerCase() !== "input") {
+      event.preventDefault();
     }
   }
 
@@ -708,6 +750,7 @@ export function EditableRewrite({
       <div
         ref={toolbarRef}
         className={`richEditToolbar${linkMode ? " richEditToolbarLink" : ""}`}
+        onMouseDown={handleToolbarMouseDown}
       >
         {linkMode ? (
           <form className="richEditLinkForm" onSubmit={handleLinkSubmit}>
