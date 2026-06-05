@@ -61,6 +61,12 @@ function isNodeInside(root: Node | null, node: Node | null): boolean {
   return !!root && !!node && (node === root || root.contains(node));
 }
 
+function isEventInsideNode(event: Event, root: Node | null, target: Node | null): boolean {
+  if (!root) return false;
+  if (target && isNodeInside(root, target)) return true;
+  return event.composedPath().includes(root);
+}
+
 function getBodySelectionRange(root: HTMLElement | null): Range | null {
   if (!root) return null;
 
@@ -625,8 +631,8 @@ export function EditableRewrite({
     function handleDocumentMouseDown(event: MouseEvent) {
       const target = event.target as Node | null;
       if (
-        isNodeInside(bodyRef.current, target) ||
-        isNodeInside(toolbarRef.current, target)
+        isEventInsideNode(event, bodyRef.current, target) ||
+        isEventInsideNode(event, toolbarRef.current, target)
       ) {
         return;
       }
@@ -1008,12 +1014,9 @@ export function EditableRewrite({
               onMouseDown={(event) =>
                 handleToolbarActionMouseDown(event, openLinkInput)
               }
-              onClick={(event) => {
-                event.preventDefault();
-                toolbarActionHandledRef.current = false;
-                isToolbarInteractingRef.current = true;
-                openLinkInput();
-              }}
+              onClick={(event) =>
+                handleToolbarActionClick(event, openLinkInput)
+              }
             >
               <svg className="richEditToolIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M10 13a5 5 0 0 0 7.1 0l2-2a5 5 0 0 0-7.1-7.1l-1.1 1.1" />
