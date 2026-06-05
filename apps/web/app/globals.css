@@ -468,45 +468,13 @@ a {
 }
 
 .sourceBody {
-  font-family: "Courier New", Courier, "Lucida Sans Typewriter", monospace;
+  font-family: "Courier New", Courier, "Lucida Sans Typewriter", "Lucida Typewriter", monospace;
   line-height: normal;
   font-size: 14px;
   margin: 0.8rem 0 0;
   color: var(--ink);
   white-space: pre-wrap;
   word-break: break-word;
-}
-
-.sourceBodyReflow {
-  font-family: var(--font-body), sans-serif;
-  line-height: 1.6;
-  font-size: 0.95rem;
-  margin: 0.8rem 0 0;
-  color: var(--ink);
-  white-space: normal;
-  word-break: break-word;
-}
-
-.sourceBodyReflow p {
-  margin: 0.6rem 0;
-}
-
-.sourceBodyReflow .sourceBodyPre {
-  font-family: "Courier New", Courier, monospace;
-  font-size: 13px;
-  line-height: normal;
-  white-space: pre;
-  overflow-x: auto;
-  margin: 0.6rem 0;
-  scrollbar-width: thin;
-  scrollbar-color: var(--line) transparent;
-}
-.sourceBodyReflow .sourceBodyPre::-webkit-scrollbar { height: 4px; }
-.sourceBodyReflow .sourceBodyPre::-webkit-scrollbar-track { background: transparent; }
-.sourceBodyReflow .sourceBodyPre::-webkit-scrollbar-thumb { background: var(--line); border-radius: 2px; }
-
-.sourceBody p {
-  margin: 0.6rem 0;
 }
 
 .editableWrap {
