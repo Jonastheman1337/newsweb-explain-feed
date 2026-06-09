@@ -45,6 +45,63 @@ describe("findUnexpectedNumbers", () => {
     expect(findUnexpectedNumbers(rewrite, source)).toEqual([]);
   });
 
+  it("accepts exact share-count times exact price totals", () => {
+    const rewrite = createRewrite({
+      lead: "Lorenz har kjopt aksjer for 34.300 kroner.",
+      key_facts: ["Kjopt for 34.300 kroner"],
+      source_spans: ["10.000 shares", "NOK 3,43 per share"]
+    });
+
+    const source =
+      "Lorenz AS acquired 10.000 shares at a price of NOK 3,43 per share.";
+
+    expect(findUnexpectedNumbers(rewrite, source)).toEqual([]);
+  });
+
+  it("requires approximate wording for average-price totals", () => {
+    const rewrite = createRewrite({
+      lead: "Lorenz har kjopt aksjer for 34.300 kroner.",
+      key_facts: ["Kjopt for 34.300 kroner"],
+      source_spans: ["10.000 shares", "average price of NOK 3,43 per share"]
+    });
+
+    const source =
+      "Lorenz AS acquired 10.000 shares at an average price of NOK 3,43 per share.";
+
+    expect(findUnexpectedNumbers(rewrite, source)).toContain("34.300");
+  });
+
+  it("accepts approximate totals derived from average trade prices", () => {
+    const rewrite = createRewrite({
+      lead: "Investoren kjopte aksjer for rundt 1,2 millioner kroner.",
+      key_facts: ["Kjopt for rundt 1,2 millioner kroner"],
+      source_spans: ["100.000 shares", "average price of NOK 12,38 per share"]
+    });
+
+    const source =
+      "The investor acquired 100.000 shares at an average price of NOK 12,38 per share.";
+
+    expect(findUnexpectedNumbers(rewrite, source)).toEqual([]);
+  });
+
+  it("accepts aggregate totals from multiple explicit share-price pairs", () => {
+    const rewrite = createRewrite({
+      lead: "Investorene kjopte samlet aksjer for 95.000 kroner.",
+      key_facts: ["Samlet kjop for 95.000 kroner"],
+      source_spans: [
+        "10.000 shares at NOK 3,50",
+        "20.000 shares at NOK 3,00"
+      ]
+    });
+
+    const source = [
+      "Investor A acquired 10.000 shares at a price of NOK 3,50 per share.",
+      "Investor B acquired 20.000 shares at a price of NOK 3,00 per share."
+    ].join("\n");
+
+    expect(findUnexpectedNumbers(rewrite, source)).toEqual([]);
+  });
+
   it("still flags rounded magnitude amounts without a close source number", () => {
     const rewrite = createRewrite({
       lead: "Selskapet skal hente 1,02 milliarder kroner.",

@@ -142,7 +142,9 @@ const CURRENCY_MARKER_GROUPS: Array<{
   {
     label: "NOK/kroner",
     patterns: [
-      /\bnok\b/i,
+      /\bNOK\b/,
+      /\bnok\s+(?=\d)/,
+      /\d\s+nok\b/,
       /\bmnok\b/i,
       /\bbnok\b/i,
       /\bkr\b/i,

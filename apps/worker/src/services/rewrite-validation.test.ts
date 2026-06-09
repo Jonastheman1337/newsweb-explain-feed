@@ -243,7 +243,7 @@ describe("validateRewriteOutput", () => {
     const payload = createPayload({
       title: "Mandatory notification of trade",
       bodyText:
-        "Lorenz AS has acquired 10.000 shares at an average price of NOK 3,43 per share."
+        "Lorenz AS has acquired 10.000 shares at a price of NOK 3,43 per share."
     });
     const rewrite = createRewrite({
       title: "Lorenz kjøper aksjer",
@@ -259,6 +259,52 @@ describe("validateRewriteOutput", () => {
     expect(result.issues.some((issue) => issue.code === "UNEXPECTED_NUMBERS")).toBe(
       false
     );
+  });
+
+  it("allows approximate totals derived from average insider trade prices", () => {
+    const payload = createPayload({
+      title: "Mandatory notification of trade",
+      bodyText:
+        "The investor acquired 100.000 shares at an average price of NOK 12,38 per share."
+    });
+    const rewrite = createRewrite({
+      title: "Investor kjoper aksjer",
+      lead:
+        "Investoren har kjopt aksjer for rundt 1,2 millioner kroner, ifolge en borsmelding.",
+      body: [],
+      key_facts: ["Kjopt for rundt 1,2 millioner kroner"],
+      source_spans: ["100.000 shares", "average price of NOK 12,38 per share"]
+    });
+
+    const result = validateRewriteOutput(rewrite, payload);
+
+    expect(result.issues.some((issue) => issue.code === "UNEXPECTED_NUMBERS")).toBe(
+      false
+    );
+  });
+
+  it("flags exact totals derived from average insider trade prices", () => {
+    const payload = createPayload({
+      title: "Mandatory notification of trade",
+      bodyText:
+        "Lorenz AS has acquired 10.000 shares at an average price of NOK 3,43 per share."
+    });
+    const rewrite = createRewrite({
+      title: "Lorenz kjoper aksjer",
+      lead:
+        "Lorenz har kjopt aksjer for 34.300 kroner, ifolge en borsmelding.",
+      body: [],
+      key_facts: ["Kjopt for 34.300 kroner"],
+      source_spans: ["10.000 shares", "average price of NOK 3,43 per share"]
+    });
+
+    const result = validateRewriteOutput(rewrite, payload);
+
+    expect(result.issues).toContainEqual({
+      code: "UNEXPECTED_NUMBERS",
+      severity: "warning",
+      message: "Unexpected numbers: 34.300"
+    });
   });
 
   it("fails when summary exceeds max sentence limit", () => {
@@ -415,6 +461,47 @@ describe("validateRewriteOutput", () => {
 
     const result = validateRewriteOutput(rewrite, payload);
     expect(result.valid).toBe(false);
+    expect(result.errors).toContain(
+      "Visible article text uses currency not present in source: NOK/kroner."
+    );
+  });
+
+  it("does not treat lowercase Norwegian nok as NOK currency", () => {
+    const payload = createPayload({
+      title: "Status of bookbuilding",
+      bodyText:
+        "Bohus ASA has received sufficient orders to cover the minimum deal size."
+    });
+    const rewrite = createRewrite({
+      lead: "Bohus har fatt nok ordre til aa dekke minimumsbelopet.",
+      body: ["Selskapet opplyser at bokbyggingen fortsetter."],
+      key_facts: ["Nok ordre til minimumsbelopet"],
+      source_spans: ["received sufficient orders", "minimum deal size"]
+    });
+
+    const result = validateRewriteOutput(rewrite, payload);
+
+    expect(
+      result.issues.some(
+        (issue) =>
+          issue.code === "UNEXPECTED_CURRENCY" &&
+          issue.message.includes("NOK/kroner")
+      )
+    ).toBe(false);
+  });
+
+  it("still flags uppercase NOK when source lacks NOK currency", () => {
+    const payload = createPayload({
+      bodyText:
+        "Selskapet melder at inntektene var 10 millioner dollar i kvartalet."
+    });
+    const rewrite = createRewrite({
+      lead: "Selskapet melder om inntekter paa NOK 10 millioner.",
+      body: ["Meldingen oppgir ikke andre tall."]
+    });
+
+    const result = validateRewriteOutput(rewrite, payload);
+
     expect(result.errors).toContain(
       "Visible article text uses currency not present in source: NOK/kroner."
     );

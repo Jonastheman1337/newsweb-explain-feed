@@ -41,6 +41,13 @@ type NumberTokenMatch = {
   index: number;
 };
 
+type ParsedNumberToken = {
+  display: string;
+  key: string;
+  value: number;
+  hasPercent: boolean;
+};
+
 type ScaledNumberUnit = "nok" | "usd" | "eur" | "gbp" | "sek" | "dkk" | "shares";
 type ScaledNumberScale = "million" | "billion";
 
@@ -153,9 +160,7 @@ function normalizeNumberCore(
   return `${normalizedInteger}.${fractionPart}`;
 }
 
-function parseNumberToken(
-  token: string
-): { display: string; key: string; value: number; hasPercent: boolean } | null {
+function parseNumberToken(token: string): ParsedNumberToken | null {
   const sanitized = sanitizeNumberToken(token);
   if (!sanitized || !/\d/.test(sanitized)) {
     return null;
@@ -600,6 +605,54 @@ const moneyContextPatterns = [
   /\b(?:nok|kroner|kr|usd|dollars?|eur|euros?|gbp|pund|pounds?)\b/i
 ];
 
+const approximateAmountContextPattern =
+  /\b(?:rundt|om lag|cirka|ca\.?|circa|about|approximately|anslagsvis|n(?:Ã¦|ae|a)r|i overkant av|dr(?:Ã¸|o)yt)\b/i;
+
+const aggregateTotalContextPattern =
+  /\b(?:samlet|til sammen|totalt|total|combined|in total|aggregate)\b/i;
+
+const averagePriceContextPatterns = [
+  /\b(?:snittpris|gjennomsnittspris|average price|weighted average)\b/i
+];
+
+const tradeTotalContextPatterns = [
+  /\b(?:kjÃ¸pesum|kjÃ¸pt|kjopt|kjop|kjÃ¸p|kjÃ¸per|solgt|sold|purchased|acquired|for|tilsvarer|verdi|samlet|til sammen|totalt)\b/i
+];
+
+const localizedNumberSource =
+  String.raw`-?(?:\d{1,3}(?:[ .]\d{3})+(?:[,.]\d+)?|\d{1,3}(?:\.\d{3})+(?:,\d+)?|\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:[,.]\d+)?)`;
+
+const shareUnitSource = String.raw`(?:aksjer|shares?)`;
+const priceWordSource = String.raw`(?:kurs(?:en)?|snittpris|gjennomsnittspris|average price|weighted average price|price per share|price|subscription price|tegningskurs)`;
+const currencySource = String.raw`(?:NOK|nok|kroner|kr|USD|usd|dollars?|EUR|eur|euros?|GBP|gbp|pund|pounds?)`;
+
+const tradePairPatterns = [
+  new RegExp(
+    String.raw`(?<quantity>${localizedNumberSource})\s+${shareUnitSource}[\s\S]{0,180}?${priceWordSource}[\s\S]{0,80}?(?:${currencySource})?\s*(?<price>${localizedNumberSource})`,
+    "gi"
+  ),
+  new RegExp(
+    String.raw`(?<quantity>${localizedNumberSource})\s+${shareUnitSource}[\s\S]{0,180}?\b(?:at|til)\b[\s\S]{0,40}?(?:${currencySource})\s*(?<price>${localizedNumberSource})\s*(?:per share|per aksje)?`,
+    "gi"
+  ),
+  new RegExp(
+    String.raw`${priceWordSource}[\s\S]{0,80}?(?:${currencySource})?\s*(?<price>${localizedNumberSource})[\s\S]{0,180}?(?<quantity>${localizedNumberSource})\s+${shareUnitSource}`,
+    "gi"
+  )
+];
+
+type TradeArithmeticCandidate = {
+  value: number;
+  usesAveragePrice: boolean;
+  paired: boolean;
+};
+
+type TradeArithmeticTarget = {
+  value: number;
+  factor: number | null;
+  roundedMagnitude: boolean;
+};
+
 function hasAnyPattern(text: string, patterns: RegExp[]): boolean {
   return patterns.some((pattern) => pattern.test(text));
 }
@@ -607,6 +660,89 @@ function hasAnyPattern(text: string, patterns: RegExp[]): boolean {
 function roughlyEqual(left: number, right: number): boolean {
   const tolerance = Math.max(1, Math.abs(right) * 0.002);
   return Math.abs(left - right) <= tolerance;
+}
+
+function visibleContextAround(text: string, match: NumberTokenMatch): string {
+  return text.slice(
+    Math.max(0, match.index - 100),
+    Math.min(text.length, match.index + match.token.length + 100)
+  );
+}
+
+function fractionDigitsFor(parsed: ParsedNumberToken): number {
+  return Number(parsed.key.split("|")[3] ?? "0");
+}
+
+function roundedMagnitudeTolerance(
+  parsed: ParsedNumberToken,
+  factor: number,
+  expectedValue: number
+): number {
+  const visibleStep = factor / 10 ** fractionDigitsFor(parsed);
+  return Math.max(1, visibleStep / 2, Math.abs(expectedValue) * 0.002);
+}
+
+function targetValuesForRewriteNumber(
+  parsed: ParsedNumberToken,
+  rewriteText: string,
+  match: NumberTokenMatch
+): TradeArithmeticTarget[] {
+  const values: TradeArithmeticTarget[] = [
+    { value: Math.abs(parsed.value), factor: null, roundedMagnitude: false }
+  ];
+  const integerEquivalent = integerThousandsEquivalentValue(parsed);
+  if (integerEquivalent != null) {
+    values.push({
+      value: Math.abs(integerEquivalent),
+      factor: null,
+      roundedMagnitude: false
+    });
+  }
+
+  const scale = rewriteScaleContext(rewriteText, match.index, match.token);
+  if (scale != null) {
+    const factor = scaleDivisor(scale);
+    values.push({
+      value: Math.abs(parsed.value * factor),
+      factor,
+      roundedMagnitude: true
+    });
+  }
+
+  return values;
+}
+
+function parseShareQuantity(raw: string): number | null {
+  const parsed = parseNumberToken(raw);
+  if (!parsed || parsed.hasPercent) {
+    return null;
+  }
+  return integerThousandsEquivalentValue(parsed) ?? parsed.value;
+}
+
+function parseTradePrice(raw: string): number | null {
+  const parsed = parseNumberToken(raw);
+  if (!parsed || parsed.hasPercent) {
+    return null;
+  }
+  return parsed.value;
+}
+
+function uniqueCandidates(
+  candidates: TradeArithmeticCandidate[]
+): TradeArithmeticCandidate[] {
+  const byValue = new Map<string, TradeArithmeticCandidate>();
+  for (const candidate of candidates) {
+    const key = candidate.value.toFixed(4);
+    const existing = byValue.get(key);
+    byValue.set(key, {
+      value: candidate.value,
+      usesAveragePrice:
+        candidate.usesAveragePrice || existing?.usesAveragePrice === true,
+      paired: candidate.paired || existing?.paired === true
+    });
+  }
+  return [...byValue.values()];
 }
 
 function collectSourceNumberValues(text: string): number[] {
@@ -640,33 +776,45 @@ function collectSourceNumberValues(text: string): number[] {
   return values;
 }
 
-function isSimpleTradeArithmeticNumber(
-  parsed: { display: string; value: number; hasPercent: boolean },
+function collectPairedTradeArithmeticCandidates(
   sourceText: string
-): boolean {
-  const unsignedDisplay = parsed.display.startsWith("-")
-    ? parsed.display.slice(1)
-    : parsed.display;
-  const targetValues = [
-    Math.abs(parsed.value),
-    /^\d{1,3}[.,]\d{3}$/.test(unsignedDisplay)
-      ? Number(unsignedDisplay.replace(/[.,]/g, ""))
-      : null
-  ].filter((value): value is number => value != null);
+): TradeArithmeticCandidate[] {
+  const candidates: TradeArithmeticCandidate[] = [];
 
-  if (parsed.hasPercent || targetValues.every((value) => value < 1000)) {
-    return false;
-  }
-  if (
-    !hasAnyPattern(sourceText, tradeArithmeticContextPatterns) ||
-    !hasAnyPattern(sourceText, moneyContextPatterns)
-  ) {
-    return false;
+  for (const pattern of tradePairPatterns) {
+    pattern.lastIndex = 0;
+    for (const match of sourceText.matchAll(pattern)) {
+      const quantity = parseShareQuantity(match.groups?.quantity ?? "");
+      const price = parseTradePrice(match.groups?.price ?? "");
+      if (
+        quantity == null ||
+        price == null ||
+        quantity < 100 ||
+        price <= 0 ||
+        price > 10_000
+      ) {
+        continue;
+      }
+      candidates.push({
+        value: quantity * price,
+        usesAveragePrice: hasAnyPattern(match[0], averagePriceContextPatterns),
+        paired: true
+      });
+    }
   }
 
+  return uniqueCandidates(candidates);
+}
+
+function collectLooseTradeArithmeticCandidates(
+  sourceText: string
+): TradeArithmeticCandidate[] {
   const sourceNumbers = collectSourceNumberValues(sourceText).filter(
     (value) => value > 0
   );
+  const usesAveragePrice = hasAnyPattern(sourceText, averagePriceContextPatterns);
+  const candidates: TradeArithmeticCandidate[] = [];
+
   for (let leftIndex = 0; leftIndex < sourceNumbers.length; leftIndex += 1) {
     for (
       let rightIndex = leftIndex + 1;
@@ -680,9 +828,144 @@ function isSimpleTradeArithmeticNumber(
       if (larger < 100 || smaller <= 0 || smaller > 10_000) {
         continue;
       }
-      if (targetValues.some((target) => roughlyEqual(larger * smaller, target))) {
+      candidates.push({
+        value: larger * smaller,
+        usesAveragePrice,
+        paired: false
+      });
+    }
+  }
+
+  return uniqueCandidates(candidates);
+}
+
+function collectTradeArithmeticCandidates(
+  sourceText: string
+): TradeArithmeticCandidate[] {
+  const paired = collectPairedTradeArithmeticCandidates(sourceText);
+  return paired.length ? paired : collectLooseTradeArithmeticCandidates(sourceText);
+}
+
+function candidateMatchesTarget(
+  candidate: TradeArithmeticCandidate,
+  target: TradeArithmeticTarget,
+  parsed: ParsedNumberToken,
+  context: string
+): boolean {
+  const isAverageDerivedTotal = candidate.usesAveragePrice && target.value >= 1000;
+  if (isAverageDerivedTotal && !approximateAmountContextPattern.test(context)) {
+    return false;
+  }
+
+  if (target.roundedMagnitude && target.factor) {
+    return (
+      Math.abs(candidate.value - target.value) <=
+      roundedMagnitudeTolerance(parsed, target.factor, candidate.value)
+    );
+  }
+
+  return roughlyEqual(candidate.value, target.value);
+}
+
+function aggregateCandidateMatchesTarget(
+  candidates: TradeArithmeticCandidate[],
+  target: TradeArithmeticTarget,
+  parsed: ParsedNumberToken,
+  context: string
+): boolean {
+  const pairedCandidates = candidates.filter((candidate) => candidate.paired);
+  if (
+    pairedCandidates.length < 2 ||
+    pairedCandidates.length > 8 ||
+    !aggregateTotalContextPattern.test(context)
+  ) {
+    return false;
+  }
+
+  const maxMask = 1 << pairedCandidates.length;
+  for (let mask = 1; mask < maxMask; mask += 1) {
+    let count = 0;
+    let sum = 0;
+    let usesAveragePrice = false;
+    for (let index = 0; index < pairedCandidates.length; index += 1) {
+      if ((mask & (1 << index)) === 0) {
+        continue;
+      }
+      const candidate = pairedCandidates[index];
+      if (!candidate) {
+        continue;
+      }
+      count += 1;
+      sum += candidate.value;
+      usesAveragePrice = usesAveragePrice || candidate.usesAveragePrice;
+    }
+    if (count < 2) {
+      continue;
+    }
+    if (usesAveragePrice && !approximateAmountContextPattern.test(context)) {
+      continue;
+    }
+    if (target.roundedMagnitude && target.factor) {
+      if (
+        Math.abs(sum - target.value) <=
+        roundedMagnitudeTolerance(parsed, target.factor, sum)
+      ) {
         return true;
       }
+      continue;
+    }
+    if (roughlyEqual(sum, target.value)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function isSimpleTradeArithmeticNumber(
+  parsed: ParsedNumberToken,
+  rewriteText: string,
+  match: NumberTokenMatch,
+  sourceText: string
+): boolean {
+  if (parsed.hasPercent) {
+    return false;
+  }
+  if (
+    !hasAnyPattern(sourceText, tradeArithmeticContextPatterns) ||
+    !hasAnyPattern(sourceText, moneyContextPatterns)
+  ) {
+    return false;
+  }
+
+  const context = visibleContextAround(rewriteText, match);
+  if (
+    !hasAnyPattern(context, moneyContextPatterns) ||
+    !hasAnyPattern(context, tradeTotalContextPatterns)
+  ) {
+    return false;
+  }
+
+  const targetValues = targetValuesForRewriteNumber(
+    parsed,
+    rewriteText,
+    match
+  ).filter((target) => target.value >= 1000);
+  if (targetValues.length === 0) {
+    return false;
+  }
+
+  const candidates = collectTradeArithmeticCandidates(sourceText);
+  for (const target of targetValues) {
+    if (
+      candidates.some((candidate) =>
+        candidateMatchesTarget(candidate, target, parsed, context)
+      )
+    ) {
+      return true;
+    }
+    if (aggregateCandidateMatchesTarget(candidates, target, parsed, context)) {
+      return true;
     }
   }
 
@@ -734,7 +1017,7 @@ export function findUnexpectedNumbers(
       !hasScaledUnitMatch &&
       !hasSharedPercentRangeMatch
     ) {
-      if (isSimpleTradeArithmeticNumber(parsed, sourceText)) {
+      if (isSimpleTradeArithmeticNumber(parsed, rewriteText, token, sourceText)) {
         continue;
       }
       unexpected.add(parsed.display);
