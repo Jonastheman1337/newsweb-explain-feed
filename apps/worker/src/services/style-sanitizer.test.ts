@@ -131,6 +131,17 @@ describe("sanitizeRewriteStyle", () => {
     expect(result.stats.normalizedExactBillionAmounts).toBe(3);
   });
 
+  it("keeps enough precision for exact kroner totals close to one billion", () => {
+    const rewrite = createRewrite();
+    rewrite.lead =
+      "Norse Atlantic oker aksjekapitalen med 1.019.832.000 kroner.";
+
+    const result = sanitizeRewriteStyle(rewrite);
+
+    expect(result.rewrite.lead).toContain("1,02 milliarder kroner");
+    expect(result.stats.normalizedExactBillionAmounts).toBe(1);
+  });
+
   it("leaves exact kroner totals below one billion unchanged", () => {
     const rewrite = createRewrite();
     rewrite.title = "HAV Group-styremedlem kjøper for 448.760 kroner";

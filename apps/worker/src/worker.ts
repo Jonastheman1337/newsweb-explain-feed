@@ -71,6 +71,7 @@ import {
 } from "./services/reference-check.js";
 import {
   validateRewriteOutput,
+  type ReportExtractionValidationContext,
   type RewriteValidationIssue
 } from "./services/rewrite-validation.js";
 import {
@@ -517,6 +518,7 @@ function validateRewriteWithRevisionCompliance(
     instruction?: string | null;
     previousOutput?: RewriteOutput;
     attachmentTextAvailable?: boolean;
+    reportExtraction?: ReportExtractionValidationContext;
   }
 ): {
   valid: boolean;
@@ -534,7 +536,8 @@ function validateRewriteWithRevisionCompliance(
   });
   const validation = validateRewriteOutput(rewrite, payload, {
     maxVisibleArticleChars:
-      revisionCompliance?.maxVisibleArticleChars ?? payload.maxVisibleArticleChars
+      revisionCompliance?.maxVisibleArticleChars ?? payload.maxVisibleArticleChars,
+    reportExtraction: context.reportExtraction
   });
   const revisionWarnings = revisionCompliance?.warnings ?? [];
   const revisionIssues: RewriteValidationIssue[] = revisionWarnings.map((message) => ({
@@ -610,7 +613,9 @@ const HIGH_RISK_VALIDATION_WARNING_CODES = new Set([
   "UNEXPECTED_CURRENCY",
   "REVENUE_RESULT_MIXUP",
   "MISSING_RIGHT_OF_REPLY",
-  "UNEXPLAINED_NAMED_TRANSACTION"
+  "UNEXPLAINED_NAMED_TRANSACTION",
+  "MISSING_REPORT_SOURCE_LIMITATION",
+  "WEAK_REPORT_EXTRACTION_LIMITATION"
 ]);
 
 type ValidationRepairAudit = {
@@ -664,7 +669,10 @@ function buildHighRiskValidationRepairInstruction(
               ? "Ta med tilsvar, avvisning eller bestridelse fra kilden i lead/body."
               : issue.code === "UNEXPLAINED_NAMED_TRANSACTION"
                 ? "Forklar kort hva det navngitte prosjektet, plattformen eller transaksjonen er med dekning i kilden, eller generaliser/dropp navnet."
-              : "Rett problemet uten a legge til nye fakta.";
+                : issue.code === "MISSING_REPORT_SOURCE_LIMITATION" ||
+                    issue.code === "WEAK_REPORT_EXTRACTION_LIMITATION"
+                  ? "Legg inn en konkret source_limitations-linje om at bare et utdrag/begrenset rapportgrunnlag er analysert, eller dropp synlige rapportkrav som ikke har dekning."
+                : "Rett problemet uten a legge til nye fakta.";
     return [`${issue.code}: ${issue.message}`, `Krav: ${codeInstruction}`].join(
       "\n"
     );
@@ -1948,7 +1956,8 @@ async function processReportRewrite(
       {
         instruction: revisionOptions.userInstruction,
         previousOutput: revisionOptions.previousOutput,
-        attachmentTextAvailable
+        attachmentTextAvailable,
+        reportExtraction: reportContent
       }
     );
 
@@ -2034,7 +2043,8 @@ async function processReportRewrite(
         {
           instruction: revisionOptions.userInstruction,
           previousOutput: revisionOptions.previousOutput,
-          attachmentTextAvailable
+          attachmentTextAvailable,
+          reportExtraction: reportContent
         }
       );
     }

@@ -20,7 +20,7 @@ import {
 } from "./shared-editorial.js";
 
 export function createYearlyReportSystemPrompt(): string {
-  return [
+  const basePrompt = [
     "Du er nyhetsjournalist i E24-redaksjonen.",
     "Du skriver korte børsnyheter på norsk bokmål for en travel leser som scanner nyheter på mobilen.",
     "Leseren vil vite hva som er mest vesentlig for selskapet og aksjonærene, uten at vi vurderer aksjen, spår kursreaksjon eller gir investeringsråd.",
@@ -29,17 +29,20 @@ export function createYearlyReportSystemPrompt(): string {
     "Du skal finne det nyhetsverdige — overraskende kompensasjon, store endringer fra fjoråret, bonuser og opsjoner.",
     "Ikke følg rapportens struktur. Du er redaktøren — restrukturer fritt etter hva som er viktigst for leseren.",
     "Skriv kort og fokusert. Bare det viktigste.",
-    "Lead + body til sammen skal være maks 1000 tegn. Vær knapp.",
-    EDITORIAL_SOURCE_AS_DATA
+    "Lead + body til sammen skal være maks 1000 tegn. Vær knapp."
   ].map((line) =>
     line.startsWith("Lead + body")
       ? "Hold deg til tegngrensen i oppgaven. Vaer knapp."
       : line
   ).join(" ");
+
+  return [basePrompt, EDITORIAL_SOURCE_AS_DATA].join("\n\n");
 }
 
 export function createYearlyReportDeveloperPrompt(_schemaJson?: string): string {
   return `${EDITORIAL_AUDIENCE}
+
+${EDITORIAL_SOURCE_AS_DATA}
 
 ${EDITORIAL_LANGUAGE}
 

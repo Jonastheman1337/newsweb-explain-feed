@@ -112,7 +112,7 @@ export function createSystemPrompt(): string {
     "Du er nyhetsjournalist i E24-redaksjonen.",
     "Du skriver korte borsnyheter pa norsk Bokmal for en travel leser som scanner nyheter pa mobilen.",
     "Leseren vil vite hva som er mest vesentlig for selskapet og aksjonærene, uten at vi vurderer aksjen, spår kursreaksjon eller gir investeringsråd.",
-    "Skriv sa enkelt at en videregaendeelev med interesse for finans forstar teksten uten a google noe.",
+    "Skriv klart for en travel, finansielt interessert leser uten a skrive ned til leseren.",
     "Ikke vaer en papegøye som bare omformulerer meldingen. Plukk ut det viktigste, det overraskende eller det dramatiske.",
     "Ikke folg kildens struktur eller rekkefolge. Du er redaktoren — du bestemmer hva som kommer forst, hva som kuttes, og hvordan saken bygges opp. Det viktigste for leseren kommer forst, uansett hvor det sto i kilden.",
     "Kutt stoy og uvesentlige detaljer. Fokuser pa det som er vesentlig for selskapet og aksjonærene.",
@@ -130,9 +130,6 @@ export function createSystemPrompt(): string {
 }
 
 const STYLE_EXAMPLES = `
-Kort rutinemelding (1 body-avsnitt):
-{"title":"Aqua Bio Technology har hentet 10 mill.","lead":"Hudpleieteknologiselskapet Aqua Bio Technology har hentet inn 10 millioner kroner ved å utstede nye aksjer. Det opplyser selskapet i en børsmelding.","body":["Pengeinnhentingen er nå registrert, og selskapet har totalt 5,2 millioner aksjer utestående."],"company_sentence":"Aqua Bio Technology utvikler bioteknologi til bruk i hudpleieprodukter.","key_facts":["Hentet 10 mill. kroner gjennom nye aksjer"],"negative_or_surprising":[],"excluded_hype":[],"source_limitations":[],"confidence":"high","importance":"uviktig","source_spans":["øke aksjekapitalen med 10 millioner kroner","26.139.675 kroner fordelt på 5.227.935 aksjer"]}
-
 Innsidehandel med oppramsing (3 body-avsnitt):
 {"title":"ABG-topper selger aksjer for over 24 mill.","lead":"To av toppsjefene i meglerhuset ABG Sundal Collier har solgt aksjer i eget selskap for til sammen over 24 mill. kroner. Det går frem av en børsmelding.","body":["Styreleder Knut Brundtland solgte aksjer for ca. 13,5 mill. kroner, til en kurs på 8 kroner per aksje.","Aksjesjef Hans Øyvind Haukeli solgte for ca. 10,8 mill. kroner til samme kurs.","Til sammen er det solgt aksjer for over 24 mill. kroner."],"company_sentence":"ABG Sundal Collier er et nordisk megler- og investeringsselskap.","key_facts":["To toppledere solgt for til sammen over 24 mill.","Kurs 8 kroner per aksje"],"negative_or_surprising":["Stort innsidersalg fra to toppledere samtidig"],"excluded_hype":[],"source_limitations":[],"confidence":"high","importance":"medium","source_spans":["solgt 1.690.000 ABG-aksjer til en kurs på 8 kroner","solgt 1.352.000 aksjer"]}
 
@@ -159,7 +156,7 @@ Materiell hendelse (2 body-avsnitt):
 `.trim();
 
 export function createDeveloperPrompt(_schemaJson?: string): string {
-  return `OPPGAVE
+  const basePrompt = `OPPGAVE
 Lag en kort nyhetssak i E24-stil. Ikke et referat, men en publiserbar nyhet.
 Leseren vil vite hva som er mest vesentlig for selskapet og aksjonærene, uten at vi vurderer aksjen, spår kursreaksjon eller gir investeringsråd. Vanlige finansord som 'datterselskap', 'kontrakt' og 'aksjekapital' er greit, men tyngre jargong ma forklares gjennom kontekst.
 
@@ -214,6 +211,8 @@ Bruk kun tall og fakta som finnes i kilden.
 Hvis meldingen viser til ekstra dokumenter som ikke er analysert, legg inn begrensningen i source_limitations. Ikke vis dette i title, lead eller body.
 
 ${EDITORIAL_NORWEGIAN}`;
+
+  return basePrompt;
 }
 
 export function createUserPrompt(payload: PromptPayload): string {
@@ -234,7 +233,7 @@ export function createUserPrompt(payload: PromptPayload): string {
   const parts = [
     "Lag en kort, publiserbar nyhetssak fra kilden under.",
     "Skriv nyhetstekst, ikke sammendrag. Plukk ut det som er mest vesentlig for selskapet og aksjonærene.",
-    "Skriv sa enkelt at en videregaendeelev med interesse for finans forstar det. Unnga tung jargong — bruk hverdagsord der det finnes.",
+    "Skriv klart for en travel, finansielt interessert leser. Unnga tung jargong — bruk hverdagsord der det finnes.",
     "Lead + body maks 1000 tegn. Kildens lengde styrer ikke sakens lengde — skriv knapt uansett.",
     "Bruk aktiv form, presens og omvendt nyhetspyramide.",
     "Kilden er en borsmelding fra Newsweb.",

@@ -70,7 +70,7 @@ describe("OpenAI prompt contract", () => {
     expect(PROMPT_VERSION).toBe("v5.8.0");
   });
 
-  it("uses materiality and mechanism framing without stock-reaction logic by default", () => {
+  it("uses materiality and mechanism-first regular notice framing by default", () => {
     const combined = [
       createSystemPrompt(),
       createDeveloperPrompt(),
@@ -117,6 +117,14 @@ describe("OpenAI prompt contract", () => {
     expect(result).toContain("Fullmakt til generalforsamling");
     expect(result).toContain("Ren tegningspåminnelse");
     expect(result).toContain("Meldingen inneholder ingen nye vilkår");
+  });
+
+  it("omits the routine share-count example that overfit notices", () => {
+    const result = createDeveloperPrompt();
+
+    expect(result).not.toContain("Kort rutinemelding (1 body-avsnitt)");
+    expect(result).not.toContain("Aqua Bio Technology");
+    expect(result).not.toContain("5,2 millioner aksjer");
   });
 
   it("asks for varied early attribution instead of repeated stock endings", () => {

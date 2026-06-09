@@ -274,11 +274,54 @@ describe("validateRewriteOutput", () => {
     ).toBe(false);
   });
 
+  it("allows rounded million figures from explicitly thousand-scaled report tables", () => {
+    const payload = createPayload({
+      title: "CMMB: Compagnie Maritime Monegasque OSV B.V. Q1 2026 Interim Report",
+      bodyText: "Q1 2026 Interim Report",
+      hasAttachments: true,
+      pdfSupplementText: [
+        "Consolidated statement of income",
+        "Amounts are in USD thousands",
+        "Revenue 33,613 12,118",
+        "Operating Profit 3,100 3,244",
+        "Result before corporate income tax 6,232 4,027"
+      ].join("\n")
+    });
+    const rewrite = createRewrite({
+      title: "CMM oker inntektene",
+      lead:
+        "CMM okte inntektene til 33,6 millioner dollar i kvartalet, fra 12,1 millioner dollar aret for.",
+      body: [
+        "Driftsresultatet var 3,1 millioner dollar, mot 3,2 millioner i samme kvartal i fjor.",
+        "Resultatet for skatt steg til 6,2 millioner dollar, fra 4,0 millioner aret for."
+      ],
+      company_sentence: "CMM har flere fartoykontrakter med Petrobras.",
+      key_facts: [
+        "Inntekter 33,6 millioner dollar",
+        "Driftsresultat 3,1 millioner dollar",
+        "Resultat for skatt 6,2 millioner dollar"
+      ],
+      negative_or_surprising: [],
+      source_limitations: ["Kun et utdrag av rapporten er analysert."],
+      source_spans: [
+        "Revenue 33,613 12,118",
+        "Operating Profit 3,100 3,244",
+        "Result before corporate income tax 6,232 4,027"
+      ]
+    });
+
+    const result = validateRewriteOutput(rewrite, payload);
+
+    expect(
+      result.issues.some((issue) => issue.code === "UNEXPECTED_NUMBERS")
+    ).toBe(false);
+  });
+
   it("allows simple source-derived insider trade totals", () => {
     const payload = createPayload({
       title: "Mandatory notification of trade",
       bodyText:
-        "Lorenz AS has acquired 10.000 shares at NOK 3,43 per share."
+        "Lorenz AS has acquired 10.000 shares at a price of NOK 3,43 per share."
     });
     const rewrite = createRewrite({
       title: "Lorenz kjøper aksjer",
@@ -300,14 +343,14 @@ describe("validateRewriteOutput", () => {
     const payload = createPayload({
       title: "Mandatory notification of trade",
       bodyText:
-        "The primary insider acquired 100.000 shares at an average price of NOK 12,38 per share."
+        "The investor acquired 100.000 shares at an average price of NOK 12,38 per share."
     });
     const rewrite = createRewrite({
-      title: "Innsider kjÃ¸per aksjer",
+      title: "Investor kjoper aksjer",
       lead:
-        "Innsideren kjÃ¸pte aksjer for rundt 1,2 millioner kroner, ifÃ¸lge en bÃ¸rsmelding.",
+        "Investoren har kjopt aksjer for rundt 1,2 millioner kroner, ifolge en borsmelding.",
       body: [],
-      key_facts: ["KjÃ¸pt for rundt 1,2 millioner kroner"],
+      key_facts: ["Kjopt for rundt 1,2 millioner kroner"],
       source_spans: ["100.000 shares", "average price of NOK 12,38 per share"]
     });
 
@@ -322,15 +365,15 @@ describe("validateRewriteOutput", () => {
     const payload = createPayload({
       title: "Mandatory notification of trade",
       bodyText:
-        "The primary insider acquired 100.000 shares at an average price of NOK 12,38 per share."
+        "Lorenz AS has acquired 10.000 shares at an average price of NOK 3,43 per share."
     });
     const rewrite = createRewrite({
-      title: "Innsider kjÃ¸per aksjer",
+      title: "Lorenz kjoper aksjer",
       lead:
-        "Innsideren kjÃ¸pte aksjer for 1,2 millioner kroner, ifÃ¸lge en bÃ¸rsmelding.",
+        "Lorenz har kjopt aksjer for 34.300 kroner, ifolge en borsmelding.",
       body: [],
-      key_facts: ["KjÃ¸pt for 1,2 millioner kroner"],
-      source_spans: ["100.000 shares", "average price of NOK 12,38 per share"]
+      key_facts: ["Kjopt for 34.300 kroner"],
+      source_spans: ["10.000 shares", "average price of NOK 3,43 per share"]
     });
 
     const result = validateRewriteOutput(rewrite, payload);
@@ -338,7 +381,7 @@ describe("validateRewriteOutput", () => {
     expect(result.issues).toContainEqual({
       code: "UNEXPECTED_NUMBERS",
       severity: "warning",
-      message: "Unexpected numbers: 1,2"
+      message: "Unexpected numbers: 34.300"
     });
   });
 
@@ -503,33 +546,35 @@ describe("validateRewriteOutput", () => {
 
   it("does not treat lowercase Norwegian nok as NOK currency", () => {
     const payload = createPayload({
-      title: "Bohus ASA: Status of bookbuilding",
+      title: "Status of bookbuilding",
       bodyText:
-        "The Company has been informed by the Managers that they have received orders such that the Offering is oversubscribed on the full deal size."
+        "Bohus ASA has received sufficient orders to cover the minimum deal size."
     });
     const rewrite = createRewrite({
-      title: "Bohus-tilbudet er overtegnet",
-      lead:
-        "Bohus har fÃ¥tt nok ordre til at aksjetilbudet fÃ¸r bÃ¸rsnoteringen er overtegnet pÃ¥ full stÃ¸rrelse.",
-      body: [],
-      key_facts: ["Aksjetilbudet er overtegnet"],
-      source_spans: ["the Offering is oversubscribed on the full deal size"]
+      lead: "Bohus har fatt nok ordre til aa dekke minimumsbelopet.",
+      body: ["Selskapet opplyser at bokbyggingen fortsetter."],
+      key_facts: ["Nok ordre til minimumsbelopet"],
+      source_spans: ["received sufficient orders", "minimum deal size"]
     });
 
     const result = validateRewriteOutput(rewrite, payload);
 
     expect(
-      result.issues.some((issue) => issue.code === "UNEXPECTED_CURRENCY")
+      result.issues.some(
+        (issue) =>
+          issue.code === "UNEXPECTED_CURRENCY" &&
+          issue.message.includes("NOK/kroner")
+      )
     ).toBe(false);
   });
 
-  it("still flags uppercase NOK when the source lacks NOK currency", () => {
+  it("still flags uppercase NOK when source lacks NOK currency", () => {
     const payload = createPayload({
       bodyText:
         "Selskapet melder at inntektene var 10 millioner dollar i kvartalet."
     });
     const rewrite = createRewrite({
-      lead: "Selskapet melder om inntekter pÃ¥ NOK 10 millioner.",
+      lead: "Selskapet melder om inntekter paa NOK 10 millioner.",
       body: ["Meldingen oppgir ikke andre tall."]
     });
 
@@ -607,6 +652,98 @@ describe("validateRewriteOutput", () => {
       severity: "blocking",
       message:
         "Report notice was rewritten as a generic report-publication story without concrete report facts."
+    });
+  });
+
+  it("blocks generic annual-report possession phrasing without concrete facts", () => {
+    const payload = createPayload({
+      title: "VDI: Vantage Drilling International Ltd. 2025 Annual Report",
+      bodyText: "The 2025 annual report has been published and is attached.",
+      hasAttachments: true
+    });
+    const rewrite = createRewrite({
+      title: "Vantage Drilling har arsrapport",
+      lead: "Vantage Drilling har arsrapport for 2025, viser rapporten.",
+      body: [],
+      source_limitations: ["Kun et utdrag av rapporten er analysert"]
+    });
+
+    const result = validateRewriteOutput(rewrite, payload);
+
+    expect(result.issues).toContainEqual({
+      code: "GENERIC_REPORT_PUBLICATION",
+      severity: "blocking",
+      message:
+        "Report notice was rewritten as a generic report-publication story without concrete report facts."
+    });
+  });
+
+  it("warns when report/PDF rewrites omit source limitations", () => {
+    const payload = createPayload({
+      title: "MM Proton I, LLC 2025 Annual Financial Report",
+      bodyText:
+        "The annual financial report is attached. Assets were USD 206.81 million and liabilities were USD 241.52 million.",
+      hasAttachments: true
+    });
+    const rewrite = createRewrite({
+      title: "MM Proton har negativ egenkapital",
+      lead:
+        "MM Proton hadde 206,81 millioner dollar i eiendeler og 241,52 millioner dollar i gjeld ved utgangen av 2025.",
+      body: [],
+      key_facts: ["Eiendeler 206,81 mill. dollar", "Gjeld 241,52 mill. dollar"],
+      source_spans: ["Assets were USD 206.81 million", "liabilities were USD 241.52 million"],
+      source_limitations: []
+    });
+
+    const result = validateRewriteOutput(rewrite, payload);
+
+    expect(result.issues).toContainEqual({
+      code: "MISSING_REPORT_SOURCE_LIMITATION",
+      severity: "warning",
+      message:
+        "Report/PDF-based rewrite must include a source_limitations note that explains the excerpted or limited source basis."
+    });
+  });
+
+  it("warns when weak report extraction has only vague limitations", () => {
+    const payload = createPayload({
+      title: "Famkaa Invest ApS - Interim Report 2026 Q1",
+      bodyText:
+        "The interim report is attached. Result before tax was DKK -19.5 million.",
+      hasAttachments: true
+    });
+    const rewrite = createRewrite({
+      title: "Famkaa Invest i minus",
+      lead:
+        "Famkaa Invest fikk et resultat for skatt paa minus 19,5 millioner danske kroner i forste kvartal.",
+      body: [],
+      key_facts: ["Resultat for skatt minus 19,5 mill. danske kroner"],
+      source_spans: ["Result before tax was DKK -19.5 million"],
+      source_limitations: ["Rapporten omtales i kilden."]
+    });
+
+    const result = validateRewriteOutput(rewrite, payload, {
+      reportExtraction: {
+        metricCandidates: [],
+        diagnostics: {
+          fallbackUsed: true,
+          incomeStatementFound: false,
+          openAIPdfFallback: true
+        }
+      }
+    });
+
+    expect(result.issues).toContainEqual({
+      code: "MISSING_REPORT_SOURCE_LIMITATION",
+      severity: "warning",
+      message:
+        "Report/PDF-based rewrite must include a source_limitations note that explains the excerpted or limited source basis."
+    });
+    expect(result.issues).toContainEqual({
+      code: "WEAK_REPORT_EXTRACTION_LIMITATION",
+      severity: "warning",
+      message:
+        "Weak report/PDF extraction without structured metrics needs an explicit limitation about the limited or uncertain report basis."
     });
   });
 

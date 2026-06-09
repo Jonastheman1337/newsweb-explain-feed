@@ -23,7 +23,7 @@ import {
 } from "./shared-editorial.js";
 
 export function createReportSystemPrompt(): string {
-  return [
+  const basePrompt = [
     "Du er nyhetsjournalist i E24-redaksjonen.",
     "Du skriver korte børsnyheter på norsk bokmål for en travel leser som scanner nyheter på mobilen.",
     "Leseren vil vite hva som er mest vesentlig for selskapet og aksjonærene, uten at vi vurderer aksjen, spår kursreaksjon eller gir investeringsråd.",
@@ -33,13 +33,14 @@ export function createReportSystemPrompt(): string {
     "Ikke vær en papegøye som bare ramser opp tall. Plukk ut det viktigste, det overraskende eller det dramatiske.",
     "Ikke følg rapportens struktur eller rekkefølge. Du er redaktøren — restrukturer fritt etter hva som er viktigst for leseren.",
     "Bruk redaksjonelt skjønn: velg det som er mest nyhetsverdig, ikke følg en rigid formel.",
-    "Lead + body til sammen skal være maks 1000 tegn. Vær knapp.",
-    EDITORIAL_SOURCE_AS_DATA
+    "Lead + body til sammen skal være maks 1000 tegn. Vær knapp."
   ].map((line) =>
     line.startsWith("Lead + body")
       ? "Hold deg til tegngrensen i oppgaven. Vaer knapp."
       : line
   ).join(" ");
+
+  return [basePrompt, EDITORIAL_SOURCE_AS_DATA].join("\n\n");
 }
 
 const REPORT_STYLE_EXAMPLES = `
@@ -160,7 +161,7 @@ ${EDITORIAL_TITLE}
   Ikke gjenta samme tidsperiode unødig i første setning, som 'første kvartal' to ganger. Varier setningen eller flytt én tidsmarkør.
   Gode titler: 'Subsea 7 femdobler resultatet', 'BW Offshore endte pa bunn av resultatguiding', 'Otovo vil hente inntil 191 millioner', 'Jinhui Shipping i minus i fjerde kvartal'.
   Nar bade resultat og en annen nyhet (oppkjop, emisjon) presenteres samtidig, kan tittelen bruke tankestrek sparsomt. Ikke bruk kolon hvis en normal tittel fungerer.
-- importance: 'viktig' for ekstraordinære eller klart materielle rapportnyheter. 'medium' for tydelig relevante rapportnyheter uten ekstraordinært omfang. 'uviktig' for rutine uten overraskelser eller lite nytt innhold.
+- importance: 'viktig' ved ekstraordinære eller klart materielle hendelser. 'medium' for tydelig relevante rapporter uten ekstraordinært omfang. 'uviktig' for rutine uten vesentlig nytt innhold.
 
 ${EDITORIAL_WRITING_STYLE}
 
@@ -228,7 +229,7 @@ export function createReportUserPrompt(payload: ReportPromptPayload): string {
 
   const parts: string[] = [
     "Lag en kort, publiserbar nyhetssak basert på kildene under.",
-    "Skriv nyhetstekst, ikke sammendrag. Plukk ut de viktigste nøkkeltallene for selskapet og aksjonærene.",
+    "Skriv nyhetstekst, ikke sammendrag. Plukk ut det som er mest vesentlig for selskapet og aksjonærene.",
     "Rapportkilden under er valgt fra rapporten: resultatoppstilling først, deretter relevante ledelses-/utsiktsider og eventuelle sider brukeren ba om.",
     "Bruk resultatoppstillingen som foretrukken kilde for inntekter, driftsresultat/EBIT og resultat før skatt.",
     "Hvis brukeren har bedt om et tema eller en side, bruk USER REQUESTED CONTEXT i rapportkilden aktivt.",

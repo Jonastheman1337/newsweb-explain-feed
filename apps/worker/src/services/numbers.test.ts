@@ -2,6 +2,23 @@ import { findUnexpectedNumbers } from "@newsweb/prompt-kit";
 import type { RewriteOutput } from "@newsweb/shared";
 import { describe, expect, it } from "vitest";
 
+function createRewrite(overrides: Partial<RewriteOutput>): RewriteOutput {
+  return {
+    title: "Selskapet melder oppdatering",
+    lead: "Selskapet melder om nye detaljer.",
+    body: [],
+    company_sentence: "Test AS er selskapet bak meldingen.",
+    key_facts: [],
+    negative_or_surprising: [],
+    excluded_hype: [],
+    source_limitations: [],
+    confidence: "medium",
+    importance: "medium",
+    source_spans: [],
+    ...overrides
+  };
+}
+
 describe("findUnexpectedNumbers", () => {
   it("flags numbers that are missing from source", () => {
     const rewrite: RewriteOutput = {
@@ -112,6 +129,231 @@ describe("findUnexpectedNumbers", () => {
     expect(missing).toContain("1.402.705");
   });
 
+  it("accepts rounded billion kroner amounts derived from exact source totals", () => {
+    const rewrite = createRewrite({
+      title: "Norse Atlantic far ja til emisjon",
+      lead:
+        "Norse Atlantic far generalforsamlingens ja til a oke aksjekapitalen med 1,02 milliarder kroner.",
+      key_facts: ["Kapitalforhoyelse pa 1,02 milliarder kroner"],
+      source_spans: ["The share capital is increased with NOK 1,019,832,000.00"]
+    });
+
+    const source =
+      "The share capital is increased with NOK 1,019,832,000.00 in connection with a rights issue.";
+
+    const missing = findUnexpectedNumbers(rewrite, source);
+    expect(missing).toEqual([]);
+  });
+
+  it("accepts rounded billion share counts derived from exact source totals", () => {
+    const rewrite = createRewrite({
+      title: "Norse Atlantic far ja til emisjon",
+      lead: "Det skal utstedes 2,04 milliarder nye aksjer.",
+      key_facts: ["2,04 milliarder nye aksjer"],
+      source_spans: ["issuance of 2,039,664,000 new shares"]
+    });
+
+    const source =
+      "The share capital increase is made by the issuance of 2,039,664,000 new shares.";
+
+    const missing = findUnexpectedNumbers(rewrite, source);
+    expect(missing).toEqual([]);
+  });
+
+  it("accepts rounded million kroner amounts derived from exact source totals", () => {
+    const rewrite = createRewrite({
+      title: "Selskapet henter kapital",
+      lead: "Selskapet henter 750 millioner kroner.",
+      key_facts: ["Henter 750 millioner kroner"],
+      source_spans: ["gross proceeds of NOK 750,000,000"]
+    });
+
+    const source =
+      "The private placement will raise gross proceeds of NOK 750,000,000.";
+
+    const missing = findUnexpectedNumbers(rewrite, source);
+    expect(missing).toEqual([]);
+  });
+
+  it("accepts source million amounts rewritten as billion amounts", () => {
+    const rewrite = createRewrite({
+      title: "Vegfinans utsteder lan",
+      lead: "Vegfinans har utstedt nye obligasjoner pa 1 milliard kroner.",
+      key_facts: ["Lan pa 1 milliard kroner"],
+      source_spans: ["issued bonds for 1.000 millioner kroner"]
+    });
+
+    const source =
+      "Vegfinans has issued bonds for 1.000 millioner kroner under the framework.";
+
+    const missing = findUnexpectedNumbers(rewrite, source);
+    expect(missing).toEqual([]);
+  });
+
+  it("rejects incorrect rounded billion amounts from exact source totals", () => {
+    const rewrite = createRewrite({
+      title: "Norse Atlantic far ja til emisjon",
+      lead:
+        "Norse Atlantic far generalforsamlingens ja til a oke aksjekapitalen med 1,20 milliarder kroner.",
+      key_facts: ["Kapitalforhoyelse pa 1,20 milliarder kroner"],
+      source_spans: ["The share capital is increased with NOK 1,019,832,000.00"]
+    });
+
+    const source =
+      "The share capital is increased with NOK 1,019,832,000.00 in connection with a rights issue.";
+
+    const missing = findUnexpectedNumbers(rewrite, source);
+    expect(missing).toContain("1,20");
+  });
+
+  it("rejects rounded scaled amounts when the source and rewrite units differ", () => {
+    const rewrite = createRewrite({
+      title: "Selskapet henter kapital",
+      lead: "Selskapet henter 1,02 milliarder kroner.",
+      key_facts: ["Henter 1,02 milliarder kroner"],
+      source_spans: ["gross proceeds of USD 1,019,832,000.00"]
+    });
+
+    const source =
+      "The private placement will raise gross proceeds of USD 1,019,832,000.00.";
+
+    const missing = findUnexpectedNumbers(rewrite, source);
+    expect(missing).toContain("1,02");
+  });
+
+  it("rejects bare integer billion wording for non-integer exact source totals", () => {
+    const rewrite = createRewrite({
+      title: "Norse Atlantic far ja til emisjon",
+      lead:
+        "Norse Atlantic far generalforsamlingens ja til a oke aksjekapitalen med 1 milliard kroner.",
+      key_facts: ["Kapitalforhoyelse pa 1 milliard kroner"],
+      source_spans: ["The share capital is increased with NOK 1,019,832,000.00"]
+    });
+
+    const source =
+      "The share capital is increased with NOK 1,019,832,000.00 in connection with a rights issue.";
+
+    const missing = findUnexpectedNumbers(rewrite, source);
+    expect(missing).toContain("1");
+  });
+
+  it("accepts rounded million figures from explicitly thousand-scaled report tables", () => {
+    const rewrite: RewriteOutput = {
+      title: "CMM oker inntektene",
+      lead:
+        "CMM okte inntektene til 33,6 millioner dollar i kvartalet, fra 12,1 millioner dollar aret for.",
+      body: [
+        "Driftsresultatet var 3,1 millioner dollar, mot 3,2 millioner i samme kvartal i fjor.",
+        "Resultatet for skatt steg til 6,2 millioner dollar, fra 4,0 millioner aret for."
+      ],
+      company_sentence: "CMM har flere fartoykontrakter med Petrobras.",
+      key_facts: [
+        "Inntekter 33,6 millioner dollar",
+        "Driftsresultat 3,1 millioner dollar",
+        "Resultat for skatt 6,2 millioner dollar"
+      ],
+      negative_or_surprising: [],
+      excluded_hype: [],
+      source_limitations: [],
+      confidence: "high",
+      importance: "medium",
+      source_spans: [
+        "Revenue 33,613 12,118",
+        "Operating Profit 3,100 3,244",
+        "Result before corporate income tax 6,232 4,027"
+      ]
+    };
+
+    const source = [
+      "Consolidated statement of income",
+      "(in USD thousands)",
+      "Revenue 33,613 12,118",
+      "Operating Profit 3,100 3,244",
+      "Result before corporate income tax 6,232 4,027"
+    ].join("\n");
+
+    const missing = findUnexpectedNumbers(rewrite, source);
+    expect(missing).toEqual([]);
+  });
+
+  it("rejects rounded million figures when the table scale is not explicit", () => {
+    const rewrite: RewriteOutput = {
+      title: "CMM oker inntektene",
+      lead:
+        "CMM okte inntektene til 33,6 millioner dollar i kvartalet, fra 12,1 millioner dollar aret for.",
+      body: ["Driftsresultatet var 3,1 millioner dollar."],
+      company_sentence: "CMM har flere fartoykontrakter med Petrobras.",
+      key_facts: ["Inntekter 33,6 millioner dollar"],
+      negative_or_surprising: [],
+      excluded_hype: [],
+      source_limitations: [],
+      confidence: "high",
+      importance: "medium",
+      source_spans: ["Revenue 33,613 12,118"]
+    };
+
+    const source = [
+      "Consolidated statement of income",
+      "Revenue 33,613 12,118",
+      "Operating Profit 3,100 3,244"
+    ].join("\n");
+
+    const missing = findUnexpectedNumbers(rewrite, source);
+    expect(missing).toContain("33,6");
+  });
+
+  it("rejects incorrectly rounded million figures from thousand-scaled tables", () => {
+    const rewrite: RewriteOutput = {
+      title: "CMM oker inntektene",
+      lead:
+        "CMM okte inntektene til 33,7 millioner dollar i kvartalet, fra 12,1 millioner dollar aret for.",
+      body: [],
+      company_sentence: "CMM har flere fartoykontrakter med Petrobras.",
+      key_facts: ["Inntekter 33,7 millioner dollar"],
+      negative_or_surprising: [],
+      excluded_hype: [],
+      source_limitations: [],
+      confidence: "high",
+      importance: "medium",
+      source_spans: ["Revenue 33,613 12,118"]
+    };
+
+    const source = [
+      "Consolidated statement of income",
+      "Amounts are in USD thousands",
+      "Revenue 33,613 12,118"
+    ].join("\n");
+
+    const missing = findUnexpectedNumbers(rewrite, source);
+    expect(missing).toContain("33,7");
+  });
+
+  it("rejects scaled table matches when rewrite text omits the million unit", () => {
+    const rewrite: RewriteOutput = {
+      title: "CMM oker inntektene",
+      lead:
+        "CMM okte inntektene til 33,6 dollar i kvartalet, fra 12,1 dollar aret for.",
+      body: [],
+      company_sentence: "CMM har flere fartoykontrakter med Petrobras.",
+      key_facts: ["Inntekter 33,6 dollar"],
+      negative_or_surprising: [],
+      excluded_hype: [],
+      source_limitations: [],
+      confidence: "high",
+      importance: "medium",
+      source_spans: ["Revenue 33,613 12,118"]
+    };
+
+    const source = [
+      "Consolidated statement of income",
+      "Amounts are in USD thousands",
+      "Revenue 33,613 12,118"
+    ].join("\n");
+
+    const missing = findUnexpectedNumbers(rewrite, source);
+    expect(missing).toContain("33,6");
+  });
+
   it("normalizes punctuation around date tokens", () => {
     const rewrite: RewriteOutput = {
       title: "Rapportdato bekreftet",
@@ -154,6 +396,32 @@ describe("findUnexpectedNumbers", () => {
 
     const source =
       "The company will host a webcast on Thursday, 4 June 2026, at 9:30 AM CET.";
+
+    const missing = findUnexpectedNumbers(rewrite, source);
+    expect(missing).toEqual([]);
+  });
+
+  it("accepts Norwegian thousands separators when source uses unseparated integers", () => {
+    const rewrite: RewriteOutput = {
+      title: "Lavere inntekter for Loch Duart",
+      lead: "Selskapet fikk lavere inntekter etter redusert hostet tonnasje.",
+      body: [
+        "Selskapet hostet 8.142 tonn GWT i regnskapsaret, opp fra 5.620 tonn aret for."
+      ],
+      company_sentence: "Loch Duart rapporterer om hostet tonnasje og fiskedodelighet.",
+      key_facts: ["Hostet 8.142 tonn GWT", "Opp fra 5.620 tonn"],
+      negative_or_surprising: [],
+      excluded_hype: [],
+      source_limitations: [],
+      confidence: "medium",
+      importance: "medium",
+      source_spans: [
+        "with 8142T GWT harvested, a rise from 5620T GWT in the prior year"
+      ]
+    };
+
+    const source =
+      "The report states that 8142T GWT was harvested, a rise from 5620T GWT in the prior year.";
 
     const missing = findUnexpectedNumbers(rewrite, source);
     expect(missing).toEqual([]);
