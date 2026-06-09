@@ -94,11 +94,57 @@ describe("getDeterministicTriageSkip", () => {
     expect(result?.kind).toBe("document-only");
   });
 
+  it("skips 675304 EAM annual report publication without report facts", () => {
+    const result = getDeterministicTriageSkip(
+      "EAM: EAM Solar AS - 2025 Annual Report",
+      "EAM Solar AS has published its annual report for 2025. The report is attached and available on the company's website.",
+      ["ANNEN INFORMASJONSPLIKTIG REGULATORISK INFORMASJON"],
+      true
+    );
+
+    expect(result?.newsworthy).toBe(false);
+    expect(result?.kind).toBe("document-only");
+  });
+
   it("keeps document notices with substantive financial facts", () => {
     const result = getDeterministicTriageSkip(
       "DOF Group ASA - Financial Report for 1st quarter 2026",
       "Revenue increased to USD 475 million. Operating income was USD 94 million and the company declares a dividend of USD 0.37 per share.",
       ["HALVÅRSRAPPORTER OG REVISJONSBERETNINGER / UTTALELSER OM FORENKLET REVISORKONTROLL"],
+      true
+    );
+
+    expect(result).toBeNull();
+  });
+
+  it("skips 675463 MOBAN prospectus publication for an already announced rights issue", () => {
+    const result = getDeterministicTriageSkip(
+      "MOBAN: Morrow Bank AB publishes prospectus for the Rights Issue",
+      "Reference is made to the previously announced rights issue. The Financial Supervisory Authority of Norway has approved a prospectus prepared in connection with the rights issue. The subscription period runs from 9 June to 23 June.",
+      ["ANNEN INFORMASJONSPLIKTIG REGULATORISK INFORMASJON"],
+      true
+    );
+
+    expect(result?.newsworthy).toBe(false);
+    expect(result?.kind).toBe("routine-prospectus");
+  });
+
+  it("keeps offering notices with a new result even when a prospectus is mentioned", () => {
+    const result = getDeterministicTriageSkip(
+      "Result of rights issue and publication of prospectus",
+      "The rights issue was fully subscribed and gross proceeds were NOK 100 million. The prospectus is available on the company's website.",
+      ["ANNEN INFORMASJONSPLIKTIG REGULATORISK INFORMASJON"],
+      true
+    );
+
+    expect(result).toBeNull();
+  });
+
+  it("keeps fresh prospectus notices that are not tied to a previously announced offering", () => {
+    const result = getDeterministicTriageSkip(
+      "Company announces rights issue and publication of prospectus",
+      "The company launches a rights issue and publishes a prospectus with the terms for the offering.",
+      ["ANNEN INFORMASJONSPLIKTIG REGULATORISK INFORMASJON"],
       true
     );
 
@@ -202,6 +248,7 @@ describe("getDeterministicTriageSkip", () => {
 describe("TRIAGE_PROMPT", () => {
   it("explicitly rejects document-only and attachment-only notices", () => {
     expect(TRIAGE_PROMPT).toContain("Form 6-K");
+    expect(TRIAGE_PROMPT).toContain("prospekt for en allerede annonsert emisjon");
     expect(TRIAGE_PROMPT).toContain("Invitasjoner til resultatpresentasjoner");
     expect(TRIAGE_PROMPT).toContain("bare kan skrives ved å lese et vedlegg");
   });
