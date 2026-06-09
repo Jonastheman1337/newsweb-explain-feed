@@ -39,6 +39,7 @@ describe("parseWorkerConfig", () => {
     expect(config.OPENAI_DEFAULT_REASONING_EFFORT).toBe("medium");
     expect(config.OPENAI_REPORT_REASONING_EFFORT).toBe("medium");
     expect(config.OPENAI_HARD_REASONING_EFFORT).toBe("medium");
+    expect(config.NEWSWEB_POLLING_ENABLED).toBe(true);
     expect(config.POLL_INTERVAL_MS).toBe(5000);
   });
 
@@ -57,8 +58,21 @@ describe("parseWorkerConfig", () => {
     expect(config.OPENAI_DEFAULT_REASONING_EFFORT).toBe("medium");
     expect(config.OPENAI_REPORT_REASONING_EFFORT).toBe("medium");
     expect(config.OPENAI_HARD_REASONING_EFFORT).toBe("medium");
+    expect(config.NEWSWEB_POLLING_ENABLED).toBe(true);
     expect(config.POLL_INTERVAL_MS).toBe(5000);
     expect(config.LATEST_BOOTSTRAP_COUNT).toBe(30);
+  });
+
+  it("can disable Newsweb polling", () => {
+    const config = parseWorkerConfig({
+      NODE_ENV: "development",
+      DATABASE_URL:
+        "postgresql://newsweb:newsweb@localhost:5432/newsweb_explain?schema=public",
+      REDIS_URL: "redis://localhost:6379",
+      OPENAI_API_KEY: "sk-openai-test-key",
+      NEWSWEB_POLLING_ENABLED: "false"
+    });
+    expect(config.NEWSWEB_POLLING_ENABLED).toBe(false);
   });
 
   it("rejects poll intervals below 5 seconds", () => {

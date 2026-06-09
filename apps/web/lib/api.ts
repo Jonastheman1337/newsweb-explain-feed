@@ -1,7 +1,27 @@
-import type { FeedQuery, FeedResponse, RewriteOutput } from "@newsweb/shared";
+import type {
+  FeedQuery,
+  FeedResponse,
+  NoticeMaterial,
+  RewriteOutput,
+  RewriteStatusResponse
+} from "@newsweb/shared";
 import { getApiBaseUrl } from "./api-base-url";
 
 const API_BASE_URL = getApiBaseUrl();
+
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
+export function isApiAuthError(error: unknown): boolean {
+  return error instanceof ApiError && (error.status === 401 || error.status === 403);
+}
 
 function createUrl(path: string, params?: Record<string, string | undefined>): string {
   if (typeof window !== "undefined") {
@@ -46,7 +66,7 @@ export async function apiGet<T>(
   });
 
   if (!response.ok) {
-    throw new Error(`API request failed (${response.status})`);
+    throw new ApiError(`API request failed (${response.status})`, response.status);
   }
   return (await response.json()) as T;
 }
@@ -95,6 +115,23 @@ type NoticeResponse =
 
 export async function getNotice(token: string | null | undefined, messageId: number) {
   return apiGet<NoticeResponse>(token, `/notice/${messageId}`);
+}
+
+export async function getNoticeStatus(
+  token: string | null | undefined,
+  messageId: number
+) {
+  return apiGet<RewriteStatusResponse>(token, `/notice/${messageId}/status`);
+}
+
+export async function getNoticeMaterials(
+  token: string | null | undefined,
+  messageId: number
+) {
+  return apiGet<{ materials: NoticeMaterial[] }>(
+    token,
+    `/notice/${messageId}/materials`
+  );
 }
 
 export async function getMetaFilters(token: string | null | undefined) {

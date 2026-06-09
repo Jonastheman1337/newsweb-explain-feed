@@ -62,11 +62,34 @@ model SourceNotice {
   rewrites       Rewrite[]
   feedItem       FeedItem?
   jobRuns        JobRun[]
+  materials      NoticeMaterial[]
 
   @@index([publishedAt(sort: Desc)])
   @@index([issuerSign])
   @@index([categoriesJson], type: Gin)
   @@map("source_notices")
+}
+
+model NoticeMaterial {
+  id            String       @id @default(cuid())
+  messageId     Int          @map("message_id")
+  kind          String
+  title         String
+  url           String?
+  fileName      String?      @map("file_name")
+  mimeType      String?      @map("mime_type")
+  fileSize      Int?         @map("file_size")
+  extractedText String       @map("extracted_text") @db.Text
+  status        String
+  errorText     String?      @map("error_text") @db.Text
+  enabled       Boolean      @default(true)
+  metadataJson  Json?        @map("metadata_json")
+  createdAt     DateTime     @default(now()) @map("created_at")
+  sourceNotice  SourceNotice @relation(fields: [messageId], references: [messageId], onDelete: Cascade)
+
+  @@index([messageId, createdAt(sort: Desc)])
+  @@index([status])
+  @@map("notice_materials")
 }
 
 model Rewrite {

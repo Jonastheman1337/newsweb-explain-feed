@@ -1,6 +1,9 @@
 import type { RewriteOutput } from "@newsweb/shared";
 import {
   formatRewriteForRevisionPrompt,
+  lengthInstructionForPayload,
+  maxVisibleArticleCharsForPayload,
+  supplementalMaterialsPromptSection,
   type PromptPayload
 } from "./prompt.js";
 import {
@@ -12,6 +15,9 @@ import {
   EDITORIAL_NO_MARKET_COMMENTARY,
   EDITORIAL_NORWEGIAN,
   EDITORIAL_QUOTES,
+  EDITORIAL_REVISION_PRIORITY,
+  EDITORIAL_SOURCE_AS_DATA,
+  EDITORIAL_SUPPLEMENTAL_MATERIALS,
   EDITORIAL_TITLE,
   EDITORIAL_WRITING_STYLE
 } from "./shared-editorial.js";
@@ -20,15 +26,20 @@ export function createReportSystemPrompt(): string {
   return [
     "Du er nyhetsjournalist i E24-redaksjonen.",
     "Du skriver korte børsnyheter på norsk bokmål for en travel leser som scanner nyheter på mobilen.",
-    "Leseren er en privatinvestor — kanskje en student eller nybegynner — som vil vite: hva skjedde, og hva betyr det for aksjen?",
+    "Leseren vil vite hva som er mest vesentlig for selskapet og aksjonærene, uten at vi vurderer aksjen, spår kursreaksjon eller gir investeringsråd.",
     "Skriv så enkelt at en videregåendeelev med interesse for finans forstår teksten uten å google noe.",
     "Kilden er et kuratert utdrag fra en kvartals- eller halvårsrapport, eventuelt kombinert med en børsmelding.",
     "Du skal lage en kort nyhetssak basert på nøkkeltallene.",
     "Ikke vær en papegøye som bare ramser opp tall. Plukk ut det viktigste, det overraskende eller det dramatiske.",
-    "Ikke følg rapportens struktur eller rekkefølge. Du er redaktøren ��� restrukturer fritt etter hva som er viktigst for leseren.",
+    "Ikke følg rapportens struktur eller rekkefølge. Du er redaktøren — restrukturer fritt etter hva som er viktigst for leseren.",
     "Bruk redaksjonelt skjønn: velg det som er mest nyhetsverdig, ikke følg en rigid formel.",
-    "Lead + body til sammen skal være maks 1000 tegn. Vær knapp."
-  ].join(" ");
+    "Lead + body til sammen skal være maks 1000 tegn. Vær knapp.",
+    EDITORIAL_SOURCE_AS_DATA
+  ].map((line) =>
+    line.startsWith("Lead + body")
+      ? "Hold deg til tegngrensen i oppgaven. Vaer knapp."
+      : line
+  ).join(" ");
 }
 
 const REPORT_STYLE_EXAMPLES = `
@@ -57,19 +68,19 @@ Oppstartsselskap uten inntekter (Andfjord Salmon — biologisk fremgang, men sto
 {"title":"Andfjord Salmon økte tapene","lead":"Det landbaserte oppdrettsselskapet Andfjord Salmon skriver at veksten i bassengene K0 og K1 ved anlegget på Andøya «har overgått forventningene, inkludert når man tar høyde for høyere vanntemperaturer enn ventet».","body":["Lakseoppdretteren skriver også at overlevelsesraten i begge bassengene er høyere enn ventet. Den var samlet sett på 99,59 prosent i starten av denne uken.","Ifølge selskapet går byggingen av bassengene K2, K3 og K4 etter planen med ny entreprenør på plass.","Andfjord er fortsatt i startfasen, og hadde driftsinntekter på 1,03 millioner i fjerde kvartal. Resultatet var på minus 74 millioner kroner i kvartalet, en kraftig økning i tapene fra 18,1 millioner året før."],"company_sentence":"Andfjord Salmon driver landbasert lakseoppdrett på Andøya.","key_facts":["Tap på 74 mill. kroner i Q4, opp fra 18,1 mill.","Driftsinntekter: 1,03 mill. kroner","Overlevelsesrate: 99,59 %","Tre nye basseng under bygging"],"negative_or_surprising":["Tapene firedoblet fra året før"],"excluded_hype":[],"source_limitations":["Kun et utdrag av rapporten er analysert"],"confidence":"high","importance":"uviktig","source_spans":["minus 74 millioner","driftsinntekter 1,03 millioner","overlevelsesrate 99,59 prosent"]}
 
 Første utbytte som milepæl (IWS — rekordhøyt resultat med CEO-sitat):
-{"title":"IWS vil betale utbytte for første gang","lead":"Leverandørselskapet Integrated Wind Solutions (IWS) melder om rekordhøyt resultat etter skatt og vil betale sitt første utbytte.","body":["Selskapet driver seks serviceskip for havvindbransjen, og leverer et resultat før skatt på 6,85 millioner euro i fjorårets fjerde kvartal, opp fra 6,5 millioner euro i samme kvartal året før. Resultat etter skatt var på 7,8 millioner euro, opp fra 5,8 millioner euro i samme periode året før.","Selskapet vil betale tre kroner per aksje i utbytte, hvorav ordinært utbytte utgjør en krone per aksje.","– IWS rapporterer nok et sterkt kvartal med rekordhøyt resultat etter skatt. Utbyttet på tre kroner per aksje er en betydelig milepæl for IWS gjennom å gi kontantutbetalinger til våre støttende aksjonærer, sier IWS-konsernsjef Lars-Henrik Røren i en melding.","Selskapet hadde en ordrebok på 152 millioner euro ved utgangen av fjerde kvartal, opp 50,5 prosent fra kvartalet før."],"company_sentence":"Integrated Wind Solutions (IWS) driver seks serviceskip for havvindbransjen.","key_facts":["Resultat etter skatt: 7,8 mill. euro, opp fra 5,8 mill.","Første utbytte: 3 kroner per aksje","Ordrebok: 152 mill. euro, opp 50,5 % fra Q3"],"negative_or_surprising":[],"excluded_hype":[],"source_limitations":["Kun et utdrag av rapporten er analysert"],"confidence":"high","importance":"medium","source_spans":["resultat etter skatt 7,8 mill.","tre kroner per aksje","ordrebok 152 mill."]}
+{"title":"IWS vil betale utbytte for første gang","lead":"Leverandørselskapet Integrated Wind Solutions (IWS) melder om rekordhøyt resultat etter skatt og vil betale sitt første utbytte.","body":["Resultatet før skatt var 6,85 millioner euro i fjorårets fjerde kvartal, opp fra 6,5 millioner euro året før. Resultat etter skatt var 7,8 millioner euro, opp fra 5,8 millioner.","Selskapet vil betale tre kroner per aksje i utbytte, hvorav én krone er ordinært utbytte.","– Utbyttet på tre kroner per aksje er en betydelig milepæl for IWS, sier konsernsjef Lars-Henrik Røren.","Ordreboken var 152 millioner euro ved utgangen av kvartalet, opp 50,5 prosent fra kvartalet før."],"company_sentence":"Integrated Wind Solutions (IWS) driver serviceskip for havvindbransjen.","key_facts":["Resultat etter skatt: 7,8 mill. euro, opp fra 5,8 mill.","Første utbytte: 3 kroner per aksje","Ordrebok: 152 mill. euro, opp 50,5 % fra Q3"],"negative_or_surprising":[],"excluded_hype":[],"source_limitations":["Kun et utdrag av rapporten er analysert"],"confidence":"high","importance":"medium","source_spans":["CEO Lars-Henrik Røren: 'The dividend of NOK 3 per share is a significant milestone for IWS'","resultat etter skatt 7,8 mill.","ordrebok 152 mill."]}
 
 Utbytte som vinkel trass svakere resultat (Höegh Autoliners — CEO-sitat med guillemets):
-{"title":"Utbyttedryss fra Höegh Autoliners","lead":"Bilfraktrederiet hadde inntekter på 358 millioner dollar i fjorårets fjerde kvartal, en oppgang fra 352 millioner dollar på samme tid året før.","body":["Driftsresultatet (ebitda) var 145 millioner, en nedgang fra 179 millioner. Resultat før skatt gikk ned til 104 millioner fra 138 millioner.","Selskapet vil betale et utbytte på 99 millioner dollar (0,519 dollar per aksje) i mars.","Toppsjef Andreas Enger skryter av at selskapet har levert et nytt sterkt år, til tross for «komplekse og volatile driftsomgivelser»."],"company_sentence":"Höegh Autoliners er et bilfraktrederi.","key_facts":["Inntekter: 358 mill. dollar, opp fra 352 mill.","Ebitda ned til 145 mill. fra 179 mill. dollar","Utbytte: 99 mill. dollar"],"negative_or_surprising":["Ebitda og resultat falt til tross for inntektsvekst"],"excluded_hype":[],"source_limitations":["Kun et utdrag av rapporten er analysert"],"confidence":"high","importance":"medium","source_spans":["inntekter 358 mill.","ebitda 145 mill.","utbytte 99 mill."]}
+{"title":"Utbyttedryss fra Höegh Autoliners","lead":"Bilfraktrederiet hadde inntekter på 358 millioner dollar i fjorårets fjerde kvartal, en oppgang fra 352 millioner dollar på samme tid året før.","body":["Driftsresultatet (ebitda) var 145 millioner, en nedgang fra 179 millioner. Resultat før skatt gikk ned til 104 millioner fra 138 millioner.","Selskapet vil betale et utbytte på 99 millioner dollar (0,519 dollar per aksje) i mars.","Toppsjef Andreas Enger sier selskapet leverte et nytt sterkt år til tross for «komplekse og volatile driftsomgivelser»."],"company_sentence":"Höegh Autoliners er et bilfraktrederi.","key_facts":["Inntekter: 358 mill. dollar, opp fra 352 mill.","Ebitda ned til 145 mill. fra 179 mill. dollar","Utbytte: 99 mill. dollar"],"negative_or_surprising":["Ebitda og resultat falt til tross for inntektsvekst"],"excluded_hype":[],"source_limitations":["Kun et utdrag av rapporten er analysert"],"confidence":"high","importance":"medium","source_spans":["CEO Andreas Enger: delivered another strong year despite 'complex and volatile operating environments'","inntekter 358 mill.","utbytte 99 mill."]}
 
 Porteføljevekst men kraftig resultatfall (Magnora — fornybar uten Q4-tall):
 {"title":"Magnora-porteføljen vokser","lead":"Fornybarselskapet Magnora, som utvikler og selger kraftanlegg, har lagt frem resultater.","body":["Magnora kommer samtidig med en oppdatering om fremdriften for salgsprosesser, og status for datasenter-satsingen deres.","Prosjektporteføljen var totalt på 9,9 gigawatt ved utgangen av året, opp fra 6,3 gigawatt for et år siden og 8,3 gigawatt etter tredje kvartal. Siden årsskiftet har den økt videre til 10,4 gigawatt.","Selskapet har ikke lagt frem resultater for fjerde kvartal spesifikt.","I 2025 som helhet falt overskuddet kraftig. Resultatet før skatt endte på 12,2 millioner kroner, ned fra 269,2 millioner kroner i 2024.","Magnora skriver at de har gått videre med diskusjoner om salg av prosjekter med kapasitet på 500-800 megawatt. Dette har ifølge selskapet ført til forhandlinger om salg av ytterligere prosjekter."],"company_sentence":"Magnora er et fornybarselskap som utvikler og selger kraftanlegg.","key_facts":["Portefølje: 10,4 GW, opp fra 6,3 GW","Resultat før skatt 2025: 12,2 mill., ned fra 269,2 mill.","Forhandler om salg av 500-800 MW"],"negative_or_surprising":["Overskuddet falt fra 269 mill. til 12 mill. kroner"],"excluded_hype":[],"source_limitations":["Kun et utdrag av rapporten er analysert"],"confidence":"high","importance":"medium","source_spans":["portefølje 9,9 gigawatt","resultat 12,2 mill.","salg 500-800 megawatt"]}
 
-Giga-handel driver inntektsvekst (PPI — eiendomsoppkjøp fra SBB):
-{"title":"Kraftig inntektshopp etter giga-handel","lead":"Eiendomsselskapet Public Property Invest (PPI) har lagt frem en rapport som viser at inntektene økte til 392 millioner kroner i fjorårets fjerde kvartal, fra 180 millioner kroner på samme tid året før.","body":["Driftsresultatet var 332 millioner kroner, opp fra 161 millioner kroner.","Resultatet før skatt gikk ned til 89 millioner fra 246 millioner kroner.","I løpet av fjerde kvartal kjøpte PPI en eiendomsportefølje for 38 milliarder kroner fra svenske SBB.","PPI skal flytte til Sverige og skal i hovedsak være børsnotert i Stockholm, en endring som er ventet å være i boks før juli.","Selskapet eide 850 eiendommer ved årsskiftet. Disse hadde en total markedsverdi på rundt 54 milliarder kroner."],"company_sentence":"Public Property Invest (PPI) er et eiendomsselskap.","key_facts":["Inntekter: 392 mill., opp fra 180 mill. kroner","Kjøpte eiendom for 38 mrd. fra SBB","850 eiendommer verdt 54 mrd. kroner","Flytter hovednotering til Stockholm"],"negative_or_surprising":["Resultat før skatt falt fra 246 mill. til 89 mill. trass inntektsvekst"],"excluded_hype":[],"source_limitations":["Kun et utdrag av rapporten er analysert"],"confidence":"high","importance":"medium","source_spans":["inntekter 392 mill.","38 milliarder fra SBB","850 eiendommer"]}
+Eiendomskjøp driver inntektsvekst (PPI — eiendomsoppkjøp fra SBB):
+{"title":"PPI øker inntektene etter eiendomskjøp","lead":"Eiendomsselskapet Public Property Invest (PPI) har lagt frem en rapport som viser at inntektene økte til 392 millioner kroner i fjorårets fjerde kvartal, fra 180 millioner kroner på samme tid året før.","body":["Driftsresultatet var 332 millioner kroner, opp fra 161 millioner kroner.","Resultatet før skatt gikk ned til 89 millioner fra 246 millioner kroner.","I løpet av fjerde kvartal kjøpte PPI en eiendomsportefølje for 38 milliarder kroner fra svenske SBB.","PPI skal flytte til Sverige og skal i hovedsak være børsnotert i Stockholm, en endring som er ventet å være i boks før juli.","Selskapet eide 850 eiendommer ved årsskiftet. Disse hadde en total markedsverdi på rundt 54 milliarder kroner."],"company_sentence":"Public Property Invest (PPI) er et eiendomsselskap.","key_facts":["Inntekter: 392 mill., opp fra 180 mill. kroner","Kjøpte eiendom for 38 mrd. fra SBB","850 eiendommer verdt 54 mrd. kroner","Flytter hovednotering til Stockholm"],"negative_or_surprising":["Resultat før skatt falt fra 246 mill. til 89 mill. trass inntektsvekst"],"excluded_hype":[],"source_limitations":["Kun et utdrag av rapporten er analysert"],"confidence":"high","importance":"medium","source_spans":["inntekter 392 mill.","38 milliarder fra SBB","850 eiendommer"]}
 
 Engangseffekt forklarer resultatsnudd (Kongsberg Automotive):
-{"title":"Lavere inntekter for Kongsberg Automotive","lead":"Bildelprodusenten har lagt frem en rapport som viser at inntektene falt til 168 millioner euro i fjorårets fjerde kvartal, fra 185 millioner euro på samme tid året før.","body":["Driftsresultatet (ebitda) steg på sin side, til 17 millioner fra 10 millioner euro.","Resultatet før skatt snudde til pluss 5 millioner euro, fra minus 6 millioner euro.","Toppsjef Trond Fiskum peker på et krevende marked og opplyser at resultatene inkluderer en positiv engangseffekt på 4,9 millioner euro knyttet til en gjennomgang av periodiseringer ved årsslutt."],"company_sentence":"Kongsberg Automotive er en bildelprodusent.","key_facts":["Inntekter: 168 mill. euro, ned fra 185 mill.","Ebitda opp til 17 mill. fra 10 mill. euro","Resultat før skatt snudde til pluss 5 mill. fra minus 6 mill.","Engangseffekt: 4,9 mill. euro"],"negative_or_surprising":["Inntektsfall på 9 % i krevende marked","Engangseffekt forklarer mye av resultatforbedringen"],"excluded_hype":[],"source_limitations":["Kun et utdrag av rapporten er analysert"],"confidence":"high","importance":"uviktig","source_spans":["inntekter 168 mill.","ebitda 17 mill.","engangseffekt 4,9 mill."]}
+{"title":"Lavere inntekter for Kongsberg Automotive","lead":"Bildelprodusenten har lagt frem en rapport som viser at inntektene falt til 168 millioner euro i fjorårets fjerde kvartal, fra 185 millioner euro på samme tid året før.","body":["Driftsresultatet (ebitda) steg på sin side til 17 millioner euro, fra 10 millioner.","Resultatet før skatt snudde til pluss 5 millioner euro, fra minus 6 millioner.","Toppsjef Trond Fiskum sier resultatene inkluderer en positiv engangseffekt på 4,9 millioner euro etter en gjennomgang av periodiseringer ved årsslutt."],"company_sentence":"Kongsberg Automotive er en bildelprodusent.","key_facts":["Inntekter: 168 mill. euro, ned fra 185 mill.","Ebitda opp til 17 mill. fra 10 mill. euro","Resultat før skatt snudde til pluss 5 mill. fra minus 6 mill.","Engangseffekt: 4,9 mill. euro"],"negative_or_surprising":["Inntektsfall på 9 %","Engangseffekt forklarer mye av resultatforbedringen"],"excluded_hype":[],"source_limitations":["Kun et utdrag av rapporten er analysert"],"confidence":"high","importance":"uviktig","source_spans":["CEO Trond Fiskum ... positive one-off effect of EUR 4.9 million","inntekter 168 mill.","ebitda 17 mill."]}
 
 Oppdrett med utdelingsplan (Grieg Seafood — storsalg til Cermaq):
 {"title":"Grieg-resultatet steg","lead":"Oppdrettsselskapet Grieg Seafood hadde et operasjonelt driftsresultat («operational ebit») på 143 millioner kroner i fjorårets fjerde kvartal, en oppgang fra 97 millioner kroner på samme tid året før.","body":["Inntektene steg til 971 millioner kroner, fra 853 millioner, mens resultat før skatt gikk opp til 271 fra 147 millioner.","Kvartalet var preget av biologiske utfordringer fra kvartalet før og overgangseffekter, heter det i kvartalsrapporten.","Styret har fattet en prinsipiell beslutning om å dele ut fire milliarder kroner, og den formelle beslutningen vil bli tatt senere.","Selskapet har tatt grep for å kutte kostnader og vil spare 50 millioner kroner etter storsalg av deler av virksomheten. 29. desember 2025 fullførte Grieg salget av virksomheten i blant annet Finnmark til Cermaq."],"company_sentence":"Grieg Seafood er et oppdrettsselskap.","key_facts":["Operasjonelt driftsresultat: 143 mill., opp fra 97 mill.","Inntekter: 971 mill., opp fra 853 mill.","Resultat før skatt: 271 mill., opp fra 147 mill.","Planlagt utdeling: 4 mrd. kroner","Solgte virksomhet til Cermaq"],"negative_or_surprising":["Biologiske utfordringer preget kvartalet"],"excluded_hype":[],"source_limitations":["Kun et utdrag av rapporten er analysert"],"confidence":"high","importance":"medium","source_spans":["operasjonelt driftsresultat 143 mill.","inntekter 971 mill.","fire milliarder kroner"]}
@@ -78,7 +89,7 @@ Emisjon + resultat (Huddly — henter penger, ledelsen tegner seg):
 {"title":"Huddly vil hente opptil 75 millioner kroner","lead":"Teknologiselskapet Huddly vil hente mellom 55 og 75 millioner kroner i en rettet emisjon til 20 kroner aksjen. Selskapet opplyser at pengene blant annet skal brukes til å nedbetale lån.","body":["Pengene fra emisjonen skal brukes til å nedbetale 30,75 millioner kroner av et lån fra nåværende og tidligere aksjonærer, samt dekke underskudd frem til selskapet oppnår positiv kontantstrøm, etter planen i andre halvår.","Ledelse og styre har indikert at de vil tegne seg for til sammen 26,5 millioner kroner i emisjonen. Styreleder Jon Øyvind Eriksen har indikert 10 millioner kroner, mens styremedlem Kristian Kolberg har indikert 15 millioner kroner.","Selskapet rapporterte samtidig inntekter på 64 millioner kroner i fjerde kvartal 2025, opp 26 prosent fra samme periode året før."],"company_sentence":"Huddly er et teknologiselskap.","key_facts":["Rettet emisjon: 55-75 mill. kroner til 20 kr/aksje","Nedbetaler lån på 30,75 mill.","Ledelse tegner seg for 26,5 mill.","Q4-inntekter: 64 mill., opp 26 %"],"negative_or_surprising":["Går med underskudd, venter positiv kontantstrøm i H2"],"excluded_hype":[],"source_limitations":["Kun et utdrag av rapporten er analysert"],"confidence":"high","importance":"medium","source_spans":["emisjon 55-75 mill.","nedbetale 30,75 mill.","inntekter 64 mill."]}
 
 Resultatfall men bedre enn ventet + guiding (MPC Container Ships):
-{"title":"Resultatfall for MPC Container Ships","lead":"Rederiet har lagt frem en rapport som viser et driftsresultat (ebitda) på 76 millioner dollar i fjorårets fjerde kvartal, en nedgang fra 83 millioner på samme tid året før.","body":["Resultat før skatt ble 46 millioner dollar, ned fra 62 millioner dollar.","Resultatene var likevel noe bedre enn analytikerne hadde ventet, ifølge Bloomberg.","Inntektene falt også, til 127 millioner fra 130 millioner dollar.","MPCC-aksjen stiger rundt 3,5 prosent i tidlig handel på Oslo Børs etter tallslippet.","Selskapet skal i mars betale utbytte 17. gang på rad. Utbyttet er på 0,05 dollar for kvartalet, tilsvarende halvparten av overskuddet.","For 2026 venter MPC inntekter på 450-460 millioner dollar og ebitda på 240-260 millioner dollar. Begge deler er høyere enn analytikernes anslag samlet inn av Bloomberg."],"company_sentence":"MPC Container Ships er et containerrederi.","key_facts":["Ebitda: 76 mill. dollar, ned fra 83 mill.","Resultat før skatt: 46 mill., ned fra 62 mill.","Utbytte: 0,05 dollar (17. gang på rad)","Guiding 2026: inntekter 450-460 mill., ebitda 240-260 mill."],"negative_or_surprising":["Resultatfall, men bedre enn analytikernes forventninger","Guiding over konsensus"],"excluded_hype":[],"source_limitations":["Kun et utdrag av rapporten er analysert"],"confidence":"high","importance":"medium","source_spans":["ebitda 76 mill.","resultat før skatt 46 mill.","guiding 450-460 mill."]}
+{"title":"Resultatfall for MPC Container Ships","lead":"Rederiet har lagt frem en rapport som viser et driftsresultat (ebitda) på 76 millioner dollar i fjorårets fjerde kvartal, en nedgang fra 83 millioner på samme tid året før.","body":["Resultat før skatt ble 46 millioner dollar, ned fra 62 millioner dollar.","Resultatene var likevel noe bedre enn analytikerne hadde ventet, ifølge Bloomberg.","Inntektene falt også, til 127 millioner fra 130 millioner dollar.","Selskapet skal i mars betale utbytte 17. gang på rad. Utbyttet er på 0,05 dollar for kvartalet, tilsvarende halvparten av overskuddet.","For 2026 venter MPC inntekter på 450-460 millioner dollar og ebitda på 240-260 millioner dollar. Begge deler er høyere enn analytikernes anslag samlet inn av Bloomberg."],"company_sentence":"MPC Container Ships er et containerrederi.","key_facts":["Ebitda: 76 mill. dollar, ned fra 83 mill.","Resultat før skatt: 46 mill., ned fra 62 mill.","Utbytte: 0,05 dollar (17. gang på rad)","Guiding 2026: inntekter 450-460 mill., ebitda 240-260 mill."],"negative_or_surprising":["Resultatfall, men bedre enn analytikernes forventninger","Guiding over konsensus"],"excluded_hype":[],"source_limitations":["Kun et utdrag av rapporten er analysert"],"confidence":"high","importance":"medium","source_spans":["ebitda 76 mill.","resultat før skatt 46 mill.","guiding 450-460 mill."]}
 
 Snudd til overskudd (Salmon Evolution — i pluss trass inntektsfall):
 {"title":"Salmon Evolution i pluss i fjerde kvartal","lead":"Salmon Evolution snudde til pluss før skatt i fjerde kvartal, fra minus 26,9 millioner til pluss 1,14 millioner kroner. Samtidig falt omsetningen kraftig, viser meldingen.","body":["Omsetningen ble på 98,7 millioner kroner, ned fra 148,7 millioner i samme periode året før.","De realiserte prisene var på 74 kroner kiloet, ned ti prosent fra perioden året før, skriver Salmon Evolution.","Selskapet leverte en slaktevekt på 1.203 tonn i kvartalet.","Salmon Evolution melder om at arbeidet med fase to av Indre Harøy-anlegget går etter planen."],"company_sentence":"Salmon Evolution driver landbasert lakseoppdrett.","key_facts":["Resultat før skatt: 1,14 mill., opp fra minus 26,9 mill.","Omsetning: 98,7 mill., ned fra 148,7 mill.","Realisert pris: 74 kr/kg, ned 10 %","Slaktevekt: 1.203 tonn"],"negative_or_surprising":["Snudde til overskudd trass kraftig inntektsfall","Lakseprisene falt 10 %"],"excluded_hype":[],"source_limitations":["Kun et utdrag av rapporten er analysert"],"confidence":"high","importance":"uviktig","source_spans":["resultat 1,14 mill.","omsetning 98,7 mill.","74 kroner kiloet"]}
@@ -87,11 +98,15 @@ Snudd til overskudd (Salmon Evolution — i pluss trass inntektsfall):
 export function createReportDeveloperPrompt(_schemaJson?: string): string {
   return `OPPGAVE
 Lag en kort nyhetssak i E24-stil basert på utdraget fra en kvartals-/halvårsrapport.
-Leseren er en privatinvestor som kanskje gar pa videregaende og er interessert i finans. Vanlige finansord som 'driftsresultat', 'ebitda' og 'omsetning' er greit, men tyngre jargong ma forklares gjennom kontekst.
+Leseren vil vite hva som er mest vesentlig for selskapet og aksjonærene, uten at vi vurderer aksjen, spår kursreaksjon eller gir investeringsråd. Vanlige finansord som 'driftsresultat', 'ebitda' og 'omsetning' er greit, men tyngre jargong ma forklares gjennom kontekst.
 
 ${EDITORIAL_AUDIENCE}
 - Vi er ikke papegøyer som bare ramser opp tall. Vi finner nyhetshistorien i tallene.
 - Hvis tilgjengelig tekst bare sier at en rapport, presentasjon, prospekt eller skjema er publisert, og rapportutdraget ikke gir substansielle tall eller fakta, ikke lag en sak om manglende tall. Skriv ekstremt kort, sett importance til 'uviktig', og legg begrensningen i source_limitations.
+
+${EDITORIAL_SOURCE_AS_DATA}
+
+${EDITORIAL_SUPPLEMENTAL_MATERIALS}
 
 HVILKE TALL ER VIKTIGE?
 Bruk redaksjonelt skjonn — plukk ut det som er mest nyhetsverdig:
@@ -99,6 +114,7 @@ Bruk redaksjonelt skjonn — plukk ut det som er mest nyhetsverdig:
 - Tre ankertall skal alltid sjekkes der de finnes: inntekter, driftsresultat (operating profit/EBIT) og resultat for skatt.
 - Hvis strukturerte nokkeltall er oppgitt i rapportkonteksten, bruk dem som veiviser, men verifiser mot sideteksten.
 - CEO-/ledelseskommentarer kan forklare utviklingen, men skal ikke overstyre tall fra resultatoppstillingen.
+- Etter nøkkeltallene skal du se etter én kort ledelseskommentar som forklarer årsak, marked, risiko, utsikter, strategi, finansiering, kontrakt, resultat eller en materiell hendelse. Hvis kommentaren kommer fra CEO, CFO eller styreleder og tilfører konkret forklaring, bruk normalt ett direkte sitat, en kildefast formulering i «...» eller en tydelig personattribuert parafrase. Ikke bruk generisk selvskryt.
 - Resultat for skatt — ofte overskriften, men ikke alltid
 - Inntekter (total omsetning)
 - Driftsresultat (operating profit/EBIT). Bruk ebitda bare hvis rapporten ikke oppgir driftsresultat/EBIT.
@@ -109,7 +125,7 @@ Bruk redaksjonelt skjonn — plukk ut det som er mest nyhetsverdig:
 - Strategiske nyheter, oppkjop eller store hendelser nevnt i rapporten
 
 Vaer fleksibel: Et selskap kan ha enorm omsetningsvekst men nesten null i resultat — det er interessant og saken bor reflektere det. Ikke led mekanisk med resultat for skatt hvis et annet tall forteller den egentlige historien.
-Led med den tydeligste utviklingen for en aksjeeier, ikke det største isolerte tallet. Hvis en kapitalinnhenting, ordrebok eller utbytte er mindre viktig enn resultatretningen, skal resultatretningen styre tittel og lead.
+Led med den tydeligste utviklingen for selskapet og aksjonærene, ikke det største isolerte tallet. Hvis en kapitalinnhenting, ordrebok eller utbytte er mindre viktig enn resultatretningen, skal resultatretningen styre tittel og lead.
 Lead skal fortelle utviklingen eller spenningen i tallene når kilden gir grunnlag for det: snur til pluss/minus, dobler/femdobler, faller, kutter, øker tapet, ender i bunn/topp av guiding, eller har svakere bunnlinje trass inntektsvekst. Ikke bruk 'fikk et resultat på X, mot Y' som standardformel når du kan skrive utviklingen direkte.
 
 For energi-/oljeselskaper er justert driftsresultat typisk nokkeltallet markedet folger. La deg tilpasse til det rapporten selv vektlegger.
@@ -122,10 +138,10 @@ Nar bade en borsmelding og en rapport er tilgjengelig, kombiner dem. Meldingen k
 
 TALL-DISIPLIN
 - Plukk ut 3-4 nokkeltall. Ikke rams opp alt rapporten inneholder.
-- De viktigste tallene for en aksjeeier er typisk: inntekter, driftsresultat/EBIT, resultat for skatt og utbytte.
+- De viktigste tallene å vurdere er typisk: inntekter, driftsresultat/EBIT, resultat for skatt og utbytte.
 - Ved utbytte: Ikke vinkle tittelen på små per-aksje-beløp alene. Bruk totalbeløp, tydelig endring ('øker', 'kutter', 'holder') eller velg en sterkere resultat-/balansevinkel.
 - Skriv synlige regnskapsforkortelser med små bokstaver: 'driftsresultat (ebit)' og 'driftsresultat før renter, skatt, av- og nedskrivninger (ebitda)'.
-- Etter nøkkeltallene: se etter årsak, utsikter, markedskommentar, risiko eller hendelser etter kvartalsslutt. Ta med én kort forklarende setning hvis kilden gir dekning. Ikke la saken bli en ren talliste.
+- Etter nøkkeltallene: se etter årsak, utsikter, markedskommentar, risiko eller hendelser etter kvartalsslutt. Ta med én kort forklarende ledelses- eller kildekommentar hvis den gir konkret dekning. Ikke la saken bli en ren talliste.
 - Unnga nisjetall som bruttofortjeneste, 'adjusted operating profit' og andre mellomlinjer med mindre de er selskapets eget nokkeltall.
 - Helårstall kan nevnes kort, men hold fokus på kvartalet.
 - Balansetall (gjeld, kontanter, egenkapital) bare nar de er nyheten (f.eks. likviditetskrise).
@@ -144,7 +160,7 @@ ${EDITORIAL_TITLE}
   Ikke gjenta samme tidsperiode unødig i første setning, som 'første kvartal' to ganger. Varier setningen eller flytt én tidsmarkør.
   Gode titler: 'Subsea 7 femdobler resultatet', 'BW Offshore endte pa bunn av resultatguiding', 'Otovo vil hente inntil 191 millioner', 'Jinhui Shipping i minus i fjerde kvartal'.
   Nar bade resultat og en annen nyhet (oppkjop, emisjon) presenteres samtidig, kan tittelen bruke tankestrek sparsomt. Ikke bruk kolon hvis en normal tittel fungerer.
-- importance: 'viktig' kun ved store overraskelser eller klare kursdrivere. 'medium' for solide rapporter. 'uviktig' for rutine uten overraskelser.
+- importance: 'viktig' for ekstraordinære eller klart materielle rapportnyheter. 'medium' for tydelig relevante rapportnyheter uten ekstraordinært omfang. 'uviktig' for rutine uten overraskelser eller lite nytt innhold.
 
 ${EDITORIAL_WRITING_STYLE}
 
@@ -198,6 +214,8 @@ export function createReportUserPrompt(payload: ReportPromptPayload): string {
     `publishedAt: ${payload.publishedAt}`,
     `categories: ${payload.categories.join(", ") || "ikke oppgitt"}`,
     `markets: ${payload.markets.join(", ") || "ikke oppgitt"}`,
+    `outputMode: ${payload.outputMode ?? "notice"}`,
+    `maxVisibleArticleChars: ${maxVisibleArticleCharsForPayload(payload)}`,
     `reportPageCount: ${payload.reportPageCount}`,
     ...(payload.reportSelectedPages?.length
       ? [
@@ -210,12 +228,14 @@ export function createReportUserPrompt(payload: ReportPromptPayload): string {
 
   const parts: string[] = [
     "Lag en kort, publiserbar nyhetssak basert på kildene under.",
-    "Skriv nyhetstekst, ikke sammendrag. Plukk ut de viktigste nøkkeltallene for en aksjeeier.",
+    "Skriv nyhetstekst, ikke sammendrag. Plukk ut de viktigste nøkkeltallene for selskapet og aksjonærene.",
     "Rapportkilden under er valgt fra rapporten: resultatoppstilling først, deretter relevante ledelses-/utsiktsider og eventuelle sider brukeren ba om.",
     "Bruk resultatoppstillingen som foretrukken kilde for inntekter, driftsresultat/EBIT og resultat før skatt.",
     "Hvis brukeren har bedt om et tema eller en side, bruk USER REQUESTED CONTEXT i rapportkilden aktivt.",
+    lengthInstructionForPayload(payload),
     "Skriv så enkelt at en videregåendeelev med interesse for finans forstår det.",
     "Bruk aktiv form, presens og omvendt nyhetspyramide.",
+    EDITORIAL_SOURCE_AS_DATA,
     "Bruk kun data i kildene under. Ikke bruk markdown.",
     "",
     "Metadata:",
@@ -248,6 +268,8 @@ export function createReportUserPrompt(payload: ReportPromptPayload): string {
     );
   }
 
+  parts.push(...supplementalMaterialsPromptSection(payload));
+
   return parts.join("\n");
 }
 
@@ -259,6 +281,8 @@ export function createReportRevisionUserPrompt(
   return [
     "Lag en revidert versjon av rapportnyheten under, basert pa instruksjonen.",
     "VIKTIG: Instruksjonen er styrende. Hvis den ber om ny vinkel, annet fokus, annen struktur, annen lengde eller stor omskriving, skal du endre alle berorte felt tydelig.",
+    EDITORIAL_REVISION_PRIORITY,
+    EDITORIAL_SOURCE_AS_DATA,
     "Behold bare tekst som fortsatt passer med instruksjonen. Ikke gjor tilfeldige smaendringer for variasjon.",
     "Hvis instruksjonen er smal og konkret, endrer du bare det som trengs. Sarlig ved 'fjern/kutt/dropp/ta bort dette: ...' skal du fjerne bare den angitte teksten og ellers bevare forrige versjon.",
     "Hvis instruksjonen er bred, kan du skrive om tittel, lead, body, key_facts, importance og source_spans sa mye som nodvendig.",

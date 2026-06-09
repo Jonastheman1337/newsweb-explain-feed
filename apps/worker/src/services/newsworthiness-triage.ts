@@ -31,6 +31,7 @@ IKKE NYHETSVERDIG (svar NEI):
 - Invitasjoner til presentasjoner uten substans
 - Invitasjoner til resultatpresentasjoner når selve rapporten/tallene ikke er publisert i kilden
 - Publisering av Form 6-K, prospekt, rapport eller annet dokument uten konkrete nye tall, hendelser eller konsekvenser i tilgjengelig tekst
+- Godkjenning/publisering av prospekt for en allerede annonsert emisjon, med mindre meldingen har nytt resultat, proveny eller utfall
 - Flaggemeldinger/store eierandeler der tilgjengelig tekst bare viser til et vedlegg eller skjema uten å oppgi hvem, hvor mye og hvorfor det er interessant
 - Trafikktall, driftsstatistikk uten overraskelser
 - Administrative endringer i verdipapirer
@@ -48,6 +49,7 @@ export type TriageResult = {
 export type DeterministicTriageSkip = TriageResult & {
   kind:
     | "document-only"
+    | "routine-prospectus"
     | "routine-reminder"
     | "public-sector-results"
     | "small-routine-bond";
@@ -79,6 +81,29 @@ const SUBSTANTIVE_FACT_PATTERNS = [
   /\b(?:acquisition|oppkjøp|merger|fusjon|sale of|salg av)\b/i,
   /\b(?:resign|resignation|fratrer|går av|ceo|cfo|chair)\b/i,
   /\b(?:nok|usd|eur|dollar|kroner|euro|million|millioner|milliard|billion)\b/i
+];
+
+const PROSPECTUS_PUBLICATION_PATTERNS = [
+  /\b(?:publishes?|publishing|publication|published|approves?|approval|approved|available)\b.{0,80}\b(?:prospectus|prospekt)\b/i,
+  /\b(?:prospectus|prospekt)\b.{0,80}\b(?:publishes?|publishing|publication|published|approves?|approval|approved|available)\b/i,
+  /\b(?:godkjennelse|godkjent|publisert|offentliggjort|tilgjengelig)\b.{0,80}\bprospekt\b/i,
+  /\bprospekt\b.{0,80}\b(?:godkjennelse|godkjent|publisert|offentliggjort|tilgjengelig)\b/i
+];
+
+const PROSPECTUS_OFFERING_CONTEXT_PATTERNS = [
+  /\b(?:rights issue|subsequent offering|repair issue|subscription rights?|subscription period)\b/i,
+  /\b(?:fortrinnsrettsemisjon|reparasjonsemisjon|emisjon|tegningsretter?|tegningsperioden)\b/i
+];
+
+const PROSPECTUS_ALREADY_ANNOUNCED_PATTERNS = [
+  /\b(?:previously announced|earlier announced|as announced|reference is made to|further to|announced on|announced by)\b/i,
+  /\b(?:tidligere annonsert|tidligere meldt|som tidligere meldt|det vises til|viser til)\b/i
+];
+
+const PROSPECTUS_MATERIAL_OUTCOME_PATTERNS = [
+  /\b(?:result|results|utfall|fully subscribed|oversubscribed|overtegnet|fulltegnet|allocated|allocation|tildel)\b/i,
+  /\b(?:gross proceeds|net proceeds|proveny|hentet|raises?|raised)\b/i,
+  /\b(?:completed|completion|gjennomfort|gjennomfoert|fullfort|fullfoert)\b/i
 ];
 
 const ROUTINE_REMINDER_PATTERNS = [
@@ -189,6 +214,10 @@ export function getDeterministicTriageSkip(
   sourceBodyText?: string
 ): DeterministicTriageSkip | null {
   const text = [title, issuerName, bodyText].filter(Boolean).join("\n").trim();
+  const sourceOnlyText = [title, issuerName, sourceBodyText ?? bodyText]
+    .filter(Boolean)
+    .join("\n")
+    .trim();
   const marketEventText = [title, sourceBodyText ?? bodyText]
     .filter(Boolean)
     .join("\n")
@@ -202,6 +231,20 @@ export function getDeterministicTriageSkip(
       kind: "document-only",
       reason:
         "Tilgjengelig tekst sier bare at et dokument/presentasjon er publisert, uten konkrete tall, hendelser eller konsekvenser."
+    };
+  }
+
+  if (
+    hasAnyPattern(sourceOnlyText, PROSPECTUS_PUBLICATION_PATTERNS) &&
+    hasAnyPattern(sourceOnlyText, PROSPECTUS_OFFERING_CONTEXT_PATTERNS) &&
+    hasAnyPattern(sourceOnlyText, PROSPECTUS_ALREADY_ANNOUNCED_PATTERNS) &&
+    !hasAnyPattern(sourceOnlyText, PROSPECTUS_MATERIAL_OUTCOME_PATTERNS)
+  ) {
+    return {
+      newsworthy: false,
+      kind: "routine-prospectus",
+      reason:
+        "Routine prospectus approval/publication for an already announced offering."
     };
   }
 

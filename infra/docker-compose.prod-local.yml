@@ -1,0 +1,88 @@
+name: newsweb-prod-local
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: newsweb_explain
+      POSTGRES_USER: newsweb
+      POSTGRES_PASSWORD: newsweb
+    volumes:
+      - ./data/prod-local-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U newsweb -d newsweb_explain"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  postgres-log:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: newsweb_generation_logs
+      POSTGRES_USER: newsweblog
+      POSTGRES_PASSWORD: newsweblog
+    volumes:
+      - ./data/prod-local-log-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U newsweblog -d newsweb_generation_logs"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  autoweb:
+    build:
+      context: ..
+      dockerfile: Dockerfile.render
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      API_PORT: 4000
+      API_BASE_URL: http://127.0.0.1:4000
+      START_WORKER: ${LOCAL_PROD_START_WORKER:-true}
+      DATABASE_URL: postgresql://newsweb:newsweb@postgres:5432/newsweb_explain?schema=public
+      GENERATION_LOG_DATABASE_URL: postgresql://newsweblog:newsweblog@postgres-log:5432/newsweb_generation_logs?schema=public
+      REDIS_URL: redis://redis:6379
+      SESSION_SECRET: ${LOCAL_PROD_SESSION_SECRET:-local-prod-session-secret-32-chars}
+      DEV_AUTH_BYPASS: "false"
+      LOGIN_USERNAME: ${LOCAL_PROD_LOGIN_USERNAME:-E24}
+      LOGIN_PASSWORD: ${LOCAL_PROD_LOGIN_PASSWORD:-local-prod-password}
+      MAGIC_LINK_BASE_URL: http://localhost:${LOCAL_PROD_WEB_PORT:-3000}/login
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-noreply@example.com}
+      ADMIN_API_KEY: ${ADMIN_API_KEY:-local-prod-admin-key}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-5.5}
+      OPENAI_FAST_MODEL: ${OPENAI_FAST_MODEL:-gpt-5.4-mini}
+      OPENAI_TIMEOUT_MS: ${OPENAI_TIMEOUT_MS:-240000}
+      OPENAI_FAST_TIMEOUT_MS: ${OPENAI_FAST_TIMEOUT_MS:-15000}
+      OPENAI_DEFAULT_REASONING_EFFORT: ${OPENAI_DEFAULT_REASONING_EFFORT:-medium}
+      OPENAI_REPORT_REASONING_EFFORT: ${OPENAI_REPORT_REASONING_EFFORT:-medium}
+      OPENAI_HARD_REASONING_EFFORT: ${OPENAI_HARD_REASONING_EFFORT:-medium}
+      NEWSWEB_POLLING_ENABLED: ${LOCAL_PROD_NEWSWEB_POLLING_ENABLED:-false}
+      POLL_INTERVAL_MS: ${POLL_INTERVAL_MS:-5000}
+      LATEST_BOOTSTRAP_COUNT: ${LOCAL_PROD_LATEST_BOOTSTRAP_COUNT:-0}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      postgres-log:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "${LOCAL_PROD_WEB_PORT:-3000}:3000"
+    command: sh -c "npm run prisma:migrate:deploy && sh scripts/render-start.sh"

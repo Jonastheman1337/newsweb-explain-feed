@@ -36,6 +36,7 @@ export const feedItemSchema = z.object({
   messageId: z.number().int(),
   publishedAt: z.string().datetime(),
   visibilityStatus: z.string(),
+  rewriteVersion: z.number().int().positive().nullable(),
   title: z.string(),
   issuerName: z.string(),
   issuerSign: z.string(),
@@ -60,7 +61,8 @@ export const feedItemSchema = z.object({
   notGenerated: z.boolean().default(false),
   skipped: z.boolean().default(false),
   failed: z.boolean().default(false),
-  processing: z.boolean().default(false)
+  processing: z.boolean().default(false),
+  regenerating: z.boolean().default(false)
 });
 
 export const feedResponseSchema = z.object({
@@ -112,7 +114,37 @@ export const rewriteStatusResponseSchema = z.object({
   phaseUpdatedAt: z.string().datetime().nullable()
 });
 
+export const outputModeSchema = z.enum(["notice", "extended_notice"]);
+
+export const noticeMaterialKindSchema = z.enum(["pdf", "newsweb", "text"]);
+export const noticeMaterialStatusSchema = z.enum(["ready", "failed"]);
+
+export const noticeMaterialSchema = z.object({
+  id: z.string(),
+  messageId: z.number().int(),
+  kind: noticeMaterialKindSchema,
+  title: z.string(),
+  url: z.string().nullable(),
+  fileName: z.string().nullable(),
+  mimeType: z.string().nullable(),
+  fileSize: z.number().int().nullable(),
+  extractedTextChars: z.number().int().nonnegative(),
+  status: noticeMaterialStatusSchema,
+  errorText: z.string().nullable(),
+  enabled: z.boolean(),
+  metadata: z.unknown().nullable(),
+  createdAt: z.string().datetime()
+});
+
+export const noticeMaterialsResponseSchema = z.object({
+  materials: z.array(noticeMaterialSchema)
+});
+
 export type FeedQuery = z.infer<typeof feedQuerySchema>;
 export type FeedResponse = z.infer<typeof feedResponseSchema>;
 export type FeedItem = z.infer<typeof feedItemSchema>;
 export type RewriteStatusResponse = z.infer<typeof rewriteStatusResponseSchema>;
+export type OutputMode = z.infer<typeof outputModeSchema>;
+export type NoticeMaterialKind = z.infer<typeof noticeMaterialKindSchema>;
+export type NoticeMaterial = z.infer<typeof noticeMaterialSchema>;
+export type NoticeMaterialsResponse = z.infer<typeof noticeMaterialsResponseSchema>;

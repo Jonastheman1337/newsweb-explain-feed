@@ -1,5 +1,6 @@
 "use client";
 
+import type { NoticeMaterial, OutputMode } from "@newsweb/shared";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -44,12 +45,21 @@ export function InstructionInput({ messageId, activeVersion, hasAttachments }: I
   const router = useRouter();
   const [text, setText] = useState("");
   const [xhighEnabled, setXhighEnabled] = useState(false);
+  const [outputMode, setOutputMode] = useState<OutputMode>("notice");
+  const [materialsOpen, setMaterialsOpen] = useState(false);
+  const [materials, setMaterials] = useState<NoticeMaterial[]>([]);
+  const [materialStatus, setMaterialStatus] = useState<"idle" | "loading" | "saving" | "error">("idle");
+  const [materialInputMode, setMaterialInputMode] = useState<"text" | "newsweb" | null>(null);
+  const [materialTitle, setMaterialTitle] = useState("");
+  const [materialText, setMaterialText] = useState("");
+  const [materialUrl, setMaterialUrl] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "polling" | "sent" | "error">("idle");
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const versionBeforeRef = useRef<number | null>(null);
   const generatedAtBeforeRef = useRef<string | null>(null);
   const isRegenRef = useRef(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { buildTelemetry } = useEditorialTelemetry(messageId, activeVersion);
 
   const resizeTextarea = useCallback(() => {
@@ -82,6 +92,168 @@ export function InstructionInput({ messageId, activeVersion, hasAttachments }: I
   useEffect(() => {
     return () => stopPolling();
   }, [stopPolling]);
+
+  async function loadMaterials() {
+    setMaterialStatus("loading");
+    try {
+      const response = await fetch(`/api/notice/${messageId}/materials`, {
+        credentials: "include"
+      });
+      if (!response.ok) {
+        setMaterialStatus("error");
+        return;
+      }
+      const data = (await response.json()) as { materials: NoticeMaterial[] };
+      setMaterials(data.materials);
+      setMaterialStatus("idle");
+    } catch {
+      setMaterialStatus("error");
+    }
+  }
+
+  useEffect(() => {
+    void loadMaterials();
+  }, [messageId]);
+
+  function selectedMaterialIds() {
+    return materials
+      .filter((material) => material.enabled && material.status === "ready")
+      .map((material) => material.id);
+  }
+
+  function resetMaterialInputs() {
+    setMaterialInputMode(null);
+    setMaterialTitle("");
+    setMaterialText("");
+    setMaterialUrl("");
+  }
+
+  async function saveTextMaterial() {
+    if (!materialText.trim()) return;
+    setMaterialStatus("saving");
+    try {
+      const response = await fetch(`/api/notice/${messageId}/materials/text`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          ...(materialTitle.trim() ? { title: materialTitle.trim() } : {}),
+          text: materialText.trim()
+        })
+      });
+      if (!response.ok) {
+        setMaterialStatus("error");
+        return;
+      }
+      const material = (await response.json()) as NoticeMaterial;
+      setMaterials((current) => [...current, material]);
+      resetMaterialInputs();
+      setMaterialStatus("idle");
+    } catch {
+      setMaterialStatus("error");
+    }
+  }
+
+  async function saveNewswebMaterial() {
+    if (!materialUrl.trim()) return;
+    setMaterialStatus("saving");
+    try {
+      const response = await fetch(`/api/notice/${messageId}/materials/newsweb`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ url: materialUrl.trim() })
+      });
+      if (!response.ok) {
+        setMaterialStatus("error");
+        return;
+      }
+      const material = (await response.json()) as NoticeMaterial;
+      setMaterials((current) => [...current, material]);
+      resetMaterialInputs();
+      setMaterialStatus("idle");
+    } catch {
+      setMaterialStatus("error");
+    }
+  }
+
+  async function uploadPdfMaterial(file: File) {
+    setMaterialStatus("saving");
+    const formData = new FormData();
+    formData.append("file", file);
+    try {
+      const response = await fetch(`/api/notice/${messageId}/materials/pdf`, {
+        method: "POST",
+        credentials: "include",
+        body: formData
+      });
+      if (!response.ok) {
+        setMaterialStatus("error");
+        return;
+      }
+      const material = (await response.json()) as NoticeMaterial;
+      setMaterials((current) => [...current, material]);
+      setMaterialsOpen(true);
+      setMaterialStatus("idle");
+    } catch {
+      setMaterialStatus("error");
+    } finally {
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  }
+
+  async function setMaterialEnabled(material: NoticeMaterial, enabled: boolean) {
+    setMaterials((current) =>
+      current.map((item) => item.id === material.id ? { ...item, enabled } : item)
+    );
+    try {
+      const response = await fetch(
+        `/api/notice/${messageId}/materials/${material.id}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ enabled })
+        }
+      );
+      if (!response.ok) {
+        throw new Error("Material update failed");
+      }
+      const updated = (await response.json()) as NoticeMaterial;
+      setMaterials((current) =>
+        current.map((item) => item.id === updated.id ? updated : item)
+      );
+    } catch {
+      setMaterialStatus("error");
+      setMaterials((current) =>
+        current.map((item) =>
+          item.id === material.id ? { ...item, enabled: material.enabled } : item
+        )
+      );
+    }
+  }
+
+  async function removeMaterial(materialId: string) {
+    const previous = materials;
+    setMaterials((current) => current.filter((item) => item.id !== materialId));
+    try {
+      const response = await fetch(
+        `/api/notice/${messageId}/materials/${materialId}`,
+        {
+          method: "DELETE",
+          credentials: "include"
+        }
+      );
+      if (!response.ok) {
+        throw new Error("Material delete failed");
+      }
+    } catch {
+      setMaterialStatus("error");
+      setMaterials(previous);
+    }
+  }
 
   function statusChanged(data: { version?: number | null; generatedAt?: string | null }) {
     return (
@@ -149,10 +321,13 @@ export function InstructionInput({ messageId, activeVersion, hasAttachments }: I
       const fetchOptions: RequestInit = {
         method: "POST",
         credentials: "include",
+        keepalive: true,
         headers: { "Content-Type": "application/json" },
       };
       const requestBody = {
         ...(instruction ? { instruction } : {}),
+        outputMode,
+        selectedMaterialIds: selectedMaterialIds(),
         ...(reasoningEffortOverride ? { reasoningEffortOverride } : {}),
         telemetry: buildTelemetry({
           actionSource:
@@ -239,6 +414,18 @@ export function InstructionInput({ messageId, activeVersion, hasAttachments }: I
   }
 
   const busy = status === "loading" || status === "polling";
+  const activeMaterialCount = selectedMaterialIds().length;
+
+  function materialMeta(material: NoticeMaterial): string {
+    if (material.status === "failed") return "Feilet";
+    const kind =
+      material.kind === "pdf"
+        ? "PDF"
+        : material.kind === "newsweb"
+          ? "Newsweb"
+          : "Tekst";
+    return `${kind} - ${material.extractedTextChars.toLocaleString("nb-NO")} tegn`;
+  }
 
   return (
     <div className="instructionWrap">
@@ -257,7 +444,158 @@ export function InstructionInput({ messageId, activeVersion, hasAttachments }: I
         disabled={busy}
         rows={2}
       />
+      <div className="materialBar">
+        <button
+          className="ghostButton"
+          type="button"
+          onClick={() => setMaterialsOpen((open) => !open)}
+          disabled={busy}
+        >
+          + Materiale{activeMaterialCount ? ` (${activeMaterialCount})` : ""}
+        </button>
+        {materialStatus === "loading" && <span className="muted">Laster ...</span>}
+        {materialStatus === "saving" && <span className="muted">Lagrer ...</span>}
+        {materialStatus === "error" && <span className="muted">Materiale feilet</span>}
+      </div>
+      {materialsOpen && (
+        <div className="materialTray">
+          <div className="materialActions">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="application/pdf,.pdf"
+              className="materialFileInput"
+              onChange={(event) => {
+                const file = event.currentTarget.files?.[0];
+                if (file) void uploadPdfMaterial(file);
+              }}
+              disabled={busy || materialStatus === "saving"}
+            />
+            <button
+              className="ghostButton"
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={busy || materialStatus === "saving"}
+            >
+              PDF
+            </button>
+            <button
+              className="ghostButton"
+              type="button"
+              onClick={() => setMaterialInputMode((mode) => mode === "newsweb" ? null : "newsweb")}
+              disabled={busy}
+            >
+              Newsweb
+            </button>
+            <button
+              className="ghostButton"
+              type="button"
+              onClick={() => setMaterialInputMode((mode) => mode === "text" ? null : "text")}
+              disabled={busy}
+            >
+              Tekst
+            </button>
+          </div>
+
+          {materialInputMode === "newsweb" && (
+            <div className="materialInlineForm">
+              <input
+                className="materialInput"
+                placeholder="Newsweb-lenke eller messageId"
+                value={materialUrl}
+                onChange={(event) => setMaterialUrl(event.target.value)}
+                disabled={busy || materialStatus === "saving"}
+              />
+              <button
+                className="ghostButton"
+                type="button"
+                onClick={saveNewswebMaterial}
+                disabled={!materialUrl.trim() || busy || materialStatus === "saving"}
+              >
+                Legg til
+              </button>
+            </div>
+          )}
+
+          {materialInputMode === "text" && (
+            <div className="materialTextForm">
+              <input
+                className="materialInput"
+                placeholder="Tittel"
+                value={materialTitle}
+                onChange={(event) => setMaterialTitle(event.target.value)}
+                disabled={busy || materialStatus === "saving"}
+              />
+              <textarea
+                className="materialTextarea"
+                placeholder="Lim inn kildetekst"
+                value={materialText}
+                onChange={(event) => setMaterialText(event.target.value)}
+                disabled={busy || materialStatus === "saving"}
+                rows={3}
+              />
+              <button
+                className="ghostButton"
+                type="button"
+                onClick={saveTextMaterial}
+                disabled={!materialText.trim() || busy || materialStatus === "saving"}
+              >
+                Legg til
+              </button>
+            </div>
+          )}
+
+          {materials.length > 0 && (
+            <ul className="materialList">
+              {materials.map((material) => (
+                <li key={material.id} className="materialItem">
+                  <label className="materialToggle">
+                    <input
+                      type="checkbox"
+                      checked={material.enabled && material.status === "ready"}
+                      disabled={busy || material.status !== "ready"}
+                      onChange={(event) =>
+                        void setMaterialEnabled(material, event.currentTarget.checked)
+                      }
+                    />
+                    <span className="materialTitle">{material.title}</span>
+                    <span className="materialMeta">{materialMeta(material)}</span>
+                  </label>
+                  <button
+                    className="draftIconButton"
+                    type="button"
+                    onClick={() => void removeMaterial(material.id)}
+                    disabled={busy}
+                    aria-label="Fjern materiale"
+                    title="Fjern materiale"
+                  >
+                    x
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
       <div className="instructionActions">
+        <div className="outputModeToggle" aria-label="Lengde">
+          <button
+            type="button"
+            className={`outputModeButton${outputMode === "notice" ? " active" : ""}`}
+            onClick={() => setOutputMode("notice")}
+            disabled={busy}
+          >
+            Notis
+          </button>
+          <button
+            type="button"
+            className={`outputModeButton${outputMode === "extended_notice" ? " active" : ""}`}
+            onClick={() => setOutputMode("extended_notice")}
+            disabled={busy}
+          >
+            Utvidet
+          </button>
+        </div>
         <button
           className="ghostButton"
           onClick={() => handleGenerate()}

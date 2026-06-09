@@ -36,16 +36,20 @@ describe("prompt style guidance", () => {
     };
     const userPrompt = createUserPrompt(payload);
 
-    expect(developerPrompt).toContain("Lav terskel for direkte sitater");
+    expect(developerPrompt).toContain("SITATER, GUILLEMETS OG PERSONATTRIBUSJON");
+    expect(developerPrompt).toContain("en nær direkte oversettelse av en engelsk formulering");
     expect(developerPrompt).toContain("Sitatstrek");
     expect(developerPrompt).toContain("Guillemets");
-    expect(userPrompt).toContain("Hvis kilden har direkte sitater");
+    expect(developerPrompt).not.toContain("Guillemets («») = parafrasering");
+    expect(userPrompt).toContain("skal saken normalt bruke ett kort sitat");
+    expect(userPrompt).not.toContain("bruk dem nar de gir nyhetsverdi");
   });
 
-  it("includes E24-style market-moving and factuality guardrails", () => {
+  it("includes E24-style materiality and factuality guardrails", () => {
     const developerPrompt = createDeveloperPrompt("{}");
 
-    expect(developerPrompt).toContain("kursdrivende");
+    expect(developerPrompt).toContain("mest vesentlig for selskapet og aksjonærene");
+    expect(developerPrompt).toContain("KILDE SOM DATA");
     expect(developerPrompt).toContain("vinkles pa det negative");
     expect(developerPrompt).toContain("Skriv 'prosent', ikke '%'");
     expect(developerPrompt).toContain(
@@ -84,5 +88,16 @@ describe("prompt style guidance", () => {
     expect(reportPrompt).toContain("små per-aksje-beløp");
     expect(reportPrompt).toContain("driftsresultat (ebit)");
     expect(reportPrompt).toContain("første kvartal' to ganger");
+    expect(reportPrompt).toContain("Etter nøkkeltallene skal du se etter én kort ledelseskommentar");
+    expect(reportPrompt).toContain("CEO, CFO eller styreleder");
+    expect(reportPrompt).toContain(
+      "Ikke klassifiser konkrete markeds-, etterspørsels- eller utsiktskommentarer som hype"
+    );
+    expect(reportPrompt).toContain("når den tilfører noe utover tallene i meldingen");
+    expect(reportPrompt).toContain("Kutt adjektiver, kundeløfter og selvskryt");
+    expect(reportPrompt).toContain(
+      "sitatstrek, guillemets eller en personattribuert parafrase"
+    );
+    expect(reportPrompt).toContain("speaker/rolle + utsagn");
   });
 });

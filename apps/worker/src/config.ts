@@ -7,6 +7,11 @@ loadDotEnv({
   override: false
 });
 
+const booleanEnvSchema = z
+  .enum(["true", "false"])
+  .default("true")
+  .transform((value) => value === "true");
+
 const configSchema = z
   .object({
     NODE_ENV: z
@@ -31,6 +36,7 @@ const configSchema = z
     OPENAI_HARD_REASONING_EFFORT: z
       .enum(["none", "minimal", "low", "medium", "high", "xhigh"])
       .default("medium"),
+    NEWSWEB_POLLING_ENABLED: booleanEnvSchema,
     POLL_INTERVAL_MS: z.coerce.number().int().min(5000).default(5000),
     LATEST_BOOTSTRAP_COUNT: z.coerce.number().int().min(0).max(50).default(30)
   });

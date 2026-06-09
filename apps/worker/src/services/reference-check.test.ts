@@ -4,6 +4,7 @@ import {
   assessReferenceCheckGate,
   buildCorrectionInstruction,
   buildCoverageReport,
+  buildReferenceCheckPrompt,
   collectDraftSentences,
   splitIntoSentences,
   type ReferenceCheckResult
@@ -224,6 +225,46 @@ describe("collectDraftSentences", () => {
       "Fjerde.",
       "Femte.",
       "Sjette."
+    ]);
+  });
+});
+
+describe("buildReferenceCheckPrompt", () => {
+  it("builds the same reference-check prompt parts production uses", () => {
+    const rewrite = createRewrite({
+      lead: "FÃ¸rste setning.",
+      body: ["Andre setning."],
+      company_sentence: "Tredje setning."
+    });
+
+    const prompt = buildReferenceCheckPrompt(
+      {
+        messageId: 123,
+        title: "Test",
+        issuerName: "Test ASA",
+        issuerSign: "TEST",
+        publishedAt: "2026-01-01T08:00:00.000Z",
+        categories: [],
+        markets: [],
+        bodyText: "Referansen sier noe.",
+        hasAttachments: false,
+        sourceBodyChars: 22
+      },
+      rewrite
+    );
+
+    expect(prompt.systemPrompt).toContain("streng referansesjekker");
+    expect(prompt.developerPrompt).toContain("Vurder hver setning");
+    expect(prompt.userPrompt).toContain("REFERANSETEKST");
+    expect(prompt.userPrompt).toContain("Referansen sier noe.");
+    expect(prompt.draftSentences).toEqual([
+      "FÃ¸rste setning.",
+      "Andre setning.",
+      "Tredje setning."
+    ]);
+    expect(prompt.visibleDraftSentences).toEqual([
+      "FÃ¸rste setning.",
+      "Andre setning."
     ]);
   });
 });

@@ -17,6 +17,16 @@ type GenerationRunStatusRecord = {
   phaseUpdatedAt: Date | null;
 } | null;
 
+const ACTIVE_GENERATION_RUN_STATUSES = new Set(["queued", "started", "pending"]);
+
+const TERMINAL_GENERATION_RUN_STATUSES = new Set(["published", "skipped", "failed"]);
+
+const TERMINAL_GENERATION_RUN_PHASES = new Set(["published", "skipped", "failed"]);
+
+// A run that has not reported phase progress for this long is considered dead
+// (worker crash, dropped queue job) so the UI can fall back to the rewrite state.
+export const GENERATION_RUN_STALE_MS = 20 * 60 * 1000;
+
 const RUNNING_JOB_STATES = new Set([
   "active",
   "delayed",
@@ -27,6 +37,23 @@ const RUNNING_JOB_STATES = new Set([
 
 export function isJobStillRunning(jobState: string | null): boolean {
   return jobState ? RUNNING_JOB_STATES.has(jobState) : false;
+}
+
+export function isGenerationRunActive(
+  generationRun: GenerationRunStatusRecord,
+  now: Date = new Date()
+): boolean {
+  if (!generationRun) return false;
+  if (TERMINAL_GENERATION_RUN_STATUSES.has(generationRun.status)) return false;
+  if (
+    !generationRun.phaseUpdatedAt ||
+    now.getTime() - generationRun.phaseUpdatedAt.getTime() > GENERATION_RUN_STALE_MS
+  ) {
+    return false;
+  }
+  if (ACTIVE_GENERATION_RUN_STATUSES.has(generationRun.status)) return true;
+  if (!generationRun.phase) return false;
+  return !TERMINAL_GENERATION_RUN_PHASES.has(generationRun.phase);
 }
 
 export function chooseGenerationRun(
@@ -70,13 +97,21 @@ export function buildGenerationStatusPayload(args: {
   generationRun: GenerationRunStatusRecord;
   rewrite: RewriteStatusRecord;
   jobState: string | null;
+  now?: Date;
 }): RewriteStatusResponse {
   const { generationRun, rewrite, jobState } = args;
-  const failed = rewrite?.status === "failed" && !isJobStillRunning(jobState);
+  const runActive =
+    isGenerationRunActive(generationRun, args.now) || isJobStillRunning(jobState);
+  const failed =
+    !runActive &&
+    (generationRun?.status === "failed" || rewrite?.status === "failed");
   const phase = deriveGenerationPhase(args);
 
   return {
-    ready: rewrite?.status === "published" || rewrite?.status === "skipped",
+    ready:
+      !runActive &&
+      !failed &&
+      (rewrite?.status === "published" || rewrite?.status === "skipped"),
     failed,
     generatedAt: rewrite?.generatedAt.toISOString() ?? null,
     version: rewrite?.version ?? null,

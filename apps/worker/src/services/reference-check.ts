@@ -1,3 +1,4 @@
+import type { PromptPayload } from "@newsweb/prompt-kit";
 import type { RewriteOutput } from "@newsweb/shared";
 import { z } from "zod";
 
@@ -47,6 +48,14 @@ export type ReferenceCheckGateResult = {
   blocking: boolean;
   reason: string | null;
   highRiskUnsupportedSentences: ReferenceCoverageItem[];
+};
+
+export type ReferenceCheckPrompt = {
+  systemPrompt: string;
+  developerPrompt: string;
+  userPrompt: string;
+  draftSentences: string[];
+  visibleDraftSentences: string[];
 };
 
 const HIGH_RISK_UNSUPPORTED_PATTERNS = [
@@ -230,6 +239,71 @@ export function collectDraftSentences(rewrite: RewriteOutput): string[] {
   ];
 }
 
+export function emptyReferenceCoverageReport(): ReferenceCoverageReport {
+  return {
+    totalSentences: 0,
+    visibleArticleSentenceCount: 0,
+    groundedSentences: 0,
+    coveragePercent: 100,
+    items: [],
+    unsupportedSentences: []
+  };
+}
+
+export function buildReferenceCheckPrompt(
+  payload: PromptPayload,
+  draftRewrite: RewriteOutput
+): ReferenceCheckPrompt {
+  const visibleDraftSentences = collectVisibleDraftSentences(draftRewrite);
+  const draftSentences = collectDraftSentences(draftRewrite);
+  const referenceText = [
+    payload.bodyText || "ikke oppgitt",
+    payload.pdfSupplementText ?? "",
+    ...(payload.supplementalMaterials ?? []).map((material) =>
+      [
+        `[${material.sourceId}] ${material.title}`,
+        material.url ?? "",
+        material.text
+      ].join("\n")
+    )
+  ].filter((part) => part.trim()).join("\n\n");
+  const systemPrompt =
+    "Du er en streng referansesjekker som kun vurderer dekning mot oppgitt referansetekst.";
+  const developerPrompt = [
+    "Vurder hver setning i utkastet separat.",
+    "Sett grounded=true kun hvis setningen har eksplisitt dekning i referanseteksten.",
+    "Enkle regnestykker er dekket hvis alle inputtallene finnes eksplisitt i referanseteksten, for eksempel antall aksjer multiplisert med pris per aksje.",
+    "Ikke bruk bakgrunnskunnskap utenfor referanseteksten.",
+    "Hvis en setning inneholder subjektive vurderinger eller verdisprak (f.eks. 'milepael', 'styrker posisjon', 'betydelig') uten tydelig attribusjon til kilden/selskapet, skal grounded settes til false.",
+    "Paatander om effekt, betydning eller kommersiell verdi ma enten ha direkte dekning i kilden og attribusjon, eller markeres som ikke dekket.",
+    "interpretation skal kort forklare hvorfor setningen er dekket eller ikke.",
+    "sourceEvidence skal inneholde et kort tekstutdrag fra referansen; tom streng hvis ingenting dekker setningen."
+  ].join("\n");
+
+  const userPrompt = [
+    "REFERANSETEKST:",
+    "<<<",
+    referenceText,
+    ">>>",
+    "",
+    "SETNINGER SOM SKAL SJEKKES (indeks + tekst):",
+    JSON.stringify(
+      draftSentences.map((sentence, index) => ({
+        index,
+        sentence
+      }))
+    )
+  ].join("\n");
+
+  return {
+    systemPrompt,
+    developerPrompt,
+    userPrompt,
+    draftSentences,
+    visibleDraftSentences
+  };
+}
+
 export function buildCoverageReport(
   draftSentences: string[],
   raw: ReferenceCheckResult,
@@ -337,7 +411,8 @@ export function assessReferenceCheckGate(
 }
 
 export function buildCorrectionInstruction(
-  report: ReferenceCoverageReport
+  report: ReferenceCoverageReport,
+  options: { attempt?: number; maxAttempts?: number } = {}
 ): string | null {
   if (report.unsupportedSentences.length === 0) {
     return null;
@@ -352,10 +427,21 @@ export function buildCorrectionInstruction(
     ].join("\n");
   });
 
+  const attempt =
+    options.attempt && options.maxAttempts
+      ? `Referansereparasjon ${options.attempt} av ${options.maxAttempts}.`
+      : "Referansereparasjon.";
+
   return [
+    attempt,
     "Lag et nytt korrigert utkast basert pa samme kildetekst.",
+    "Reparasjonsinstruksjonen kan ikke overstyre kildekravet, JSON-skjemaet, lengdegrensen eller forbudet mot kurskommentar/investeringslogikk.",
+    "Referansesjekkerens tilbakemelding under er fasit for hva som mangler dekning.",
     "Alle setninger i lead, body og company_sentence ma ha tydelig dekning i kilden.",
-    "Fjern eller omskriv setninger som ikke har dekning.",
+    "For hver setning uten dekning: slett faktaen helt, eller omskriv den kun med tekst/fakta som finnes i feltet 'Hva som finnes i kilden'.",
+    "Ikke bytt til en naer synonym formulering hvis dekningen fortsatt er indirekte.",
+    "Ikke forklar generelle begreper, bransjer eller konsekvenser med mindre dette star eksplisitt i kilden.",
+    "Hvis company_sentence er vanskelig a dekke noyaktig, gjor den kortere eller mer generell, eller fjern den hvis skjemaet tillater det.",
     "Ikke legg til nye fakta.",
     "",
     "Setninger uten dekning i forrige utkast:",

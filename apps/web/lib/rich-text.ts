@@ -1,0 +1,346 @@
+const ALLOWED_LINK_PROTOCOLS = new Set(["http:", "https:", "mailto:"]);
+
+export function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function stripTags(value: string): string {
+  return value.replace(/<[^>]*>/g, "");
+}
+
+export function plainTextToRichHtml(text: string): string {
+  const blocks = text.split(/\n{2,}/).filter((block) => block.length > 0);
+  if (!blocks.length) return "";
+
+  return blocks
+    .map(
+      (block) =>
+        `<p>${escapeHtml(block).replace(/\r?\n/g, "<br>")}</p>`
+    )
+    .join("");
+}
+
+export function normalizeLinkHref(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  const withProtocol = /^[a-z][a-z0-9+.-]*:/i.test(trimmed)
+    ? trimmed
+    : `https://${trimmed}`;
+
+  try {
+    const url = new URL(withProtocol);
+    if (!ALLOWED_LINK_PROTOCOLS.has(url.protocol)) return null;
+    return url.href;
+  } catch {
+    return null;
+  }
+}
+
+function appendCleanChildren(source: Node, target: Node, doc: Document) {
+  for (const child of Array.from(source.childNodes)) {
+    const clean = cleanNode(child, doc);
+    if (clean) {
+      target.appendChild(clean);
+    }
+  }
+}
+
+function appendCleanFlowChildren(source: Node, target: Node, doc: Document) {
+  let paragraph: HTMLParagraphElement | null = null;
+
+  function flushParagraph() {
+    if (paragraph && nodeHasContent(paragraph)) {
+      target.appendChild(paragraph);
+    }
+    paragraph = null;
+  }
+
+  function appendFlowNode(clean: Node) {
+    if (clean.nodeType === Node.DOCUMENT_FRAGMENT_NODE) {
+      for (const child of Array.from(clean.childNodes)) {
+        appendFlowNode(child);
+      }
+      return;
+    }
+
+    if (isBlockElement(clean)) {
+      flushParagraph();
+      target.appendChild(clean);
+      return;
+    }
+
+    if (!paragraph) {
+      paragraph = doc.createElement("p");
+    }
+    paragraph.appendChild(clean);
+  }
+
+  for (const child of Array.from(source.childNodes)) {
+    const clean = cleanNode(child, doc);
+    if (clean) {
+      appendFlowNode(clean);
+    }
+  }
+
+  flushParagraph();
+}
+
+function appendCleanListChild(clean: Node, list: HTMLElement, doc: Document) {
+  if (
+    clean.nodeType === Node.ELEMENT_NODE &&
+    (clean as Element).tagName.toLowerCase() === "li"
+  ) {
+    list.appendChild(clean);
+    return;
+  }
+
+  if (clean.nodeType === Node.DOCUMENT_FRAGMENT_NODE) {
+    for (const child of Array.from(clean.childNodes)) {
+      appendCleanListChild(child, list, doc);
+    }
+    return;
+  }
+
+  const item = doc.createElement("li");
+  item.appendChild(clean);
+  if (nodeHasContent(item)) {
+    list.appendChild(item);
+  }
+}
+
+function hasBoldStyle(element: Element): boolean {
+  const fontWeight = (element as HTMLElement).style.fontWeight.trim().toLowerCase();
+  if (fontWeight === "bold" || fontWeight === "bolder") return true;
+
+  const numericWeight = Number(fontWeight);
+  return Number.isFinite(numericWeight) && numericWeight >= 600;
+}
+
+function hasItalicStyle(element: Element): boolean {
+  const fontStyle = (element as HTMLElement).style.fontStyle.trim().toLowerCase();
+  return fontStyle === "italic" || fontStyle === "oblique";
+}
+
+function cleanStyledInline(element: Element, doc: Document): Node | null {
+  const fragment = doc.createDocumentFragment();
+  appendCleanChildren(element, fragment, doc);
+  if (!fragment.childNodes.length) return null;
+
+  let clean: Node = fragment;
+  if (hasItalicStyle(element)) {
+    const em = doc.createElement("em");
+    em.appendChild(clean);
+    clean = em;
+  }
+
+  if (hasBoldStyle(element)) {
+    const strong = doc.createElement("strong");
+    strong.appendChild(clean);
+    clean = strong;
+  }
+
+  return nodeHasContent(clean) ? clean : null;
+}
+
+function cleanNode(node: Node, doc: Document): Node | null {
+  if (node.nodeType === Node.TEXT_NODE) {
+    return doc.createTextNode(node.textContent ?? "");
+  }
+
+  if (node.nodeType !== Node.ELEMENT_NODE) {
+    return null;
+  }
+
+  const element = node as Element;
+  const tag = element.tagName.toLowerCase();
+
+  if (tag === "script" || tag === "style" || tag === "iframe") {
+    return null;
+  }
+
+  if (tag === "br") {
+    return doc.createElement("br");
+  }
+
+  if (tag === "strong" || tag === "b") {
+    const strong = doc.createElement("strong");
+    appendCleanChildren(element, strong, doc);
+    return nodeHasContent(strong) ? strong : null;
+  }
+
+  if (tag === "em" || tag === "i") {
+    const em = doc.createElement("em");
+    appendCleanChildren(element, em, doc);
+    return nodeHasContent(em) ? em : null;
+  }
+
+  if (tag === "a") {
+    const href = normalizeLinkHref(element.getAttribute("href") ?? "");
+    const fragment = doc.createDocumentFragment();
+    appendCleanChildren(element, fragment, doc);
+    if (!href) return fragment;
+
+    const anchor = doc.createElement("a");
+    anchor.setAttribute("href", href);
+    anchor.appendChild(fragment);
+    return nodeHasContent(anchor) ? anchor : null;
+  }
+
+  if (tag === "span") {
+    return cleanStyledInline(element, doc);
+  }
+
+  if (tag === "ul" || tag === "ol") {
+    const list = doc.createElement(tag);
+    for (const child of Array.from(element.childNodes)) {
+      const clean = cleanNode(child, doc);
+      if (clean) {
+        appendCleanListChild(clean, list, doc);
+      }
+    }
+    return list.children.length ? list : null;
+  }
+
+  if (tag === "li") {
+    const item = doc.createElement("li");
+    appendCleanChildren(element, item, doc);
+    return nodeHasContent(item) ? item : null;
+  }
+
+  if (tag === "p" || tag === "div") {
+    const fragment = doc.createDocumentFragment();
+    appendCleanFlowChildren(element, fragment, doc);
+    return fragment.childNodes.length ? fragment : null;
+  }
+
+  const fragment = doc.createDocumentFragment();
+  appendCleanChildren(element, fragment, doc);
+  return fragment.childNodes.length ? fragment : null;
+}
+
+function nodeHasContent(node: Node): boolean {
+  if ((node.textContent ?? "").trim()) return true;
+
+  if (node.nodeType === Node.ELEMENT_NODE || node.nodeType === Node.DOCUMENT_FRAGMENT_NODE) {
+    return Array.from(node.childNodes).some((child) => {
+      if (child.nodeType !== Node.ELEMENT_NODE) return false;
+      return (child as Element).tagName.toLowerCase() === "br" || nodeHasContent(child);
+    });
+  }
+
+  return false;
+}
+
+function isBlockElement(node: Node): boolean {
+  if (node.nodeType !== Node.ELEMENT_NODE) return false;
+  const tag = (node as Element).tagName.toLowerCase();
+  return tag === "p" || tag === "ul" || tag === "ol";
+}
+
+function normalizeRoot(container: HTMLElement, doc: Document): string {
+  const normalized = doc.createElement("div");
+  let paragraph: HTMLParagraphElement | null = null;
+
+  function flushParagraph() {
+    if (paragraph && nodeHasContent(paragraph)) {
+      normalized.appendChild(paragraph);
+    }
+    paragraph = null;
+  }
+
+  for (const node of Array.from(container.childNodes)) {
+    if (!nodeHasContent(node)) continue;
+
+    if (isBlockElement(node)) {
+      flushParagraph();
+      normalized.appendChild(node);
+      continue;
+    }
+
+    if (!paragraph) {
+      paragraph = doc.createElement("p");
+    }
+    paragraph.appendChild(node);
+  }
+
+  flushParagraph();
+  return normalized.innerHTML;
+}
+
+export function sanitizeRichHtml(html: string): string {
+  if (typeof document === "undefined") {
+    return plainTextToRichHtml(stripTags(html));
+  }
+
+  const template = document.createElement("template");
+  template.innerHTML = html;
+  const cleaned = document.createElement("div");
+  appendCleanChildren(template.content, cleaned, document);
+  return normalizeRoot(cleaned, document);
+}
+
+function inlineText(node: Node): string {
+  if (node.nodeType === Node.TEXT_NODE) {
+    return node.textContent ?? "";
+  }
+
+  if (node.nodeType !== Node.ELEMENT_NODE) {
+    return "";
+  }
+
+  const element = node as Element;
+  if (element.tagName.toLowerCase() === "br") {
+    return "\n";
+  }
+
+  return Array.from(element.childNodes).map(inlineText).join("");
+}
+
+function blockText(node: Node, orderedIndex?: number): string {
+  if (node.nodeType !== Node.ELEMENT_NODE) {
+    return inlineText(node).trim();
+  }
+
+  const element = node as Element;
+  const tag = element.tagName.toLowerCase();
+
+  if (tag === "ul" || tag === "ol") {
+    return Array.from(element.children)
+      .filter((child) => child.tagName.toLowerCase() === "li")
+      .map((child, index) =>
+        blockText(child, tag === "ol" ? index + 1 : undefined)
+      )
+      .filter(Boolean)
+      .join("\n");
+  }
+
+  if (tag === "li") {
+    const prefix = orderedIndex == null ? "- " : `${orderedIndex}. `;
+    return `${prefix}${inlineText(element).trim()}`;
+  }
+
+  return inlineText(element).trim();
+}
+
+export function richHtmlToPlainText(html: string): string {
+  if (typeof document === "undefined") {
+    return stripTags(html).trim();
+  }
+
+  const template = document.createElement("template");
+  template.innerHTML = sanitizeRichHtml(html);
+  return Array.from(template.content.childNodes)
+    .map((node) => blockText(node))
+    .filter(Boolean)
+    .join("\n\n");
+}
+
+export function createNoticeClipboardHtml(title: string, bodyHtml: string): string {
+  return `<article><h2>${escapeHtml(title)}</h2>${sanitizeRichHtml(bodyHtml)}</article>`;
+}

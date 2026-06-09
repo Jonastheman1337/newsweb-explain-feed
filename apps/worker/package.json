@@ -9,6 +9,8 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/worker.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "eval:editorial": "tsx src/scripts/editorial-eval.ts",
+    "eval:notice": "tsx src/scripts/targeted-notice-eval.ts",
     "smoke:model-storytelling": "tsx src/scripts/model-smoke-storytelling.ts",
     "test": "vitest run"
   },

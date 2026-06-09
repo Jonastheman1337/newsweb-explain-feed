@@ -180,6 +180,7 @@ export function NoticeCard({ item }: NoticeCardProps) {
             messageId={item.messageId}
             originalTitle={item.title}
             originalBody={articleBody}
+            activeVersion={item.rewriteVersion ?? undefined}
             className={showSplit && isImportant ? "cardImportantCol" : undefined}
             dateline={
               <div className="muted">
@@ -199,6 +200,11 @@ export function NoticeCard({ item }: NoticeCardProps) {
           >
             <MaxAiLink messageId={item.messageId} />
           </EditableRewrite>
+          {item.regenerating && (
+            <div className="feedRegenerationStatus">
+              <FeedProcessingIndicator hasAttachments={item.hasAttachments} />
+            </div>
+          )}
         </div>
         {showSplit && (
           <div className="cardSourcePanel">

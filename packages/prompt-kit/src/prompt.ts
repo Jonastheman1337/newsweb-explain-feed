@@ -10,11 +10,26 @@ import {
   EDITORIAL_NO_MARKET_COMMENTARY,
   EDITORIAL_NORWEGIAN,
   EDITORIAL_QUOTES,
+  EDITORIAL_REVISION_PRIORITY,
+  EDITORIAL_SOURCE_AS_DATA,
+  EDITORIAL_SUPPLEMENTAL_MATERIALS,
   EDITORIAL_TITLE,
   EDITORIAL_WRITING_STYLE
 } from "./shared-editorial.js";
 
-export const PROMPT_VERSION = "v5.6.0";
+export const PROMPT_VERSION = "v5.8.0";
+
+export type OutputMode = "notice" | "extended_notice";
+
+export type SupplementalMaterialPayload = {
+  id: string;
+  sourceId: string;
+  kind: string;
+  title: string;
+  url?: string | null;
+  text: string;
+  textChars?: number;
+};
 
 export type PromptPayload = {
   messageId: number;
@@ -27,29 +42,91 @@ export type PromptPayload = {
   bodyText: string;
   hasAttachments: boolean;
   sourceBodyChars: number;
+  outputMode?: OutputMode;
+  maxVisibleArticleChars?: number;
+  supplementalMaterials?: SupplementalMaterialPayload[];
   pdfSupplementText?: string;
   pdfSupplementPageCount?: number;
   pdfSupplementAttachmentId?: number;
 };
 
+export function maxVisibleArticleCharsForOutputMode(mode?: OutputMode): number {
+  return mode === "extended_notice" ? 1800 : 1000;
+}
+
+export function maxVisibleArticleCharsForPayload(payload: PromptPayload): number {
+  return payload.maxVisibleArticleChars ?? maxVisibleArticleCharsForOutputMode(payload.outputMode);
+}
+
+export function lengthInstructionForPayload(payload: PromptPayload): string {
+  const maxChars = maxVisibleArticleCharsForPayload(payload);
+  return `Synlig artikkeltekst maks ${maxChars} tegn. Tittel og metadata teller ikke med.`;
+}
+
+const MECHANISM_FIRST_RULE = [
+  "MEKANISMEFORKLARING",
+  "- Forklar hva begrepet gjor i akkurat denne meldingen, ikke gi en leksikondefinisjon.",
+  "- Forklar hvorfor strukturen er med, hva den endrer, og hvordan den fungerer innenfor fakta i kilden.",
+  "- Ikke gjor forklaringen mer analytisk, spekulativ eller radgivende."
+].join("\n");
+
+const QUOTE_USER_INSTRUCTION =
+  "Hvis kilden inneholder et relevant sitat eller en navngitt uttalelse fra CEO, CFO, styreleder, primærinnsider eller annen nøkkelperson, skal saken normalt bruke ett kort sitat, en kildefast formulering i «...» eller en tydelig personattribuert parafrase. Ved oversettelse skal meningen bevares, men språket skal flyte naturlig på norsk. Dropp bare uttalelsen hvis den er generisk PR, ikke forklarer nyheten, eller saken er en svært kort rutinemelding.";
+
+const EXTRA_SOURCE_INSTRUCTION =
+  "Bruk denne kildeteksten bare når den tilfører nyhetsverdig substans, forklaring eller relevant personuttalelse. Et kort sitat eller en navngitt uttalelse fra CEO, CFO, styreleder eller annen nøkkelperson kan brukes selv om hovedfakta allerede står i børsmeldingen, hvis uttalelsen forklarer årsak, risiko, utsikter, strategi eller betydningen av hendelsen.";
+
+export function supplementalMaterialsPromptSection(
+  payload: Pick<PromptPayload, "supplementalMaterials">
+): string[] {
+  const materials = payload.supplementalMaterials?.filter((material) =>
+    material.text.trim()
+  );
+  if (!materials || materials.length === 0) {
+    return [];
+  }
+
+  const sections: string[] = [
+    "",
+    "SUPPLERENDE MATERIALE (SEKUNDAERE KILDER):",
+    EDITORIAL_SUPPLEMENTAL_MATERIALS
+  ];
+  for (const material of materials) {
+    sections.push(
+      "",
+      `[${material.sourceId}]`,
+      `type: ${material.kind}`,
+      `title: ${material.title}`,
+      ...(material.url ? [`url: ${material.url}`] : []),
+      `textChars: ${material.textChars ?? material.text.length}`,
+      "<<<",
+      material.text,
+      ">>>"
+    );
+  }
+  return sections;
+}
+
 export function createSystemPrompt(): string {
-  return [
+  const basePrompt = [
     "Du er nyhetsjournalist i E24-redaksjonen.",
     "Du skriver korte borsnyheter pa norsk Bokmal for en travel leser som scanner nyheter pa mobilen.",
-    "Leseren er en privatinvestor — kanskje en student eller nybegynner — som vil vite: hva skjedde, og hva betyr det for aksjen?",
+    "Leseren vil vite hva som er mest vesentlig for selskapet og aksjonærene, uten at vi vurderer aksjen, spår kursreaksjon eller gir investeringsråd.",
     "Skriv sa enkelt at en videregaendeelev med interesse for finans forstar teksten uten a google noe.",
     "Ikke vaer en papegøye som bare omformulerer meldingen. Plukk ut det viktigste, det overraskende eller det dramatiske.",
-    "Ikke folg kildens struktur eller rekkefolge. Du er redaktoren — du bestemmer hva som kommer forst, hva som kuttes, og hvordan saken bygges opp. Det viktigste for aksjeeieren kommer forst, uansett hvor det sto i kilden.",
-    "Kutt stoy og uvesentlige detaljer. Fokuser pa det som betyr noe for en som eier eller vurderer a kjope aksjen.",
+    "Ikke folg kildens struktur eller rekkefolge. Du er redaktoren — du bestemmer hva som kommer forst, hva som kuttes, og hvordan saken bygges opp. Det viktigste for leseren kommer forst, uansett hvor det sto i kilden.",
+    "Kutt stoy og uvesentlige detaljer. Fokuser pa det som er vesentlig for selskapet og aksjonærene.",
     "Hvis et borsbegrep ma brukes (emisjon, warrant, spleis o.l.), forklar det gjennom kontekst i neste setning, ikke med en definisjon.",
     "Teksten skal leses som en publiserbar nyhet, ikke som et sammendrag av en melding.",
     "Du skriver i aktiv form og tidsnaer presens.",
     "Du bruker omvendt nyhetspyramide: det viktigste forst.",
-    "Skriv kort. Lead + body til sammen skal vaere maks 1000 tegn.",
+    "Skriv kort. Hold deg til tegngrensen i oppgaven.",
     "Lengden pa kilden sier ingenting om hvor lang saken skal vaere. Vi bestemmer hva som er viktig og skriver knapt.",
     "Bruk kun informasjon som star eksplisitt i kilden.",
     "Ikke spekuler, ikke overdriv, og ikke legg til tall eller fakta."
   ].join(" ");
+
+  return [basePrompt, EDITORIAL_SOURCE_AS_DATA, MECHANISM_FIRST_RULE].join("\n\n");
 }
 
 const STYLE_EXAMPLES = `
@@ -75,7 +152,7 @@ Kontrakt (2 body-avsnitt):
 {"title":"AF Gruppen-datter lander 200 mill.-kontrakt","lead":"Betonmast, et datterselskap av AF Gruppen, har signert en kontrakt på 200 mill. kroner med Ragn-Sells for bygging av et nullutslippsanlegg for næringsavfall i Drammen, melder selskapet.","body":["Kontrakten er en totalentreprise, som betyr at Betonmast tar ansvar for hele byggeprosjektet.","Anlegget skal sortere næringsavfall og bygges med tilhørende infrastruktur."],"company_sentence":"Betonmast er et datterselskap av entreprenørkonsernet AF Gruppen.","key_facts":["Kontrakt verdt 200 mill. kroner","Nullutslippsanlegg i Drammen"],"negative_or_surprising":[],"excluded_hype":[],"source_limitations":[],"confidence":"high","importance":"uviktig","source_spans":["kontrakt med Ragn-Sells","totalentreprise med verdi på rundt 200 millioner kroner"]}
 
 Hendelse med sitat (3 body-avsnitt):
-{"title":"Norse Atlantic setter opp ekstrafly","lead":"Flyselskapet Norse Atlantic legger til ekstra flyginger mellom London og Bangkok fordi urolighetene i Midtøsten har endret flyrutene globalt.","body":["Endringene i luftrommet har gjort at flere reisende trenger alternative ruter mellom Europa og Sørøst-Asia, og Norse ser en mulighet.","De fire ekstraflygningene går 9. og 11. mars fra London, med retur 10. og 12. mars. Selskapet bruker Boeing 787 Dreamliner.","- Norse Atlantic Airways ble bygget for å tilby langdistanseforbindelser mellom kontinenter på en fleksibel og effektiv måte, sier konsernsjef Eivind Roald."],"company_sentence":"Norse Atlantic Airways er et norsk flyselskap som flyr langdistanseruter.","key_facts":["Fire ekstra flyginger London–Bangkok","Skyldes endringer i luftrom på grunn av Midtøsten"],"negative_or_surprising":[],"excluded_hype":[],"source_limitations":[],"confidence":"high","importance":"medium","source_spans":["to ekstra tur-retur-flygninger","utviklingen i deler av Midtøsten har ført til endringer"]}
+{"title":"Norse Atlantic setter opp ekstrafly","lead":"Flyselskapet Norse Atlantic legger til ekstra flyginger mellom London og Bangkok fordi urolighetene i Midtøsten har endret flyrutene globalt.","body":["Endringene i luftrommet gjør at flere reisende trenger alternative ruter mellom Europa og Sørøst-Asia, opplyser selskapet.","De fire ekstraflygningene går 9. og 11. mars fra London, med retur 10. og 12. mars.","– Vi ser økt behov for alternative langdistanseruter mellom Europa og Asia, sier konsernsjef Eivind Roald."],"company_sentence":"Norse Atlantic Airways er et norsk flyselskap som flyr langdistanseruter.","key_facts":["Fire ekstra flyginger London–Bangkok","Skyldes endringer i luftrom på grunn av Midtøsten"],"negative_or_surprising":[],"excluded_hype":[],"source_limitations":[],"confidence":"high","importance":"medium","source_spans":["to ekstra tur-retur-flygninger","CEO Eivind Roald: 'We see increased need for alternative long-haul routes between Europe and Asia'"]}
 
 Materiell hendelse (2 body-avsnitt):
 {"title":"Gulf Keystone stopper produksjonen","lead":"Oljeselskapet Gulf Keystone har midlertidig stengt ned produksjonen i Kurdistan i Irak på grunn av sikkerhetssituasjonen.","body":["Selskapet har satt i gang tiltak for å beskytte de ansatte. Oljeanleggene er ikke skadet, ifølge meldingen.","Gulf Keystone følger situasjonen tett og lover å komme med oppdateringer."],"company_sentence":"Gulf Keystone er et oljeselskap som produserer olje i Kurdistan-regionen i Irak.","key_facts":["Produksjonen er stanset midlertidig","Ansatte beskyttes, anlegg ikke skadet"],"negative_or_surprising":["Produksjonsstans grunnet sikkerhetssituasjon"],"excluded_hype":[],"source_limitations":[],"confidence":"high","importance":"viktig","source_spans":["midlertidig har stengt produksjonen","tiltak for å beskytte ansatte"]}
@@ -84,12 +161,18 @@ Materiell hendelse (2 body-avsnitt):
 export function createDeveloperPrompt(_schemaJson?: string): string {
   return `OPPGAVE
 Lag en kort nyhetssak i E24-stil. Ikke et referat, men en publiserbar nyhet.
-Leseren er en privatinvestor som kanskje gar pa videregaende og er interessert i finans. Vanlige finansord som 'datterselskap', 'kontrakt' og 'aksjekapital' er greit, men tyngre jargong ma forklares gjennom kontekst.
+Leseren vil vite hva som er mest vesentlig for selskapet og aksjonærene, uten at vi vurderer aksjen, spår kursreaksjon eller gir investeringsråd. Vanlige finansord som 'datterselskap', 'kontrakt' og 'aksjekapital' er greit, men tyngre jargong ma forklares gjennom kontekst.
 
 ${EDITORIAL_AUDIENCE}
 - Vi er ikke papegøyer som bare omformulerer borsmeldingen. Vi plukker ut det viktige, overraskende eller dramatiske.
 - Ikke prøv å løfte rutineinformasjon over nyhetsterskelen. Hvis tilgjengelig tekst bare sier at et dokument, en presentasjon eller et skjema er publisert, er det støy: skriv ekstremt kort, sett importance til 'uviktig' og legg manglende grunnlag i source_limitations.
 - Rene påminnelser om tegningsperiode, siste tegningsdag eller oppstart av tegningsperiode er støy hvis de ikke inneholder nye vilkår, proveny, resultat eller konsekvens.
+
+${EDITORIAL_SOURCE_AS_DATA}
+
+${EDITORIAL_SUPPLEMENTAL_MATERIALS}
+
+${MECHANISM_FIRST_RULE}
 
 ${EDITORIAL_LANGUAGE}
 
@@ -126,7 +209,7 @@ ${EDITORIAL_AVOID}
 EKSEMPLER PA GOD E24-OUTPUT
 ${STYLE_EXAMPLES}
 
-Sprak: norsk Bokmal. Tone: noytral, enkel, lett a forsta for en privatinvestor uten profesjonell finansbakgrunn.
+Sprak: norsk Bokmal. Tone: noytral, enkel og presis for en finansielt interessert leser uten profesjonell nisjekunnskap.
 Bruk kun tall og fakta som finnes i kilden.
 Hvis meldingen viser til ekstra dokumenter som ikke er analysert, legg inn begrensningen i source_limitations. Ikke vis dette i title, lead eller body.
 
@@ -143,18 +226,21 @@ export function createUserPrompt(payload: PromptPayload): string {
     `categories: ${payload.categories.join(", ") || "ikke oppgitt"}`,
     `markets: ${payload.markets.join(", ") || "ikke oppgitt"}`,
     `hasAttachments: ${payload.hasAttachments ? "ja" : "nei"}`,
-    `sourceBodyChars: ${payload.sourceBodyChars}`
+    `sourceBodyChars: ${payload.sourceBodyChars}`,
+    `outputMode: ${payload.outputMode ?? "notice"}`,
+    `maxVisibleArticleChars: ${maxVisibleArticleCharsForPayload(payload)}`
   ].join("\n");
 
   const parts = [
     "Lag en kort, publiserbar nyhetssak fra kilden under.",
-    "Skriv nyhetstekst, ikke sammendrag. Plukk ut det viktigste for en aksjeeier.",
+    "Skriv nyhetstekst, ikke sammendrag. Plukk ut det som er mest vesentlig for selskapet og aksjonærene.",
     "Skriv sa enkelt at en videregaendeelev med interesse for finans forstar det. Unnga tung jargong — bruk hverdagsord der det finnes.",
     "Lead + body maks 1000 tegn. Kildens lengde styrer ikke sakens lengde — skriv knapt uansett.",
     "Bruk aktiv form, presens og omvendt nyhetspyramide.",
     "Kilden er en borsmelding fra Newsweb.",
+    EDITORIAL_SOURCE_AS_DATA,
     "Bruk kun data i kildene under. Ikke bruk markdown.",
-    "Hvis kilden har direkte sitater, bruk dem nar de gir nyhetsverdi.",
+    QUOTE_USER_INSTRUCTION,
     "",
     "Metadata:",
     metadata,
@@ -165,16 +251,26 @@ export function createUserPrompt(payload: PromptPayload): string {
     ">>>"
   ];
 
+  const lengthLineIndex = parts.findIndex((part) =>
+    part.startsWith("Lead + body maks 1000 tegn.")
+  );
+  if (lengthLineIndex >= 0) {
+    parts[lengthLineIndex] =
+      `${lengthInstructionForPayload(payload)} Kildens lengde styrer ikke sakens lengde; skriv knapt uansett.`;
+  }
+
   if (payload.pdfSupplementText) {
     parts.push(
       "",
       "EKSTRA KILDETEKST FRA SELSKAPET:",
-      "Bruk denne kildeteksten kun hvis den inneholder nyhetsverdige opplysninger som ikke dekkes av borsmeldingen.",
+      EXTRA_SOURCE_INSTRUCTION,
       "<<<",
       payload.pdfSupplementText,
       ">>>"
     );
   }
+
+  parts.push(...supplementalMaterialsPromptSection(payload));
 
   return parts.join("\n");
 }
@@ -205,18 +301,22 @@ export function createRevisionUserPrompt(
     `categories: ${payload.categories.join(", ") || "ikke oppgitt"}`,
     `markets: ${payload.markets.join(", ") || "ikke oppgitt"}`,
     `hasAttachments: ${payload.hasAttachments ? "ja" : "nei"}`,
-    `sourceBodyChars: ${payload.sourceBodyChars}`
+    `sourceBodyChars: ${payload.sourceBodyChars}`,
+    `outputMode: ${payload.outputMode ?? "notice"}`,
+    `maxVisibleArticleChars: ${maxVisibleArticleCharsForPayload(payload)}`
   ].join("\n");
 
   const formattedPrevious = formatRewriteForRevisionPrompt(previousOutput);
 
-  return [
+  const parts = [
     "Lag en revidert versjon av nyhetssaken under, basert pa instruksjonen.",
     "VIKTIG: Instruksjonen er styrende. Hvis instruksjonen ber om ny vinkel, annet fokus, annen struktur, annen lengde eller stor omskriving, skal du endre alle berorte felt tydelig.",
+    EDITORIAL_REVISION_PRIORITY,
+    EDITORIAL_SOURCE_AS_DATA,
     "Behold bare tekst som fortsatt passer med instruksjonen. Ikke gjor tilfeldige smaendringer for variasjon.",
     "Hvis instruksjonen er smal og konkret, endrer du bare det som trengs. Sarlig ved 'fjern/kutt/dropp/ta bort dette: ...' skal du fjerne bare den angitte teksten og ellers bevare forrige versjon.",
     "Hvis instruksjonen er bred, kan du skrive om tittel, lead, body, key_facts, importance og source_spans sa mye som nodvendig.",
-    "Lead + body maks 1000 tegn og maks 8 body-avsnitt. Disse grensene gjelder med mindre instruksjonen eksplisitt ber om lengre tekst.",
+    `${lengthInstructionForPayload(payload)} Maks 8 body-avsnitt. Hvis instruksjonen ber om mer tekst, prioriter innenfor denne maksgrensen.`,
     "Hvis instruksjonen ber deg fokusere mer pa noe, kutt eller kort ned andre deler for a holde deg innenfor grensene. Prioriter, ikke utvid.",
     "Eksempler pa instruksjoner og forventet oppforsel:",
     "- 'Fjern dette fra teksten' → slett den aktuelle setningen/avsnittet, behold resten urort.",
@@ -229,6 +329,7 @@ export function createRevisionUserPrompt(
     "Skriv sa enkelt at en videregaendeelev med interesse for finans forstar det.",
     "Bruk aktiv form, presens og omvendt nyhetspyramide.",
     "Bruk kun data i kilden under. Ikke bruk markdown.",
+    QUOTE_USER_INSTRUCTION,
     "",
     "Metadata:",
     metadata,
@@ -247,14 +348,17 @@ export function createRevisionUserPrompt(
       ? [
           "",
           "EKSTRA KILDETEKST FRA SELSKAPET:",
-          "Bruk denne kildeteksten kun hvis den inneholder nyhetsverdige opplysninger som ikke dekkes av borsmeldingen.",
+          EXTRA_SOURCE_INSTRUCTION,
           "<<<",
           payload.pdfSupplementText,
           ">>>"
         ]
       : []),
+    ...supplementalMaterialsPromptSection(payload),
     "",
     "INSTRUKSJON:",
     instruction
-  ].join("\n");
+  ];
+
+  return parts.join("\n");
 }

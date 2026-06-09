@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { BackButton } from "../../../components/back-button";
+import { FeedSearchUrlReset } from "../../../components/feed-search-url-reset";
 import { LiveFeedList } from "../../../components/live-feed-list";
 import { SearchableSelect } from "../../../components/searchable-select";
-import { getFeed, getMetaFilters } from "../../../lib/api";
+import { getFeed, getMetaFilters, isApiAuthError } from "../../../lib/api";
 import { getSessionToken } from "../../../lib/session";
 
 type FeedData = Awaited<ReturnType<typeof getFeed>>;
@@ -62,6 +63,13 @@ export default async function FeedPage({ searchParams }: FeedPageProps) {
     getMetaFilters(token)
   ]);
 
+  if (
+    (feedResult.status === "rejected" && isApiAuthError(feedResult.reason)) ||
+    (filtersResult.status === "rejected" && isApiAuthError(filtersResult.reason))
+  ) {
+    redirect("/login");
+  }
+
   let feedUnavailable = false;
   let feed: FeedData = {
     items: [],
@@ -73,7 +81,10 @@ export default async function FeedPage({ searchParams }: FeedPageProps) {
   } else if (requestedQuery.cursor) {
     try {
       feed = await getFeed(token, { ...requestedQuery, cursor: undefined });
-    } catch {
+    } catch (error) {
+      if (isApiAuthError(error)) {
+        redirect("/login");
+      }
       feedUnavailable = true;
     }
   } else {
@@ -91,7 +102,10 @@ export default async function FeedPage({ searchParams }: FeedPageProps) {
         ...requestedQuery,
         cursor: undefined
       });
-    } catch {
+    } catch (error) {
+      if (isApiAuthError(error)) {
+        redirect("/login");
+      }
       feedUnavailable = true;
       feed = {
         items: [],
@@ -103,7 +117,7 @@ export default async function FeedPage({ searchParams }: FeedPageProps) {
   return (
     <section>
       <form className="panel filterGrid" method="get">
-        <input type="text" name="q" placeholder="Sok i tittel eller tekst" defaultValue={params.q} />
+        <input type="text" name="q" placeholder="Sok i tittel eller tekst" defaultValue="" />
         <SearchableSelect
           name="market"
           placeholder="Alle markeder"
@@ -136,6 +150,7 @@ export default async function FeedPage({ searchParams }: FeedPageProps) {
         />
         <button type="submit">Oppdater feed</button>
       </form>
+      {normalized.q ? <FeedSearchUrlReset /> : null}
 
       <div className="feedList">
         {feedUnavailable ? (
@@ -179,7 +194,6 @@ export default async function FeedPage({ searchParams }: FeedPageProps) {
                 market: normalized.market,
                 category: normalized.category,
                 issuer: normalized.issuer,
-                q: normalized.q,
                 limit: params.limit
               },
               { cursor: feed.nextCursor }

@@ -2,28 +2,36 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import type { GenerationPhase } from "@newsweb/shared";
 import { E24Loader } from "./e24-loader";
 import {
   GENERATION_STEP_DURATION_MS,
+  getGenerationStepIndex,
   getGenerationSteps
 } from "./generation-steps";
 
 type ProcessingIndicatorProps = {
   messageId: number;
   hasAttachments?: boolean;
+  initialPhase?: GenerationPhase | string | null;
 };
 
-export function ProcessingIndicator({ messageId, hasAttachments }: ProcessingIndicatorProps) {
+export function ProcessingIndicator({
+  messageId,
+  hasAttachments,
+  initialPhase
+}: ProcessingIndicatorProps) {
   const steps = getGenerationSteps(hasAttachments);
   const router = useRouter();
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const [stepIndex, setStepIndex] = useState(0);
+  const [phaseStepIndex, setPhaseStepIndex] = useState(() =>
+    getGenerationStepIndex(initialPhase, hasAttachments)
+  );
   const [elapsed, setElapsed] = useState(0);
   const [failed, setFailed] = useState(false);
 
   // Advance steps on a timer
   useEffect(() => {
-    setStepIndex(0);
     setElapsed(0);
     const interval = setInterval(() => {
       setElapsed((prev) => prev + 1000);
@@ -32,10 +40,8 @@ export function ProcessingIndicator({ messageId, hasAttachments }: ProcessingInd
   }, [steps.length]);
 
   useEffect(() => {
-    setStepIndex(
-      Math.min(Math.floor(elapsed / GENERATION_STEP_DURATION_MS), steps.length - 1)
-    );
-  }, [elapsed, steps.length]);
+    setPhaseStepIndex(getGenerationStepIndex(initialPhase, hasAttachments));
+  }, [hasAttachments, initialPhase]);
 
   // Poll for completion
   useEffect(() => {
@@ -48,6 +54,10 @@ export function ProcessingIndicator({ messageId, hasAttachments }: ProcessingInd
         });
         if (res.ok) {
           const data = await res.json();
+          const nextPhaseStep = getGenerationStepIndex(data.phase, hasAttachments);
+          if (nextPhaseStep >= 0) {
+            setPhaseStepIndex((current) => Math.max(current, nextPhaseStep));
+          }
           if (data.ready) {
             clearInterval(pollRef.current!);
             pollRef.current = null;
@@ -77,7 +87,13 @@ export function ProcessingIndicator({ messageId, hasAttachments }: ProcessingInd
         pollRef.current = null;
       }
     };
-  }, [messageId, router]);
+  }, [hasAttachments, messageId, router]);
+
+  const timerStepIndex = Math.min(
+    Math.floor(elapsed / GENERATION_STEP_DURATION_MS),
+    steps.length - 1
+  );
+  const stepIndex = Math.max(timerStepIndex, phaseStepIndex);
 
   const progress = Math.min(
     ((stepIndex / (steps.length - 1)) * 80) + (elapsed > 0 ? Math.min(elapsed / 500, 15) : 0),

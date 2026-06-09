@@ -25,6 +25,7 @@ function sourceOnlyFeedItem(
     messageId: item.messageId,
     publishedAt: item.publishedAt.toISOString(),
     visibilityStatus: item.visibilityStatus,
+    rewriteVersion: item.sourceNotice.rewrites[0]?.version ?? null,
     title: item.sourceNotice.title,
     issuerName: item.sourceNotice.issuerName,
     issuerSign: item.sourceNotice.issuerSign,
@@ -42,7 +43,8 @@ function sourceOnlyFeedItem(
     notGenerated: flags.notGenerated ?? false,
     skipped: flags.skipped ?? false,
     failed: flags.failed ?? false,
-    processing: flags.processing ?? false
+    processing: flags.processing ?? false,
+    regenerating: false
   };
 }
 
@@ -79,6 +81,7 @@ export function mapDbItemToFeedItem(item: FeedItemWithRelations): FeedItem | nul
     messageId: item.messageId,
     publishedAt: item.publishedAt.toISOString(),
     visibilityStatus: item.visibilityStatus,
+    rewriteVersion: rewriteRecord.version,
     title: rewrite.title,
     issuerName: item.sourceNotice.issuerName,
     issuerSign: item.sourceNotice.issuerSign,
@@ -96,6 +99,7 @@ export function mapDbItemToFeedItem(item: FeedItemWithRelations): FeedItem | nul
     notGenerated: false,
     skipped: false,
     failed: false,
-    processing: false
+    processing: false,
+    regenerating: false
   };
 }

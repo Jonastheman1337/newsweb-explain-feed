@@ -1,6 +1,8 @@
 import {
   normalizeRewriteJson,
+  noticeMaterialsResponseSchema,
   noticeResponseSchema,
+  outputModeSchema,
   rewriteOutputSchema
 } from "@newsweb/shared";
 import { logPrisma, prisma } from "@newsweb/shared/db";
@@ -24,6 +26,15 @@ import {
   normalizeNewswebAttachments,
   resolveNewswebAttachmentDownload
 } from "../services/newsweb-attachments.js";
+import {
+  MAX_TOTAL_MATERIAL_TEXT_CHARS,
+  extractPdfMaterialText,
+  fetchNewswebMaterial,
+  parseNewswebMaterialMessageId,
+  pdfTitleFromFileName,
+  sanitizeMaterialTitle,
+  truncateMaterialText
+} from "../services/notice-materials.js";
 
 const paramsSchema = z.object({
   messageId: z.coerce.number().int().positive()
@@ -34,6 +45,11 @@ const attachmentParamsSchema = z.object({
   attachmentId: z.coerce.number().int().positive()
 });
 
+const materialParamsSchema = z.object({
+  messageId: z.coerce.number().int().positive(),
+  materialId: z.string().min(1).max(80)
+});
+
 const statusQuerySchema = z.object({
   jobId: z.string().optional()
 });
@@ -41,10 +57,38 @@ const statusQuerySchema = z.object({
 const generateBodySchema = z
   .object({
     instruction: z.string().max(2000).optional(),
+    outputMode: outputModeSchema.optional(),
+    selectedMaterialIds: z.array(z.string().min(1).max(80)).max(20).optional(),
     reasoningEffortOverride: z.enum(["xhigh"]).optional(),
     telemetry: editorialTelemetrySchema
   })
   .optional();
+
+const textMaterialBodySchema = z.object({
+  title: z.string().max(180).optional(),
+  text: z.string().min(1).max(50_000)
+});
+
+const newswebMaterialBodySchema = z.object({
+  url: z.string().min(1).max(500).optional(),
+  messageId: z.coerce.number().int().positive().optional()
+}).refine((value) => value.url || value.messageId, {
+  message: "Newsweb-lenke eller messageId mangler."
+});
+
+const updateMaterialBodySchema = z.object({
+  enabled: z.boolean()
+});
+
+type MaterialSnapshot = {
+  id: string;
+  sourceId: string;
+  kind: string;
+  title: string;
+  url: string | null;
+  text: string;
+  textChars: number;
+};
 
 async function nextRewriteContext(messageId: number): Promise<{
   targetVersion: number;
@@ -93,6 +137,90 @@ function buildSourcePayload(notice: {
     hasAttachments: notice.hasAttachments,
     attachments: normalizeNewswebAttachments(notice.rawMessageJson)
   };
+}
+
+function materialPayload(material: {
+  id: string;
+  messageId: number;
+  kind: string;
+  title: string;
+  url: string | null;
+  fileName: string | null;
+  mimeType: string | null;
+  fileSize: number | null;
+  extractedText: string;
+  status: string;
+  errorText: string | null;
+  enabled: boolean;
+  metadataJson: Prisma.JsonValue | null;
+  createdAt: Date;
+}) {
+  return {
+    id: material.id,
+    messageId: material.messageId,
+    kind: material.kind,
+    title: material.title,
+    url: material.url,
+    fileName: material.fileName,
+    mimeType: material.mimeType,
+    fileSize: material.fileSize,
+    extractedTextChars: material.extractedText.length,
+    status: material.status,
+    errorText: material.errorText,
+    enabled: material.enabled,
+    metadata: material.metadataJson ?? null,
+    createdAt: material.createdAt.toISOString()
+  };
+}
+
+async function ensureNoticeExists(messageId: number): Promise<boolean> {
+  const source = await prisma.sourceNotice.findUnique({
+    where: { messageId },
+    select: { messageId: true }
+  });
+  return Boolean(source);
+}
+
+async function selectedMaterialSnapshots(
+  messageId: number,
+  selectedMaterialIds?: string[]
+): Promise<MaterialSnapshot[]> {
+  if (selectedMaterialIds && selectedMaterialIds.length === 0) {
+    return [];
+  }
+
+  const materials = await prisma.noticeMaterial.findMany({
+    where: {
+      messageId,
+      status: "ready",
+      enabled: true,
+      ...(selectedMaterialIds ? { id: { in: selectedMaterialIds } } : {})
+    },
+    orderBy: { createdAt: "asc" }
+  });
+
+  const truncationMarker = "\n\n[... mer valgt materiale er avkortet ...]";
+  let remainingChars = MAX_TOTAL_MATERIAL_TEXT_CHARS;
+  const snapshots: MaterialSnapshot[] = [];
+  for (const material of materials) {
+    if (remainingChars <= truncationMarker.length) break;
+    let text = material.extractedText.trim();
+    if (!text) continue;
+    if (text.length > remainingChars) {
+      text = `${text.slice(0, remainingChars - truncationMarker.length)}${truncationMarker}`;
+    }
+    remainingChars -= text.length;
+    snapshots.push({
+      id: material.id,
+      sourceId: `material_${material.id}`,
+      kind: material.kind,
+      title: material.title,
+      url: material.url,
+      text,
+      textChars: text.length
+    });
+  }
+  return snapshots;
 }
 
 export const noticeRoutes: FastifyPluginAsync = async (fastify) => {
@@ -186,6 +314,206 @@ export const noticeRoutes: FastifyPluginAsync = async (fastify) => {
       };
 
       return reply.send(noticeResponseSchema.parse(payload));
+    }
+  );
+
+  fastify.get(
+    "/notice/:messageId/materials",
+    {
+      preHandler: fastify.authenticate
+    },
+    async (request, reply) => {
+      const { messageId } = paramsSchema.parse(request.params);
+      if (!(await ensureNoticeExists(messageId))) {
+        return reply.code(404).send({ message: "Notis ikke funnet." });
+      }
+
+      const materials = await prisma.noticeMaterial.findMany({
+        where: { messageId },
+        orderBy: { createdAt: "asc" }
+      });
+
+      return reply.send(
+        noticeMaterialsResponseSchema.parse({
+          materials: materials.map(materialPayload)
+        })
+      );
+    }
+  );
+
+  fastify.post(
+    "/notice/:messageId/materials/text",
+    {
+      preHandler: fastify.authenticate
+    },
+    async (request, reply) => {
+      const { messageId } = paramsSchema.parse(request.params);
+      if (!(await ensureNoticeExists(messageId))) {
+        return reply.code(404).send({ message: "Notis ikke funnet." });
+      }
+      const body = textMaterialBodySchema.parse(request.body);
+      const text = truncateMaterialText(body.text);
+      const material = await prisma.noticeMaterial.create({
+        data: {
+          messageId,
+          kind: "text",
+          title: sanitizeMaterialTitle(body.title ?? "Tekstmateriale"),
+          extractedText: text,
+          status: "ready",
+          enabled: true
+        }
+      });
+
+      return reply.code(201).send(materialPayload(material));
+    }
+  );
+
+  fastify.post(
+    "/notice/:messageId/materials/newsweb",
+    {
+      preHandler: fastify.authenticate
+    },
+    async (request, reply) => {
+      const { messageId } = paramsSchema.parse(request.params);
+      if (!(await ensureNoticeExists(messageId))) {
+        return reply.code(404).send({ message: "Notis ikke funnet." });
+      }
+      const body = newswebMaterialBodySchema.parse(request.body);
+      const sourceInput = body.messageId ? String(body.messageId) : body.url ?? "";
+      const materialMessageId =
+        body.messageId ?? parseNewswebMaterialMessageId(sourceInput);
+      if (!materialMessageId) {
+        return reply.code(400).send({ message: "Ugyldig Newsweb-lenke." });
+      }
+      if (materialMessageId === messageId) {
+        return reply.code(400).send({ message: "Denne meldingen er allerede hovedkilden." });
+      }
+
+      let materialData: Awaited<ReturnType<typeof fetchNewswebMaterial>> | null = null;
+      let errorText: string | null = null;
+      try {
+        materialData = await fetchNewswebMaterial(materialMessageId);
+      } catch (error) {
+        errorText = error instanceof Error ? error.message : String(error);
+      }
+
+      const material = await prisma.noticeMaterial.create({
+        data: {
+          messageId,
+          kind: "newsweb",
+          title: materialData?.title ?? `Newsweb ${materialMessageId}`,
+          url: `https://newsweb.oslobors.no/message/${materialMessageId}`,
+          extractedText: materialData?.text ?? "",
+          status: materialData ? "ready" : "failed",
+          errorText,
+          enabled: Boolean(materialData),
+          metadataJson: toJsonValue(
+            materialData?.metadata ?? { messageId: materialMessageId }
+          )
+        }
+      });
+
+      return reply.code(201).send(materialPayload(material));
+    }
+  );
+
+  fastify.post(
+    "/notice/:messageId/materials/pdf",
+    {
+      preHandler: fastify.authenticate
+    },
+    async (request, reply) => {
+      const { messageId } = paramsSchema.parse(request.params);
+      if (!(await ensureNoticeExists(messageId))) {
+        return reply.code(404).send({ message: "Notis ikke funnet." });
+      }
+
+      const file = await request.file();
+      if (!file) {
+        return reply.code(400).send({ message: "PDF mangler." });
+      }
+      const fileName = sanitizeMaterialTitle(file.filename || "materiale.pdf");
+      const isPdf =
+        file.mimetype === "application/pdf" || fileName.toLowerCase().endsWith(".pdf");
+      if (!isPdf) {
+        return reply.code(415).send({ message: "Bare PDF-filer stottes." });
+      }
+
+      const buffer = await file.toBuffer();
+      let extracted: Awaited<ReturnType<typeof extractPdfMaterialText>> | null = null;
+      let errorText: string | null = null;
+      try {
+        extracted = await extractPdfMaterialText(buffer);
+        if (!extracted.text.trim()) {
+          throw new Error("PDF-en ga ingen lesbar tekst.");
+        }
+      } catch (error) {
+        errorText = error instanceof Error ? error.message : String(error);
+      }
+
+      const material = await prisma.noticeMaterial.create({
+        data: {
+          messageId,
+          kind: "pdf",
+          title: pdfTitleFromFileName(fileName),
+          fileName,
+          mimeType: file.mimetype,
+          fileSize: buffer.length,
+          extractedText: extracted?.text ?? "",
+          status: extracted ? "ready" : "failed",
+          errorText,
+          enabled: Boolean(extracted),
+          metadataJson: toJsonValue({
+            pageCount: extracted?.pageCount ?? null
+          })
+        }
+      });
+
+      return reply.code(201).send(materialPayload(material));
+    }
+  );
+
+  fastify.patch(
+    "/notice/:messageId/materials/:materialId",
+    {
+      preHandler: fastify.authenticate
+    },
+    async (request, reply) => {
+      const { messageId, materialId } = materialParamsSchema.parse(request.params);
+      const body = updateMaterialBodySchema.parse(request.body);
+      const material = await prisma.noticeMaterial.findFirst({
+        where: { id: materialId, messageId }
+      });
+      if (!material) {
+        return reply.code(404).send({ message: "Materiale ikke funnet." });
+      }
+
+      const updated = await prisma.noticeMaterial.update({
+        where: { id: material.id },
+        data: { enabled: body.enabled && material.status === "ready" }
+      });
+
+      return reply.send(materialPayload(updated));
+    }
+  );
+
+  fastify.delete(
+    "/notice/:messageId/materials/:materialId",
+    {
+      preHandler: fastify.authenticate
+    },
+    async (request, reply) => {
+      const { messageId, materialId } = materialParamsSchema.parse(request.params);
+      const material = await prisma.noticeMaterial.findFirst({
+        where: { id: materialId, messageId },
+        select: { id: true }
+      });
+      if (!material) {
+        return reply.code(404).send({ message: "Materiale ikke funnet." });
+      }
+
+      await prisma.noticeMaterial.delete({ where: { id: material.id } });
+      return reply.send({ ok: true });
     }
   );
 
@@ -540,7 +868,12 @@ export const noticeRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       const instruction = body?.instruction?.trim() || undefined;
+      const outputMode = body?.outputMode ?? "notice";
       const reasoningEffortOverride = body?.reasoningEffortOverride;
+      const supplementalMaterials = await selectedMaterialSnapshots(
+        messageId,
+        body?.selectedMaterialIds
+      );
       const { targetVersion, previousRewriteJson } =
         await nextRewriteContext(messageId);
       const phaseUpdatedAt = new Date();
@@ -562,7 +895,9 @@ export const noticeRoutes: FastifyPluginAsync = async (fastify) => {
             targetVersion,
             previousRewriteJson,
             instruction: instruction ?? null,
-            reasoningEffortOverride: reasoningEffortOverride ?? null
+            outputMode,
+            reasoningEffortOverride: reasoningEffortOverride ?? null,
+            supplementalMaterials
           })
         }
       });
@@ -577,6 +912,8 @@ export const noticeRoutes: FastifyPluginAsync = async (fastify) => {
             generationRunId: generationRun.id,
             targetVersion,
             ...(reasoningEffortOverride ? { reasoningEffortOverride } : {}),
+            outputMode,
+            ...(supplementalMaterials.length > 0 ? { supplementalMaterials } : {}),
             ...(previousRewriteJson ? { previousRewriteJson } : {}),
             ...(instruction ? { instruction } : {})
           },
@@ -619,7 +956,9 @@ export const noticeRoutes: FastifyPluginAsync = async (fastify) => {
         actionSource: body?.telemetry?.actionSource ?? "instruction_input",
         payload: {
           instruction: instruction ?? null,
+          outputMode,
           reasoningEffortOverride: reasoningEffortOverride ?? null,
+          selectedMaterialIds: supplementalMaterials.map((material) => material.id),
           targetVersion,
           generationRunId: generationRun.id,
           jobId: job.id ?? null

@@ -2,6 +2,7 @@
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 
 const DEFAULT_TABS = ["feedback", "edits", "titles", "events", "generations"];
 const DEFAULT_TIMEZONE = "Europe/Oslo";
@@ -498,7 +499,286 @@ function groupGenerationOutcomes(generationRows) {
     });
 }
 
-function analyze(data, timeZone) {
+function normalizeNorwegian(value) {
+  return String(value ?? "")
+    .toLowerCase()
+    .replaceAll("æ", "ae")
+    .replaceAll("ø", "o")
+    .replaceAll("å", "a")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+function promptVersionBucket(row) {
+  return row.prompt_version || row.promptVersion || "unknown";
+}
+
+function isTruthy(value) {
+  return value === true || String(value).toLowerCase() === "true";
+}
+
+function rate(numerator, denominator) {
+  return denominator > 0 ? Number((numerator / denominator).toFixed(4)) : 0;
+}
+
+function sortedBuckets(map) {
+  return [...map.values()].sort((a, b) =>
+    String(a.prompt_version).localeCompare(String(b.prompt_version))
+  );
+}
+
+function engagementBucket(map, promptVersion) {
+  const key = promptVersion || "unknown";
+  let bucket = map.get(key);
+  if (!bucket) {
+    bucket = {
+      prompt_version: key,
+      generation_count: 0,
+      published_generation_count: 0,
+      failed_generation_count: 0,
+      feedback_count: 0,
+      copy_count: 0,
+      copy_without_edits_count: 0,
+      copy_with_edits_count: 0,
+      copy_with_edits_rate: 0,
+      regenerate_count: 0,
+      title_request_count: 0,
+      title_select_count: 0
+    };
+    map.set(key, bucket);
+  }
+  return bucket;
+}
+
+function engagementByPromptVersion(data) {
+  const buckets = new Map();
+
+  for (const row of data.generations ?? []) {
+    const bucket = engagementBucket(buckets, promptVersionBucket(row));
+    bucket.generation_count += 1;
+    if (row.status === "published") bucket.published_generation_count += 1;
+    if (row.status === "failed") bucket.failed_generation_count += 1;
+  }
+
+  for (const row of data.feedback ?? []) {
+    engagementBucket(buckets, promptVersionBucket(row)).feedback_count += 1;
+  }
+
+  for (const row of data.edits ?? []) {
+    const bucket = engagementBucket(buckets, promptVersionBucket(row));
+    bucket.copy_count += 1;
+    if (isTruthy(row.has_edits)) bucket.copy_with_edits_count += 1;
+    else bucket.copy_without_edits_count += 1;
+  }
+
+  for (const row of data.events ?? []) {
+    if (row.action === "regenerate_request") {
+      engagementBucket(buckets, promptVersionBucket(row)).regenerate_count += 1;
+    }
+  }
+
+  for (const row of data.titles ?? []) {
+    const bucket = engagementBucket(buckets, promptVersionBucket(row));
+    if (
+      row.action === "title_suggestion_request" ||
+      row.action === "title_suggestion_refresh"
+    ) {
+      bucket.title_request_count += 1;
+    }
+    if (row.action === "title_suggestion_select") {
+      bucket.title_select_count += 1;
+    }
+  }
+
+  for (const bucket of buckets.values()) {
+    bucket.copy_with_edits_rate = rate(bucket.copy_with_edits_count, bucket.copy_count);
+  }
+
+  return sortedBuckets(buckets);
+}
+
+function firstSentence(text) {
+  const value = String(text ?? "");
+  const abbreviations = new Set(["ca", "eks", "f", "mill", "mrd", "osv"]);
+  for (let i = 0; i < value.length; i += 1) {
+    const char = value[i];
+    if (!/[.!?]/.test(char)) continue;
+    const next = value[i + 1] ?? "";
+    if (next && !/\s/.test(next)) continue;
+    if (char === ".") {
+      const token = normalizeNorwegian(value.slice(0, i).match(/([A-Za-zÆØÅæøå]+)$/)?.[1] ?? "");
+      if (abbreviations.has(token)) continue;
+    }
+    return value.slice(0, i + 1);
+  }
+  return value;
+}
+
+const descriptorSuffixes = [
+  "selskapet",
+  "konsernet",
+  "rederiet",
+  "banken",
+  "fondet",
+  "gruppen",
+  "operatoren",
+  "produsenten",
+  "leverandoren",
+  "utvikleren",
+  "aktoren",
+  "kommunen",
+  "meglerhuset"
+];
+
+const descriptorLeadRe = new RegExp(
+  `^(?:det\\s+[a-z0-9-]+\\s+)?(?:[a-z0-9-]+(?:${descriptorSuffixes.join("|")})|[a-z0-9-]+(?:-${descriptorSuffixes.join("|-")}))\\s+`,
+  "i"
+);
+
+function hasDescriptorOrCompanyContextLead(lead) {
+  const normalized = normalizeNorwegian(lead);
+  const first = normalizeNorwegian(firstSentence(lead));
+  return descriptorLeadRe.test(normalized) || /^[^.,:;!?]{2,90},\s+som\b/i.test(first);
+}
+
+function hasStockAttributionEnding(lead) {
+  const normalized = normalizeNorwegian(firstSentence(lead).trim());
+  return [
+    "ifolge en borsmelding.",
+    "ifolge borsmeldingen.",
+    "ifolge en melding.",
+    "viser kvartalsrapporten.",
+    "viser rapporten.",
+    "viser meldingen."
+  ].some((ending) => normalized.endsWith(ending));
+}
+
+function hasQuoteOrParaphrase(rewrite) {
+  return /[–«»]/.test([rewrite.title, rewrite.lead, ...(rewrite.body ?? [])].join("\n"));
+}
+
+function hasBulletPreamble(rewrite) {
+  return (rewrite.body ?? []).some((item) =>
+    /^dette er noen\b/i.test(normalizeNorwegian(item).trim())
+  );
+}
+
+function hasInertTitle(title) {
+  const normalized = normalizeNorwegian(title);
+  return (
+    /^(lavere|hoyere|inntektsfall|resultatfall|resultathopp|underskudd|overskudd|driftsresultatet|resultatet)\b/i.test(
+      normalized
+    ) ||
+    /^.+(?:-resultatet|-tapet|-inntektene)\b/i.test(normalized) ||
+    /^.+\sfor\s[A-ZÆØÅ]/.test(String(title ?? ""))
+  );
+}
+
+function parseRewriteOutput(row) {
+  const raw = row.output_json ?? row.outputJson;
+  if (!raw) return { missing: true, parseError: false, rewrite: null };
+  let parsed = raw;
+  if (typeof raw === "string") {
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      return { missing: false, parseError: true, rewrite: null };
+    }
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return { missing: false, parseError: true, rewrite: null };
+  }
+  const rewrite = {
+    title: typeof parsed.title === "string" ? parsed.title : "",
+    lead: typeof parsed.lead === "string" ? parsed.lead : "",
+    body: Array.isArray(parsed.body)
+      ? parsed.body.filter((item) => typeof item === "string")
+      : []
+  };
+  if (!rewrite.title && !rewrite.lead && !rewrite.body.length) {
+    return { missing: false, parseError: true, rewrite: null };
+  }
+  return { missing: false, parseError: false, rewrite };
+}
+
+function articleShapeBucket(map, promptVersion) {
+  const key = promptVersion || "unknown";
+  let bucket = map.get(key);
+  if (!bucket) {
+    bucket = {
+      prompt_version: key,
+      article_count: 0,
+      missing_output_count: 0,
+      parse_error_count: 0,
+      descriptor_company_context_lead_count: 0,
+      descriptor_company_context_lead_rate: 0,
+      stock_attribution_ending_count: 0,
+      stock_attribution_ending_rate: 0,
+      quote_or_paraphrase_count: 0,
+      quote_or_paraphrase_rate: 0,
+      bullet_preamble_count: 0,
+      bullet_preamble_rate: 0,
+      inert_title_count: 0,
+      inert_title_rate: 0
+    };
+    map.set(key, bucket);
+  }
+  return bucket;
+}
+
+function articleShapeByPromptVersion(generations) {
+  const buckets = new Map();
+  for (const row of generations ?? []) {
+    const bucket = articleShapeBucket(buckets, promptVersionBucket(row));
+    const parsed = parseRewriteOutput(row);
+    if (parsed.missing) {
+      bucket.missing_output_count += 1;
+      continue;
+    }
+    if (parsed.parseError || !parsed.rewrite) {
+      bucket.parse_error_count += 1;
+      continue;
+    }
+
+    bucket.article_count += 1;
+    if (hasDescriptorOrCompanyContextLead(parsed.rewrite.lead)) {
+      bucket.descriptor_company_context_lead_count += 1;
+    }
+    if (hasStockAttributionEnding(parsed.rewrite.lead)) {
+      bucket.stock_attribution_ending_count += 1;
+    }
+    if (hasQuoteOrParaphrase(parsed.rewrite)) {
+      bucket.quote_or_paraphrase_count += 1;
+    }
+    if (hasBulletPreamble(parsed.rewrite)) {
+      bucket.bullet_preamble_count += 1;
+    }
+    if (hasInertTitle(parsed.rewrite.title)) {
+      bucket.inert_title_count += 1;
+    }
+  }
+
+  for (const bucket of buckets.values()) {
+    bucket.descriptor_company_context_lead_rate = rate(
+      bucket.descriptor_company_context_lead_count,
+      bucket.article_count
+    );
+    bucket.stock_attribution_ending_rate = rate(
+      bucket.stock_attribution_ending_count,
+      bucket.article_count
+    );
+    bucket.quote_or_paraphrase_rate = rate(
+      bucket.quote_or_paraphrase_count,
+      bucket.article_count
+    );
+    bucket.bullet_preamble_rate = rate(bucket.bullet_preamble_count, bucket.article_count);
+    bucket.inert_title_rate = rate(bucket.inert_title_count, bucket.article_count);
+  }
+
+  return sortedBuckets(buckets);
+}
+
+export function analyze(data, timeZone) {
   const generations = data.generations ?? [];
   const events = data.events ?? [];
 
@@ -530,13 +810,20 @@ function analyze(data, timeZone) {
       generations.filter((row) => row.error_group),
       "error_group"
     ),
+    engagement: {
+      byPromptVersion: engagementByPromptVersion(data),
+      articleShapeByPromptVersion: articleShapeByPromptVersion(generations)
+    },
     noticesByEventCount: groupEventsByMessage(events),
     feedback: (data.feedback ?? []).map((row) => ({
       created_at: row.created_at,
       message_id: row.message_id,
       notice: row.notice,
       version: row.version,
-      text: row.text
+      text: row.text,
+      prompt_version: row.prompt_version,
+      model: row.model,
+      action_source: row.action_source
     })),
     edits: (data.edits ?? []).map((row) => ({
       copied_at: row.copied_at,
@@ -546,7 +833,10 @@ function analyze(data, timeZone) {
       original_title: row.original_title,
       edited_title: row.edited_title,
       original_body: row.original_body,
-      edited_body: row.edited_body
+      edited_body: row.edited_body,
+      prompt_version: row.prompt_version,
+      model: row.model,
+      action_source: row.action_source
     })),
     titles: (data.titles ?? []).map((row) => ({
       created_at: row.created_at,
@@ -557,7 +847,10 @@ function analyze(data, timeZone) {
       selected_title: row.selected_title,
       selected_index: row.selected_index,
       selected_was_original: row.selected_was_original,
-      suggestions: row.suggestions
+      suggestions: row.suggestions,
+      prompt_version: row.prompt_version,
+      model: row.model,
+      action_source: row.action_source
     })),
     failedGenerations: generations
       .filter((row) => row.status === "failed" || row.status === "needs_retry")
@@ -666,7 +959,9 @@ async function main() {
   );
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exitCode = 1;
-});
+if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
+  main().catch((error) => {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = 1;
+  });
+}

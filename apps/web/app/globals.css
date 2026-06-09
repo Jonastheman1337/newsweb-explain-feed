@@ -262,6 +262,10 @@ a {
   animation: feedProcessingTextFade 0.45s ease;
 }
 
+.feedRegenerationStatus .feedProcessingStatus {
+  margin-top: 0.45rem;
+}
+
 .cardSkipped {
   opacity: 0.5;
   box-shadow: none;
@@ -351,6 +355,12 @@ a {
 
 .processingWrap {
   margin: 0.75rem 0;
+}
+
+.regenerationStatus {
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--line);
 }
 
 .processingSteps {
@@ -458,45 +468,13 @@ a {
 }
 
 .sourceBody {
-  font-family: "Courier New", Courier, "Lucida Sans Typewriter", monospace;
+  font-family: "Courier New", Courier, "Lucida Sans Typewriter", "Lucida Typewriter", monospace;
   line-height: normal;
   font-size: 14px;
   margin: 0.8rem 0 0;
   color: var(--ink);
   white-space: pre-wrap;
   word-break: break-word;
-}
-
-.sourceBodyReflow {
-  font-family: var(--font-body), sans-serif;
-  line-height: 1.6;
-  font-size: 0.95rem;
-  margin: 0.8rem 0 0;
-  color: var(--ink);
-  white-space: normal;
-  word-break: break-word;
-}
-
-.sourceBodyReflow p {
-  margin: 0.6rem 0;
-}
-
-.sourceBodyReflow .sourceBodyPre {
-  font-family: "Courier New", Courier, monospace;
-  font-size: 13px;
-  line-height: normal;
-  white-space: pre;
-  overflow-x: auto;
-  margin: 0.6rem 0;
-  scrollbar-width: thin;
-  scrollbar-color: var(--line) transparent;
-}
-.sourceBodyReflow .sourceBodyPre::-webkit-scrollbar { height: 4px; }
-.sourceBodyReflow .sourceBodyPre::-webkit-scrollbar-track { background: transparent; }
-.sourceBodyReflow .sourceBodyPre::-webkit-scrollbar-thumb { background: var(--line); border-radius: 2px; }
-
-.sourceBody p {
-  margin: 0.6rem 0;
 }
 
 .editableWrap {
@@ -529,6 +507,36 @@ a {
 }
 
 .copyIcon {
+  width: 14px;
+  height: 14px;
+}
+
+.draftDot,
+.tabDraftDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--accent);
+  flex: 0 0 auto;
+}
+
+.draftIconButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+
+.draftIconButton:hover,
+.draftIconButtonActive {
+  color: var(--accent);
+}
+
+.draftIcon {
   width: 14px;
   height: 14px;
 }
@@ -666,9 +674,102 @@ a {
   font: inherit;
   line-height: 1.6;
   color: var(--ink);
-  resize: none;
-  overflow: hidden;
+  min-height: 3rem;
   outline: none;
+  overflow-wrap: break-word;
+}
+
+.editableBody p {
+  margin: 0 0 0.65rem;
+}
+
+.editableBody p:last-child {
+  margin-bottom: 0;
+}
+
+.editableBody ul,
+.editableBody ol {
+  margin: 0.55rem 0;
+  padding-left: 1.25rem;
+}
+
+.editableBody li {
+  margin: 0.2rem 0;
+}
+
+.editableBody a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.richEditToolbar {
+  position: fixed;
+  z-index: 1000;
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  max-width: calc(100vw - 16px);
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+  transform: translateX(-50%);
+}
+
+.richEditToolbar:not([data-visible="true"]) {
+  display: none;
+}
+
+.richEditToolButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 0.76rem;
+  cursor: pointer;
+}
+
+.richEditToolButton:hover,
+.richEditToolButton:focus-visible {
+  color: var(--ink);
+  background: var(--bg-soft);
+  outline: none;
+}
+
+.richEditToolIcon {
+  width: 15px;
+  height: 15px;
+}
+
+.richEditLinkForm {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+}
+
+.richEditLinkInput {
+  width: min(160px, calc(100vw - 70px));
+  height: 26px;
+  padding: 0 0.35rem;
+  border: none;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.82rem;
+  outline: none;
+}
+
+.richEditLinkInput::placeholder {
+  color: var(--ink-soft);
 }
 
 .editableActions {
@@ -795,6 +896,7 @@ a {
 
 .rewriteTabs { display: flex; flex-wrap: wrap; gap: 0.3rem; margin: 0.5rem 0; }
 .rewriteTab {
+  display: inline-flex; align-items: center; gap: 0.25rem;
   padding: 0.35rem 0.7rem; border-radius: var(--radius); border: 1px solid var(--line);
   background: transparent; cursor: pointer; font: inherit; font-size: 0.85rem; color: var(--ink-soft);
 }
@@ -806,7 +908,126 @@ a {
   font: inherit; resize: none; overflow: hidden; min-height: 3rem;
 }
 .instructionTextarea:focus { outline: none; border-color: var(--accent); }
-.instructionActions { display: flex; align-items: center; gap: 0.75rem; margin-top: 0.4rem; }
+.materialBar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.35rem;
+}
+.materialTray {
+  margin-top: 0.45rem;
+  padding: 0.55rem 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+.materialActions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.45rem;
+}
+.materialFileInput {
+  display: none;
+}
+.materialInlineForm,
+.materialTextForm {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0.45rem 0;
+}
+.materialInlineForm {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+.materialInput,
+.materialTextarea {
+  width: 100%;
+  padding: 0.45rem 0.55rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--bg-soft);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.86rem;
+}
+.materialTextarea {
+  resize: vertical;
+  min-height: 5rem;
+}
+.materialInput:focus,
+.materialTextarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.materialList {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0.35rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+.materialItem,
+.materialToggle {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+.materialItem {
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.materialToggle {
+  gap: 0.45rem;
+}
+.materialTitle {
+  min-width: 0;
+  color: var(--ink);
+  font-size: 0.86rem;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.materialMeta {
+  flex: 0 0 auto;
+  color: var(--ink-soft);
+  font-size: 0.75rem;
+}
+.outputModeToggle {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.outputModeButton {
+  padding: 0.2rem 0.45rem;
+  border: none;
+  border-right: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.outputModeButton:last-child {
+  border-right: none;
+}
+.outputModeButton:hover {
+  color: var(--ink);
+}
+.outputModeButton.active {
+  background: var(--accent);
+  color: var(--bg-main);
+}
+.outputModeButton:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+.instructionActions { display: flex; align-items: center; flex-wrap: wrap; gap: 0.75rem; margin-top: 0.4rem; }
 .xhighToggle {
   display: inline-flex;
   align-items: center;

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getNotice } from "../../../../lib/api";
+import { getNotice, getNoticeStatus, isApiAuthError } from "../../../../lib/api";
 import { GenerateButton } from "../../../../components/generate-button";
 import { EditableRewrite } from "../../../../components/editable-rewrite";
 import { ProcessingIndicator } from "../../../../components/processing-indicator";
@@ -48,13 +48,29 @@ export default async function NoticePage({ params, searchParams }: NoticePagePro
     redirect("/feed");
   }
 
-  const notice = await getNotice(token, id).catch(() => {
+  const notice = await getNotice(token, id).catch((error) => {
+    if (isApiAuthError(error)) {
+      redirect("/login");
+    }
     redirect("/feed");
+  });
+  const noticeStatus = await getNoticeStatus(token, id).catch((error) => {
+    if (isApiAuthError(error)) {
+      redirect("/login");
+    }
+    return null;
   });
 
   const isProcessing = "processing" in notice && notice.processing === true;
   const isSkipped = "skipped" in notice && notice.skipped === true;
   const isFailed = "failed" in notice && notice.failed === true;
+  const isRegenerating =
+    !isProcessing &&
+    !isSkipped &&
+    !isFailed &&
+    noticeStatus != null &&
+    !noticeStatus.ready &&
+    !noticeStatus.failed;
   const activeVersion =
     "rewrites" in notice && notice.rewrites?.length
       ? notice.rewrites[notice.rewrites.length - 1]?.version
@@ -81,6 +97,17 @@ export default async function NoticePage({ params, searchParams }: NoticePagePro
     </p>
   );
 
+  const regenerationIndicator = isRegenerating ? (
+    <div className="regenerationStatus">
+      <p className="noticePanelTitle">Ny AI-versjon genereres</p>
+      <ProcessingIndicator
+        messageId={notice.source.messageId}
+        hasAttachments={notice.source.hasAttachments}
+        initialPhase={noticeStatus?.phase}
+      />
+    </div>
+  ) : null;
+
   return (
     <section>
       <NoticeTelemetry
@@ -99,7 +126,11 @@ export default async function NoticePage({ params, searchParams }: NoticePagePro
             <p className="noticePanelTitle">AI-notis genereres</p>
             <h2>{notice.source.title}</h2>
             {dateline}
-            <ProcessingIndicator messageId={notice.source.messageId} hasAttachments={notice.source.hasAttachments} />
+            <ProcessingIndicator
+              messageId={notice.source.messageId}
+              hasAttachments={notice.source.hasAttachments}
+              initialPhase={noticeStatus?.phase}
+            />
           </>
         ) : isSkipped ? (
           <>
@@ -135,12 +166,15 @@ export default async function NoticePage({ params, searchParams }: NoticePagePro
             return (
               <>
                 {rewrites && rewrites.length > 1 ? (
-                  <RewriteTabs
-                    rewrites={rewrites}
-                    messageId={notice.source.messageId}
-                    dateline={dateline}
-                    hasAttachments={notice.source.hasAttachments}
-                  />
+                  <>
+                    <RewriteTabs
+                      rewrites={rewrites}
+                      messageId={notice.source.messageId}
+                      dateline={dateline}
+                      hasAttachments={notice.source.hasAttachments}
+                    />
+                    {regenerationIndicator}
+                  </>
                 ) : (
                   <>
                     <EditableRewrite
@@ -156,6 +190,7 @@ export default async function NoticePage({ params, searchParams }: NoticePagePro
                       activeVersion={activeVersion}
                       hasAttachments={notice.source.hasAttachments}
                     />
+                    {regenerationIndicator}
                   </>
                 )}
               </>

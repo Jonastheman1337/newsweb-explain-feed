@@ -75,6 +75,9 @@ used as a fallback when local extraction diagnostics are weak.
 
 ## Local Development
 
+Use this for fast iteration. It runs the API, worker, and web app as local
+development processes with hot reload.
+
 ```bash
 npm install
 npm run dev:deps
@@ -85,6 +88,83 @@ npm run dev
 ```
 
 Open `http://localhost:3000/feed`.
+
+This mode is intentionally not production-equivalent: `NODE_ENV` defaults to
+development, auth bypass can be enabled for localhost, and the services do not
+start through the Render Docker image.
+
+## Production-Like Local Testing
+
+Use this when localhost needs to behave like the actual Render service before a
+deploy or when debugging issues that only show up on the hosted site.
+
+To test against the same data shape as production without writing to production,
+copy Render's external database URLs into your root `.env`:
+
+```text
+RENDER_DATABASE_EXTERNAL_URL=postgresql://...
+RENDER_LOG_DATABASE_EXTERNAL_URL=postgresql://...
+```
+
+Use the external database URLs from the Render database pages. Do not use the
+internal `DATABASE_URL` values injected into the Render service; those are for
+Render's private network.
+
+Clone production data into isolated local databases:
+
+```bash
+npm run local:prod:clone-db
+```
+
+This restores into `infra/data/prod-local-*`. It does not point localhost at the
+live Render database, so local testing cannot mutate production notices,
+rewrites, generation logs, or feed state.
+
+```bash
+npm run local:prod
+```
+
+The command expects a root `.env` file and reads it with Docker Compose's
+`--env-file` option. The worker starts in production mode by default, so
+`OPENAI_API_KEY` must be present unless you start without the worker:
+
+```bash
+LOCAL_PROD_START_WORKER=false npm run local:prod
+```
+
+Open `http://localhost:3000/feed`. The default local password login is:
+
+```text
+username: E24
+password: local-prod-password
+```
+
+Override `LOCAL_PROD_LOGIN_USERNAME` or `LOCAL_PROD_LOGIN_PASSWORD` in your shell
+if you need different local credentials. The command uses the same `Dockerfile.render` image and
+`scripts/render-start.sh` process layout as Render, sets `NODE_ENV=production`,
+runs deploy migrations first, exposes only the web port, and points the web app
+at the internal API on `127.0.0.1:4000`.
+
+It also creates separate local Postgres databases for app data and generation
+logs under `infra/data/prod-local-*`, plus a local Redis instance. Because this
+path is built like production, it does not hot reload. Re-run the command after
+code changes.
+
+Automatic Newsweb polling is disabled in this local production-like stack, and
+the latest-notice bootstrap count defaults to `0`. That keeps the cloned data
+stable and avoids generating a batch of new local rewrites on startup. Manual
+regeneration still works when the worker is enabled. To test automatic polling,
+run with:
+
+```bash
+LOCAL_PROD_NEWSWEB_POLLING_ENABLED=true LOCAL_PROD_LATEST_BOOTSTRAP_COUNT=30 npm run local:prod
+```
+
+Stop the production-like stack with:
+
+```bash
+npm run local:prod:down
+```
 
 Useful checks:
 

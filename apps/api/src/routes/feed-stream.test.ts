@@ -10,6 +10,7 @@ const baseItem: FeedItem = {
   messageId: 123,
   publishedAt: "2026-05-29T06:00:00.000Z",
   visibilityStatus: "published",
+  rewriteVersion: null,
   title: "Original tittel",
   issuerName: "Test ASA",
   issuerSign: "TEST",
@@ -27,7 +28,8 @@ const baseItem: FeedItem = {
   notGenerated: false,
   skipped: false,
   failed: true,
-  processing: false
+  processing: false,
+  regenerating: false
 };
 
 describe("feed stream updates", () => {
@@ -40,5 +42,37 @@ describe("feed stream updates", () => {
 
   it("emits failed items from the mapped database state", () => {
     expect(applyFeedUpdateState(baseItem, "failed")).toEqual(baseItem);
+  });
+
+  it("keeps first-time generations in the processing state", () => {
+    const firstGenerationItem = {
+      ...baseItem,
+      rewriteVersion: 1,
+      failed: false,
+      processing: true
+    };
+
+    expect(applyFeedUpdateState(firstGenerationItem, "processing")).toEqual({
+      ...firstGenerationItem,
+      processing: true,
+      regenerating: false
+    });
+  });
+
+  it("marks published items as regenerating instead of replacing the article", () => {
+    const publishedItem = {
+      ...baseItem,
+      rewriteVersion: 1,
+      title: "Publisert tittel",
+      lead: "Ingress",
+      body: ["Brodtekst"],
+      failed: false
+    };
+
+    expect(applyFeedUpdateState(publishedItem, "processing")).toEqual({
+      ...publishedItem,
+      processing: false,
+      regenerating: true
+    });
   });
 });

@@ -2,6 +2,7 @@ import { QUEUE_NAMES, parseRedisUrl } from "@newsweb/shared";
 import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
 import jwt from "@fastify/jwt";
+import multipart from "@fastify/multipart";
 import { Queue } from "bullmq";
 import Fastify, { type FastifyInstance } from "fastify";
 import { Redis } from "ioredis";
@@ -13,6 +14,7 @@ import { feedStreamRoutes } from "./routes/feed-stream.js";
 import { healthRoutes } from "./routes/health.js";
 import { metaRoutes } from "./routes/meta.js";
 import { noticeRoutes } from "./routes/notice.js";
+import { MAX_MATERIAL_FILE_BYTES } from "./services/notice-materials.js";
 
 function isLocalHostRequest(hostHeader?: string): boolean {
   if (!hostHeader) {
@@ -54,6 +56,12 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(cookie);
   await app.register(jwt, {
     secret: config.SESSION_SECRET
+  });
+  await app.register(multipart, {
+    limits: {
+      fileSize: MAX_MATERIAL_FILE_BYTES,
+      files: 1
+    }
   });
 
   app.decorate("authenticate", async (request, reply) => {

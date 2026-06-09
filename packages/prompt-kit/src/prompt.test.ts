@@ -3,9 +3,15 @@ import { describe, expect, it } from "vitest";
 import {
   PROMPT_VERSION,
   createDeveloperPrompt,
+  createSystemPrompt,
+  createUserPrompt,
   createRevisionUserPrompt,
   type PromptPayload
 } from "./prompt.js";
+import {
+  createRegularPromptVariantMessages,
+  regularPromptVariantIds
+} from "./regular-prompt-variants.js";
 import {
   createReportDeveloperPrompt,
   createReportRevisionUserPrompt,
@@ -61,7 +67,25 @@ const sampleYearlyPayload: YearlyReportPromptPayload = {
 
 describe("OpenAI prompt contract", () => {
   it("bumps the prompt version for the editorial guardrail update", () => {
-    expect(PROMPT_VERSION).toBe("v5.6.0");
+    expect(PROMPT_VERSION).toBe("v5.8.0");
+  });
+
+  it("uses materiality and mechanism framing without stock-reaction logic by default", () => {
+    const combined = [
+      createSystemPrompt(),
+      createDeveloperPrompt(),
+      createUserPrompt(samplePayload)
+    ].join("\n");
+
+    expect(combined).not.toContain("hva betyr det for aksjen");
+    expect(combined).not.toContain("vurderer a kjope aksjen");
+    expect(combined).not.toContain("aksjeeier");
+    expect(combined).not.toContain("kursdrivende");
+    expect(combined).not.toContain("kurseffekt");
+    expect(combined).toContain("mest vesentlig for selskapet og aksjonærene");
+    expect(combined).toContain("KILDE SOM DATA");
+    expect(combined).toContain("MEKANISMEFORKLARING");
+    expect(combined).toContain("Forklar hva begrepet gjor i akkurat denne meldingen");
   });
 
   it("does not embed the JSON schema in the developer prompt", () => {
@@ -101,6 +125,92 @@ describe("OpenAI prompt contract", () => {
     expect(result).toContain("ikke la hver sak ende med samme standardhale");
     expect(result).toContain("Kildehenvisningen kan sta i andre setning");
     expect(result).toContain("gar det frem av meldingen");
+  });
+
+  it("uses source-close quote guidance without the old guillemets taxonomy", () => {
+    const combined = [
+      createDeveloperPrompt(),
+      createUserPrompt({
+        ...samplePayload,
+        hasAttachments: true,
+        pdfSupplementText: "CEO Kari Hansen says demand was weaker than expected."
+      })
+    ].join("\n");
+
+    expect(combined).toContain("SITATER, GUILLEMETS OG PERSONATTRIBUSJON");
+    expect(combined).toContain("en nær direkte oversettelse av en engelsk formulering");
+    expect(combined).toContain("skal saken normalt bruke ett kort sitat");
+    expect(combined).toContain("tilfører nyhetsverdig substans, forklaring eller relevant personuttalelse");
+    expect(combined).not.toContain("Guillemets («») = parafrasering");
+    expect(combined).not.toContain("Hvis kilden har direkte sitater");
+    expect(combined).not.toContain("bruk dem nar de gir nyhetsverdi");
+    expect(combined).not.toContain("kun hvis den inneholder nyhetsverdige opplysninger som ikke dekkes");
+  });
+
+  it("renders selected supplemental materials as secondary sources", () => {
+    const prompt = createUserPrompt({
+      ...samplePayload,
+      outputMode: "extended_notice",
+      supplementalMaterials: [
+        {
+          id: "mat1",
+          sourceId: "material_mat1",
+          kind: "text",
+          title: "Analyst note",
+          text: "Analysts expected revenue of 120 million kroner.",
+          textChars: 48
+        }
+      ]
+    });
+
+    expect(prompt).toContain("outputMode: extended_notice");
+    expect(prompt).toContain("maxVisibleArticleChars: 1800");
+    expect(prompt).toContain("Synlig artikkeltekst maks 1800 tegn");
+    expect(prompt).toContain("SUPPLERENDE MATERIALE");
+    expect(prompt).toContain("[material_mat1]");
+    expect(prompt).toContain("Analysts expected revenue");
+  });
+
+  it("exposes regular prompt variants for offline editorial evals", () => {
+    expect(regularPromptVariantIds).toEqual([
+      "regular_v5_6_control",
+      "audience_mechanism_v1"
+    ]);
+
+    const control = createRegularPromptVariantMessages(
+      "regular_v5_6_control",
+      samplePayload
+    );
+
+    expect(control.systemPrompt).toBe(createSystemPrompt());
+    expect(control.developerPrompt).toBe(createDeveloperPrompt());
+    expect(control.userPrompt).toBe(createUserPrompt(samplePayload));
+  });
+
+  it("adds a mechanism-first challenger without stock-advice audience framing", () => {
+    const challenger = createRegularPromptVariantMessages(
+      "audience_mechanism_v1",
+      samplePayload
+    );
+    const combined = [
+      challenger.systemPrompt,
+      challenger.developerPrompt,
+      challenger.userPrompt
+    ].join("\n");
+
+    expect(challenger.promptVersion).toContain("audience_mechanism_v1");
+    expect(combined).not.toContain("hva betyr det for aksjen");
+    expect(combined).not.toContain("vurderer a kjope aksjen");
+    expect(combined).not.toContain("aksjeeier");
+    expect(combined).toContain("MEKANISMEFORKLARING");
+    expect(combined.match(/MEKANISMEFORKLARING/g)).toHaveLength(2);
+    expect(combined).toContain("Forklar hva begrepet gjor i akkurat denne meldingen");
+    expect(combined).toContain(
+      "Leseren er finansielt interessert og leser dette som nyheter, ikke som investeringsrad."
+    );
+    expect(combined).toContain(
+      "Plukk ut det som hjelper leseren a forsta hva selskapet har meldt og hvilken mekanisme som betyr noe."
+    );
   });
 });
 
@@ -204,6 +314,15 @@ describe("createReportRevisionUserPrompt", () => {
     expect(result).toContain("Start punktlisten direkte med forste kulepunkt");
     expect(result).toContain("Ikke lag et eget body-element");
     expect(result.match(/\"Dette er noen/g)).toBeNull();
+  });
+
+  it("adds quote-aware management-comment guidance for report rewrites", () => {
+    const result = createReportDeveloperPrompt();
+
+    expect(result).toContain("Etter nøkkeltallene skal du se etter én kort ledelseskommentar");
+    expect(result).toContain("CEO, CFO eller styreleder");
+    expect(result).toContain("en kildefast formulering i «...»");
+    expect(result).not.toContain("skryter av");
   });
 
   it("keeps report source context and user instruction in revision mode", () => {

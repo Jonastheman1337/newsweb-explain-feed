@@ -1,6 +1,9 @@
 import type { RewriteOutput } from "@newsweb/shared";
 import {
   formatRewriteForRevisionPrompt,
+  lengthInstructionForPayload,
+  maxVisibleArticleCharsForPayload,
+  supplementalMaterialsPromptSection,
   type PromptPayload
 } from "./prompt.js";
 import {
@@ -10,6 +13,9 @@ import {
   EDITORIAL_LENGTH_CAP,
   EDITORIAL_NO_MARKET_COMMENTARY,
   EDITORIAL_NORWEGIAN,
+  EDITORIAL_REVISION_PRIORITY,
+  EDITORIAL_SOURCE_AS_DATA,
+  EDITORIAL_SUPPLEMENTAL_MATERIALS,
   EDITORIAL_TITLE
 } from "./shared-editorial.js";
 
@@ -17,20 +23,29 @@ export function createYearlyReportSystemPrompt(): string {
   return [
     "Du er nyhetsjournalist i E24-redaksjonen.",
     "Du skriver korte børsnyheter på norsk bokmål for en travel leser som scanner nyheter på mobilen.",
-    "Leseren er en privatinvestor — kanskje en student eller nybegynner — som vil vite: hva skjedde, og hva betyr det for aksjen?",
+    "Leseren vil vite hva som er mest vesentlig for selskapet og aksjonærene, uten at vi vurderer aksjen, spår kursreaksjon eller gir investeringsråd.",
     "Skriv så enkelt at en videregåendeelev med interesse for finans forstår teksten uten å google noe.",
     "Kilden er utdrag fra en årsrapport med lederlønnsdata.",
     "Du skal finne det nyhetsverdige — overraskende kompensasjon, store endringer fra fjoråret, bonuser og opsjoner.",
     "Ikke følg rapportens struktur. Du er redaktøren — restrukturer fritt etter hva som er viktigst for leseren.",
     "Skriv kort og fokusert. Bare det viktigste.",
-    "Lead + body til sammen skal være maks 1000 tegn. Vær knapp."
-  ].join(" ");
+    "Lead + body til sammen skal være maks 1000 tegn. Vær knapp.",
+    EDITORIAL_SOURCE_AS_DATA
+  ].map((line) =>
+    line.startsWith("Lead + body")
+      ? "Hold deg til tegngrensen i oppgaven. Vaer knapp."
+      : line
+  ).join(" ");
 }
 
 export function createYearlyReportDeveloperPrompt(_schemaJson?: string): string {
   return `${EDITORIAL_AUDIENCE}
 
 ${EDITORIAL_LANGUAGE}
+
+${EDITORIAL_SOURCE_AS_DATA}
+
+${EDITORIAL_SUPPLEMENTAL_MATERIALS}
 
 OPPGAVE: LEDERLONN FRA ARSRAPPORT
 Kilden er utdrag fra en arsrapport med lederlonn og godtgjorelse.
@@ -71,13 +86,17 @@ export function createYearlyReportUserPrompt(payload: YearlyReportPromptPayload)
     `publishedAt: ${payload.publishedAt}`,
     `categories: ${payload.categories.join(", ") || "ikke oppgitt"}`,
     `markets: ${payload.markets.join(", ") || "ikke oppgitt"}`,
+    `outputMode: ${payload.outputMode ?? "notice"}`,
+    `maxVisibleArticleChars: ${maxVisibleArticleCharsForPayload(payload)}`,
     `reportPageCount: ${payload.reportPageCount}`
   ].join("\n");
 
   const parts: string[] = [
     "Lag en kort nyhetssak om lederlønn fra årsrapporten under.",
     "Skriv nyhetstekst, ikke sammendrag.",
+    lengthInstructionForPayload(payload),
     "Bruk aktiv form, presens og omvendt nyhetspyramide.",
+    EDITORIAL_SOURCE_AS_DATA,
     "Bruk kun data i kildene under. Ikke bruk markdown.",
     "",
     "Metadata:",
@@ -105,6 +124,8 @@ export function createYearlyReportUserPrompt(payload: YearlyReportPromptPayload)
     );
   }
 
+  parts.push(...supplementalMaterialsPromptSection(payload));
+
   return parts.join("\n");
 }
 
@@ -116,6 +137,8 @@ export function createYearlyReportRevisionUserPrompt(
   return [
     "Lag en revidert versjon av lederlonnssaken under, basert pa instruksjonen.",
     "VIKTIG: Instruksjonen er styrende. Hvis den ber om ny vinkel, annet fokus, annen struktur, annen lengde eller stor omskriving, skal du endre alle berorte felt tydelig.",
+    EDITORIAL_REVISION_PRIORITY,
+    EDITORIAL_SOURCE_AS_DATA,
     "Behold bare tekst som fortsatt passer med instruksjonen. Ikke gjor tilfeldige smaendringer for variasjon.",
     "Hvis instruksjonen er smal og konkret, endrer du bare det som trengs. Sarlig ved 'fjern/kutt/dropp/ta bort dette: ...' skal du fjerne bare den angitte teksten og ellers bevare forrige versjon.",
     "Hvis instruksjonen er bred, kan du skrive om tittel, lead, body, key_facts, importance og source_spans sa mye som nodvendig.",

@@ -142,7 +142,9 @@ const CURRENCY_MARKER_GROUPS: Array<{
   {
     label: "NOK/kroner",
     patterns: [
-      /\bnok\b/i,
+      /\bNOK\b/,
+      /\bnok\s+(?=\d)/,
+      /\d\s+nok\b/,
       /\bmnok\b/i,
       /\bbnok\b/i,
       /\bkr\b/i,
@@ -172,12 +174,55 @@ const CURRENCY_MARKER_GROUPS: Array<{
   }
 ];
 
+const KEY_PERSON_ROLE_SOURCE =
+  "(?:CEO|CFO|chief executive|konsernsjef|toppsjef|finansdirekt(?:ør|or|Ã¸r)|styreleder|prim(?:ær|aer|Ã¦r)innsider|administrerende\\s+direkt(?:ør|or|Ã¸r))";
+const ATTRIBUTION_VERB_SOURCE =
+  "(?:sier|skriver|opplyser|uttaler|mener|peker\\s+p(?:å|a|Ã¥)|says?|said|comments?|commented|states?|stated)";
+const SOURCE_QUOTE_MARK_SOURCE =
+  "(?:\"[^\"]{8,}\"|'[^']{8,}'|“[^”]{8,}”|«[^»]{8,}»|Â«[^Â»]{8,}Â»)";
+
+const KEY_PERSON_ROLE_PATTERN = new RegExp(KEY_PERSON_ROLE_SOURCE, "i");
+const DRAFT_STANDALONE_DASH_QUOTE_PATTERN = new RegExp(
+  `(?:^|\\n)\\s*–\\s+[\\s\\S]{8,}?\\b${ATTRIBUTION_VERB_SOURCE}\\b`,
+  "i"
+);
+const INLINE_GUILLEMETS_PATTERN = /«[^»]{8,}»|Â«[^Â»]{8,}Â»/;
+const INLINE_GUILLEMETS_GLOBAL_PATTERN = /«([^»]{8,})»|Â«([^Â»]{8,})Â»/g;
+const DRAFT_NAMED_PERSON_ATTRIBUTION_PATTERNS = [
+  new RegExp(
+    `${KEY_PERSON_ROLE_SOURCE}[\\s\\S]{0,120}\\b${ATTRIBUTION_VERB_SOURCE}\\b`,
+    "i"
+  ),
+  new RegExp(
+    `\\b${ATTRIBUTION_VERB_SOURCE}\\b[\\s\\S]{0,120}${KEY_PERSON_ROLE_SOURCE}`,
+    "i"
+  )
+];
+const SOURCE_NAMED_QUOTE_LIKE_PATTERNS = [
+  new RegExp(
+    `${KEY_PERSON_ROLE_SOURCE}[\\s\\S]{0,180}(?:${ATTRIBUTION_VERB_SOURCE}|${SOURCE_QUOTE_MARK_SOURCE})`,
+    "i"
+  ),
+  new RegExp(
+    `(?:${ATTRIBUTION_VERB_SOURCE}|${SOURCE_QUOTE_MARK_SOURCE})[\\s\\S]{0,180}${KEY_PERSON_ROLE_SOURCE}`,
+    "i"
+  )
+];
+
 export type RewriteValidationSeverity = "blocking" | "warning";
 
 export type RewriteValidationIssue = {
   code: string;
   severity: RewriteValidationSeverity;
   message: string;
+};
+
+export type QuoteTelemetry = {
+  sourceContainsNamedQuoteLikePattern: boolean;
+  draftContainsStandaloneDashQuote: boolean;
+  draftContainsInlineGuillemets: boolean;
+  draftContainsNamedPersonAttribution: boolean;
+  draftSourceSpansMentionQuoteSpeaker: boolean;
 };
 
 export function countSentences(text: string): number {
@@ -230,7 +275,14 @@ export function buildValidationSourceText(payload: PromptPayload): string {
     payload.categories.join(", "),
     payload.markets.join(", "),
     payload.bodyText,
-    payload.pdfSupplementText ?? ""
+    payload.pdfSupplementText ?? "",
+    ...(payload.supplementalMaterials ?? []).map((material) =>
+      [
+        `[${material.sourceId}] ${material.title}`,
+        material.url ?? "",
+        material.text
+      ].join("\n")
+    )
   ].join("\n");
 }
 
@@ -251,6 +303,91 @@ function addIssue(
   message: string
 ): void {
   issues.push({ code, severity, message });
+}
+
+function normalizeQuoteEvidenceText(text: string): string {
+  return text
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9æøåÃ¦Ã¸Ã¥]+/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function inlineGuillemetsTexts(text: string): string[] {
+  return [...text.matchAll(INLINE_GUILLEMETS_GLOBAL_PATTERN)]
+    .map((match) => match[1] ?? match[2] ?? "")
+    .map((value) => value.trim())
+    .filter((value) => value.length >= 8);
+}
+
+function sourceSpansContainInlineQuoteEvidence(
+  rewrite: RewriteOutput,
+  visibleText: string
+): boolean {
+  const sourceSpansText = rewrite.source_spans.join("\n");
+  if (INLINE_GUILLEMETS_PATTERN.test(sourceSpansText)) {
+    return true;
+  }
+
+  const normalizedSpans = normalizeQuoteEvidenceText(sourceSpansText);
+  for (const quoted of inlineGuillemetsTexts(visibleText)) {
+    const normalizedQuote = normalizeQuoteEvidenceText(quoted);
+    if (normalizedQuote.length >= 8 && normalizedSpans.includes(normalizedQuote)) {
+      return true;
+    }
+
+    const quoteTokens = normalizedQuote
+      .split(" ")
+      .filter((token) => token.length >= 4);
+    if (
+      quoteTokens.length >= 2 &&
+      quoteTokens.filter((token) => normalizedSpans.includes(token)).length >= 2
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function sourceSpansContainQuoteEvidence(
+  rewrite: RewriteOutput,
+  visibleText: string,
+  telemetry: QuoteTelemetry
+): boolean {
+  const sourceSpansText = rewrite.source_spans.join("\n");
+  return (
+    telemetry.draftSourceSpansMentionQuoteSpeaker ||
+    DRAFT_STANDALONE_DASH_QUOTE_PATTERN.test(sourceSpansText) ||
+    sourceSpansContainInlineQuoteEvidence(rewrite, visibleText)
+  );
+}
+
+export function collectQuoteTelemetry(
+  rewrite: RewriteOutput,
+  payload: PromptPayload
+): QuoteTelemetry {
+  const sourceText = buildValidationSourceText(payload);
+  const visibleText = visibleArticleText(rewrite);
+  const sourceSpansText = rewrite.source_spans.join("\n");
+
+  return {
+    sourceContainsNamedQuoteLikePattern: hasAnyPattern(
+      sourceText,
+      SOURCE_NAMED_QUOTE_LIKE_PATTERNS
+    ),
+    draftContainsStandaloneDashQuote:
+      DRAFT_STANDALONE_DASH_QUOTE_PATTERN.test(visibleText),
+    draftContainsInlineGuillemets: INLINE_GUILLEMETS_PATTERN.test(visibleText),
+    draftContainsNamedPersonAttribution: hasAnyPattern(
+      visibleText,
+      DRAFT_NAMED_PERSON_ATTRIBUTION_PATTERNS
+    ),
+    draftSourceSpansMentionQuoteSpeaker:
+      KEY_PERSON_ROLE_PATTERN.test(sourceSpansText)
+  };
 }
 
 function findUnexpectedCurrencyMarkers(
@@ -388,9 +525,12 @@ export function validateRewriteOutput(
   issues: RewriteValidationIssue[];
   blockingErrors: string[];
   warnings: string[];
+  quoteTelemetry: QuoteTelemetry;
 } {
   const issues: RewriteValidationIssue[] = [];
   const validationSourceText = buildValidationSourceText(payload);
+  const visibleText = visibleArticleText(rewrite);
+  const quoteTelemetry = collectQuoteTelemetry(rewrite, payload);
   const maxVisibleArticleChars =
     options?.maxVisibleArticleChars ?? MAX_VISIBLE_ARTICLE_CHARS;
 
@@ -417,7 +557,7 @@ export function validateRewriteOutput(
   }
 
   const visibleMetaPatterns = matchingPatterns(
-    visibleArticleText(rewrite),
+    visibleText,
     VISIBLE_ATTACHMENT_REFERENCE_PATTERNS
   );
   if (visibleMetaPatterns.length > 0) {
@@ -549,6 +689,20 @@ export function validateRewriteOutput(
     addIssue(issues, issue.code, "warning", issue.message);
   }
 
+  if (
+    (quoteTelemetry.draftContainsStandaloneDashQuote ||
+      quoteTelemetry.draftContainsInlineGuillemets ||
+      quoteTelemetry.draftContainsNamedPersonAttribution) &&
+    !sourceSpansContainQuoteEvidence(rewrite, visibleText, quoteTelemetry)
+  ) {
+    addIssue(
+      issues,
+      "MISSING_QUOTE_SOURCE_SPAN",
+      "warning",
+      "Visible article text uses a quote, source-close wording, or named-person attribution, but source_spans lacks speaker or quote wording evidence."
+    );
+  }
+
   const errors = issues.map((issue) => issue.message);
   const blockingErrors = issues
     .filter((issue) => issue.severity === "blocking")
@@ -562,6 +716,7 @@ export function validateRewriteOutput(
     errors,
     issues,
     blockingErrors,
-    warnings
+    warnings,
+    quoteTelemetry
   };
 }

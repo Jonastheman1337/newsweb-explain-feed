@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  GENERATION_RUN_STALE_MS,
   buildGenerationStatusPayload,
   chooseGenerationRun,
-  deriveGenerationPhase
+  deriveGenerationPhase,
+  isGenerationRunActive
 } from "./generation-status.js";
 
 const oldDate = new Date("2026-05-29T08:00:00.000Z");
@@ -77,6 +79,135 @@ describe("generation status", () => {
       jobState: "active",
       generationRunId: "run-1",
       phase: "checking_references",
+      phaseUpdatedAt: "2026-05-29T08:01:00.000Z"
+    });
+  });
+
+  it("keeps active regenerations not ready even while an older rewrite is published", () => {
+    expect(
+      buildGenerationStatusPayload({
+        generationRun: {
+          id: "run-2",
+          status: "queued",
+          phase: "queued",
+          phaseUpdatedAt: newDate
+        },
+        rewrite: {
+          status: "published",
+          generatedAt: oldDate,
+          version: 1
+        },
+        jobState: "waiting"
+      })
+    ).toEqual({
+      ready: false,
+      failed: false,
+      generatedAt: "2026-05-29T08:00:00.000Z",
+      version: 1,
+      jobState: "waiting",
+      generationRunId: "run-2",
+      phase: "queued",
+      phaseUpdatedAt: "2026-05-29T08:01:00.000Z"
+    });
+  });
+
+  it("treats terminal run statuses as inactive even with a stale non-terminal phase", () => {
+    expect(
+      isGenerationRunActive(
+        {
+          id: "run-3",
+          status: "failed",
+          phase: "checking_references",
+          phaseUpdatedAt: newDate
+        },
+        newDate
+      )
+    ).toBe(false);
+  });
+
+  it("treats runs without recent phase progress as dead", () => {
+    const staleNow = new Date(newDate.getTime() + GENERATION_RUN_STALE_MS + 1);
+
+    expect(
+      isGenerationRunActive(
+        {
+          id: "run-4",
+          status: "started",
+          phase: "writing_notice",
+          phaseUpdatedAt: newDate
+        },
+        staleNow
+      )
+    ).toBe(false);
+
+    expect(
+      isGenerationRunActive(
+        {
+          id: "run-4",
+          status: "started",
+          phase: "writing_notice",
+          phaseUpdatedAt: newDate
+        },
+        newDate
+      )
+    ).toBe(true);
+  });
+
+  it("reports a published rewrite as ready when the latest run died silently", () => {
+    const staleNow = new Date(newDate.getTime() + GENERATION_RUN_STALE_MS + 1);
+
+    expect(
+      buildGenerationStatusPayload({
+        generationRun: {
+          id: "run-5",
+          status: "started",
+          phase: "writing_notice",
+          phaseUpdatedAt: newDate
+        },
+        rewrite: {
+          status: "published",
+          generatedAt: oldDate,
+          version: 1
+        },
+        jobState: null,
+        now: staleNow
+      })
+    ).toEqual({
+      ready: true,
+      failed: false,
+      generatedAt: "2026-05-29T08:00:00.000Z",
+      version: 1,
+      jobState: null,
+      generationRunId: "run-5",
+      phase: "writing_notice",
+      phaseUpdatedAt: "2026-05-29T08:01:00.000Z"
+    });
+  });
+
+  it("reports a failed regeneration when the latest run failed over an older rewrite", () => {
+    expect(
+      buildGenerationStatusPayload({
+        generationRun: {
+          id: "run-2",
+          status: "failed",
+          phase: "failed",
+          phaseUpdatedAt: newDate
+        },
+        rewrite: {
+          status: "published",
+          generatedAt: oldDate,
+          version: 1
+        },
+        jobState: "failed"
+      })
+    ).toEqual({
+      ready: false,
+      failed: true,
+      generatedAt: "2026-05-29T08:00:00.000Z",
+      version: 1,
+      jobState: "failed",
+      generationRunId: "run-2",
+      phase: "failed",
       phaseUpdatedAt: "2026-05-29T08:01:00.000Z"
     });
   });

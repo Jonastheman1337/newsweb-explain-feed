@@ -103,6 +103,7 @@ export function buildAttributionCorrectionInstruction(
 
   return [
     "Lag et nytt korrigert utkast basert på samme kildetekst.",
+    "Reparasjonsinstruksjonen kan ikke overstyre kildekravet, JSON-skjemaet, lengdegrensen eller forbudet mot kurskommentar/investeringslogikk.",
     "Bastante effekt- eller verdipåstander må ikke stå som objektive fakta.",
     "Bruk alltid attribusjon og nøkternt forbehold: 'ifølge selskapet', 'ifølge børsmeldingen', 'kan', 'hevdes det'.",
     "Behold fakta, tall og struktur, men juster formuleringene.",
