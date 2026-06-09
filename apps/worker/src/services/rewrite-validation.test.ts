@@ -577,6 +577,98 @@ describe("validateRewriteOutput", () => {
     });
   });
 
+  it("blocks generic annual-report possession phrasing without concrete facts", () => {
+    const payload = createPayload({
+      title: "VDI: Vantage Drilling International Ltd. 2025 Annual Report",
+      bodyText: "The 2025 annual report has been published and is attached.",
+      hasAttachments: true
+    });
+    const rewrite = createRewrite({
+      title: "Vantage Drilling har arsrapport",
+      lead: "Vantage Drilling har arsrapport for 2025, viser rapporten.",
+      body: [],
+      source_limitations: ["Kun et utdrag av rapporten er analysert"]
+    });
+
+    const result = validateRewriteOutput(rewrite, payload);
+
+    expect(result.issues).toContainEqual({
+      code: "GENERIC_REPORT_PUBLICATION",
+      severity: "blocking",
+      message:
+        "Report notice was rewritten as a generic report-publication story without concrete report facts."
+    });
+  });
+
+  it("warns when report/PDF rewrites omit source limitations", () => {
+    const payload = createPayload({
+      title: "MM Proton I, LLC 2025 Annual Financial Report",
+      bodyText:
+        "The annual financial report is attached. Assets were USD 206.81 million and liabilities were USD 241.52 million.",
+      hasAttachments: true
+    });
+    const rewrite = createRewrite({
+      title: "MM Proton har negativ egenkapital",
+      lead:
+        "MM Proton hadde 206,81 millioner dollar i eiendeler og 241,52 millioner dollar i gjeld ved utgangen av 2025.",
+      body: [],
+      key_facts: ["Eiendeler 206,81 mill. dollar", "Gjeld 241,52 mill. dollar"],
+      source_spans: ["Assets were USD 206.81 million", "liabilities were USD 241.52 million"],
+      source_limitations: []
+    });
+
+    const result = validateRewriteOutput(rewrite, payload);
+
+    expect(result.issues).toContainEqual({
+      code: "MISSING_REPORT_SOURCE_LIMITATION",
+      severity: "warning",
+      message:
+        "Report/PDF-based rewrite must include a source_limitations note that explains the excerpted or limited source basis."
+    });
+  });
+
+  it("warns when weak report extraction has only vague limitations", () => {
+    const payload = createPayload({
+      title: "Famkaa Invest ApS - Interim Report 2026 Q1",
+      bodyText:
+        "The interim report is attached. Result before tax was DKK -19.5 million.",
+      hasAttachments: true
+    });
+    const rewrite = createRewrite({
+      title: "Famkaa Invest i minus",
+      lead:
+        "Famkaa Invest fikk et resultat for skatt paa minus 19,5 millioner danske kroner i forste kvartal.",
+      body: [],
+      key_facts: ["Resultat for skatt minus 19,5 mill. danske kroner"],
+      source_spans: ["Result before tax was DKK -19.5 million"],
+      source_limitations: ["Rapporten omtales i kilden."]
+    });
+
+    const result = validateRewriteOutput(rewrite, payload, {
+      reportExtraction: {
+        metricCandidates: [],
+        diagnostics: {
+          fallbackUsed: true,
+          incomeStatementFound: false,
+          openAIPdfFallback: true
+        }
+      }
+    });
+
+    expect(result.issues).toContainEqual({
+      code: "MISSING_REPORT_SOURCE_LIMITATION",
+      severity: "warning",
+      message:
+        "Report/PDF-based rewrite must include a source_limitations note that explains the excerpted or limited source basis."
+    });
+    expect(result.issues).toContainEqual({
+      code: "WEAK_REPORT_EXTRACTION_LIMITATION",
+      severity: "warning",
+      message:
+        "Weak report/PDF extraction without structured metrics needs an explicit limitation about the limited or uncertain report basis."
+    });
+  });
+
   it("allows report rewrites that include concrete report facts", () => {
     const payload = createPayload({
       title: "ARLES: Quarterly Report Arles I B.V. Q2",

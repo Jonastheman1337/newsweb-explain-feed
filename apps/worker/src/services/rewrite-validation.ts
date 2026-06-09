@@ -82,7 +82,12 @@ const GENERIC_REPORT_PUBLICATION_PATTERNS = [
   /\b(?:publiserer|publisert|offentliggjort|released|published)\b.{0,90}\b(?:rapport|årsrapport|årsmelding|annual report|interim report|quarterly report)\b/i,
   /\b(?:rapport|årsrapport|årsmelding|annual report|interim report|quarterly report)\b.{0,90}\b(?:publiserer|publisert|offentliggjort|released|published)\b/i,
   /\b(?:publiserer|publisert|offentliggjort|released|published)\b.{0,90}(?:\u00e5rsrapport|\u00e5rsmelding)/i,
-  /(?:\u00e5rsrapport|\u00e5rsmelding).{0,90}\b(?:publiserer|publisert|offentliggjort|released|published)\b/i
+  /(?:\u00e5rsrapport|\u00e5rsmelding).{0,90}\b(?:publiserer|publisert|offentliggjort|released|published)\b/i,
+  /\b(?:har|med|sender|legger frem|lagt frem)\b.{0,70}\b(?:rapport|arsrapport|annual report|interim report|quarterly report)\b/i,
+  /\b(?:rapport|arsrapport|annual report|interim report|quarterly report)\b.{0,70}\b(?:folger|vedlagt|omtales|tilgjengelig|available)\b/i,
+  /\b(?:viser til|omtaler)\b.{0,80}\b(?:rapport|arsrapport|annual report|interim report|quarterly report)\b/i,
+  /\b(?:har|med|sender|legger frem|lagt frem)\b.{0,70}(?:\u00e5rsrapport|\u00e5rsmelding|del\u00e5rsrapport|halv\u00e5rsrapport)\b/i,
+  /(?:\u00e5rsrapport|\u00e5rsmelding|del\u00e5rsrapport|halv\u00e5rsrapport).{0,70}\b(?:f\u00f8lger|folger|vedlagt|omtales|tilgjengelig|available)\b/i
 ];
 
 const CONCRETE_REPORT_FACT_PATTERNS = [
@@ -94,6 +99,12 @@ const CONCRETE_REPORT_FACT_PATTERNS = [
 
 const VISIBLE_NUMBER_PATTERN =
   /\b\d{1,3}(?:[ .]\d{3})*(?:,\d+)?\b|\b\d+(?:,\d+)?\b/g;
+
+const REPORT_LIMITATION_PATTERNS = [
+  /\b(?:utdrag|avkortet|begrenset|bare deler|ikke fullstendig)\b/i,
+  /\b(?:analysert|analysegrunnlag|kildegrunnlag|ekstra kildetekst)\b/i,
+  /\b(?:ikke oppgitt|ikke funnet|mangler|uklar|uklart|ikke inkludert)\b/i
+];
 
 const DATE_MONTH_PATTERN =
   /^\.\s*(?:jan(?:uar)?|feb(?:ruar)?|mars|apr(?:il)?|mai|jun(?:i)?|jul(?:i)?|aug(?:ust)?|sep(?:tember)?|okt(?:ober)?|nov(?:ember)?|des(?:ember)?|january|february|march|april|may|june|july|august|september|october|november|december)\b/i;
@@ -180,6 +191,16 @@ export type RewriteValidationIssue = {
   code: string;
   severity: RewriteValidationSeverity;
   message: string;
+};
+
+export type ReportExtractionValidationContext = {
+  metrics?: unknown[];
+  metricCandidates?: unknown[];
+  diagnostics?: {
+    fallbackUsed?: boolean;
+    incomeStatementFound?: boolean;
+    openAIPdfFallback?: boolean;
+  };
 };
 
 export function countSentences(text: string): number {
@@ -313,6 +334,45 @@ function isGenericReportPublicationRewrite(
   return !hasAnyPattern(visibleBody, CONCRETE_REPORT_FACT_PATTERNS);
 }
 
+function hasReportContext(
+  payload: PromptPayload,
+  reportExtraction?: ReportExtractionValidationContext
+): boolean {
+  return (
+    reportExtraction != null ||
+    Boolean(payload.pdfSupplementText?.trim()) ||
+    (payload.hasAttachments && isReportLikePayload(payload))
+  );
+}
+
+function hasReportSourceLimitation(rewrite: RewriteOutput): boolean {
+  const limitationText = rewrite.source_limitations.join("\n");
+  return (
+    limitationText.trim().length > 0 &&
+    hasAnyPattern(limitationText, REPORT_LIMITATION_PATTERNS)
+  );
+}
+
+function isWeakReportExtraction(
+  reportExtraction?: ReportExtractionValidationContext
+): boolean {
+  if (!reportExtraction) {
+    return false;
+  }
+
+  const metricCount =
+    reportExtraction.metricCandidates?.length ??
+    reportExtraction.metrics?.length ??
+    0;
+  const diagnostics = reportExtraction.diagnostics;
+  return (
+    metricCount === 0 &&
+    diagnostics?.incomeStatementFound !== true &&
+    (diagnostics?.fallbackUsed === true ||
+      diagnostics?.openAIPdfFallback === true)
+  );
+}
+
 function normalizeVisibleNumberToken(token: string): string | null {
   const normalized = token.replace(/[ .]/g, "").replace(",", ".");
   if (!/\d/.test(normalized)) return null;
@@ -383,7 +443,10 @@ function jargonGuardrailIssues(rewrite: RewriteOutput): Array<{
 export function validateRewriteOutput(
   rewrite: RewriteOutput,
   payload: PromptPayload,
-  options?: { maxVisibleArticleChars?: number }
+  options?: {
+    maxVisibleArticleChars?: number;
+    reportExtraction?: ReportExtractionValidationContext;
+  }
 ): {
   valid: boolean;
   errors: string[];
@@ -440,7 +503,31 @@ export function validateRewriteOutput(
     );
   }
 
-  if (payload.hasAttachments && rewrite.source_limitations.length === 0) {
+  const reportContext = hasReportContext(payload, options?.reportExtraction);
+  const reportSourceLimitation = hasReportSourceLimitation(rewrite);
+  if (reportContext && !reportSourceLimitation) {
+    addIssue(
+      issues,
+      "MISSING_REPORT_SOURCE_LIMITATION",
+      "warning",
+      "Report/PDF-based rewrite must include a source_limitations note that explains the excerpted or limited source basis."
+    );
+  }
+
+  if (
+    isWeakReportExtraction(options?.reportExtraction) &&
+    rewrite.source_limitations.length > 0 &&
+    !reportSourceLimitation
+  ) {
+    addIssue(
+      issues,
+      "WEAK_REPORT_EXTRACTION_LIMITATION",
+      "warning",
+      "Weak report/PDF extraction without structured metrics needs an explicit limitation about the limited or uncertain report basis."
+    );
+  }
+
+  if (!reportContext && payload.hasAttachments && rewrite.source_limitations.length === 0) {
     addIssue(
       issues,
       "MISSING_ATTACHMENT_LIMITATION",
