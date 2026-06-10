@@ -255,6 +255,12 @@ describe("buildReferenceCheckPrompt", () => {
 
     expect(prompt.systemPrompt).toContain("streng referansesjekker");
     expect(prompt.developerPrompt).toContain("Vurder hver setning");
+    expect(prompt.developerPrompt).toContain(
+      "En naturlig norsk oversettelse eller gjengivelse"
+    );
+    expect(prompt.developerPrompt).toContain(
+      "skal ikke gi grounded=false"
+    );
     expect(prompt.userPrompt).toContain("REFERANSETEKST");
     expect(prompt.userPrompt).toContain("Referansen sier noe.");
     expect(prompt.draftSentences).toEqual([
@@ -321,5 +327,32 @@ describe("buildCorrectionInstruction", () => {
     const instruction = buildCorrectionInstruction(report);
     expect(instruction).toContain("Setninger uten dekning i forrige utkast");
     expect(instruction).toContain("Hun kommer fra partiet Hoyre.");
+    expect(instruction).toContain(
+      "skal beholdes ordrett i det korrigerte utkastet"
+    );
+    expect(instruction).not.toContain("siste reparasjonsforsøk");
+  });
+
+  it("preserves grounded quotes in the final repair attempt instruction", () => {
+    const rewrite = createRewrite();
+    const raw: ReferenceCheckResult = {
+      sentences: collectDraftSentences(rewrite).map((sentence, index) => ({
+        index,
+        sentence,
+        grounded: index !== 1,
+        interpretation:
+          index === 1 ? "Partitilhørighet er ikke oppgitt i kilden." : "Dekket.",
+        sourceEvidence: "Erna Solberg er tidligere statsminister i Norge."
+      }))
+    };
+    const report = buildCoverageReport(collectDraftSentences(rewrite), raw);
+    const instruction = buildCorrectionInstruction(report, {
+      attempt: 3,
+      maxAttempts: 3
+    });
+    expect(instruction).toContain("Dette er siste reparasjonsforsøk");
+    expect(instruction).toContain(
+      "Sitater og personuttalelser som har dekning i kilden, skal beholdes."
+    );
   });
 });

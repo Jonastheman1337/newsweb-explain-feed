@@ -41,7 +41,9 @@ describe("prompt style guidance", () => {
     expect(developerPrompt).toContain("Sitatstrek");
     expect(developerPrompt).toContain("Guillemets");
     expect(developerPrompt).not.toContain("Guillemets («») = parafrasering");
-    expect(userPrompt).toContain("skal saken normalt bruke ett kort sitat");
+    expect(userPrompt).toContain("Sjekk kilden for navngitte uttalelser");
+    expect(userPrompt).toContain("skal saken gjengi den med sitatstrek");
+    expect(userPrompt).not.toContain("skal saken normalt bruke ett kort sitat");
     expect(userPrompt).not.toContain("bruk dem nar de gir nyhetsverdi");
   });
 
@@ -93,7 +95,8 @@ describe("prompt style guidance", () => {
     expect(reportPrompt).toContain(
       "Ikke klassifiser konkrete markeds-, etterspørsels- eller utsiktskommentarer som hype"
     );
-    expect(reportPrompt).toContain("når den tilfører noe utover tallene i meldingen");
+    expect(reportPrompt).toContain("HOVEDREGEL FOR PERSONUTTALELSER");
+    expect(reportPrompt).toContain("Regnskap for uttalelser");
     expect(reportPrompt).toContain("Kutt adjektiver, kundeløfter og selvskryt");
     expect(reportPrompt).toContain(
       "sitatstrek, guillemets eller en personattribuert parafrase"

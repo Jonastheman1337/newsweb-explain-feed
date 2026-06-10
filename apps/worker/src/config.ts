@@ -12,6 +12,15 @@ const booleanEnvSchema = z
   .default("true")
   .transform((value) => value === "true");
 
+const reasoningEffortEnvSchema = z.enum([
+  "none",
+  "minimal",
+  "low",
+  "medium",
+  "high",
+  "xhigh"
+]);
+
 const configSchema = z
   .object({
     NODE_ENV: z
@@ -27,15 +36,12 @@ const configSchema = z
     OPENAI_FAST_MODEL: z.string().default("gpt-5.4-mini"),
     OPENAI_TIMEOUT_MS: z.coerce.number().int().min(1000).default(240000),
     OPENAI_FAST_TIMEOUT_MS: z.coerce.number().int().min(1000).default(15000),
-    OPENAI_DEFAULT_REASONING_EFFORT: z
-      .enum(["none", "minimal", "low", "medium", "high", "xhigh"])
-      .default("medium"),
-    OPENAI_REPORT_REASONING_EFFORT: z
-      .enum(["none", "minimal", "low", "medium", "high", "xhigh"])
-      .default("medium"),
-    OPENAI_HARD_REASONING_EFFORT: z
-      .enum(["none", "minimal", "low", "medium", "high", "xhigh"])
-      .default("medium"),
+    OPENAI_DEFAULT_REASONING_EFFORT: reasoningEffortEnvSchema.default("medium"),
+    OPENAI_REPORT_REASONING_EFFORT: reasoningEffortEnvSchema.default("medium"),
+    OPENAI_HARD_REASONING_EFFORT: reasoningEffortEnvSchema.default("medium"),
+    OPENAI_TRIAGE_REASONING_EFFORT: reasoningEffortEnvSchema.default("minimal"),
+    OPENAI_REFERENCE_REASONING_EFFORT: reasoningEffortEnvSchema.default("medium"),
+    OPENAI_REVIEW_REASONING_EFFORT: reasoningEffortEnvSchema.default("medium"),
     NEWSWEB_POLLING_ENABLED: booleanEnvSchema,
     POLL_INTERVAL_MS: z.coerce.number().int().min(5000).default(5000),
     LATEST_BOOTSTRAP_COUNT: z.coerce.number().int().min(0).max(50).default(30)

@@ -39,7 +39,7 @@ IKKE NYHETSVERDIG (svar NEI):
 Hvis saken bare kan skrives ved å lese et vedlegg som ikke er gjengitt i teksten,
 er den ikke nyhetsverdig nok for automatisk omskriving.
 
-Svar med et JSON-objekt: {"newsworthy": true/false, "reason": "kort begrunnelse på norsk"}`;
+Sett newsworthy til true/false og gi en kort begrunnelse på norsk i reason.`;
 
 export type TriageResult = {
   newsworthy: boolean;

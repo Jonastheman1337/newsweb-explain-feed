@@ -27,18 +27,24 @@ describe("parseWorkerConfig", () => {
       OPENAI_FAST_MODEL: "gpt-5.4-mini",
       OPENAI_TIMEOUT_MS: "60000",
       OPENAI_FAST_TIMEOUT_MS: "15000",
-      OPENAI_DEFAULT_REASONING_EFFORT: "medium",
-      OPENAI_REPORT_REASONING_EFFORT: "medium",
+      OPENAI_DEFAULT_REASONING_EFFORT: "high",
+      OPENAI_REPORT_REASONING_EFFORT: "high",
       OPENAI_HARD_REASONING_EFFORT: "medium",
+      OPENAI_TRIAGE_REASONING_EFFORT: "low",
+      OPENAI_REFERENCE_REASONING_EFFORT: "high",
+      OPENAI_REVIEW_REASONING_EFFORT: "low",
       POLL_INTERVAL_MS: "5000"
     });
     expect(config.OPENAI_MODEL).toBe("gpt-5.5");
     expect(config.OPENAI_FAST_MODEL).toBe("gpt-5.4-mini");
     expect(config.OPENAI_TIMEOUT_MS).toBe(60000);
     expect(config.OPENAI_FAST_TIMEOUT_MS).toBe(15000);
-    expect(config.OPENAI_DEFAULT_REASONING_EFFORT).toBe("medium");
-    expect(config.OPENAI_REPORT_REASONING_EFFORT).toBe("medium");
+    expect(config.OPENAI_DEFAULT_REASONING_EFFORT).toBe("high");
+    expect(config.OPENAI_REPORT_REASONING_EFFORT).toBe("high");
     expect(config.OPENAI_HARD_REASONING_EFFORT).toBe("medium");
+    expect(config.OPENAI_TRIAGE_REASONING_EFFORT).toBe("low");
+    expect(config.OPENAI_REFERENCE_REASONING_EFFORT).toBe("high");
+    expect(config.OPENAI_REVIEW_REASONING_EFFORT).toBe("low");
     expect(config.NEWSWEB_POLLING_ENABLED).toBe(true);
     expect(config.POLL_INTERVAL_MS).toBe(5000);
   });
@@ -58,6 +64,9 @@ describe("parseWorkerConfig", () => {
     expect(config.OPENAI_DEFAULT_REASONING_EFFORT).toBe("medium");
     expect(config.OPENAI_REPORT_REASONING_EFFORT).toBe("medium");
     expect(config.OPENAI_HARD_REASONING_EFFORT).toBe("medium");
+    expect(config.OPENAI_TRIAGE_REASONING_EFFORT).toBe("minimal");
+    expect(config.OPENAI_REFERENCE_REASONING_EFFORT).toBe("medium");
+    expect(config.OPENAI_REVIEW_REASONING_EFFORT).toBe("medium");
     expect(config.NEWSWEB_POLLING_ENABLED).toBe(true);
     expect(config.POLL_INTERVAL_MS).toBe(5000);
     expect(config.LATEST_BOOTSTRAP_COUNT).toBe(30);

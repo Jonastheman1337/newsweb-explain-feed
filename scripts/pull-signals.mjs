@@ -778,6 +778,325 @@ function articleShapeByPromptVersion(generations) {
   return sortedBuckets(buckets);
 }
 
+function parseJsonField(raw) {
+  if (raw == null || raw === "") return null;
+  if (typeof raw !== "string") return raw;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function percentile(sortedValues, p) {
+  if (!sortedValues.length) return null;
+  const index = Math.min(
+    sortedValues.length - 1,
+    Math.max(0, Math.ceil((p / 100) * sortedValues.length) - 1)
+  );
+  return sortedValues[index];
+}
+
+function validationIssueStats(generations) {
+  const byVersion = new Map();
+  const codeTotals = new Map();
+
+  for (const row of generations) {
+    const validation = parseJsonField(row.validation_json);
+    if (!validation || typeof validation !== "object") continue;
+    const version = promptVersionBucket(row);
+    let bucket = byVersion.get(version);
+    if (!bucket) {
+      bucket = {
+        prompt_version: version,
+        runs_with_validation: 0,
+        runs_with_blocking: 0,
+        runs_with_warning: 0,
+        issue_counts: new Map()
+      };
+      byVersion.set(version, bucket);
+    }
+    bucket.runs_with_validation += 1;
+    const issues = Array.isArray(validation.issues) ? validation.issues : [];
+    let hasBlocking = false;
+    let hasWarning = false;
+    for (const issue of issues) {
+      if (!issue || typeof issue !== "object") continue;
+      const code = String(issue.code ?? "(unknown)");
+      const severity = String(issue.severity ?? "(unknown)");
+      const key = `${code}:${severity}`;
+      bucket.issue_counts.set(key, (bucket.issue_counts.get(key) ?? 0) + 1);
+      codeTotals.set(key, (codeTotals.get(key) ?? 0) + 1);
+      if (severity === "blocking") hasBlocking = true;
+      if (severity === "warning") hasWarning = true;
+    }
+    if (hasBlocking) bucket.runs_with_blocking += 1;
+    if (hasWarning) bucket.runs_with_warning += 1;
+  }
+
+  const toRanked = (map) =>
+    [...map.entries()]
+      .map(([key, count]) => {
+        const [code, severity] = key.split(":");
+        return { code, severity, count };
+      })
+      .sort((a, b) => b.count - a.count || a.code.localeCompare(b.code));
+
+  return {
+    byPromptVersion: [...byVersion.values()]
+      .map((bucket) => ({
+        prompt_version: bucket.prompt_version,
+        runs_with_validation: bucket.runs_with_validation,
+        runs_with_blocking: bucket.runs_with_blocking,
+        runs_with_warning: bucket.runs_with_warning,
+        issues: toRanked(bucket.issue_counts)
+      }))
+      .sort((a, b) => a.prompt_version.localeCompare(b.prompt_version)),
+    rankedIssueCodes: toRanked(codeTotals)
+  };
+}
+
+function referenceRepairStats(generations) {
+  const byVersion = new Map();
+
+  for (const row of generations) {
+    const validation = parseJsonField(row.validation_json);
+    const referenceCheck =
+      parseJsonField(row.reference_check_json) ??
+      (validation && typeof validation === "object" ? validation.referenceCheck : null);
+    const version = promptVersionBucket(row);
+    let bucket = byVersion.get(version);
+    if (!bucket) {
+      bucket = {
+        prompt_version: version,
+        run_count: 0,
+        reference_check_ran: 0,
+        correction_applied_count: 0,
+        correction_attempt_total: 0,
+        attempts_distribution: { "0": 0, "1": 0, "2": 0, "3+": 0 },
+        checker_error_count: 0,
+        blocking_after_repairs_count: 0,
+        high_risk_unsupported_count: 0,
+        attribution_correction_count: 0,
+        validation_repair_applied_count: 0,
+        editorial_review_repair_count: 0,
+        initial_coverages: [],
+        final_coverages: []
+      };
+      byVersion.set(version, bucket);
+    }
+    bucket.run_count += 1;
+    if (validation && typeof validation === "object") {
+      const validationRepair = validation.validationRepair;
+      if (validationRepair && typeof validationRepair === "object" && validationRepair.applied) {
+        bucket.validation_repair_applied_count += 1;
+      }
+      const editorialReview = validation.editorialReview;
+      if (editorialReview && typeof editorialReview === "object" && editorialReview.repairApplied) {
+        bucket.editorial_review_repair_count += 1;
+      }
+    }
+    if (!referenceCheck || typeof referenceCheck !== "object") continue;
+    bucket.reference_check_ran += 1;
+    if (referenceCheck.checkerError) bucket.checker_error_count += 1;
+    if (referenceCheck.correctionApplied) bucket.correction_applied_count += 1;
+    if (referenceCheck.blocking) bucket.blocking_after_repairs_count += 1;
+    if (Number(referenceCheck.highRiskUnsupportedSentenceCount) > 0) {
+      bucket.high_risk_unsupported_count += 1;
+    }
+    if (referenceCheck.attributionCorrectionApplied) {
+      bucket.attribution_correction_count += 1;
+    }
+    const attempts = Number(referenceCheck.correctionAttempts ?? 0);
+    bucket.correction_attempt_total += Number.isFinite(attempts) ? attempts : 0;
+    const attemptsKey = attempts >= 3 ? "3+" : String(Math.max(0, attempts));
+    bucket.attempts_distribution[attemptsKey] += 1;
+    const initial = Number(referenceCheck.initialCoveragePercent);
+    const final = Number(referenceCheck.finalCoveragePercent);
+    if (Number.isFinite(initial)) bucket.initial_coverages.push(initial);
+    if (Number.isFinite(final)) bucket.final_coverages.push(final);
+  }
+
+  const avg = (values) =>
+    values.length
+      ? Number((values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(1))
+      : null;
+
+  return [...byVersion.values()]
+    .map((bucket) => ({
+      prompt_version: bucket.prompt_version,
+      run_count: bucket.run_count,
+      reference_check_ran: bucket.reference_check_ran,
+      correction_applied_count: bucket.correction_applied_count,
+      correction_applied_rate: rate(bucket.correction_applied_count, bucket.reference_check_ran),
+      correction_attempt_total: bucket.correction_attempt_total,
+      attempts_distribution: bucket.attempts_distribution,
+      checker_error_count: bucket.checker_error_count,
+      blocking_after_repairs_count: bucket.blocking_after_repairs_count,
+      high_risk_unsupported_count: bucket.high_risk_unsupported_count,
+      attribution_correction_count: bucket.attribution_correction_count,
+      validation_repair_applied_count: bucket.validation_repair_applied_count,
+      editorial_review_repair_count: bucket.editorial_review_repair_count,
+      avg_initial_coverage: avg(bucket.initial_coverages),
+      avg_final_coverage: avg(bucket.final_coverages)
+    }))
+    .sort((a, b) => a.prompt_version.localeCompare(b.prompt_version));
+}
+
+function modelCallStats(generations) {
+  const byVersion = new Map();
+
+  for (const row of generations) {
+    const calls = parseJsonField(row.model_calls);
+    const version = promptVersionBucket(row);
+    let bucket = byVersion.get(version);
+    if (!bucket) {
+      bucket = {
+        prompt_version: version,
+        run_count: 0,
+        runs_with_model_calls: 0,
+        total_calls: 0,
+        rewrite_call_distribution: { "1": 0, "2": 0, "3": 0, "4+": 0 },
+        runs_with_repair_calls: 0,
+        reasoning_efforts: new Map(),
+        latency_seconds: []
+      };
+      byVersion.set(version, bucket);
+    }
+    bucket.run_count += 1;
+
+    if (row.started_at && row.finished_at) {
+      const seconds =
+        (new Date(row.finished_at).getTime() - new Date(row.started_at).getTime()) / 1000;
+      if (Number.isFinite(seconds) && seconds >= 0) {
+        bucket.latency_seconds.push(Number(seconds.toFixed(1)));
+      }
+    }
+
+    if (!Array.isArray(calls) || calls.length === 0) continue;
+    bucket.runs_with_model_calls += 1;
+    bucket.total_calls += calls.length;
+    let rewriteCalls = 0;
+    for (const call of calls) {
+      if (!call || typeof call !== "object") continue;
+      if (call.schemaName === "rewrite_output") rewriteCalls += 1;
+      const effortKey = `${call.schemaName ?? "(unknown)"}:${call.reasoningEffort ?? "(unknown)"}`;
+      bucket.reasoning_efforts.set(
+        effortKey,
+        (bucket.reasoning_efforts.get(effortKey) ?? 0) + 1
+      );
+    }
+    if (rewriteCalls > 0) {
+      const key = rewriteCalls >= 4 ? "4+" : String(rewriteCalls);
+      bucket.rewrite_call_distribution[key] += 1;
+      if (rewriteCalls > 1) bucket.runs_with_repair_calls += 1;
+    }
+  }
+
+  return [...byVersion.values()]
+    .map((bucket) => {
+      const latencies = bucket.latency_seconds.sort((a, b) => a - b);
+      return {
+        prompt_version: bucket.prompt_version,
+        run_count: bucket.run_count,
+        runs_with_model_calls: bucket.runs_with_model_calls,
+        avg_calls_per_run: bucket.runs_with_model_calls
+          ? Number((bucket.total_calls / bucket.runs_with_model_calls).toFixed(2))
+          : null,
+        rewrite_call_distribution: bucket.rewrite_call_distribution,
+        runs_with_repair_calls: bucket.runs_with_repair_calls,
+        repair_call_rate: rate(bucket.runs_with_repair_calls, bucket.runs_with_model_calls),
+        calls_by_schema_and_effort: [...bucket.reasoning_efforts.entries()]
+          .map(([key, count]) => ({ key, count }))
+          .sort((a, b) => b.count - a.count),
+        latency_seconds_p50: percentile(latencies, 50),
+        latency_seconds_p90: percentile(latencies, 90),
+        latency_sample_count: latencies.length
+      };
+    })
+    .sort((a, b) => a.prompt_version.localeCompare(b.prompt_version));
+}
+
+function countSentencesApprox(text) {
+  return String(text ?? "")
+    .split(/[.!?](?:\s|$)/)
+    .filter((part) => part.trim().length > 0).length;
+}
+
+const attributionRe = /ifolge|melder selskapet|opplyser|skriver selskapet|borsmelding/;
+
+function editPatternStats(edits) {
+  const stats = {
+    copy_count: 0,
+    with_edits_count: 0,
+    title_changed_count: 0,
+    body_changed_count: 0,
+    title_shortened_count: 0,
+    percent_sign_fix_count: 0,
+    thousand_separator_fix_count: 0,
+    attribution_added_count: 0,
+    sentences_removed_count: 0,
+    examples: []
+  };
+
+  for (const row of edits) {
+    stats.copy_count += 1;
+    if (!isTruthy(row.has_edits)) continue;
+    stats.with_edits_count += 1;
+
+    const originalTitle = String(row.original_title ?? "");
+    const editedTitle = String(row.edited_title ?? "");
+    const originalBody = String(row.original_body ?? "");
+    const editedBody = String(row.edited_body ?? "");
+    const titleChanged = originalTitle.trim() !== editedTitle.trim();
+    const bodyChanged = originalBody.trim() !== editedBody.trim();
+
+    if (titleChanged) {
+      stats.title_changed_count += 1;
+      if (
+        editedTitle.trim().length > 0 &&
+        editedTitle.trim().length < originalTitle.trim().length * 0.9
+      ) {
+        stats.title_shortened_count += 1;
+      }
+    }
+    if (bodyChanged) {
+      stats.body_changed_count += 1;
+      const combinedOriginal = `${originalTitle}\n${originalBody}`;
+      const combinedEdited = `${editedTitle}\n${editedBody}`;
+      if (combinedOriginal.includes("%") && !combinedEdited.includes("%")) {
+        stats.percent_sign_fix_count += 1;
+      }
+      if (/\d[  ]\d{3}/.test(combinedOriginal) && /\d\.\d{3}/.test(combinedEdited)) {
+        stats.thousand_separator_fix_count += 1;
+      }
+      const normalizedOriginal = normalizeNorwegian(combinedOriginal);
+      const normalizedEdited = normalizeNorwegian(combinedEdited);
+      if (!attributionRe.test(normalizedOriginal) && attributionRe.test(normalizedEdited)) {
+        stats.attribution_added_count += 1;
+      }
+      if (countSentencesApprox(editedBody) < countSentencesApprox(originalBody)) {
+        stats.sentences_removed_count += 1;
+      }
+    }
+
+    if (stats.examples.length < 20 && (titleChanged || bodyChanged)) {
+      stats.examples.push({
+        copied_at: row.copied_at,
+        message_id: row.message_id,
+        prompt_version: row.prompt_version,
+        title_changed: titleChanged,
+        body_changed: bodyChanged,
+        original_title: originalTitle,
+        edited_title: editedTitle
+      });
+    }
+  }
+
+  stats.with_edits_rate = rate(stats.with_edits_count, stats.copy_count);
+  return stats;
+}
+
 export function analyze(data, timeZone) {
   const generations = data.generations ?? [];
   const events = data.events ?? [];
@@ -813,6 +1132,12 @@ export function analyze(data, timeZone) {
     engagement: {
       byPromptVersion: engagementByPromptVersion(data),
       articleShapeByPromptVersion: articleShapeByPromptVersion(generations)
+    },
+    qualityPipeline: {
+      validationIssues: validationIssueStats(generations),
+      referenceRepairByPromptVersion: referenceRepairStats(generations),
+      modelCallsByPromptVersion: modelCallStats(generations),
+      editPatterns: editPatternStats(data.edits ?? [])
     },
     noticesByEventCount: groupEventsByMessage(events),
     feedback: (data.feedback ?? []).map((row) => ({
@@ -951,7 +1276,15 @@ async function main() {
         feedbackCount: artifact.summary.feedback.length,
         editCount: artifact.summary.edits.length,
         titleCount: artifact.summary.titles.length,
-        problematicGenerationCount: artifact.summary.problematicGenerations.length
+        problematicGenerationCount: artifact.summary.problematicGenerations.length,
+        rankedValidationIssues:
+          artifact.summary.qualityPipeline.validationIssues.rankedIssueCodes.slice(0, 12),
+        referenceRepair: artifact.summary.qualityPipeline.referenceRepairByPromptVersion,
+        modelCalls: artifact.summary.qualityPipeline.modelCallsByPromptVersion,
+        editPatterns: {
+          ...artifact.summary.qualityPipeline.editPatterns,
+          examples: undefined
+        }
       },
       null,
       2

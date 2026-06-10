@@ -17,7 +17,7 @@ import {
   EDITORIAL_WRITING_STYLE
 } from "./shared-editorial.js";
 
-export const PROMPT_VERSION = "v5.8.0";
+export const PROMPT_VERSION = "v5.9.0";
 
 export type OutputMode = "notice" | "extended_notice";
 
@@ -71,7 +71,7 @@ const MECHANISM_FIRST_RULE = [
 ].join("\n");
 
 const QUOTE_USER_INSTRUCTION =
-  "Hvis kilden inneholder et relevant sitat eller en navngitt uttalelse fra CEO, CFO, styreleder, primærinnsider eller annen nøkkelperson, skal saken normalt bruke ett kort sitat, en kildefast formulering i «...» eller en tydelig personattribuert parafrase. Ved oversettelse skal meningen bevares, men språket skal flyte naturlig på norsk. Dropp bare uttalelsen hvis den er generisk PR, ikke forklarer nyheten, eller saken er en svært kort rutinemelding.";
+  "Sjekk kilden for navngitte uttalelser fra CEO, CFO, styreleder, primærinnsider eller annen nøkkelperson. Finnes en uttalelse som forklarer årsak, marked, risiko, utsikter eller hendelsen, skal saken gjengi den med sitatstrek, kildefast «...»-formulering eller personattribuert parafrase, på naturlig norsk. Dropp den bare hvis den er ren PR uten innhold (legg den da i excluded_hype) eller saken er en svært kort rutinemelding.";
 
 const EXTRA_SOURCE_INSTRUCTION =
   "Bruk denne kildeteksten bare når den tilfører nyhetsverdig substans, forklaring eller relevant personuttalelse. Et kort sitat eller en navngitt uttalelse fra CEO, CFO, styreleder eller annen nøkkelperson kan brukes selv om hovedfakta allerede står i børsmeldingen, hvis uttalelsen forklarer årsak, risiko, utsikter, strategi eller betydningen av hendelsen.";
@@ -151,6 +151,12 @@ Kontrakt (2 body-avsnitt):
 Hendelse med sitat (3 body-avsnitt):
 {"title":"Norse Atlantic setter opp ekstrafly","lead":"Flyselskapet Norse Atlantic legger til ekstra flyginger mellom London og Bangkok fordi urolighetene i Midtøsten har endret flyrutene globalt.","body":["Endringene i luftrommet gjør at flere reisende trenger alternative ruter mellom Europa og Sørøst-Asia, opplyser selskapet.","De fire ekstraflygningene går 9. og 11. mars fra London, med retur 10. og 12. mars.","– Vi ser økt behov for alternative langdistanseruter mellom Europa og Asia, sier konsernsjef Eivind Roald."],"company_sentence":"Norse Atlantic Airways er et norsk flyselskap som flyr langdistanseruter.","key_facts":["Fire ekstra flyginger London–Bangkok","Skyldes endringer i luftrom på grunn av Midtøsten"],"negative_or_surprising":[],"excluded_hype":[],"source_limitations":[],"confidence":"high","importance":"medium","source_spans":["to ekstra tur-retur-flygninger","CEO Eivind Roald: 'We see increased need for alternative long-haul routes between Europe and Asia'"]}
 
+Resultatvarsel med kildefast formulering («...» i løpende tekst og sitatstrek):
+{"title":"Elopak venter svakere salg i Europa","lead":"Emballasjeselskapet Elopak venter svakere salg i Europa i andre halvår, går det frem av en børsmelding.","body":["Selskapet skriver at salget i Europa ventes å bli «klart svakere enn tidligere antatt», og peker på at kundene utsetter bestillinger.","– Vi ser at flere kunder skyver ordrer til neste år, men etterspørselen utenfor Europa er stabil, sier konsernsjef Thomas Körmendi."],"company_sentence":"Elopak produserer kartongemballasje for drikkevarer.","key_facts":["Venter svakere salg i Europa i andre halvår","Kunder utsetter bestillinger"],"negative_or_surprising":["Resultatvarsel for Europa-virksomheten"],"excluded_hype":[],"source_limitations":[],"confidence":"high","importance":"viktig","source_spans":["'European sales are expected to be clearly weaker than previously assumed'","CEO Thomas Körmendi: 'We see several customers pushing orders into next year, while demand outside Europe remains stable'"]}
+
+Kontrakt med ledelseskommentar (sitatstrek i eget avsnitt, PR-del i excluded_hype):
+{"title":"Nordic Semiconductor lander storkontrakt i USA","lead":"Brikkeprodusenten Nordic Semiconductor har signert en treårig leveranseavtale verdt 40 millioner dollar med en amerikansk industrikunde, melder selskapet.","body":["Avtalen gjelder trådløse brikker til sensorer som overvåker industrianlegg.","– Dette er den største enkeltkontrakten vår i USA, og leveransene starter i første kvartal, sier administrerende direktør Vegard Wollan."],"company_sentence":"Nordic Semiconductor utvikler trådløse halvlederbrikker.","key_facts":["Treårig avtale verdt 40 millioner dollar","Leveranser fra første kvartal"],"negative_or_surprising":[],"excluded_hype":["CEO-utsagn om at selskapet er 'thrilled' over samarbeidet — generisk PR"],"source_limitations":[],"confidence":"high","importance":"medium","source_spans":["three-year supply agreement valued at USD 40 million","CEO Vegard Wollan: 'This is our largest single contract in the US, with deliveries starting in the first quarter'"]}
+
 Materiell hendelse (2 body-avsnitt):
 {"title":"Gulf Keystone stopper produksjonen","lead":"Oljeselskapet Gulf Keystone har midlertidig stengt ned produksjonen i Kurdistan i Irak på grunn av sikkerhetssituasjonen.","body":["Selskapet har satt i gang tiltak for å beskytte de ansatte. Oljeanleggene er ikke skadet, ifølge meldingen.","Gulf Keystone følger situasjonen tett og lover å komme med oppdateringer."],"company_sentence":"Gulf Keystone er et oljeselskap som produserer olje i Kurdistan-regionen i Irak.","key_facts":["Produksjonen er stanset midlertidig","Ansatte beskyttes, anlegg ikke skadet"],"negative_or_surprising":["Produksjonsstans grunnet sikkerhetssituasjon"],"excluded_hype":[],"source_limitations":[],"confidence":"high","importance":"viktig","source_spans":["midlertidig har stengt produksjonen","tiltak for å beskytte ansatte"]}
 `.trim();
@@ -209,6 +215,9 @@ ${STYLE_EXAMPLES}
 Sprak: norsk Bokmal. Tone: noytral, enkel og presis for en finansielt interessert leser uten profesjonell nisjekunnskap.
 Bruk kun tall og fakta som finnes i kilden.
 Hvis meldingen viser til ekstra dokumenter som ikke er analysert, legg inn begrensningen i source_limitations. Ikke vis dette i title, lead eller body.
+
+SELVSJEKK SITAT
+Før du leverer: Hvis kilden har en navngitt nøkkelpersonuttalelse med konkret innhold — står den i saken (sitatstrek, «...» eller parafrase) eller i excluded_hype? Hvis nei, rett det.
 
 ${EDITORIAL_NORWEGIAN}`;
 

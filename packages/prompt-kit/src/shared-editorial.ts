@@ -129,13 +129,16 @@ Når den eksakte ordlyden er ekstra viktig, bruk «...» og hold deg tettere til
 
 Ikke bruk «...» rundt en fri omskriving som legger til tolkning, årsak eller styrkegrad som ikke ligger i kilden. «...» brukes heller ikke rundt konkrete tall eller fakta alene.
 
-Bruk normalt ett kort sitat, én kildefast formulering i «...» eller én tydelig personattribuert parafrase når en CEO, CFO, styreleder, primærinnsider eller annen nøkkelperson forklarer årsak, marked, risiko, utsikter, strategi, finansiering, kontrakt, resultat eller en materiell hendelse.
+HOVEDREGEL FOR PERSONUTTALELSER
+Hvis kilden inneholder en navngitt uttalelse fra CEO, CFO, styreleder, primærinnsider eller annen nøkkelperson som tilfører noe utover tallene — årsak, marked, etterspørsel, risiko, utsikter, strategi, finansiering, kontrakt, resultat eller en materiell hendelse — skal saken gjengi den. Velg form: sitatstrek i eget avsnitt, kildefast «...»-formulering i løpende tekst, eller personattribuert parafrase.
 
-Ikke klassifiser konkrete markeds-, etterspørsels- eller utsiktskommentarer som hype bare fordi de kommer fra ledelsen. Hvis en CEO, CFO eller styreleder sier noe kildefast om etterspørsel, ordreinngang, booking, ruter som selger raskt, kapasitet, markedssituasjon, risiko, guiding eller utsikter, skal kommentaren vurderes som mulig nyhetsverdig kontekst.
+Unntak — dropp uttalelsen bare hvis ett av disse gjelder:
+1. Uttalelsen er generisk PR uten konkret innhold: bare tilfredshet, stolthet, optimisme, «sterk drift», «godt produkt», «attraktivt tilbud» eller lignende. Legg den da i excluded_hype.
+2. Saken er en svært kort rutinemelding der uttalelsen ikke forklarer noe.
 
-Ta den normalt med når den tilfører noe utover tallene i meldingen, for eksempel en fremoverlent vurdering av etterspørsel, booking, kapasitet eller marked. Bruk da ett kort sitat eller en tydelig personattribuert parafrase. Kutt adjektiver, kundeløfter og selvskryt, men behold den konkrete markedsinformasjonen.
+Regnskap for uttalelser: hver navngitt nøkkelpersonuttalelse i kilden skal enten gjengis i saken eller stå i excluded_hype. En relevant uttalelse som forsvinner stille er en feil, på samme måte som et oppfunnet sitat er en feil.
 
-Dropp fortsatt uttalelser som bare uttrykker tilfredshet, stolthet, optimisme, «sterk drift», «godt produkt», «attraktivt tilbud» eller lignende uten konkret markeds- eller utsiktsinformasjon.
+Ikke klassifiser konkrete markeds-, etterspørsels- eller utsiktskommentarer som hype bare fordi de kommer fra ledelsen. Hvis en CEO, CFO eller styreleder sier noe kildefast om etterspørsel, ordreinngang, booking, kapasitet, markedssituasjon, risiko, guiding eller utsikter, skal den med i saken. Kutt adjektiver, kundeløfter og selvskryt, men behold den konkrete markedsinformasjonen.
 
 Ikke-papegøye-regelen gjelder ikke korte, relevante sitater eller kildefaste formuleringer. Et godt sitat kan gjengis på naturlig norsk så lenge meningen er kildefast.
 

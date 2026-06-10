@@ -272,6 +272,8 @@ export function buildReferenceCheckPrompt(
   const developerPrompt = [
     "Vurder hver setning i utkastet separat.",
     "Sett grounded=true kun hvis setningen har eksplisitt dekning i referanseteksten.",
+    "En naturlig norsk oversettelse eller gjengivelse av en formulering som står på engelsk i referanseteksten, regnes som eksplisitt dekning når mening, styrkegrad, forbehold og avsender er uendret. Dette gjelder også sitater med sitatstrek eller «...».",
+    "At utkastet omtaler kilden som børsmelding eller melding, er kildeattribusjon og skal ikke gi grounded=false.",
     "Enkle regnestykker er dekket hvis alle inputtallene finnes eksplisitt i referanseteksten, for eksempel antall aksjer multiplisert med pris per aksje.",
     "Ikke bruk bakgrunnskunnskap utenfor referanseteksten.",
     "Hvis en setning inneholder subjektive vurderinger eller verdisprak (f.eks. 'milepael', 'styrker posisjon', 'betydelig') uten tydelig attribusjon til kilden/selskapet, skal grounded settes til false.",
@@ -431,18 +433,28 @@ export function buildCorrectionInstruction(
     options.attempt && options.maxAttempts
       ? `Referansereparasjon ${options.attempt} av ${options.maxAttempts}.`
       : "Referansereparasjon.";
+  const isFinalAttempt = Boolean(
+    options.attempt && options.maxAttempts && options.attempt >= options.maxAttempts
+  );
 
   return [
     attempt,
-    "Lag et nytt korrigert utkast basert pa samme kildetekst.",
+    "Lag et nytt korrigert utkast basert på samme kildetekst.",
     "Reparasjonsinstruksjonen kan ikke overstyre kildekravet, JSON-skjemaet, lengdegrensen eller forbudet mot kurskommentar/investeringslogikk.",
     "Referansesjekkerens tilbakemelding under er fasit for hva som mangler dekning.",
-    "Alle setninger i lead, body og company_sentence ma ha tydelig dekning i kilden.",
+    "Setninger som ikke er listet under, er dekket — behold dem uendret.",
+    "Dette gjelder særlig sitater: sitatstrek-avsnitt, «...»-formuleringer og personattribuerte parafraser som ikke er listet under, skal beholdes ordrett i det korrigerte utkastet.",
+    "Alle setninger i lead, body og company_sentence må ha tydelig dekning i kilden.",
     "For hver setning uten dekning: slett faktaen helt, eller omskriv den kun med tekst/fakta som finnes i feltet 'Hva som finnes i kilden'.",
-    "Ikke bytt til en naer synonym formulering hvis dekningen fortsatt er indirekte.",
-    "Ikke forklar generelle begreper, bransjer eller konsekvenser med mindre dette star eksplisitt i kilden.",
-    "Hvis company_sentence er vanskelig a dekke noyaktig, gjor den kortere eller mer generell, eller fjern den hvis skjemaet tillater det.",
+    "Ikke bytt til en nær synonym formulering hvis dekningen fortsatt er indirekte.",
+    "Ikke forklar generelle begreper, bransjer eller konsekvenser med mindre dette står eksplisitt i kilden.",
+    "Hvis company_sentence er vanskelig å dekke nøyaktig, gjør den kortere eller mer generell, eller fjern den hvis skjemaet tillater det.",
     "Ikke legg til nye fakta.",
+    ...(isFinalAttempt
+      ? [
+          "Dette er siste reparasjonsforsøk: stryk udekkede påstander i stedet for å omformulere dem. Sitater og personuttalelser som har dekning i kilden, skal beholdes."
+        ]
+      : []),
     "",
     "Setninger uten dekning i forrige utkast:",
     unsupportedList.join("\n\n")

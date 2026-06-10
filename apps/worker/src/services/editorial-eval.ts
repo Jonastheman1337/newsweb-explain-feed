@@ -1,5 +1,7 @@
 import type { PromptPayload, RegularPromptVariantId } from "@newsweb/prompt-kit";
 
+import type { QuoteTelemetry } from "./rewrite-validation.js";
+
 export const evalCategoryIds = [
   "results_guidance",
   "financing",
@@ -91,6 +93,17 @@ export type EvalGenerationSummary = {
   variantId: RegularPromptVariantId;
   category: EvalCategoryId;
   fatalStatus: EvalFatalStatus;
+  quoteTelemetry?: QuoteTelemetry;
+};
+
+export type EvalQuoteMetrics = {
+  generationsWithTelemetry: number;
+  quoteOpportunityCount: number;
+  quotePresenceCount: number;
+  quotePresenceRate: number;
+  dashQuoteCount: number;
+  guillemetsCount: number;
+  attributionOnlyCount: number;
 };
 
 export type EvalRunSummaryInput = {
@@ -125,6 +138,7 @@ export type EditorialEvalSummary = {
   bothBad: number;
   fatalCounts: Record<string, number>;
   categoryNetWins: Record<string, number>;
+  quoteMetrics: Record<string, EvalQuoteMetrics>;
   recommendation: "ship_candidate" | "iterate" | "reject";
   reasons: string[];
 };
@@ -453,6 +467,42 @@ export function summarizeEditorialEval(
       (fatalCounts[generation.variantId] ?? 0) + 1;
   }
 
+  const quoteMetrics: Record<string, EvalQuoteMetrics> = {};
+  for (const generation of run.generations) {
+    const telemetry = generation.quoteTelemetry;
+    if (!telemetry) continue;
+    const metrics = (quoteMetrics[generation.variantId] ??= {
+      generationsWithTelemetry: 0,
+      quoteOpportunityCount: 0,
+      quotePresenceCount: 0,
+      quotePresenceRate: 0,
+      dashQuoteCount: 0,
+      guillemetsCount: 0,
+      attributionOnlyCount: 0
+    });
+    metrics.generationsWithTelemetry += 1;
+    const hasQuote =
+      telemetry.draftContainsStandaloneDashQuote ||
+      telemetry.draftContainsInlineGuillemets;
+    if (telemetry.draftContainsStandaloneDashQuote) metrics.dashQuoteCount += 1;
+    if (telemetry.draftContainsInlineGuillemets) metrics.guillemetsCount += 1;
+    if (!hasQuote && telemetry.draftContainsNamedPersonAttribution) {
+      metrics.attributionOnlyCount += 1;
+    }
+    if (telemetry.sourceContainsNamedQuoteLikePattern) {
+      metrics.quoteOpportunityCount += 1;
+      if (hasQuote) metrics.quotePresenceCount += 1;
+    }
+  }
+  for (const metrics of Object.values(quoteMetrics)) {
+    metrics.quotePresenceRate =
+      metrics.quoteOpportunityCount > 0
+        ? Number(
+            (metrics.quotePresenceCount / metrics.quoteOpportunityCount).toFixed(4)
+          )
+        : 0;
+  }
+
   let controlWins = 0;
   let challengerWins = 0;
   let ties = 0;
@@ -528,6 +578,7 @@ export function summarizeEditorialEval(
     bothBad,
     fatalCounts,
     categoryNetWins,
+    quoteMetrics,
     recommendation,
     reasons
   };

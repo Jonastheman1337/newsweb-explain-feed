@@ -5,8 +5,28 @@ This note is for future agents who need to find or rerun the OpenAI-only editori
 ## Current Status
 
 - The mechanism-first challenger has already been shipped as the default regular notice prompt in `packages/prompt-kit/src/prompt.ts`.
-- The production prompt version is `v5.7.0`.
+- The production prompt version is `v5.9.0` (quote-frequency update, 2026-06-10:
+  HOVEDREGEL FOR PERSONUTTALELSER + uttalelses-regnskap via `excluded_hype` in
+  `EDITORIAL_QUOTES`, two new quote-bearing style examples in both v5 and v6,
+  SELVSJEKK SITAT at the end of the v5 developer prompt, de-hedged report
+  management-comment rule, and quote-preserving reference-repair instructions).
+  Production baseline before the change (29 days, v5.8.0 and older): 2.9% of
+  published articles contained a real quote, zero dash quotes, 31% quote rate
+  when the source had a quotable key-person statement. Re-measure with
+  `npm run signals:pull` + `node scripts/analyze-quote-telemetry.mjs <artifact>`.
+- A `regular_v6_full` challenger (correct bokmål, deduplicated blocks, SELVSJEKK
+  self-check, extract-then-write schema `rewriteOutputJsonSchemaV6`) is registered
+  in `packages/prompt-kit/src/prompt-v6.ts` + `regular-prompt-variants.ts` and is
+  pending blind review. Eval artifacts: `tmp/editorial-eval/cases-v6-50.json`,
+  `run-v6-50.json` (+ `run-v6-50.log`), generated 2026-06-10 at reasoning effort
+  high — **these predate the v5.9.0 quote changes (both arms changed identically);
+  regenerate the run before any ship decision.** Ship only on the acceptance rule
+  below; the production flip steps are in the v6 plan (PROMPT_VERSION → v6.0.0,
+  schema order swap, test-string updates).
 - Report and yearly-report prompt paths were not changed by the ship.
+- Note for Windows: `npm run eval:editorial -w apps/worker -- run ...` can swallow
+  `--flags` on some npm versions. Run the underlying tool directly from
+  `apps/worker` instead: `npx tsx src/scripts/editorial-eval.ts run ...`.
 - The historical A/B eval implementation is local/unmerged unless these files exist in the checkout:
   - `apps/worker/src/scripts/editorial-eval.ts`
   - `apps/worker/src/services/editorial-eval.ts`
@@ -82,7 +102,10 @@ Common files:
 - `run-15.json`: generated outputs, validation, reference-check results, latency, model, and reasoning effort.
 - `review-15.html`: static blind-review page.
 - `reviews.json`: exported browser review choices.
-- `summary-15.json`: win rates, fatal counts, category net wins, and recommendation.
+- `summary-15.json`: win rates, fatal counts, category net wins, per-variant
+  `quoteMetrics` (quote opportunity count from `sourceContainsNamedQuoteLikePattern`,
+  quote presence rate given opportunity, dash/guillemets counts), and recommendation.
+  Runs created before the quote-telemetry field produce empty `quoteMetrics`.
 
 Known local artifacts from the June 2, 2026 run:
 

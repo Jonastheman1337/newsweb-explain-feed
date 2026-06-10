@@ -44,7 +44,7 @@ export type OpenAIJsonRequest = {
   reasoningEffort: OpenAIReasoningEffort;
   timeoutMs: number;
   maxOutputTokens: number;
-  temperature?: number;
+  promptCacheKey?: string;
   file?: OpenAIFileInput;
 };
 
@@ -58,9 +58,11 @@ export async function callOpenAIForJson(
 ): Promise<string> {
   const attempts = 2;
   const emptyResponseSummaries: string[] = [];
+  let currentRequest = request;
+  let hitMaxOutputTokens = false;
 
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
-    const response = await callOpenAIResponse(client, request);
+    const response = await callOpenAIResponse(client, currentRequest);
     const content = response.output_text?.trim() ?? "";
     if (content) {
       return content;
@@ -69,18 +71,41 @@ export async function callOpenAIForJson(
     emptyResponseSummaries.push(
       `attempt${attempt}=${summary || "empty_response_metadata"}`
     );
+    if (isIncompleteDueToMaxOutputTokens(response)) {
+      // Reasoning tokens count against max_output_tokens; an identical retry
+      // would hit the same ceiling, so double the budget for the next attempt.
+      hitMaxOutputTokens = true;
+      currentRequest = {
+        ...currentRequest,
+        maxOutputTokens: currentRequest.maxOutputTokens * 2
+      };
+    }
   }
 
   throw new Error(
     [
-      `OpenAI returned no output_text for ${request.schemaName} after ${attempts} attempts`,
-      requestDiagnostics(request),
+      hitMaxOutputTokens
+        ? `OpenAI response incomplete (max_output_tokens) for ${request.schemaName} after ${attempts} attempts`
+        : `OpenAI returned no output_text for ${request.schemaName} after ${attempts} attempts`,
+      requestDiagnostics(currentRequest),
       emptyResponseSummaries.length
         ? `emptyResponses=${emptyResponseSummaries.join(" ; ")}`
         : null
     ]
       .filter(Boolean)
       .join(" | ")
+  );
+}
+
+function isIncompleteDueToMaxOutputTokens(response: OpenAIJsonResponse): boolean {
+  if (response.status !== "incomplete") {
+    return false;
+  }
+  const details = response.incomplete_details;
+  return (
+    typeof details === "object" &&
+    details !== null &&
+    (details as { reason?: unknown }).reason === "max_output_tokens"
   );
 }
 
@@ -130,8 +155,8 @@ async function callOpenAIResponse(
         max_output_tokens: request.maxOutputTokens,
         store: false,
         reasoning: { effort: request.reasoningEffort },
-        ...(request.temperature !== undefined
-          ? { temperature: request.temperature }
+        ...(request.promptCacheKey
+          ? { prompt_cache_key: request.promptCacheKey }
           : {}),
         input: [
           { role: "system", content: request.systemPrompt },

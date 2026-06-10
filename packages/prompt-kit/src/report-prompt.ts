@@ -115,7 +115,7 @@ Bruk redaksjonelt skjonn — plukk ut det som er mest nyhetsverdig:
 - Tre ankertall skal alltid sjekkes der de finnes: inntekter, driftsresultat (operating profit/EBIT) og resultat for skatt.
 - Hvis strukturerte nokkeltall er oppgitt i rapportkonteksten, bruk dem som veiviser, men verifiser mot sideteksten.
 - CEO-/ledelseskommentarer kan forklare utviklingen, men skal ikke overstyre tall fra resultatoppstillingen.
-- Etter nøkkeltallene skal du se etter én kort ledelseskommentar som forklarer årsak, marked, risiko, utsikter, strategi, finansiering, kontrakt, resultat eller en materiell hendelse. Hvis kommentaren kommer fra CEO, CFO eller styreleder og tilfører konkret forklaring, bruk normalt ett direkte sitat, en kildefast formulering i «...» eller en tydelig personattribuert parafrase. Ikke bruk generisk selvskryt.
+- Etter nøkkeltallene skal du se etter én kort ledelseskommentar som forklarer årsak, marked, risiko, utsikter, strategi, finansiering, kontrakt, resultat eller en materiell hendelse. Hvis kommentaren kommer fra CEO, CFO eller styreleder og tilfører konkret forklaring, skal du bruke ett direkte sitat, en kildefast formulering i «...» eller en tydelig personattribuert parafrase. Å droppe en konkret, forklarende ledelseskommentar som finnes i kilden, er en kvalitetsfeil — dropp bare generisk selvskryt.
 - Resultat for skatt — ofte overskriften, men ikke alltid
 - Inntekter (total omsetning)
 - Driftsresultat (operating profit/EBIT). Bruk ebitda bare hvis rapporten ikke oppgir driftsresultat/EBIT.

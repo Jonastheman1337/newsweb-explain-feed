@@ -89,8 +89,10 @@ describe("callOpenAIForJson", () => {
     expect(calls).toHaveLength(2);
   });
 
-  it("keeps empty response metadata in no-output diagnostics", async () => {
+  it("doubles the token budget when the response is incomplete on max_output_tokens", async () => {
+    const calls: CapturedCall[] = [];
     const client = createMockClient({
+      calls,
       outputText: "",
       response: {
         id: "resp_123",
@@ -100,8 +102,25 @@ describe("callOpenAIForJson", () => {
     });
 
     await expect(callOpenAIForJson(client, baseRequest)).rejects.toThrow(
-      /attempt1=id=resp_123 status=incomplete incomplete=.*max_output_tokens/
+      /OpenAI response incomplete \(max_output_tokens\) for test_schema after 2 attempts.*attempt1=id=resp_123 status=incomplete incomplete=.*max_output_tokens/
     );
+    expect(calls).toHaveLength(2);
+    expect(calls[0]!.body.max_output_tokens).toBe(512);
+    expect(calls[1]!.body.max_output_tokens).toBe(1024);
+  });
+
+  it("passes prompt_cache_key only when provided", async () => {
+    const calls: CapturedCall[] = [];
+    const client = createMockClient({ calls, outputText: '{"ok":true}' });
+
+    await callOpenAIForJson(client, baseRequest);
+    expect(calls[0]!.body).not.toHaveProperty("prompt_cache_key");
+
+    await callOpenAIForJson(client, {
+      ...baseRequest,
+      promptCacheKey: "newsweb:rewrite-regular:v5.8.0"
+    });
+    expect(calls[1]!.body.prompt_cache_key).toBe("newsweb:rewrite-regular:v5.8.0");
   });
 
   it("wraps API errors with the schema name", async () => {

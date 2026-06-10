@@ -100,3 +100,68 @@ export const rewriteOutputJsonSchema = {
     "source_spans"
   ]
 } as const;
+
+/**
+ * v6 schema: identical key set and constraints, but property order is
+ * extract-then-write. Structured outputs generate fields in schema property
+ * order, so the model documents its evidence (source_spans, key_facts, ...)
+ * before committing to title/lead/body. Consumers are key-based, so the order
+ * is invisible to zod, the API mapper, the UI, and jsonb storage.
+ */
+export const rewriteOutputJsonSchemaV6 = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    source_spans: {
+      type: "array",
+      minItems: 1,
+      maxItems: 8,
+      items: { type: "string", minLength: 5, maxLength: 320 }
+    },
+    key_facts: {
+      type: "array",
+      minItems: 1,
+      maxItems: 8,
+      items: { type: "string", minLength: 5, maxLength: 300 }
+    },
+    negative_or_surprising: {
+      type: "array",
+      maxItems: 6,
+      items: { type: "string", minLength: 5, maxLength: 300 }
+    },
+    excluded_hype: {
+      type: "array",
+      maxItems: 6,
+      items: { type: "string", minLength: 5, maxLength: 300 }
+    },
+    source_limitations: {
+      type: "array",
+      maxItems: 6,
+      items: { type: "string", minLength: 5, maxLength: 300 }
+    },
+    importance: { type: "string", enum: ["viktig", "medium", "uviktig"] },
+    company_sentence: { type: "string", minLength: 10, maxLength: 220 },
+    title: { type: "string", minLength: 6, maxLength: 140 },
+    lead: { type: "string", minLength: 20, maxLength: 350 },
+    body: {
+      type: "array",
+      minItems: 0,
+      maxItems: 8,
+      items: { type: "string", minLength: 10, maxLength: 600 }
+    },
+    confidence: { type: "string", enum: ["high", "medium", "low"] }
+  },
+  required: [
+    "source_spans",
+    "key_facts",
+    "negative_or_surprising",
+    "excluded_hype",
+    "source_limitations",
+    "importance",
+    "company_sentence",
+    "title",
+    "lead",
+    "body",
+    "confidence"
+  ]
+} as const;

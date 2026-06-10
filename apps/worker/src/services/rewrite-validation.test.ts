@@ -229,6 +229,47 @@ describe("validateRewriteOutput", () => {
       message:
         "Visible article text uses a quote, source-close wording, or named-person attribution, but source_spans lacks speaker or quote wording evidence."
     });
+    expect(
+      result.issues.some((issue) => issue.code === "MISSING_QUOTE_OPPORTUNITY")
+    ).toBe(false);
+  });
+
+  it("warns when the source has a key-person statement but the draft has no quote", () => {
+    const payload = createPayload({
+      bodyText:
+        'CEO Kari Hansen says "Demand was weaker than expected" and expects lower activity.'
+    });
+    const rewrite = createRewrite({
+      lead: "Selskapet venter lavere aktivitet fremover.",
+      body: ["Etterspørselen var svakere i kvartalet."],
+      key_facts: ["Venter lavere aktivitet"],
+      source_spans: ["expects lower activity"]
+    });
+
+    const result = validateRewriteOutput(rewrite, payload);
+
+    expect(result.quoteTelemetry.sourceContainsNamedQuoteLikePattern).toBe(true);
+    expect(result.quoteTelemetry.draftContainsStandaloneDashQuote).toBe(false);
+    expect(result.quoteTelemetry.draftContainsInlineGuillemets).toBe(false);
+    expect(result.quoteTelemetry.draftContainsNamedPersonAttribution).toBe(false);
+    expect(result.issues).toContainEqual({
+      code: "MISSING_QUOTE_OPPORTUNITY",
+      severity: "warning",
+      message:
+        "Source contains a named key-person statement, but visible article text has no quote, source-close wording, or named-person attribution."
+    });
+  });
+
+  it("does not warn about a missed quote opportunity when the source has no key-person statement", () => {
+    const payload = createPayload();
+    const rewrite = createRewrite();
+
+    const result = validateRewriteOutput(rewrite, payload);
+
+    expect(result.quoteTelemetry.sourceContainsNamedQuoteLikePattern).toBe(false);
+    expect(
+      result.issues.some((issue) => issue.code === "MISSING_QUOTE_OPPORTUNITY")
+    ).toBe(false);
   });
 
   it("allows exact report numbers with source-spaced and rewrite-dotted thousands", () => {

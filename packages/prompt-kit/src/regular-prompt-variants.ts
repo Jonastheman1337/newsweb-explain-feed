@@ -5,11 +5,17 @@ import {
   createUserPrompt,
   type PromptPayload
 } from "./prompt.js";
+import {
+  createDeveloperPromptV6,
+  createSystemPromptV6,
+  createUserPromptV6
+} from "./prompt-v6.js";
 import { EDITORIAL_AUDIENCE } from "./shared-editorial.js";
 
 export const regularPromptVariantIds = [
   "regular_v5_6_control",
-  "audience_mechanism_v1"
+  "audience_mechanism_v1",
+  "regular_v6_full"
 ] as const;
 
 export type RegularPromptVariantId = (typeof regularPromptVariantIds)[number];
@@ -103,6 +109,16 @@ export function createRegularPromptVariantMessages(
       systemPrompt: createSystemPrompt(),
       developerPrompt: createDeveloperPrompt(),
       userPrompt: createUserPrompt(payload)
+    };
+  }
+
+  if (variantId === "regular_v6_full") {
+    return {
+      variantId,
+      promptVersion: `${PROMPT_VERSION}:regular_v6_full`,
+      systemPrompt: createSystemPromptV6(),
+      developerPrompt: createDeveloperPromptV6(),
+      userPrompt: createUserPromptV6(payload)
     };
   }
 

@@ -67,7 +67,7 @@ const sampleYearlyPayload: YearlyReportPromptPayload = {
 
 describe("OpenAI prompt contract", () => {
   it("bumps the prompt version for the editorial guardrail update", () => {
-    expect(PROMPT_VERSION).toBe("v5.8.0");
+    expect(PROMPT_VERSION).toBe("v5.9.0");
   });
 
   it("uses materiality and mechanism-first regular notice framing by default", () => {
@@ -147,12 +147,32 @@ describe("OpenAI prompt contract", () => {
 
     expect(combined).toContain("SITATER, GUILLEMETS OG PERSONATTRIBUSJON");
     expect(combined).toContain("en nær direkte oversettelse av en engelsk formulering");
-    expect(combined).toContain("skal saken normalt bruke ett kort sitat");
+    expect(combined).toContain("HOVEDREGEL FOR PERSONUTTALELSER");
+    expect(combined).toContain("Regnskap for uttalelser");
+    expect(combined).toContain("skal saken gjengi den");
+    expect(combined).toContain("Sjekk kilden for navngitte uttalelser");
     expect(combined).toContain("tilfører nyhetsverdig substans, forklaring eller relevant personuttalelse");
+    expect(combined).not.toContain("skal saken normalt bruke ett kort sitat");
+    expect(combined).not.toContain("Bruk normalt ett kort sitat");
     expect(combined).not.toContain("Guillemets («») = parafrasering");
     expect(combined).not.toContain("Hvis kilden har direkte sitater");
     expect(combined).not.toContain("bruk dem nar de gir nyhetsverdi");
     expect(combined).not.toContain("kun hvis den inneholder nyhetsverdige opplysninger som ikke dekkes");
+  });
+
+  it("includes quote-bearing style examples and the quote self-check", () => {
+    const result = createDeveloperPrompt();
+
+    expect(result).toContain("Resultatvarsel med kildefast formulering");
+    expect(result).toContain("«klart svakere enn tidligere antatt»");
+    expect(result).toContain("Kontrakt med ledelseskommentar");
+    expect(result).toContain(
+      "– Dette er den største enkeltkontrakten vår i USA"
+    );
+    expect(result).toContain("SELVSJEKK SITAT");
+    expect(
+      result.match(/– [^"]{8,}?, sier /g)?.length ?? 0
+    ).toBeGreaterThanOrEqual(3);
   });
 
   it("renders selected supplemental materials as secondary sources", () => {
@@ -182,7 +202,8 @@ describe("OpenAI prompt contract", () => {
   it("exposes regular prompt variants for offline editorial evals", () => {
     expect(regularPromptVariantIds).toEqual([
       "regular_v5_6_control",
-      "audience_mechanism_v1"
+      "audience_mechanism_v1",
+      "regular_v6_full"
     ]);
 
     const control = createRegularPromptVariantMessages(
@@ -330,6 +351,10 @@ describe("createReportRevisionUserPrompt", () => {
     expect(result).toContain("Etter nøkkeltallene skal du se etter én kort ledelseskommentar");
     expect(result).toContain("CEO, CFO eller styreleder");
     expect(result).toContain("en kildefast formulering i «...»");
+    expect(result).toContain(
+      "Å droppe en konkret, forklarende ledelseskommentar som finnes i kilden, er en kvalitetsfeil"
+    );
+    expect(result).not.toContain("bruk normalt ett direkte sitat");
     expect(result).not.toContain("skryter av");
   });
 

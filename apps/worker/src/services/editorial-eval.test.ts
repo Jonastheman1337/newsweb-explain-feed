@@ -298,4 +298,69 @@ describe("summarizeEditorialEval", () => {
       "Challenger has more fatal validation/reference failures."
     );
   });
+
+  it("summarizes per-variant quote metrics from generation quote telemetry", () => {
+    const telemetry = {
+      sourceContainsNamedQuoteLikePattern: true,
+      draftContainsStandaloneDashQuote: false,
+      draftContainsInlineGuillemets: false,
+      draftContainsNamedPersonAttribution: false,
+      draftSourceSpansMentionQuoteSpeaker: false
+    };
+    const summary = summarizeEditorialEval(
+      {
+        generations: [
+          {
+            ...generations[0],
+            quoteTelemetry: {
+              ...telemetry,
+              draftContainsStandaloneDashQuote: true,
+              draftSourceSpansMentionQuoteSpeaker: true
+            }
+          },
+          {
+            ...generations[2],
+            quoteTelemetry: {
+              ...telemetry,
+              draftContainsNamedPersonAttribution: true
+            }
+          },
+          {
+            ...generations[1],
+            quoteTelemetry: {
+              ...telemetry,
+              draftContainsInlineGuillemets: true,
+              draftSourceSpansMentionQuoteSpeaker: true
+            }
+          },
+          // No telemetry: ignored by the quote metrics.
+          generations[3]
+        ]
+      },
+      [],
+      {
+        controlVariant: "regular_v5_6_control",
+        challengerVariant: "audience_mechanism_v1"
+      }
+    );
+
+    expect(summary.quoteMetrics["regular_v5_6_control"]).toEqual({
+      generationsWithTelemetry: 2,
+      quoteOpportunityCount: 2,
+      quotePresenceCount: 1,
+      quotePresenceRate: 0.5,
+      dashQuoteCount: 1,
+      guillemetsCount: 0,
+      attributionOnlyCount: 1
+    });
+    expect(summary.quoteMetrics["audience_mechanism_v1"]).toEqual({
+      generationsWithTelemetry: 1,
+      quoteOpportunityCount: 1,
+      quotePresenceCount: 1,
+      quotePresenceRate: 1,
+      dashQuoteCount: 0,
+      guillemetsCount: 1,
+      attributionOnlyCount: 0
+    });
+  });
 });

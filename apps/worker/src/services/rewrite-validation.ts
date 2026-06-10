@@ -790,6 +790,20 @@ export function validateRewriteOutput(
     );
   }
 
+  if (
+    quoteTelemetry.sourceContainsNamedQuoteLikePattern &&
+    !quoteTelemetry.draftContainsStandaloneDashQuote &&
+    !quoteTelemetry.draftContainsInlineGuillemets &&
+    !quoteTelemetry.draftContainsNamedPersonAttribution
+  ) {
+    addIssue(
+      issues,
+      "MISSING_QUOTE_OPPORTUNITY",
+      "warning",
+      "Source contains a named key-person statement, but visible article text has no quote, source-close wording, or named-person attribution."
+    );
+  }
+
   const errors = issues.map((issue) => issue.message);
   const blockingErrors = issues
     .filter((issue) => issue.severity === "blocking")

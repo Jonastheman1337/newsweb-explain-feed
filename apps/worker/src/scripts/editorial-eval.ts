@@ -11,6 +11,7 @@ import {
 } from "@newsweb/prompt-kit";
 import {
   rewriteOutputJsonSchema,
+  rewriteOutputJsonSchemaV6,
   rewriteOutputSchema,
   type RewriteOutput
 } from "@newsweb/shared";
@@ -390,17 +391,22 @@ async function runGeneration({
     messages.userPrompt.length;
   let referencePromptChars = 0;
 
+  // v6 variants pair with the extract-then-write schema order; zod parsing
+  // and all downstream consumers are key-based, so outputs stay comparable.
+  const rewriteJsonSchema =
+    variantId === "regular_v6_full" ? rewriteOutputJsonSchemaV6 : rewriteOutputJsonSchema;
+
   try {
     const raw = await callOpenAIForJson(client, {
       schemaName: "rewrite_output",
-      schema: rewriteOutputJsonSchema as Record<string, unknown>,
+      schema: rewriteJsonSchema as Record<string, unknown>,
       systemPrompt: messages.systemPrompt,
       developerPrompt: messages.developerPrompt,
       userPrompt: messages.userPrompt,
       model,
       reasoningEffort,
       timeoutMs,
-      maxOutputTokens: 4096
+      maxOutputTokens: 16384
     });
     const parsed = rewriteOutputSchema.parse(clampRewriteArrays(JSON.parse(raw)));
     const styleResult = sanitizeRewriteStyle(parsed);
@@ -443,6 +449,7 @@ async function runGeneration({
         blockingErrors: validation.blockingErrors,
         warnings: validation.warnings
       },
+      quoteTelemetry: validation.quoteTelemetry,
       referenceCheck: {
         coveragePercent: referenceResult.coverage.coveragePercent,
         unsupportedSentenceCount:
@@ -528,7 +535,7 @@ async function runReferenceCheck({
     model,
     reasoningEffort,
     timeoutMs,
-    maxOutputTokens: 4096
+    maxOutputTokens: 16384
   });
   const parsed = referenceCheckResultSchema.parse(JSON.parse(raw));
   return {

@@ -481,9 +481,15 @@ Important env vars:
 - `OPENAI_FAST_MODEL`: triage/title suggestion model.
 - `OPENAI_TIMEOUT_MS`.
 - `OPENAI_FAST_TIMEOUT_MS`.
-- `OPENAI_DEFAULT_REASONING_EFFORT`.
-- `OPENAI_REPORT_REASONING_EFFORT`.
-- `OPENAI_HARD_REASONING_EFFORT`.
+- `OPENAI_DEFAULT_REASONING_EFFORT`: regular rewrites and their corrections
+  (production runs `high`; code default `medium`).
+- `OPENAI_REPORT_REASONING_EFFORT`: report/yearly rewrites (production `high`).
+- `OPENAI_HARD_REASONING_EFFORT`: PDF context extraction.
+- `OPENAI_TRIAGE_REASONING_EFFORT`: newsworthiness triage on the fast model
+  (default `minimal`).
+- `OPENAI_REFERENCE_REASONING_EFFORT`: reference checker, decoupled from the
+  rewrite effort (default `medium`).
+- `OPENAI_REVIEW_REASONING_EFFORT`: editorial revision review (default `medium`).
 - `NEWSWEB_POLLING_ENABLED`.
 - `POLL_INTERVAL_MS`.
 - `LATEST_BOOTSTRAP_COUNT`.

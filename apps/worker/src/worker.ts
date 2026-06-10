@@ -879,6 +879,7 @@ type JsonModelCallInput = {
   reasoningEffort?: OpenAIReasoningEffort;
   timeoutMs?: number;
   maxOutputTokens?: number;
+  promptCacheKey?: string;
   file?: OpenAIFileInput;
 };
 
@@ -946,7 +947,10 @@ async function callModelForJson({
   model = config.OPENAI_MODEL,
   reasoningEffort = config.OPENAI_DEFAULT_REASONING_EFFORT,
   timeoutMs = config.OPENAI_TIMEOUT_MS,
-  maxOutputTokens = 4096,
+  // Reasoning tokens count against max_output_tokens on gpt-5.x, so the
+  // ceiling must cover reasoning + JSON output, not just the JSON.
+  maxOutputTokens = 16384,
+  promptCacheKey,
   file
 }: JsonModelCallInput): Promise<{
   content: string;
@@ -978,6 +982,7 @@ async function callModelForJson({
       reasoningEffort,
       timeoutMs,
       maxOutputTokens,
+      promptCacheKey,
       file
     });
 
@@ -1016,9 +1021,10 @@ async function callModelTriage(
       developerPrompt: "Svar kun med strukturert triage etter skjemaet.",
       userPrompt,
       model: config.OPENAI_FAST_MODEL,
-      reasoningEffort: "none",
+      reasoningEffort: config.OPENAI_TRIAGE_REASONING_EFFORT,
       timeoutMs: config.OPENAI_FAST_TIMEOUT_MS,
-      maxOutputTokens: 200
+      maxOutputTokens: 768,
+      promptCacheKey: `newsweb:triage:${PROMPT_VERSION}`
     });
 
     return {
@@ -1041,7 +1047,7 @@ async function callModelEditorialRevisionReview({
   instruction,
   previousOutput,
   draftRewrite,
-  reasoningEffort = config.OPENAI_DEFAULT_REASONING_EFFORT
+  reasoningEffort = config.OPENAI_REVIEW_REASONING_EFFORT
 }: {
   instruction: string;
   previousOutput: RewriteOutput;
@@ -1063,7 +1069,7 @@ async function callModelEditorialRevisionReview({
       draftRewrite
     }),
     reasoningEffort,
-    maxOutputTokens: 900
+    promptCacheKey: `newsweb:editorial-review:${PROMPT_VERSION}`
   });
 
   return {
@@ -1103,7 +1109,8 @@ async function callModelRewrite(
     systemPrompt,
     developerPrompt,
     userPrompt,
-    reasoningEffort
+    reasoningEffort,
+    promptCacheKey: `newsweb:rewrite-regular:${PROMPT_VERSION}`
   });
 
   return {
@@ -1116,7 +1123,7 @@ async function callModelRewrite(
 async function callModelReferenceCheck(
   payload: PromptPayload,
   draftRewrite: RewriteOutput,
-  reasoningEffort: OpenAIReasoningEffort = config.OPENAI_DEFAULT_REASONING_EFFORT
+  reasoningEffort: OpenAIReasoningEffort = config.OPENAI_REFERENCE_REASONING_EFFORT
 ): Promise<{
   coverage: ReferenceCoverageReport;
   promptChars: number;
@@ -1138,7 +1145,8 @@ async function callModelReferenceCheck(
     systemPrompt: referencePrompt.systemPrompt,
     developerPrompt: referencePrompt.developerPrompt,
     userPrompt: referencePrompt.userPrompt,
-    reasoningEffort
+    reasoningEffort,
+    promptCacheKey: `newsweb:reference-check:${PROMPT_VERSION}`
   });
 
   const parsed = referenceCheckResultSchema.parse(JSON.parse(result.content));
@@ -1181,7 +1189,8 @@ async function callModelReportRewrite(
     systemPrompt,
     developerPrompt,
     userPrompt,
-    reasoningEffort
+    reasoningEffort,
+    promptCacheKey: `newsweb:rewrite-report:${PROMPT_VERSION}`
   });
 
   return {
@@ -1221,7 +1230,8 @@ async function callModelYearlyReportRewrite(
     systemPrompt,
     developerPrompt,
     userPrompt,
-    reasoningEffort
+    reasoningEffort,
+    promptCacheKey: `newsweb:rewrite-yearly:${PROMPT_VERSION}`
   });
 
   return {
@@ -1251,7 +1261,6 @@ async function applyReferenceCheckRepair<TPayload extends PromptPayload>({
   rewritePayload,
   rewrite,
   revisionInstructionForPrompt,
-  rewriteReasoningEffort,
   correctionReasoningEffort,
   existingCorrectionAttempts = 0,
   modelCalls,
@@ -1261,7 +1270,6 @@ async function applyReferenceCheckRepair<TPayload extends PromptPayload>({
   rewritePayload: TPayload;
   rewrite: RewriteOutput;
   revisionInstructionForPrompt?: string;
-  rewriteReasoningEffort: OpenAIReasoningEffort;
   correctionReasoningEffort: OpenAIReasoningEffort;
   existingCorrectionAttempts?: number;
   modelCalls: ModelCallLog[];
@@ -1296,8 +1304,7 @@ async function applyReferenceCheckRepair<TPayload extends PromptPayload>({
     try {
       referenceCheck = await callModelReferenceCheck(
         referencePayload,
-        currentRewrite,
-        rewriteReasoningEffort
+        currentRewrite
       );
     } catch (error) {
       promptChars += collectFailedModelCall(error, modelCalls);
@@ -1625,7 +1632,7 @@ async function callOpenAIPdfContext({
     model: config.OPENAI_MODEL,
     reasoningEffort,
     timeoutMs: config.OPENAI_TIMEOUT_MS,
-    maxOutputTokens: 2500,
+    promptCacheKey: `newsweb:pdf-context:${PROMPT_VERSION}`,
     file: {
       filename: pdf.attachmentName ?? `attachment-${pdf.attachmentId}.pdf`,
       mimeType: "application/pdf",
@@ -1850,7 +1857,6 @@ async function processReportRewrite(
       rewritePayload: reportPayload,
       rewrite,
       revisionInstructionForPrompt,
-      rewriteReasoningEffort: reportReasoningEffort,
       correctionReasoningEffort: reportReasoningEffort,
       modelCalls,
       callRewrite: callModelReportRewrite
@@ -1928,7 +1934,6 @@ async function processReportRewrite(
         rewritePayload: reportPayload,
         rewrite,
         revisionInstructionForPrompt,
-        rewriteReasoningEffort: reportReasoningEffort,
         correctionReasoningEffort: reportReasoningEffort,
         existingCorrectionAttempts: referenceCorrectionAttempts,
         modelCalls,
@@ -2015,7 +2020,6 @@ async function processReportRewrite(
         rewritePayload: reportPayload,
         rewrite,
         revisionInstructionForPrompt,
-        rewriteReasoningEffort: reportReasoningEffort,
         correctionReasoningEffort: reportReasoningEffort,
         existingCorrectionAttempts: referenceCorrectionAttempts,
         modelCalls,
@@ -2318,7 +2322,6 @@ async function processYearlyReportRewrite(
       rewritePayload: yearlyPayload,
       rewrite,
       revisionInstructionForPrompt,
-      rewriteReasoningEffort: reportReasoningEffort,
       correctionReasoningEffort: reportReasoningEffort,
       modelCalls,
       callRewrite: callModelYearlyReportRewrite
@@ -2396,7 +2399,6 @@ async function processYearlyReportRewrite(
         rewritePayload: yearlyPayload,
         rewrite,
         revisionInstructionForPrompt,
-        rewriteReasoningEffort: reportReasoningEffort,
         correctionReasoningEffort: reportReasoningEffort,
         existingCorrectionAttempts: referenceCorrectionAttempts,
         modelCalls,
@@ -2478,7 +2480,6 @@ async function processYearlyReportRewrite(
         rewritePayload: yearlyPayload,
         rewrite,
         revisionInstructionForPrompt,
-        rewriteReasoningEffort: reportReasoningEffort,
         correctionReasoningEffort: reportReasoningEffort,
         existingCorrectionAttempts: referenceCorrectionAttempts,
         modelCalls,
@@ -3452,8 +3453,9 @@ const rewriteWorker = new Worker<RewriteJobData>(
       const modelCalls: ModelCallLog[] = [...preRewriteModelCalls];
       const rewriteReasoningEffort =
         job.data.reasoningEffortOverride ?? config.OPENAI_DEFAULT_REASONING_EFFORT;
-      const correctionReasoningEffort =
-        job.data.reasoningEffortOverride ?? config.OPENAI_REPORT_REASONING_EFFORT;
+      // Corrections revise the same notice with the same prompt family, so they
+      // run at the rewrite effort (not the report effort, which is a different pipeline).
+      const correctionReasoningEffort = rewriteReasoningEffort;
       const revisionInstructionForPrompt = appendRevisionChecklist(
         job.data.instruction
       );
@@ -3504,7 +3506,6 @@ const rewriteWorker = new Worker<RewriteJobData>(
           rewritePayload: payload,
           rewrite,
           revisionInstructionForPrompt,
-          rewriteReasoningEffort,
           correctionReasoningEffort,
           modelCalls,
           callRewrite: callModelRewrite
@@ -3579,7 +3580,6 @@ const rewriteWorker = new Worker<RewriteJobData>(
             rewritePayload: payload,
             rewrite,
             revisionInstructionForPrompt,
-            rewriteReasoningEffort,
             correctionReasoningEffort,
             existingCorrectionAttempts: referenceCorrectionAttempts,
             modelCalls,
@@ -3661,7 +3661,6 @@ const rewriteWorker = new Worker<RewriteJobData>(
             rewritePayload: payload,
             rewrite,
             revisionInstructionForPrompt,
-            rewriteReasoningEffort,
             correctionReasoningEffort,
             existingCorrectionAttempts: referenceCorrectionAttempts,
             modelCalls,
