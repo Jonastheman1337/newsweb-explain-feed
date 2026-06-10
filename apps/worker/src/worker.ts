@@ -70,6 +70,7 @@ import {
   type ReferenceCoverageReport
 } from "./services/reference-check.js";
 import {
+  ensureReportSourceLimitation,
   validateRewriteOutput,
   type ReportExtractionValidationContext,
   type RewriteValidationIssue
@@ -1955,6 +1956,11 @@ async function processReportRewrite(
         finalCoverage;
     }
 
+    rewrite = ensureReportSourceLimitation(
+      rewrite,
+      reportReferencePayload,
+      reportContent
+    );
     let validationResult = validateRewriteWithRevisionCompliance(
       rewrite,
       reportReferencePayload,
@@ -2041,6 +2047,11 @@ async function processReportRewrite(
         repairedReferenceRepair.initialCoverage ??
         finalCoverage;
 
+      rewrite = ensureReportSourceLimitation(
+        rewrite,
+        reportReferencePayload,
+        reportContent
+      );
       validationResult = validateRewriteWithRevisionCompliance(
         rewrite,
         reportReferencePayload,
@@ -2420,6 +2431,7 @@ async function processYearlyReportRewrite(
         finalCoverage;
     }
 
+    rewrite = ensureReportSourceLimitation(rewrite, payload);
     let validationResult = validateRewriteWithRevisionCompliance(rewrite, payload, {
       instruction: revisionOptions.userInstruction,
       previousOutput: revisionOptions.previousOutput,
@@ -2501,6 +2513,7 @@ async function processYearlyReportRewrite(
         repairedReferenceRepair.initialCoverage ??
         finalCoverage;
 
+      rewrite = ensureReportSourceLimitation(rewrite, payload);
       validationResult = validateRewriteWithRevisionCompliance(rewrite, payload, {
         instruction: revisionOptions.userInstruction,
         previousOutput: revisionOptions.previousOutput,
@@ -3601,6 +3614,7 @@ const rewriteWorker = new Worker<RewriteJobData>(
             finalCoverage;
         }
 
+        rewrite = ensureReportSourceLimitation(rewrite, payload);
         let validationResult = validateRewriteWithRevisionCompliance(rewrite, payload, {
           instruction: job.data.instruction,
           previousOutput,
@@ -3682,6 +3696,7 @@ const rewriteWorker = new Worker<RewriteJobData>(
             repairedReferenceRepair.initialCoverage ??
             finalCoverage;
 
+          rewrite = ensureReportSourceLimitation(rewrite, payload);
           validationResult = validateRewriteWithRevisionCompliance(rewrite, payload, {
             instruction: job.data.instruction,
             previousOutput,

@@ -106,6 +106,9 @@ const REPORT_LIMITATION_PATTERNS = [
   /\b(?:ikke oppgitt|ikke funnet|mangler|uklar|uklart|ikke inkludert)\b/i
 ];
 
+const DEFAULT_REPORT_SOURCE_LIMITATION =
+  "Ekstra kildetekst er analysert som begrenset kildegrunnlag.";
+
 const DATE_MONTH_PATTERN =
   /^\.\s*(?:jan(?:uar)?|feb(?:ruar)?|mars|apr(?:il)?|mai|jun(?:i)?|jul(?:i)?|aug(?:ust)?|sep(?:tember)?|okt(?:ober)?|nov(?:ember)?|des(?:ember)?|january|february|march|april|may|june|july|august|september|october|november|december)\b/i;
 
@@ -486,6 +489,24 @@ function hasReportSourceLimitation(rewrite: RewriteOutput): boolean {
     limitationText.trim().length > 0 &&
     hasAnyPattern(limitationText, REPORT_LIMITATION_PATTERNS)
   );
+}
+
+export function ensureReportSourceLimitation(
+  rewrite: RewriteOutput,
+  payload: PromptPayload,
+  reportExtraction?: ReportExtractionValidationContext
+): RewriteOutput {
+  if (!hasReportContext(payload, reportExtraction) || hasReportSourceLimitation(rewrite)) {
+    return rewrite;
+  }
+
+  return {
+    ...rewrite,
+    source_limitations: [
+      ...rewrite.source_limitations,
+      DEFAULT_REPORT_SOURCE_LIMITATION
+    ]
+  };
 }
 
 function isWeakReportExtraction(

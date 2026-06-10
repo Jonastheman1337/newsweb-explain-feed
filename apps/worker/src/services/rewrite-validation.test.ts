@@ -11,6 +11,7 @@ import {
   countSentences,
   countSummarySentences,
   collectQuoteTelemetry,
+  ensureReportSourceLimitation,
   validateRewriteOutput
 } from "./rewrite-validation.js";
 
@@ -744,6 +745,32 @@ describe("validateRewriteOutput", () => {
       message:
         "Report/PDF-based rewrite must include a source_limitations note that explains the excerpted or limited source basis."
     });
+  });
+
+  it("can add the hidden limitation required for PDF-supplement rewrites", () => {
+    const payload = createPayload({
+      title: "Exercise of subscription rights",
+      categories: ["MANAGERS' TRANSACTION"],
+      hasAttachments: true,
+      pdfSupplementText:
+        "Price(s) Volume(s) NOK 1 27,949. Aggregated volume 27,949."
+    });
+    const rewrite = createRewrite({
+      title: "Next-sjef faar aksjer",
+      lead:
+        "Next Biometrics-sjef Ulf Ritsvall faar nye aksjer og warrants i selskapets emisjon.",
+      body: ["Aksjene prises til en krone stykket."],
+      source_limitations: []
+    });
+
+    const normalized = ensureReportSourceLimitation(rewrite, payload);
+    const result = validateRewriteOutput(normalized, payload);
+
+    expect(normalized.source_limitations).toHaveLength(1);
+    expect(normalized.source_limitations[0]).toMatch(/begrenset kildegrunnlag/);
+    expect(result.issues.map((issue) => issue.code)).not.toContain(
+      "MISSING_REPORT_SOURCE_LIMITATION"
+    );
   });
 
   it("warns when weak report extraction has only vague limitations", () => {
