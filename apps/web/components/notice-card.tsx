@@ -75,7 +75,11 @@ export function NoticeCard({ item }: NoticeCardProps) {
             {item.title}
           </Link>
         </h2>
-        <p className="muted">Ikke generert enda</p>
+        {item.regenerating ? (
+          <FeedProcessingIndicator hasAttachments={item.hasAttachments} />
+        ) : (
+          <p className="muted">Ikke generert enda</p>
+        )}
         <div className="editableActions">
           <MaxAiLink messageId={item.messageId} />
           <span className="actionsRight">
@@ -146,6 +150,9 @@ export function NoticeCard({ item }: NoticeCardProps) {
             {item.title}
           </Link>
         </h2>
+        {item.regenerating ? (
+          <FeedProcessingIndicator hasAttachments={item.hasAttachments} />
+        ) : null}
         <div className="editableActions">
           <MaxAiLink messageId={item.messageId} />
           <span className="actionsRight">

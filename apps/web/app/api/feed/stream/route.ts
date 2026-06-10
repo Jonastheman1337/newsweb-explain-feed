@@ -6,6 +6,27 @@ export const dynamic = "force-dynamic";
 
 const API_BASE_URL = getApiBaseUrl();
 
+const SSE_HEADERS = {
+  "Content-Type": "text/event-stream",
+  "Cache-Control": "no-cache, no-transform",
+  Connection: "keep-alive",
+  "X-Accel-Buffering": "no"
+} as const;
+
+const UNAVAILABLE_RETRY_MS = 5_000;
+
+/**
+ * EventSource never reconnects after a non-200 response, so upstream
+ * failures must not surface as HTTP errors. Instead return a 200 stream
+ * that ends immediately with a retry hint; the browser then keeps
+ * reconnecting on its own until the API is reachable again.
+ */
+function unavailableResponse(): Response {
+  return new Response(`retry: ${UNAVAILABLE_RETRY_MS}\n\n`, {
+    headers: SSE_HEADERS
+  });
+}
+
 export async function GET() {
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE)?.value;
@@ -15,13 +36,18 @@ export async function GET() {
     headers.Authorization = `Bearer ${token}`;
   }
 
-  const upstream = await fetch(`${API_BASE_URL}/feed/stream`, {
-    headers,
-    cache: "no-store"
-  });
+  let upstream: Response;
+  try {
+    upstream = await fetch(`${API_BASE_URL}/feed/stream`, {
+      headers,
+      cache: "no-store"
+    });
+  } catch {
+    return unavailableResponse();
+  }
 
   if (!upstream.ok || !upstream.body) {
-    return new Response("Feed stream unavailable", { status: upstream.status });
+    return unavailableResponse();
   }
 
   // Pipe the upstream SSE stream through to the client.
@@ -43,11 +69,6 @@ export async function GET() {
   });
 
   return new Response(stream, {
-    headers: {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache, no-transform",
-      Connection: "keep-alive",
-      "X-Accel-Buffering": "no"
-    }
+    headers: SSE_HEADERS
   });
 }

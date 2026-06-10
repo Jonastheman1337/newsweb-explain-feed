@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { FeedItem } from "@newsweb/shared";
 import { NoticeCard } from "./notice-card";
+import { useFeedStream } from "./use-feed-stream";
 
 type LiveFeedListProps = {
   initialItems: FeedItem[];
@@ -13,9 +14,10 @@ type LiveFeedListProps = {
     issuer?: string;
     q?: string;
   };
+  emptyState?: ReactNode;
 };
 
-const FILTERED_FEED_REFRESH_DEBOUNCE_MS = 250;
+const FEED_REFRESH_DEBOUNCE_MS = 250;
 
 function sortFeedItems(items: FeedItem[]): FeedItem[] {
   return [...items].sort((left, right) => {
@@ -26,11 +28,15 @@ function sortFeedItems(items: FeedItem[]): FeedItem[] {
   });
 }
 
-export function LiveFeedList({ initialItems, filters }: LiveFeedListProps) {
+export function LiveFeedList({ initialItems, filters, emptyState }: LiveFeedListProps) {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [items, setItems] = useState<FeedItem[]>(() => sortFeedItems(initialItems));
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hasFilters = Boolean(
+    filters?.market || filters?.category || filters?.issuer || filters?.q
+  );
 
   useEffect(() => {
     setItems(sortFeedItems(initialItems));
@@ -68,50 +74,47 @@ export function LiveFeedList({ initialItems, filters }: LiveFeedListProps) {
     }
   }, [items, pathname, searchParams]);
 
-  useEffect(() => {
-    const hasFilters = filters?.market || filters?.category || filters?.issuer || filters?.q;
-    const es = new EventSource("/api/feed/stream");
-    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
-
-    function refreshFilteredFeed() {
-      if (refreshTimer) {
-        clearTimeout(refreshTimer);
-      }
-      refreshTimer = setTimeout(() => {
-        refreshTimer = null;
-        router.refresh();
-      }, FILTERED_FEED_REFRESH_DEBOUNCE_MS);
+  const refreshFeed = useCallback(() => {
+    if (refreshTimerRef.current) {
+      clearTimeout(refreshTimerRef.current);
     }
+    refreshTimerRef.current = setTimeout(() => {
+      refreshTimerRef.current = null;
+      router.refresh();
+    }, FEED_REFRESH_DEBOUNCE_MS);
+  }, [router]);
 
-    es.onmessage = (event) => {
-      try {
-        const item: FeedItem = JSON.parse(event.data);
-        if (hasFilters) {
-          refreshFilteredFeed();
-          return;
-        }
-
-        setItems((prev) => {
-          const exists = prev.some((existing) => existing.messageId === item.messageId);
-          const next = exists
-            ? prev.map((existing) =>
-                existing.messageId === item.messageId ? item : existing
-              )
-            : [item, ...prev];
-          return sortFeedItems(next);
-        });
-      } catch {
-        // Ignore parse errors
-      }
-    };
-
+  useEffect(() => {
     return () => {
-      es.close();
-      if (refreshTimer) {
-        clearTimeout(refreshTimer);
+      if (refreshTimerRef.current) {
+        clearTimeout(refreshTimerRef.current);
       }
     };
-  }, [filters?.market, filters?.category, filters?.issuer, filters?.q, router]);
+  }, []);
+
+  useFeedStream({
+    onItem: (item) => {
+      if (hasFilters) {
+        refreshFeed();
+        return;
+      }
+
+      setItems((prev) => {
+        const exists = prev.some((existing) => existing.messageId === item.messageId);
+        const next = exists
+          ? prev.map((existing) =>
+              existing.messageId === item.messageId ? item : existing
+            )
+          : [item, ...prev];
+        return sortFeedItems(next);
+      });
+    },
+    onReconnect: refreshFeed
+  });
+
+  if (items.length === 0) {
+    return <>{emptyState}</>;
+  }
 
   return (
     <>

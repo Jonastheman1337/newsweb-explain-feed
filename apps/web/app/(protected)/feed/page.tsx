@@ -46,9 +46,6 @@ export default async function FeedPage({ searchParams }: FeedPageProps) {
     issuer: params.issuer || undefined,
     q: params.q || undefined
   };
-  const hasActiveFilters = Boolean(
-    normalized.market || normalized.category || normalized.issuer || normalized.q
-  );
   const requestedQuery = {
     cursor: normalized.cursor,
     limit: params.limit ? Number(params.limit) : 30,
@@ -163,23 +160,22 @@ export default async function FeedPage({ searchParams }: FeedPageProps) {
               Last inn igjen
             </Link>
           </article>
-        ) : feed.items.length === 0 ? (
-          <>
-            {hasActiveFilters ? (
-              <LiveFeedList initialItems={[]} filters={normalized} />
-            ) : null}
-            <article className="card">
-              <h2>Ingen saker matcher filtrene</h2>
-              <p className="muted">
-                Nullstill filtre eller sok for a vise siste borsnyheter.
-              </p>
-              <Link href="/feed" className="ghostButton" style={{ display: "inline-block" }}>
-                Nullstill filtre
-              </Link>
-            </article>
-          </>
         ) : (
-          <LiveFeedList initialItems={feed.items} filters={normalized} />
+          <LiveFeedList
+            initialItems={feed.items}
+            filters={normalized}
+            emptyState={
+              <article className="card">
+                <h2>Ingen saker matcher filtrene</h2>
+                <p className="muted">
+                  Nullstill filtre eller sok for a vise siste borsnyheter.
+                </p>
+                <Link href="/feed" className="ghostButton" style={{ display: "inline-block" }}>
+                  Nullstill filtre
+                </Link>
+              </article>
+            }
+          />
         )}
       </div>
 

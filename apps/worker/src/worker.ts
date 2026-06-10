@@ -2985,6 +2985,10 @@ const rewriteWorker = new Worker<RewriteJobData>(
         throw new Error(`source_notices missing for ${messageId}`);
       }
 
+      // Bootstrap and retry jobs reach this point without the ingest-time
+      // "processing" event, so emit it here to keep open feeds live.
+      await publishFeedUpdate(messageId, "processing");
+
       const categories = ((source.categoriesJson as string[]) ?? []).map(fixDoubleEncodedUtf8);
 
       const payload: PromptPayload = {

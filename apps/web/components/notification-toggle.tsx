@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import type { FeedItem } from "@newsweb/shared";
+import { useEffect, useState } from "react";
+import { useFeedStream } from "./use-feed-stream";
 
 export function NotificationToggle() {
   const [enabled, setEnabled] = useState(false);
   const [supported, setSupported] = useState(true);
-  const esRef = useRef<EventSource | null>(null);
 
   // Check support + restore state after mount (avoids hydration mismatch)
   useEffect(() => {
@@ -24,37 +23,16 @@ export function NotificationToggle() {
     }
   }, []);
 
-  // Manage EventSource lifecycle based on enabled state
-  useEffect(() => {
-    if (!enabled) {
-      if (esRef.current) {
-        esRef.current.close();
-        esRef.current = null;
-      }
-      return;
+  useFeedStream({
+    enabled,
+    onItem: (item) => {
+      new Notification(item.title, {
+        body: item.issuerName,
+        tag: String(item.messageId),
+        icon: "/favicon.ico"
+      });
     }
-
-    const es = new EventSource("/api/feed/stream");
-    esRef.current = es;
-
-    es.onmessage = (event) => {
-      try {
-        const item: FeedItem = JSON.parse(event.data);
-        new Notification(item.title, {
-          body: item.issuerName,
-          tag: String(item.messageId),
-          icon: "/favicon.ico"
-        });
-      } catch {
-        // Ignore parse errors
-      }
-    };
-
-    return () => {
-      es.close();
-      esRef.current = null;
-    };
-  }, [enabled]);
+  });
 
   async function toggle() {
     if (enabled) {
