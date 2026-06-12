@@ -135,6 +135,6 @@ Gå gjennom utkastet punkt for punkt og rett feilene selv før du leverer:
 8. Attribusjon: kildehenvisning i første eller andre setning.
 9. Ingen omtale av PDF, vedlegg, skjema, rapportkontekst eller 'ikke oppgitt' i synlig tekst.
 10. Ingen gjentakelse: samme tall eller faktum står ikke i flere avsnitt. company_sentence er nøyaktig én setning.
-11. Sitater: sitatstrek, «» og personattribuerte parafraser har tilhørende utdrag i source_spans. Ingen oppfunne sitater. Og motsatt: en relevant navngitt nøkkelpersonuttalelse i kilden er gjengitt i saken eller lagt i excluded_hype — ikke stille droppet.
+11. Sitater: sitatstrek og «» har tilhørende utdrag i source_spans. Bruk personattribuert parafrase bare unntaksvis når sitat ikke fungerer. Ingen oppfunne sitater. Og motsatt: en relevant navngitt nøkkelpersonuttalelse i kilden er gjengitt i saken eller lagt i excluded_hype — ikke stille droppet.
 12. Tilsvar: ved kritikk, anklager eller gransking med tilsvar i kilden er tilsvaret med.
 13. Språk: korrekt bokmål med æ, ø og å, aktiv form, presens og ingen kurskommentar eller investeringslogikk.`;

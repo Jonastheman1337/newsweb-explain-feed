@@ -67,7 +67,7 @@ const sampleYearlyPayload: YearlyReportPromptPayload = {
 
 describe("OpenAI prompt contract", () => {
   it("bumps the prompt version for the editorial guardrail update", () => {
-    expect(PROMPT_VERSION).toBe("v5.9.0");
+    expect(PROMPT_VERSION).toBe("v5.9.1");
   });
 
   it("uses materiality and mechanism-first regular notice framing by default", () => {
@@ -148,11 +148,15 @@ describe("OpenAI prompt contract", () => {
     expect(combined).toContain("SITATER, GUILLEMETS OG PERSONATTRIBUSJON");
     expect(combined).toContain("en nær direkte oversettelse av en engelsk formulering");
     expect(combined).toContain("HOVEDREGEL FOR PERSONUTTALELSER");
+    expect(combined).toContain("Tre verktøy, rangert");
+    expect(combined).toContain("Sitatstrek (–) er hovedformen");
+    expect(combined).toContain("Fri personattribuert parafrase er fallback");
+    expect(combined).toContain("Ikke erstatt et godt kort sitat");
     expect(combined).toContain("Regnskap for uttalelser");
-    expect(combined).toContain("skal saken gjengi den");
+    expect(combined).toContain("skal saken normalt bruke ett kort sitatstrek-avsnitt");
     expect(combined).toContain("Sjekk kilden for navngitte uttalelser");
+    expect(combined).toContain("Bruk ren personattribuert parafrase bare");
     expect(combined).toContain("tilfører nyhetsverdig substans, forklaring eller relevant personuttalelse");
-    expect(combined).not.toContain("skal saken normalt bruke ett kort sitat");
     expect(combined).not.toContain("Bruk normalt ett kort sitat");
     expect(combined).not.toContain("Guillemets («») = parafrasering");
     expect(combined).not.toContain("Hvis kilden har direkte sitater");
@@ -169,7 +173,13 @@ describe("OpenAI prompt contract", () => {
     expect(result).toContain(
       "– Dette er den største enkeltkontrakten vår i USA"
     );
+    expect(result).toContain("Avtale med sitat etter kontekst");
+    expect(result).toContain("Det er nå opp til eierne bak Knif");
+    expect(result).toContain("– Vi håper eierne i Knif ser verdien i å fusjonere");
+    expect(result).toContain("Tilleggsmateriale med analytikersitat");
+    expect(result).toContain("Han skriver videre at opptrappingen skjer raskere");
     expect(result).toContain("SELVSJEKK SITAT");
+    expect(result).toContain("Hvis du bare har parafrasert den");
     expect(
       result.match(/– [^"]{8,}?, sier /g)?.length ?? 0
     ).toBeGreaterThanOrEqual(3);
@@ -351,6 +361,8 @@ describe("createReportRevisionUserPrompt", () => {
     expect(result).toContain("Etter nøkkeltallene skal du se etter én kort ledelseskommentar");
     expect(result).toContain("CEO, CFO eller styreleder");
     expect(result).toContain("en kildefast formulering i «...»");
+    expect(result).toContain("skal du normalt bruke ett kort sitatstrek-avsnitt");
+    expect(result).toContain("Bruk personattribuert parafrase bare");
     expect(result).toContain(
       "Å droppe en konkret, forklarende ledelseskommentar som finnes i kilden, er en kvalitetsfeil"
     );

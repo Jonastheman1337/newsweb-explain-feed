@@ -17,7 +17,7 @@ import {
   EDITORIAL_WRITING_STYLE
 } from "./shared-editorial.js";
 
-export const PROMPT_VERSION = "v5.9.0";
+export const PROMPT_VERSION = "v5.9.1";
 
 export type OutputMode = "notice" | "extended_notice";
 
@@ -71,10 +71,10 @@ const MECHANISM_FIRST_RULE = [
 ].join("\n");
 
 const QUOTE_USER_INSTRUCTION =
-  "Sjekk kilden for navngitte uttalelser fra CEO, CFO, styreleder, primærinnsider eller annen nøkkelperson. Finnes en uttalelse som forklarer årsak, marked, risiko, utsikter eller hendelsen, skal saken gjengi den med sitatstrek, kildefast «...»-formulering eller personattribuert parafrase, på naturlig norsk. Dropp den bare hvis den er ren PR uten innhold (legg den da i excluded_hype) eller saken er en svært kort rutinemelding.";
+  "Sjekk kilden for navngitte uttalelser fra CEO, CFO, styreleder, primærinnsider eller annen nøkkelperson. Finnes en uttalelse som forklarer årsak, marked, risiko, utsikter eller hendelsen, skal saken normalt bruke ett kort sitatstrek-avsnitt på naturlig norsk. Bruk kildefast «...»-formulering når sitatet passer bedre i en løpende setning. Bruk ren personattribuert parafrase bare når et direkte sitat blir for langt, uklart eller unaturlig. Dropp uttalelsen bare hvis den er ren PR uten innhold (legg den da i excluded_hype) eller saken er en svært kort rutinemelding.";
 
 const EXTRA_SOURCE_INSTRUCTION =
-  "Bruk denne kildeteksten bare når den tilfører nyhetsverdig substans, forklaring eller relevant personuttalelse. Et kort sitat eller en navngitt uttalelse fra CEO, CFO, styreleder eller annen nøkkelperson kan brukes selv om hovedfakta allerede står i børsmeldingen, hvis uttalelsen forklarer årsak, risiko, utsikter, strategi eller betydningen av hendelsen.";
+  "Bruk denne kildeteksten bare når den tilfører nyhetsverdig substans, forklaring eller relevant personuttalelse. Et kort sitatstrek-avsnitt eller en kildefast «...»-formulering fra CEO, CFO, styreleder eller annen nøkkelperson kan brukes selv om hovedfakta allerede står i børsmeldingen, hvis uttalelsen forklarer årsak, risiko, utsikter, strategi eller betydningen av hendelsen.";
 
 export function supplementalMaterialsPromptSection(
   payload: Pick<PromptPayload, "supplementalMaterials">
@@ -157,6 +157,12 @@ Resultatvarsel med kildefast formulering («...» i løpende tekst og sitatstrek
 Kontrakt med ledelseskommentar (sitatstrek i eget avsnitt, PR-del i excluded_hype):
 {"title":"Nordic Semiconductor lander storkontrakt i USA","lead":"Brikkeprodusenten Nordic Semiconductor har signert en treårig leveranseavtale verdt 40 millioner dollar med en amerikansk industrikunde, melder selskapet.","body":["Avtalen gjelder trådløse brikker til sensorer som overvåker industrianlegg.","– Dette er den største enkeltkontrakten vår i USA, og leveransene starter i første kvartal, sier administrerende direktør Vegard Wollan."],"company_sentence":"Nordic Semiconductor utvikler trådløse halvlederbrikker.","key_facts":["Treårig avtale verdt 40 millioner dollar","Leveranser fra første kvartal"],"negative_or_surprising":[],"excluded_hype":["CEO-utsagn om at selskapet er 'thrilled' over samarbeidet — generisk PR"],"source_limitations":[],"confidence":"high","importance":"medium","source_spans":["three-year supply agreement valued at USD 40 million","CEO Vegard Wollan: 'This is our largest single contract in the US, with deliveries starting in the first quarter'"]}
 
+Avtale med sitat etter kontekst (sitatstrek, ikke parafrase):
+{"title":"Storebrand forhandler om Knif-avtale","lead":"Storebrand Forsikring har forhandlet frem avtaler om å slå sammen virksomhet med Knif og Knif Trygghet, melder selskapet.","body":["Det er nå opp til eierne bak Knif og Knif Trygghet om de ønsker å tiltre avtalene som er fremforhandlet av partene.","– Vi håper eierne i Knif ser verdien i å fusjonere, og vi ser frem til et langt og godt samarbeid, sier Storebrand Forsikring-sjef Trond Fladvad i meldingen."],"company_sentence":"Storebrand Forsikring er skadeforsikringsdelen av Storebrand-konsernet.","key_facts":["Fremforhandlede avtaler med Knif og Knif Trygghet","Eierne i Knif må ta stilling til avtalene"],"negative_or_surprising":[],"excluded_hype":[],"source_limitations":[],"confidence":"high","importance":"medium","source_spans":["Det er nå opp til eierne bak Knif og Knif Trygghet","Trond Fladvad: 'Vi håper eierne i Knif ser verdien i å fusjonere'"]}
+
+Tilleggsmateriale med analytikersitat (sitatstrek og oppfølging, ikke kursmål):
+{"title":"Kongsberg setter nye vekstmål","lead":"Kongsberg Gruppen har kapitalmarkedsdag onsdag, der forsvarskonsernet legger frem nye finansielle mål.","body":["I 2029 har selskapet mål om å omsette for 100 milliarder kroner og 150 milliarder i 2033.","– De nye målene ligger i øvre del av forventningene, skriver Pareto Securities-analytiker Fabian Jørgensen i et notat.","Han skriver videre at opptrappingen skjer raskere enn meglerhuset hadde antatt."],"company_sentence":"Kongsberg Gruppen er et norsk teknologikonsern med hovedvekt på forsvar og romfart.","key_facts":["Mål om 100 mrd. kroner i omsetning i 2029","Mål om 150 mrd. kroner i 2033"],"negative_or_surprising":[],"excluded_hype":[],"source_limitations":[],"confidence":"high","importance":"viktig","source_spans":["mål om å omsette for 100 milliarder kroner og 150 milliarder i 2033","material_pareto: Fabian Jørgensen: 'målene ligger i øvre del av forventningene'"]}
+
 Materiell hendelse (2 body-avsnitt):
 {"title":"Gulf Keystone stopper produksjonen","lead":"Oljeselskapet Gulf Keystone har midlertidig stengt ned produksjonen i Kurdistan i Irak på grunn av sikkerhetssituasjonen.","body":["Selskapet har satt i gang tiltak for å beskytte de ansatte. Oljeanleggene er ikke skadet, ifølge meldingen.","Gulf Keystone følger situasjonen tett og lover å komme med oppdateringer."],"company_sentence":"Gulf Keystone er et oljeselskap som produserer olje i Kurdistan-regionen i Irak.","key_facts":["Produksjonen er stanset midlertidig","Ansatte beskyttes, anlegg ikke skadet"],"negative_or_surprising":["Produksjonsstans grunnet sikkerhetssituasjon"],"excluded_hype":[],"source_limitations":[],"confidence":"high","importance":"viktig","source_spans":["midlertidig har stengt produksjonen","tiltak for å beskytte ansatte"]}
 `.trim();
@@ -217,7 +223,7 @@ Bruk kun tall og fakta som finnes i kilden.
 Hvis meldingen viser til ekstra dokumenter som ikke er analysert, legg inn begrensningen i source_limitations. Ikke vis dette i title, lead eller body.
 
 SELVSJEKK SITAT
-Før du leverer: Hvis kilden har en navngitt nøkkelpersonuttalelse med konkret innhold — står den i saken (sitatstrek, «...» eller parafrase) eller i excluded_hype? Hvis nei, rett det.
+Før du leverer: Hvis kilden har en navngitt nøkkelpersonuttalelse med konkret innhold — står den i saken som sitatstrek eller kildefast «...»? Hvis du bare har parafrasert den, vurder om den heller bør være et kort sitatstrek-avsnitt. Hvis uttalelsen ikke brukes, står den i excluded_hype? Hvis nei, rett det.
 
 ${EDITORIAL_NORWEGIAN}`;
 

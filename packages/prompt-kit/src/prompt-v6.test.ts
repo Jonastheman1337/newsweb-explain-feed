@@ -88,10 +88,17 @@ describe("prompt v6", () => {
   it("includes the quote main rule and quote-bearing style examples", () => {
     const developer = createDeveloperPromptV6();
     expect(developer).toContain("HOVEDREGEL FOR PERSONUTTALELSER");
+    expect(developer).toContain("Sitatstrek (–) er hovedformen");
+    expect(developer).toContain("Fri personattribuert parafrase er fallback");
+    expect(developer).toContain("skal saken normalt bruke ett kort sitatstrek-avsnitt");
     expect(developer).toContain("Regnskap for uttalelser");
     expect(developer).toContain("Resultatvarsel med kildefast formulering");
     expect(developer).toContain("«klart svakere enn tidligere antatt»");
     expect(developer).toContain("Kontrakt med ledelseskommentar");
+    expect(developer).toContain("Avtale med sitat etter kontekst");
+    expect(developer).toContain("– Vi håper eierne i Knif ser verdien i å fusjonere");
+    expect(developer).toContain("Tilleggsmateriale med analytikersitat");
+    expect(developer).toContain("Han skriver videre at opptrappingen skjer raskere");
     expect(developer).toContain("ikke stille droppet");
     expect(
       developer.match(/– [^"]{8,}?, sier /g)?.length ?? 0

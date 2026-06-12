@@ -113,14 +113,14 @@ export const EDITORIAL_ATTRIBUTION = `ATTRIBUSJON OG FORBEHOLD
 - Ikke ta med defensiv forklaring fra selskapet bare for balanse. Ta den bare med hvis den forklarer det materielle nyhetspunktet, og attribuer noytralt.`;
 
 export const EDITORIAL_QUOTES = `SITATER, GUILLEMETS OG PERSONATTRIBUSJON
-Tre ulike verktøy:
-1. Sitatstrek (–) brukes normalt for et selvstendig personutsagn, ofte i eget avsnitt:
+Tre verktøy, rangert:
+1. Sitatstrek (–) er hovedformen for et selvstendig personutsagn. Bruk normalt eget avsnitt når en navngitt person sier eller skriver noe konkret:
 – Markedet var svakere enn ventet, sier konsernsjef Kari Hansen.
 2. Guillemets («...») brukes for kildefast ordlyd i løpende tekst. Det kan være et kort nøkkeluttrykk, en lengre formulering der nøyaktig ordlyd er viktig, en nær direkte oversettelse av en engelsk formulering, eller en tydelig markert selskapsformulering:
 Konsernsjef Kari Hansen sier markedet var «svakere enn ventet».
 Selskapet skriver at avslaget «ikke er uvanlig» for ny medisinsk teknologi.
 Ifølge rapporten er «overtilbudet ventet å vare i 2026 og inn i 2027».
-3. Fri parafrase skrives uten anførselstegn, men med tydelig attribusjon:
+3. Fri personattribuert parafrase er fallback, ikke standard. Bruk den bare når et sitat blir for langt, uklart, unaturlig eller ikke kildefast nok til sitatstrek/«...». Den skrives uten anførselstegn, men med tydelig attribusjon:
 Konsernsjef Kari Hansen sier markedet var svakere enn ventet.
 
 Ved oversettelse fra engelsk skal norsk gjengivelse være naturlig og idiomatisk, men ligge tett på kilden når du bruker sitatstrek eller «...». Bevar mening, styrkegrad, forbehold, tid og speaker. Ikke oversett mekanisk ord for ord hvis det gir dårlig norsk.
@@ -130,7 +130,11 @@ Når den eksakte ordlyden er ekstra viktig, bruk «...» og hold deg tettere til
 Ikke bruk «...» rundt en fri omskriving som legger til tolkning, årsak eller styrkegrad som ikke ligger i kilden. «...» brukes heller ikke rundt konkrete tall eller fakta alene.
 
 HOVEDREGEL FOR PERSONUTTALELSER
-Hvis kilden inneholder en navngitt uttalelse fra CEO, CFO, styreleder, primærinnsider eller annen nøkkelperson som tilfører noe utover tallene — årsak, marked, etterspørsel, risiko, utsikter, strategi, finansiering, kontrakt, resultat eller en materiell hendelse — skal saken gjengi den. Velg form: sitatstrek i eget avsnitt, kildefast «...»-formulering i løpende tekst, eller personattribuert parafrase.
+Hvis kilden inneholder en navngitt uttalelse fra CEO, CFO, styreleder, primærinnsider eller annen nøkkelperson som tilfører noe utover tallene — årsak, marked, etterspørsel, risiko, utsikter, strategi, finansiering, kontrakt, resultat eller en materiell hendelse — skal saken normalt bruke ett kort sitatstrek-avsnitt. Bygg gjerne slik: ett avsnitt med fakta/kontekst, nytt avsnitt med sitatstrek, og eventuelt ett kort oppfølgingsavsnitt med 'Han/hun skriver videre ...' når oppfølgingen tilfører ny informasjon.
+
+Ikke erstatt et godt kort sitat med en ren 'X sier at ...'-parafrase. Bruk personattribuert parafrase bare som unntak når sitatstrek eller «...» ikke fungerer.
+
+Samme prioritet gjelder navngitte analytikere eller andre eksterne kilder i valgt tilleggsmateriale når de gir konkret, relevant forklaring eller forventningskontekst. Ikke ta med anbefalinger, kursmål eller investeringsråd.
 
 Unntak — dropp uttalelsen bare hvis ett av disse gjelder:
 1. Uttalelsen er generisk PR uten konkret innhold: bare tilfredshet, stolthet, optimisme, «sterk drift», «godt produkt», «attraktivt tilbud» eller lignende. Legg den da i excluded_hype.
@@ -146,7 +150,7 @@ Lengre tekst i «...» brukes bare når nøyaktig ordlyd er nyhetsmessig viktig.
 
 Anti-eksempel: Hvis kilden bare sier at CEO er "very pleased and excited about the future", skal sitatet droppes eller legges i excluded_hype som generisk PR uten konkret forklaring.
 
-Hvis du bruker sitatstrek, guillemets eller en personattribuert parafrase fra en personuttalelse, skal source_spans inneholde original ordlyd eller et kort utdrag som viser speaker/rolle + utsagn. Ikke oppfinn sitater.`;
+Hvis du bruker sitatstrek, guillemets eller unntaksvis en personattribuert parafrase fra en personuttalelse, skal source_spans inneholde original ordlyd eller et kort utdrag som viser speaker/rolle + utsagn. Ikke oppfinn sitater.`;
 
 export const EDITORIAL_AVOID = `UNNGA
 - Ticker-koder i titler og lopende tekst. Bruk selskapets fulle eller vanlige navn.

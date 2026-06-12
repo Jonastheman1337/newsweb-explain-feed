@@ -40,10 +40,13 @@ describe("prompt style guidance", () => {
     expect(developerPrompt).toContain("en nær direkte oversettelse av en engelsk formulering");
     expect(developerPrompt).toContain("Sitatstrek");
     expect(developerPrompt).toContain("Guillemets");
+    expect(developerPrompt).toContain("Sitatstrek (–) er hovedformen");
+    expect(developerPrompt).toContain("Fri personattribuert parafrase er fallback");
+    expect(developerPrompt).toContain("Ikke erstatt et godt kort sitat");
     expect(developerPrompt).not.toContain("Guillemets («») = parafrasering");
     expect(userPrompt).toContain("Sjekk kilden for navngitte uttalelser");
-    expect(userPrompt).toContain("skal saken gjengi den med sitatstrek");
-    expect(userPrompt).not.toContain("skal saken normalt bruke ett kort sitat");
+    expect(userPrompt).toContain("skal saken normalt bruke ett kort sitatstrek-avsnitt");
+    expect(userPrompt).toContain("Bruk ren personattribuert parafrase bare");
     expect(userPrompt).not.toContain("bruk dem nar de gir nyhetsverdi");
   });
 
@@ -98,9 +101,8 @@ describe("prompt style guidance", () => {
     expect(reportPrompt).toContain("HOVEDREGEL FOR PERSONUTTALELSER");
     expect(reportPrompt).toContain("Regnskap for uttalelser");
     expect(reportPrompt).toContain("Kutt adjektiver, kundeløfter og selvskryt");
-    expect(reportPrompt).toContain(
-      "sitatstrek, guillemets eller en personattribuert parafrase"
-    );
+    expect(reportPrompt).toContain("skal du normalt bruke ett kort sitatstrek-avsnitt");
+    expect(reportPrompt).toContain("Bruk personattribuert parafrase bare");
     expect(reportPrompt).toContain("speaker/rolle + utsagn");
   });
 });
