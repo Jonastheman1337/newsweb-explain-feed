@@ -61,9 +61,13 @@ export default async function NoticePage({ params, searchParams }: NoticePagePro
     return null;
   });
 
-  const isProcessing = "processing" in notice && notice.processing === true;
+  const noticeIsProcessing = "processing" in notice && notice.processing === true;
+  const statusFailed = noticeStatus?.failed === true;
+  const isProcessing = noticeIsProcessing && !statusFailed;
   const isSkipped = "skipped" in notice && notice.skipped === true;
-  const isFailed = "failed" in notice && notice.failed === true;
+  const isFailed =
+    ("failed" in notice && notice.failed === true) ||
+    (noticeIsProcessing && statusFailed);
   const isRegenerating =
     !isProcessing &&
     !isSkipped &&

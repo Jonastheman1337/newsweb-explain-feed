@@ -1,5 +1,6 @@
 import {
   QUEUE_NAMES,
+  GENERATION_RUN_STALE_MS,
   REDIS_CHANNELS,
   isYearlyReportCategory,
   needsNewsworthinessTriage,
@@ -10,6 +11,7 @@ import {
   rewriteOutputJsonSchema,
   rewriteOutputSchema,
   shouldSkipRewrite,
+  toPrismaJsonValue,
   type RewriteOutput
 } from "@newsweb/shared";
 import { loadConfig } from "./config.js";
@@ -102,6 +104,13 @@ import {
   latestBootstrapRewriteJobId,
   shouldQueueLatestBootstrapRewrite
 } from "./services/latest-bootstrap.js";
+import {
+  STALE_GENERATION_RECOVERY_ERROR,
+  STALE_GENERATION_RECOVERY_LIMIT,
+  STALE_GENERATION_RECOVERY_LOOKBACK_MS,
+  shouldRecoverStaleGenerationRun,
+  staleGenerationRecoveryJobId
+} from "./services/stale-generation-recovery.js";
 import { sanitizeRewriteStyle } from "./services/style-sanitizer.js";
 import { setGenerationPhase } from "./services/generation-phase.js";
 
@@ -479,12 +488,12 @@ function generationInputJson(
   modelCalls: ModelCallLog[] = [],
   reasoningEffortOverride?: OpenAIReasoningEffort
 ): Prisma.InputJsonValue {
-  return {
+  return toPrismaJsonValue({
     sourcePayload: payload,
     previousRewrite: previousOutput ?? null,
     reasoningEffortOverride: reasoningEffortOverride ?? null,
     modelCalls
-  } as unknown as Prisma.InputJsonValue;
+  });
 }
 
 function referenceCoverageJson(
@@ -843,8 +852,7 @@ async function startGenerationRun(
     ),
     ...(previousOutput
       ? {
-          previousRewriteJson:
-            previousOutput as unknown as Prisma.InputJsonValue
+          previousRewriteJson: toPrismaJsonValue(previousOutput)
         }
       : {}),
     model: config.OPENAI_MODEL,
@@ -2712,6 +2720,9 @@ async function upsertRewrite(args: {
   inputJson?: Prisma.InputJsonValue;
 }): Promise<void> {
   const version = args.version ?? 1;
+  const rewriteJson = toPrismaJsonValue(args.rewriteJson);
+  const validationJson = toPrismaJsonValue(args.validationJson);
+  const inputJson = args.inputJson ? toPrismaJsonValue(args.inputJson) : undefined;
   await prisma.rewrite.upsert({
     where: {
       messageId_version: {
@@ -2725,8 +2736,8 @@ async function upsertRewrite(args: {
       lang: "nb",
       model: config.OPENAI_MODEL,
       promptVersion: PROMPT_VERSION,
-      rewriteJson: args.rewriteJson,
-      validationJson: args.validationJson,
+      rewriteJson,
+      validationJson,
       status: args.status,
       userInstruction: args.userInstruction ?? null
     },
@@ -2734,8 +2745,8 @@ async function upsertRewrite(args: {
       lang: "nb",
       model: config.OPENAI_MODEL,
       promptVersion: PROMPT_VERSION,
-      rewriteJson: args.rewriteJson,
-      validationJson: args.validationJson,
+      rewriteJson,
+      validationJson,
       status: args.status,
       userInstruction: args.userInstruction ?? null,
       generatedAt: new Date()
@@ -2749,24 +2760,37 @@ async function upsertRewrite(args: {
       args.status === "published" ||
       args.status === "failed" ||
       args.status === "skipped";
-    await logPrisma.generationRun.update({
-      where: { id: args.generationRunId },
-      data: {
-        version,
-        status: args.status,
-        phase,
-        phaseUpdatedAt,
-        userInstruction: args.userInstruction ?? null,
-        ...(args.inputJson ? { inputJson: args.inputJson } : {}),
-        outputJson: args.rewriteJson,
-        validationJson: args.validationJson,
-        model: config.OPENAI_MODEL,
-        promptVersion: PROMPT_VERSION,
-        promptChars: extractPromptChars(args.validationJson),
-        errorText: extractRewriteErrorText(args.rewriteJson),
-        ...(terminalStatus ? { finishedAt: new Date() } : {})
-      }
-    });
+    try {
+      await logPrisma.generationRun.update({
+        where: { id: args.generationRunId },
+        data: {
+          version,
+          status: args.status,
+          phase,
+          phaseUpdatedAt,
+          userInstruction: args.userInstruction ?? null,
+          ...(inputJson ? { inputJson } : {}),
+          outputJson: rewriteJson,
+          validationJson,
+          model: config.OPENAI_MODEL,
+          promptVersion: PROMPT_VERSION,
+          promptChars: extractPromptChars(validationJson),
+          errorText: extractRewriteErrorText(rewriteJson),
+          ...(terminalStatus ? { finishedAt: new Date() } : {})
+        }
+      });
+    } catch (error) {
+      console.error(
+        JSON.stringify({
+          service: "worker",
+          queue: QUEUE_NAMES.rewrite,
+          event: "generation_run_update_failed",
+          messageId: args.messageId,
+          generationRunId: args.generationRunId,
+          error: error instanceof Error ? error.message : String(error)
+        })
+      );
+    }
   }
 }
 
@@ -2924,11 +2948,11 @@ const ingestWorker = new Worker<IngestJobData>(
           status: "queued",
           phase: "queued",
           phaseUpdatedAt,
-          inputJson: {
+          inputJson: toPrismaJsonValue({
             endpoint: "worker/ingest",
             messageId: job.data.messageId,
             targetVersion: 1
-          } as Prisma.InputJsonValue
+          })
         }
       });
 
@@ -3982,6 +4006,222 @@ const publishWorker = new Worker<PublishJobData>(
   }
 );
 
+async function recoverStaleNewMessageRuns(): Promise<{
+  candidates: number;
+  recovered: number;
+  skipped: number;
+  failed: number;
+}> {
+  const now = new Date();
+  const staleBefore = new Date(now.getTime() - GENERATION_RUN_STALE_MS);
+  const requestedAfter = new Date(
+    now.getTime() - STALE_GENERATION_RECOVERY_LOOKBACK_MS
+  );
+  const candidates = await logPrisma.generationRun.findMany({
+    where: {
+      reason: "new-message",
+      status: { in: ["queued", "started", "pending"] },
+      requestedAt: { gte: requestedAfter },
+      OR: [
+        { phaseUpdatedAt: null },
+        { phaseUpdatedAt: { lt: staleBefore } }
+      ]
+    },
+    orderBy: { requestedAt: "asc" },
+    take: STALE_GENERATION_RECOVERY_LIMIT,
+    select: {
+      id: true,
+      messageId: true,
+      version: true,
+      reason: true,
+      status: true,
+      requestedAt: true,
+      phaseUpdatedAt: true
+    }
+  });
+
+  if (candidates.length === 0) {
+    return { candidates: 0, recovered: 0, skipped: 0, failed: 0 };
+  }
+
+  const messageIds = [...new Set(candidates.map((run) => run.messageId))];
+  const [messageRuns, rewrites] = await Promise.all([
+    logPrisma.generationRun.findMany({
+      where: {
+        messageId: { in: messageIds },
+        reason: "new-message",
+        requestedAt: { gte: requestedAfter }
+      },
+      orderBy: { requestedAt: "desc" },
+      select: {
+        id: true,
+        messageId: true,
+        version: true,
+        reason: true,
+        status: true,
+        requestedAt: true,
+        phaseUpdatedAt: true
+      }
+    }),
+    prisma.rewrite.findMany({
+      where: { messageId: { in: messageIds } },
+      orderBy: { generatedAt: "desc" },
+      select: {
+        messageId: true,
+        version: true,
+        status: true,
+        generatedAt: true
+      }
+    })
+  ]);
+
+  const runsByMessage = new Map<number, typeof messageRuns>();
+  for (const run of messageRuns) {
+    const group = runsByMessage.get(run.messageId) ?? [];
+    group.push(run);
+    runsByMessage.set(run.messageId, group);
+  }
+
+  const rewritesByMessage = new Map<number, typeof rewrites>();
+  for (const rewrite of rewrites) {
+    const group = rewritesByMessage.get(rewrite.messageId) ?? [];
+    group.push(rewrite);
+    rewritesByMessage.set(rewrite.messageId, group);
+  }
+
+  let recovered = 0;
+  let skipped = 0;
+  let failed = 0;
+
+  for (const candidate of candidates) {
+    const messageRunsForNotice = runsByMessage.get(candidate.messageId) ?? [];
+    const rewritesForNotice = rewritesByMessage.get(candidate.messageId) ?? [];
+
+    if (
+      !shouldRecoverStaleGenerationRun({
+        run: candidate,
+        messageRuns: messageRunsForNotice,
+        rewrites: rewritesForNotice,
+        now
+      })
+    ) {
+      skipped += 1;
+      continue;
+    }
+
+    const jobId = staleGenerationRecoveryJobId(candidate.messageId, candidate.id);
+    const existingJob = await rewriteQueue.getJob(jobId);
+    if (existingJob) {
+      skipped += 1;
+      continue;
+    }
+
+    const latestRewrite = rewritesForNotice[0];
+    const targetVersion = candidate.version ?? latestRewrite?.version ?? 1;
+    const phaseUpdatedAt = new Date();
+    let recoveryRunId: string | null = null;
+
+    try {
+      await logPrisma.generationRun.update({
+        where: { id: candidate.id },
+        data: {
+          status: "failed",
+          phase: "failed",
+          phaseUpdatedAt,
+          errorText: STALE_GENERATION_RECOVERY_ERROR,
+          finishedAt: phaseUpdatedAt
+        }
+      });
+
+      const recoveryRun = await logPrisma.generationRun.create({
+        data: {
+          messageId: candidate.messageId,
+          version: targetVersion,
+          reason: "new-message",
+          status: "queued",
+          phase: "queued",
+          phaseUpdatedAt,
+          inputJson: toPrismaJsonValue({
+            endpoint: "worker/stale-recovery",
+            messageId: candidate.messageId,
+            targetVersion,
+            recoveredGenerationRunId: candidate.id,
+            staleRunStatus: candidate.status,
+            stalePhaseUpdatedAt: candidate.phaseUpdatedAt?.toISOString() ?? null
+          })
+        }
+      });
+      recoveryRunId = recoveryRun.id;
+
+      const recoveryJob = await rewriteQueue.add(
+        "rewrite-stale-recovery",
+        {
+          messageId: candidate.messageId,
+          reason: "new-message",
+          generationRunId: recoveryRun.id,
+          targetVersion
+        },
+        {
+          jobId,
+          attempts: 3,
+          backoff: {
+            type: "exponential",
+            delay: 5000
+          },
+          removeOnComplete: 2000,
+          removeOnFail: 2000
+        }
+      );
+
+      await logPrisma.generationRun.update({
+        where: { id: recoveryRun.id },
+        data: {
+          jobId: recoveryJob.id != null ? String(recoveryJob.id) : null,
+          jobName: "rewrite-stale-recovery"
+        }
+      });
+
+      await publishFeedUpdate(candidate.messageId, "processing");
+      recovered += 1;
+    } catch (error) {
+      failed += 1;
+      if (recoveryRunId) {
+        try {
+          await logPrisma.generationRun.update({
+            where: { id: recoveryRunId },
+            data: {
+              status: "failed",
+              phase: "failed",
+              phaseUpdatedAt: new Date(),
+              errorText: error instanceof Error ? error.message : String(error),
+              finishedAt: new Date()
+            }
+          });
+        } catch {
+          // Best effort: the original recovery error is logged below.
+        }
+      }
+      console.error(
+        JSON.stringify({
+          service: "worker",
+          queue: QUEUE_NAMES.rewrite,
+          event: "stale_generation_recovery_failed",
+          messageId: candidate.messageId,
+          generationRunId: candidate.id,
+          error: error instanceof Error ? error.message : String(error)
+        })
+      );
+    }
+  }
+
+  return {
+    candidates: candidates.length,
+    recovered,
+    skipped,
+    failed
+  };
+}
+
 async function bootstrap(): Promise<void> {
   const repeatables = await ingestQueue.getRepeatableJobs();
   for (const repeatable of repeatables) {
@@ -4032,6 +4272,19 @@ async function bootstrap(): Promise<void> {
         }`
       );
     }
+  }
+
+  try {
+    const recovered = await recoverStaleNewMessageRuns();
+    console.log(
+      `[worker] stale generation recovery candidates=${recovered.candidates} recovered=${recovered.recovered} skipped=${recovered.skipped} failed=${recovered.failed}`
+    );
+  } catch (error) {
+    console.error(
+      `[worker] stale generation recovery failed: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
   }
 
   console.log(

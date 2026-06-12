@@ -1,4 +1,5 @@
 import {
+  GENERATION_RUN_STALE_MS,
   isGenerationPhase,
   type GenerationPhase,
   type RewriteStatusResponse
@@ -23,10 +24,6 @@ const TERMINAL_GENERATION_RUN_STATUSES = new Set(["published", "skipped", "faile
 
 const TERMINAL_GENERATION_RUN_PHASES = new Set(["published", "skipped", "failed"]);
 
-// A run that has not reported phase progress for this long is considered dead
-// (worker crash, dropped queue job) so the UI can fall back to the rewrite state.
-export const GENERATION_RUN_STALE_MS = 20 * 60 * 1000;
-
 const RUNNING_JOB_STATES = new Set([
   "active",
   "delayed",
@@ -34,6 +31,8 @@ const RUNNING_JOB_STATES = new Set([
   "waiting",
   "waiting-children"
 ]);
+
+export { GENERATION_RUN_STALE_MS };
 
 export function isJobStillRunning(jobState: string | null): boolean {
   return jobState ? RUNNING_JOB_STATES.has(jobState) : false;
@@ -54,6 +53,33 @@ export function isGenerationRunActive(
   if (ACTIVE_GENERATION_RUN_STATUSES.has(generationRun.status)) return true;
   if (!generationRun.phase) return false;
   return !TERMINAL_GENERATION_RUN_PHASES.has(generationRun.phase);
+}
+
+function isGenerationRunStale(
+  generationRun: GenerationRunStatusRecord,
+  now: Date
+): boolean {
+  if (!generationRun) return false;
+  if (TERMINAL_GENERATION_RUN_STATUSES.has(generationRun.status)) return false;
+  return (
+    !generationRun.phaseUpdatedAt ||
+    now.getTime() - generationRun.phaseUpdatedAt.getTime() > GENERATION_RUN_STALE_MS
+  );
+}
+
+function isStaleGenerationFailure(args: {
+  generationRun: GenerationRunStatusRecord;
+  rewrite: RewriteStatusRecord;
+  jobState: string | null;
+  now: Date;
+}): boolean {
+  if (!isGenerationRunStale(args.generationRun, args.now)) return false;
+  if (isJobStillRunning(args.jobState)) return false;
+  return (
+    !args.rewrite ||
+    args.rewrite.status === "pending" ||
+    args.rewrite.status === "needs_retry"
+  );
 }
 
 export function chooseGenerationRun(
@@ -100,12 +126,21 @@ export function buildGenerationStatusPayload(args: {
   now?: Date;
 }): RewriteStatusResponse {
   const { generationRun, rewrite, jobState } = args;
+  const now = args.now ?? new Date();
   const runActive =
-    isGenerationRunActive(generationRun, args.now) || isJobStillRunning(jobState);
+    isGenerationRunActive(generationRun, now) || isJobStillRunning(jobState);
+  const staleFailed = isStaleGenerationFailure({
+    generationRun,
+    rewrite,
+    jobState,
+    now
+  });
   const failed =
     !runActive &&
-    (generationRun?.status === "failed" || rewrite?.status === "failed");
-  const phase = deriveGenerationPhase(args);
+    (staleFailed ||
+      generationRun?.status === "failed" ||
+      rewrite?.status === "failed");
+  const phase = staleFailed ? "failed" : deriveGenerationPhase(args);
 
   return {
     ready:

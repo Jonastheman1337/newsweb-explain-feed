@@ -184,6 +184,61 @@ describe("generation status", () => {
     });
   });
 
+  it("reports stale queued work without a terminal rewrite as failed", () => {
+    const staleNow = new Date(newDate.getTime() + GENERATION_RUN_STALE_MS + 1);
+
+    expect(
+      buildGenerationStatusPayload({
+        generationRun: {
+          id: "run-6",
+          status: "queued",
+          phase: "queued",
+          phaseUpdatedAt: newDate
+        },
+        rewrite: {
+          status: "pending",
+          generatedAt: oldDate,
+          version: 1
+        },
+        jobState: null,
+        now: staleNow
+      })
+    ).toEqual({
+      ready: false,
+      failed: true,
+      generatedAt: "2026-05-29T08:00:00.000Z",
+      version: 1,
+      jobState: null,
+      generationRunId: "run-6",
+      phase: "failed",
+      phaseUpdatedAt: "2026-05-29T08:01:00.000Z"
+    });
+  });
+
+  it("does not fail fresh queued work before the stale threshold", () => {
+    expect(
+      buildGenerationStatusPayload({
+        generationRun: {
+          id: "run-7",
+          status: "queued",
+          phase: "queued",
+          phaseUpdatedAt: newDate
+        },
+        rewrite: {
+          status: "pending",
+          generatedAt: oldDate,
+          version: 1
+        },
+        jobState: null,
+        now: newDate
+      })
+    ).toMatchObject({
+      ready: false,
+      failed: false,
+      phase: "queued"
+    });
+  });
+
   it("reports a failed regeneration when the latest run failed over an older rewrite", () => {
     expect(
       buildGenerationStatusPayload({

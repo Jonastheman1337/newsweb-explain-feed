@@ -1,4 +1,5 @@
 import { createHmac } from "node:crypto";
+import { toPrismaJsonValue } from "@newsweb/shared";
 import { logPrisma, prisma } from "@newsweb/shared/db";
 import type { Prisma } from "@prisma/client";
 import type { FastifyBaseLogger } from "fastify";
@@ -31,7 +32,7 @@ type RewriteContext = {
 };
 
 export function toJsonValue(value: unknown): Prisma.InputJsonValue {
-  return JSON.parse(JSON.stringify(value ?? null)) as Prisma.InputJsonValue;
+  return toPrismaJsonValue(value);
 }
 
 export function hashTelemetryId(secret: string, value?: string): string | null {

@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import type { Prisma } from "@prisma/client";
+import { toPrismaJsonValue } from "@newsweb/shared";
 import { logPrisma } from "@newsweb/shared/db";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
@@ -39,7 +40,7 @@ function loadEnvVar(name: string, fallback: string): string {
 }
 
 function toJsonValue(value: unknown): Prisma.InputJsonValue {
-  return JSON.parse(JSON.stringify(value ?? null)) as Prisma.InputJsonValue;
+  return toPrismaJsonValue(value);
 }
 
 const titleSuggestionsJsonSchema = {

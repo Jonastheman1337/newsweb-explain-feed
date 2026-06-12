@@ -18,6 +18,9 @@ export const generationPhaseSchema = z.enum(GENERATION_PHASES);
 
 export type GenerationPhase = z.infer<typeof generationPhaseSchema>;
 
+// A run that has not reported phase progress for this long is considered dead.
+export const GENERATION_RUN_STALE_MS = 20 * 60 * 1000;
+
 export const GENERATION_PHASE_LABELS: Record<GenerationPhase, string> = {
   queued: "Venter på generering",
   reading_notice: "Leser original melding",
