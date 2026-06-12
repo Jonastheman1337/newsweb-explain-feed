@@ -16,6 +16,7 @@ type GenerationRunStatusRecord = {
   status: string;
   phase: string | null;
   phaseUpdatedAt: Date | null;
+  requestedAt?: Date | null;
 } | null;
 
 const ACTIVE_GENERATION_RUN_STATUSES = new Set(["queued", "started", "pending"]);
@@ -82,6 +83,19 @@ function isStaleGenerationFailure(args: {
   );
 }
 
+function isReadyRewriteCurrentForRun(
+  generationRun: GenerationRunStatusRecord,
+  rewrite: RewriteStatusRecord
+): boolean {
+  if (rewrite?.status !== "published" && rewrite?.status !== "skipped") {
+    return false;
+  }
+  if (!generationRun?.requestedAt) {
+    return false;
+  }
+  return rewrite.generatedAt.getTime() >= generationRun.requestedAt.getTime();
+}
+
 export function chooseGenerationRun(
   jobRun: GenerationRunStatusRecord,
   latestRun: GenerationRunStatusRecord
@@ -129,6 +143,7 @@ export function buildGenerationStatusPayload(args: {
   const now = args.now ?? new Date();
   const runActive =
     isGenerationRunActive(generationRun, now) || isJobStillRunning(jobState);
+  const currentReadyRewrite = isReadyRewriteCurrentForRun(generationRun, rewrite);
   const staleFailed = isStaleGenerationFailure({
     generationRun,
     rewrite,
@@ -136,6 +151,7 @@ export function buildGenerationStatusPayload(args: {
     now
   });
   const failed =
+    !currentReadyRewrite &&
     !runActive &&
     (staleFailed ||
       generationRun?.status === "failed" ||
@@ -144,9 +160,10 @@ export function buildGenerationStatusPayload(args: {
 
   return {
     ready:
-      !runActive &&
-      !failed &&
-      (rewrite?.status === "published" || rewrite?.status === "skipped"),
+      currentReadyRewrite ||
+      (!runActive &&
+        !failed &&
+        (rewrite?.status === "published" || rewrite?.status === "skipped")),
     failed,
     generatedAt: rewrite?.generatedAt.toISOString() ?? null,
     version: rewrite?.version ?? null,

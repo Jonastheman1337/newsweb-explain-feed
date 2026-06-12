@@ -111,6 +111,31 @@ describe("generation status", () => {
     });
   });
 
+  it("reports ready when a terminal rewrite was generated after the selected run was requested", () => {
+    expect(
+      buildGenerationStatusPayload({
+        generationRun: {
+          id: "run-current-terminal",
+          status: "queued",
+          phase: "queued",
+          phaseUpdatedAt: newDate,
+          requestedAt: oldDate
+        },
+        rewrite: {
+          status: "skipped",
+          generatedAt: newDate,
+          version: 1
+        },
+        jobState: null,
+        now: newDate
+      })
+    ).toMatchObject({
+      ready: true,
+      failed: false,
+      phase: "queued"
+    });
+  });
+
   it("treats terminal run statuses as inactive even with a stale non-terminal phase", () => {
     expect(
       isGenerationRunActive(

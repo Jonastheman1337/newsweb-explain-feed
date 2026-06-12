@@ -4033,6 +4033,7 @@ async function recoverStaleNewMessageRuns(): Promise<{
       id: true,
       messageId: true,
       version: true,
+      jobId: true,
       reason: true,
       status: true,
       requestedAt: true,
@@ -4057,6 +4058,7 @@ async function recoverStaleNewMessageRuns(): Promise<{
         id: true,
         messageId: true,
         version: true,
+        jobId: true,
         reason: true,
         status: true,
         requestedAt: true,
@@ -4113,6 +4115,39 @@ async function recoverStaleNewMessageRuns(): Promise<{
     const existingJob = await rewriteQueue.getJob(jobId);
     if (existingJob) {
       skipped += 1;
+      continue;
+    }
+
+    const originalJobIds = [
+      candidate.jobId,
+      `rewrite-${candidate.messageId}`
+    ].filter((id): id is string => Boolean(id));
+    let resumedExistingJob = false;
+    for (const originalJobId of [...new Set(originalJobIds)]) {
+      const originalJob = await rewriteQueue.getJob(originalJobId);
+      if (!originalJob) continue;
+      const originalJobState = await originalJob.getState();
+      if (originalJobState === "completed" || originalJobState === "failed") {
+        continue;
+      }
+
+      const phaseUpdatedAt = new Date();
+      await logPrisma.generationRun.update({
+        where: { id: candidate.id },
+        data: {
+          status: "queued",
+          phase: "queued",
+          phaseUpdatedAt,
+          errorText: null,
+          finishedAt: null
+        }
+      });
+      await publishFeedUpdate(candidate.messageId, "processing");
+      recovered += 1;
+      resumedExistingJob = true;
+      break;
+    }
+    if (resumedExistingJob) {
       continue;
     }
 

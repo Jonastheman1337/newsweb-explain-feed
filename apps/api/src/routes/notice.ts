@@ -624,7 +624,8 @@ export const noticeRoutes: FastifyPluginAsync = async (fastify) => {
             id: true,
             status: true,
             phase: true,
-            phaseUpdatedAt: true
+            phaseUpdatedAt: true,
+            requestedAt: true
           }
         });
       }
@@ -639,7 +640,8 @@ export const noticeRoutes: FastifyPluginAsync = async (fastify) => {
           id: true,
           status: true,
           phase: true,
-          phaseUpdatedAt: true
+          phaseUpdatedAt: true,
+          requestedAt: true
         }
       });
 
