@@ -5,13 +5,17 @@ import {
 import { logPrisma, prisma } from "@newsweb/shared/db";
 import type { Prisma } from "@prisma/client";
 import type { FastifyPluginAsync } from "fastify";
-import { mapDbItemToFeedItem } from "../services/feed-item-mapper.js";
 import {
-  GENERATION_RUN_STALE_MS,
-  isGenerationRunActive
-} from "../services/generation-status.js";
+  shouldMarkFeedItemRegenerating,
+  type FeedRewriteStateRecord
+} from "../services/feed-regeneration.js";
+import { mapDbItemToFeedItem } from "../services/feed-item-mapper.js";
+import { GENERATION_RUN_STALE_MS } from "../services/generation-status.js";
 
-async function findRegeneratingMessageIds(messageIds: number[]): Promise<Set<number>> {
+async function findRegeneratingMessageIds(
+  messageIds: number[],
+  rewritesByMessageId: Map<number, FeedRewriteStateRecord[]>
+): Promise<Set<number>> {
   if (messageIds.length === 0) {
     return new Set();
   }
@@ -28,7 +32,8 @@ async function findRegeneratingMessageIds(messageIds: number[]): Promise<Set<num
       id: true,
       status: true,
       phase: true,
-      phaseUpdatedAt: true
+      phaseUpdatedAt: true,
+      requestedAt: true
     }
   });
 
@@ -39,7 +44,12 @@ async function findRegeneratingMessageIds(messageIds: number[]): Promise<Set<num
       continue;
     }
     seenIds.add(run.messageId);
-    if (isGenerationRunActive(run)) {
+    if (
+      shouldMarkFeedItemRegenerating(
+        run,
+        rewritesByMessageId.get(run.messageId) ?? []
+      )
+    ) {
       activeIds.add(run.messageId);
     }
   }
@@ -145,9 +155,19 @@ export const feedRoutes: FastifyPluginAsync = async (fastify) => {
 
       const hasNext = items.length > query.limit;
       const slice = hasNext ? items.slice(0, query.limit) : items;
+      const rewritesByMessageId = new Map<number, FeedRewriteStateRecord[]>(
+        slice.map((item) => [
+          item.messageId,
+          item.sourceNotice.rewrites.map((rewrite) => ({
+            status: rewrite.status,
+            generatedAt: rewrite.generatedAt
+          }))
+        ])
+      );
 
       const regeneratingMessageIds = await findRegeneratingMessageIds(
-        slice.map((item) => item.messageId)
+        slice.map((item) => item.messageId),
+        rewritesByMessageId
       );
 
       const responseItems = slice
