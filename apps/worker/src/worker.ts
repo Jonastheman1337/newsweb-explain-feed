@@ -154,10 +154,79 @@ const openAIClient = createOpenAIClient(config.OPENAI_API_KEY);
 
 const connection = parseRedisUrl(config.REDIS_URL);
 const MAX_REFERENCE_REPAIR_ATTEMPTS = 3;
+const REDIS_WATCHDOG_WINDOW_MS = 60_000;
+const REDIS_WATCHDOG_ERROR_THRESHOLD = 30;
+const REDIS_WATCHDOG_EXIT_GRACE_MS = 250;
+const redisConnectionErrorTimestamps: number[] = [];
+let redisWatchdogExitScheduled = false;
+
+type RedisRuntimeEmitter = {
+  on(event: "error", listener: (error: Error) => void): unknown;
+};
+
+function isRedisConnectionError(error: Error): boolean {
+  return /ECONNRESET|EPIPE|ECONNREFUSED|ETIMEDOUT|Connection is closed|Connection is unreachable/i.test(
+    error.message
+  );
+}
+
+function recordRedisRuntimeError(source: string, error: Error): void {
+  console.error(
+    JSON.stringify({
+      service: "worker",
+      event: "redis_runtime_error",
+      source,
+      error: error.message
+    })
+  );
+
+  if (!isRedisConnectionError(error) || redisWatchdogExitScheduled) {
+    return;
+  }
+
+  const now = Date.now();
+  const windowStart = now - REDIS_WATCHDOG_WINDOW_MS;
+  redisConnectionErrorTimestamps.push(now);
+  while (
+    redisConnectionErrorTimestamps.length > 0 &&
+    redisConnectionErrorTimestamps[0] < windowStart
+  ) {
+    redisConnectionErrorTimestamps.shift();
+  }
+
+  if (redisConnectionErrorTimestamps.length < REDIS_WATCHDOG_ERROR_THRESHOLD) {
+    return;
+  }
+
+  redisWatchdogExitScheduled = true;
+  console.error(
+    JSON.stringify({
+      service: "worker",
+      event: "redis_watchdog_exit",
+      errorsInWindow: redisConnectionErrorTimestamps.length,
+      windowMs: REDIS_WATCHDOG_WINDOW_MS
+    })
+  );
+  setTimeout(() => process.exit(1), REDIS_WATCHDOG_EXIT_GRACE_MS).unref();
+}
+
+function attachRedisRuntimeErrorHandler(
+  source: string,
+  emitter: RedisRuntimeEmitter
+): void {
+  emitter.on("error", (error) => {
+    recordRedisRuntimeError(source, error);
+  });
+}
+
 const redisPub = new Redis(config.REDIS_URL, { maxRetriesPerRequest: null });
+attachRedisRuntimeErrorHandler("redis-publisher", redisPub);
 const ingestQueue = new Queue<IngestJobData>(QUEUE_NAMES.ingest, { connection });
 const rewriteQueue = new Queue<RewriteJobData>(QUEUE_NAMES.rewrite, { connection });
 const publishQueue = new Queue<PublishJobData>(QUEUE_NAMES.publish, { connection });
+attachRedisRuntimeErrorHandler("ingest-queue", ingestQueue);
+attachRedisRuntimeErrorHandler("rewrite-queue", rewriteQueue);
+attachRedisRuntimeErrorHandler("publish-queue", publishQueue);
 const skippedMissingIssuerSign = new Set<number>();
 
 async function publishFeedUpdate(
@@ -4005,6 +4074,10 @@ const publishWorker = new Worker<PublishJobData>(
     concurrency: 6
   }
 );
+
+attachRedisRuntimeErrorHandler("ingest-worker", ingestWorker);
+attachRedisRuntimeErrorHandler("rewrite-worker", rewriteWorker);
+attachRedisRuntimeErrorHandler("publish-worker", publishWorker);
 
 async function recoverStaleNewMessageRuns(): Promise<{
   candidates: number;

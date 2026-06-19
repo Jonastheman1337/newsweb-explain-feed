@@ -15,6 +15,8 @@ export const healthRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get("/health", async (_request, reply) => {
     let db: "up" | "down" = "up";
     let redis: "up" | "down" = "up";
+    let queueLagSec = 0;
+    let modelLatencyP95 = 0;
 
     try {
       await prisma.$queryRaw`SELECT 1`;
@@ -28,46 +30,57 @@ export const healthRoutes: FastifyPluginAsync = async (fastify) => {
       redis = "down";
     }
 
-    const waitingJobs = await fastify.rewriteQueue.getJobs(
-      ["waiting", "delayed"],
-      0,
-      50
-    );
+    try {
+      const waitingJobs = await fastify.rewriteQueue.getJobs(
+        ["waiting", "delayed"],
+        0,
+        50
+      );
+      const oldestTimestamp = waitingJobs.reduce<number>(
+        (oldest, job) =>
+          oldest === 0 ? job.timestamp : Math.min(oldest, job.timestamp),
+        0
+      );
+      queueLagSec =
+        oldestTimestamp > 0
+          ? Math.max(0, Math.floor((Date.now() - oldestTimestamp) / 1000))
+          : 0;
+    } catch {
+      redis = "down";
+    }
 
-    const oldestTimestamp = waitingJobs.reduce<number>(
-      (oldest, job) => (oldest === 0 ? job.timestamp : Math.min(oldest, job.timestamp)),
-      0
-    );
-    const queueLagSec =
-      oldestTimestamp > 0
-        ? Math.max(0, Math.floor((Date.now() - oldestTimestamp) / 1000))
-        : 0;
+    if (db === "up") {
+      try {
+        const recentRuns = await prisma.jobRun.findMany({
+          where: {
+            jobType: "rewrite",
+            status: "success",
+            finishedAt: { not: null }
+          },
+          orderBy: {
+            startedAt: "desc"
+          },
+          take: 120
+        });
 
-    const recentRuns = await prisma.jobRun.findMany({
-      where: {
-        jobType: "rewrite",
-        status: "success",
-        finishedAt: { not: null }
-      },
-      orderBy: {
-        startedAt: "desc"
-      },
-      take: 120
-    });
-
-    const latenciesMs = recentRuns
-      .filter((run) => run.finishedAt)
-      .map((run) => run.finishedAt!.getTime() - run.startedAt.getTime())
-      .filter((value) => value >= 0);
+        const latenciesMs = recentRuns
+          .filter((run) => run.finishedAt)
+          .map((run) => run.finishedAt!.getTime() - run.startedAt.getTime())
+          .filter((value) => value >= 0);
+        modelLatencyP95 = percentile(latenciesMs, 0.95);
+      } catch {
+        db = "down";
+      }
+    }
 
     const payload = healthResponseSchema.parse({
       ok: db === "up" && redis === "up",
       db,
       redis,
       queueLagSec,
-      modelLatencyP95: percentile(latenciesMs, 0.95)
+      modelLatencyP95
     });
 
-    return reply.send(payload);
+    return reply.code(payload.ok ? 200 : 503).send(payload);
   });
 };
