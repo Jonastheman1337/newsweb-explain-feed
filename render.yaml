@@ -1,7 +1,7 @@
 services:
   - type: keyvalue
     name: newsweb-explain-redis
-    plan: free
+    plan: starter
     ipAllowList: []
     maxmemoryPolicy: noeviction
 
