@@ -20,7 +20,10 @@
     "test": "npm run test -w packages/shared && npm run test -w packages/prompt-kit && npm run build -w packages/shared && npm run build -w packages/prompt-kit && npm run test -w apps/api && npm run test -w apps/worker",
     "eval:notice": "node scripts/run-targeted-notice-eval.mjs",
     "smoke:model-storytelling": "npm run build -w packages/shared && npm run build -w packages/prompt-kit && npm run smoke:model-storytelling -w apps/worker",
+    "smoke:openai-5.6": "node scripts/smoke-openai-5.6.mjs",
     "signals:pull": "node scripts/pull-signals.mjs",
+    "signals:test": "node --test scripts/pull-signals.test.mjs scripts/openai-costs.test.mjs",
+    "openai:usage": "node scripts/pull-openai-usage.mjs",
     "prisma:generate": "prisma generate",
     "prisma:migrate:dev": "prisma migrate dev",
     "prisma:migrate:deploy": "prisma migrate deploy && node scripts/init-log-db.mjs"

@@ -1,11 +1,17 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import type { Prisma } from "@prisma/client";
-import { toPrismaJsonValue } from "@newsweb/shared";
+import { toPrismaJsonValue, type OpenAIModelCallTelemetry } from "@newsweb/shared";
 import { logPrisma } from "@newsweb/shared/db";
+import {
+  callOpenAIForJson,
+  createOpenAIClient,
+  getOpenAIErrorTelemetry,
+  openAIServiceTiers,
+  type OpenAIServiceTier
+} from "@newsweb/shared/openai-responses";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import OpenAI from "openai";
 import { getApiBaseUrl } from "../../../../../lib/api-base-url";
 import { SESSION_COOKIE } from "../../../../../lib/session-cookie";
 
@@ -41,6 +47,24 @@ function loadEnvVar(name: string, fallback: string): string {
 
 function toJsonValue(value: unknown): Prisma.InputJsonValue {
   return toPrismaJsonValue(value);
+}
+
+function readServiceTier(value: string): OpenAIServiceTier {
+  return openAIServiceTiers.includes(value as OpenAIServiceTier)
+    ? (value as OpenAIServiceTier)
+    : "default";
+}
+
+function applyOpenAITelemetry(
+  modelCall: OpenAIModelCallTelemetry,
+  telemetry: OpenAIModelCallTelemetry
+): void {
+  modelCall.responseModel = telemetry.responseModel;
+  modelCall.requestedServiceTier = telemetry.requestedServiceTier;
+  modelCall.serviceTier = telemetry.serviceTier;
+  modelCall.attemptCount = telemetry.attemptCount;
+  modelCall.attempts = telemetry.attempts;
+  modelCall.usage = telemetry.usage;
 }
 
 const titleSuggestionsJsonSchema = {
@@ -82,7 +106,11 @@ function parseTitleSuggestions(raw: string): string[] {
     .slice(0, 5);
 }
 
-async function updateGenerationRunFailure(runId: string | null, errorText: string) {
+async function updateGenerationRunFailure(
+  runId: string | null,
+  errorText: string,
+  inputJson?: Prisma.InputJsonValue
+) {
   if (!runId) return;
   try {
     await logPrisma.generationRun.update({
@@ -90,6 +118,7 @@ async function updateGenerationRunFailure(runId: string | null, errorText: strin
       data: {
         status: "failed",
         errorText,
+        ...(inputJson ? { inputJson } : {}),
         finishedAt: new Date()
       }
     });
@@ -116,7 +145,10 @@ export async function POST(
   }
 
   const OPENAI_API_KEY = loadEnvVar("OPENAI_API_KEY", "");
-  const OPENAI_FAST_MODEL = loadEnvVar("OPENAI_FAST_MODEL", "gpt-5.4-mini");
+  const OPENAI_FAST_MODEL = loadEnvVar("OPENAI_FAST_MODEL", "gpt-5.6-luna");
+  const OPENAI_SERVICE_TIER = readServiceTier(
+    loadEnvVar("OPENAI_SERVICE_TIER", "default")
+  );
   const OPENAI_FAST_TIMEOUT_MS = Number(
     loadEnvVar("OPENAI_FAST_TIMEOUT_MS", "15000")
   );
@@ -179,6 +211,31 @@ export async function POST(
 
   let generationRunId: string | null = null;
   const numericMessageId = Number(messageId);
+  const titleModelCall: OpenAIModelCallTelemetry & {
+    provider: "openai";
+    schemaName: string;
+    model: string;
+    reasoningEffort: "none";
+    timeoutMs: number;
+    maxOutputTokens: number;
+    promptChars: number;
+  } = {
+    provider: "openai" as const,
+    schemaName: "title_suggestions",
+    model: OPENAI_FAST_MODEL,
+    reasoningEffort: "none",
+    timeoutMs: Number.isFinite(OPENAI_FAST_TIMEOUT_MS)
+      ? OPENAI_FAST_TIMEOUT_MS
+      : 15000,
+    maxOutputTokens: 512,
+    promptChars: prompt.length,
+    responseModel: null,
+    requestedServiceTier: OPENAI_SERVICE_TIER,
+    serviceTier: null,
+    attemptCount: 0,
+    attempts: [],
+    usage: null
+  };
   const requestPayload = {
     endpoint: "POST /api/notice/[messageId]/suggest-titles",
     messageId: numericMessageId,
@@ -188,7 +245,9 @@ export async function POST(
     issuerName,
     model: OPENAI_FAST_MODEL,
     reasoningEffort: "none",
-    prompt
+    serviceTier: OPENAI_SERVICE_TIER,
+    prompt,
+    modelCalls: [titleModelCall]
   };
 
   try {
@@ -232,45 +291,31 @@ export async function POST(
   }
 
   try {
-    const openAI = new OpenAI({ apiKey: OPENAI_API_KEY });
-    const response = await openAI.responses.create(
+    const result = await callOpenAIForJson(
+      createOpenAIClient(OPENAI_API_KEY),
       {
+        schemaName: "title_suggestions",
+        schema: titleSuggestionsJsonSchema,
+        systemPrompt: "",
+        developerPrompt,
+        userPrompt,
         model: OPENAI_FAST_MODEL,
-        max_output_tokens: 512,
-        store: false,
-        reasoning: { effort: "none" },
-        input: [
-          { role: "developer", content: developerPrompt },
-          { role: "user", content: userPrompt }
-        ],
-        text: {
-          format: {
-            type: "json_schema",
-            name: "title_suggestions",
-            schema: titleSuggestionsJsonSchema,
-            strict: true
-          },
-          verbosity: "low"
-        }
-      },
-      {
-        signal: AbortSignal.timeout(
-          Number.isFinite(OPENAI_FAST_TIMEOUT_MS)
-            ? OPENAI_FAST_TIMEOUT_MS
-            : 15000
-        )
+        reasoningEffort: "none",
+        serviceTier: OPENAI_SERVICE_TIER,
+        timeoutMs: titleModelCall.timeoutMs,
+        maxOutputTokens: titleModelCall.maxOutputTokens,
+        promptCacheKey: "newsweb:title-suggestions:title-suggestions-v4"
       }
     );
-    const text = response.output_text?.trim() ?? "";
-    if (!text) {
-      throw new Error("OpenAI returned no title suggestion output");
-    }
+    applyOpenAITelemetry(titleModelCall, result);
+    const text = result.content;
 
     const selectedTitles = parseTitleSuggestions(text);
     await logPrisma.generationRun.update({
       where: { id: generationRunId! },
       data: {
         status: "finished",
+        inputJson: toJsonValue(requestPayload),
         outputJson: toJsonValue({ rawText: text, titles: selectedTitles }),
         finishedAt: new Date()
       }
@@ -278,9 +323,12 @@ export async function POST(
     return NextResponse.json({ titles: selectedTitles });
   } catch (err) {
     console.error("[suggest-titles] Error:", err);
+    const telemetry = getOpenAIErrorTelemetry(err);
+    if (telemetry) applyOpenAITelemetry(titleModelCall, telemetry);
     await updateGenerationRunFailure(
       generationRunId,
-      err instanceof Error ? err.message : String(err)
+      err instanceof Error ? err.message : String(err),
+      toJsonValue(requestPayload)
     );
     return NextResponse.json({ message: "Failed to generate titles" }, { status: 500 });
   }

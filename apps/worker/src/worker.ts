@@ -12,6 +12,7 @@ import {
   rewriteOutputSchema,
   shouldSkipRewrite,
   toPrismaJsonValue,
+  type OpenAIModelCallTelemetry,
   type RewriteOutput
 } from "@newsweb/shared";
 import { loadConfig } from "./config.js";
@@ -97,9 +98,12 @@ import {
 import {
   callOpenAIForJson,
   createOpenAIClient,
+  getOpenAIErrorTelemetry,
   type OpenAIFileInput,
-  type OpenAIReasoningEffort
+  type OpenAIReasoningEffort,
+  type OpenAIServiceTier
 } from "./services/openai-responses.js";
+import { routeOpenAIModel } from "./services/openai-model-routing.js";
 import {
   latestBootstrapRewriteJobId,
   shouldQueueLatestBootstrapRewrite
@@ -151,6 +155,14 @@ type FeedUpdateState = "source" | "processing" | "published" | "failed";
 
 const config = loadConfig();
 const openAIClient = createOpenAIClient(config.OPENAI_API_KEY);
+
+function modelForReasoningEffort(effort: OpenAIReasoningEffort): string {
+  return routeOpenAIModel({
+    mainModel: config.OPENAI_MODEL,
+    hardModel: config.OPENAI_HARD_MODEL,
+    reasoningEffort: effort
+  });
+}
 
 const connection = parseRedisUrl(config.REDIS_URL);
 const MAX_REFERENCE_REPAIR_ATTEMPTS = 3;
@@ -924,7 +936,9 @@ async function startGenerationRun(
           previousRewriteJson: toPrismaJsonValue(previousOutput)
         }
       : {}),
-    model: config.OPENAI_MODEL,
+    model: modelForReasoningEffort(
+      job.data.reasoningEffortOverride ?? config.OPENAI_DEFAULT_REASONING_EFFORT
+    ),
     promptVersion: PROMPT_VERSION,
     startedAt: new Date()
   };
@@ -955,13 +969,14 @@ type JsonModelCallInput = {
   userPrompt: string;
   model?: string;
   reasoningEffort?: OpenAIReasoningEffort;
+  serviceTier?: OpenAIServiceTier;
   timeoutMs?: number;
   maxOutputTokens?: number;
   promptCacheKey?: string;
   file?: OpenAIFileInput;
 };
 
-type ModelCallLog = {
+type ModelCallLog = OpenAIModelCallTelemetry & {
   provider: "openai";
   schemaName: string;
   model: string;
@@ -1016,14 +1031,27 @@ function clampRewriteArrays(raw: Record<string, unknown>): Record<string, unknow
   return raw;
 }
 
+function applyOpenAITelemetry(
+  modelCall: ModelCallLog,
+  telemetry: OpenAIModelCallTelemetry
+): void {
+  modelCall.responseModel = telemetry.responseModel;
+  modelCall.requestedServiceTier = telemetry.requestedServiceTier;
+  modelCall.serviceTier = telemetry.serviceTier;
+  modelCall.attemptCount = telemetry.attemptCount;
+  modelCall.attempts = telemetry.attempts;
+  modelCall.usage = telemetry.usage;
+}
+
 async function callModelForJson({
   schemaName,
   schema,
   systemPrompt,
   developerPrompt,
   userPrompt,
-  model = config.OPENAI_MODEL,
+  model,
   reasoningEffort = config.OPENAI_DEFAULT_REASONING_EFFORT,
+  serviceTier = config.OPENAI_SERVICE_TIER,
   timeoutMs = config.OPENAI_TIMEOUT_MS,
   // Reasoning tokens count against max_output_tokens on gpt-5.x, so the
   // ceiling must cover reasoning + JSON output, not just the JSON.
@@ -1035,41 +1063,52 @@ async function callModelForJson({
   promptChars: number;
   modelCall: ModelCallLog;
 }> {
+  const resolvedModel = model ?? modelForReasoningEffort(reasoningEffort);
   const promptChars = systemPrompt.length + developerPrompt.length + userPrompt.length;
   const modelCall: ModelCallLog = {
     provider: "openai",
     schemaName,
-    model,
+    model: resolvedModel,
     reasoningEffort,
     timeoutMs,
     maxOutputTokens,
     systemPrompt,
     developerPrompt,
     userPrompt,
-    promptChars
+    promptChars,
+    responseModel: null,
+    requestedServiceTier: serviceTier,
+    serviceTier: null,
+    attemptCount: 0,
+    attempts: [],
+    usage: null
   };
 
   try {
-    const content = await callOpenAIForJson(openAIClient, {
+    const result = await callOpenAIForJson(openAIClient, {
       schemaName,
       schema,
       systemPrompt,
       developerPrompt,
       userPrompt,
-      model,
+      model: resolvedModel,
       reasoningEffort,
+      serviceTier,
       timeoutMs,
       maxOutputTokens,
       promptCacheKey,
       file
     });
+    applyOpenAITelemetry(modelCall, result);
 
     return {
-      content,
+      content: result.content,
       promptChars,
       modelCall
     };
   } catch (error) {
+    const telemetry = getOpenAIErrorTelemetry(error);
+    if (telemetry) applyOpenAITelemetry(modelCall, telemetry);
     const enriched: ModelCallFailureCarrier =
       error instanceof Error ? error : new Error(String(error));
     enriched.modelCall = modelCall;
@@ -1679,7 +1718,7 @@ async function callOpenAIPdfContext({
   schemaName,
   schema,
   userPrompt,
-  reasoningEffort = config.OPENAI_HARD_REASONING_EFFORT,
+  reasoningEffort = config.OPENAI_REFERENCE_REASONING_EFFORT,
   foundField = false
 }: {
   pdf: PdfAttachmentDownload;
@@ -1707,7 +1746,6 @@ async function callOpenAIPdfContext({
     systemPrompt,
     developerPrompt,
     userPrompt,
-    model: config.OPENAI_MODEL,
     reasoningEffort,
     timeoutMs: config.OPENAI_TIMEOUT_MS,
     promptCacheKey: `newsweb:pdf-context:${PROMPT_VERSION}`,
@@ -1889,9 +1927,7 @@ async function processReportRewrite(
   const modelCalls: ModelCallLog[] = [...(revisionOptions.modelCalls ?? [])];
   const reportReasoningEffort =
     revisionOptions.reasoningEffortOverride ??
-    (reportContent.diagnostics.openAIPdfFallback
-      ? config.OPENAI_HARD_REASONING_EFFORT
-      : config.OPENAI_REPORT_REASONING_EFFORT);
+    config.OPENAI_REPORT_REASONING_EFFORT;
   const reportReferenceText = [
     payload.bodyText && payload.bodyText.trim().length >= 100
       ? payload.bodyText
@@ -2372,9 +2408,7 @@ async function processYearlyReportRewrite(
   const modelCalls: ModelCallLog[] = [...(revisionOptions.modelCalls ?? [])];
   const reportReasoningEffort =
     revisionOptions.reasoningEffortOverride ??
-    (yearlyContent.openAIPdfFallback
-      ? config.OPENAI_HARD_REASONING_EFFORT
-      : config.OPENAI_REPORT_REASONING_EFFORT);
+    config.OPENAI_REPORT_REASONING_EFFORT;
   const revisionInstructionForPrompt = appendRevisionChecklist(
     revisionOptions.userInstruction
   );
@@ -2778,6 +2812,34 @@ async function processYearlyReportRewrite(
   }
 }
 
+function rewriteModelFromInputJson(inputJson: unknown): string {
+  if (!inputJson || typeof inputJson !== "object" || Array.isArray(inputJson)) {
+    return config.OPENAI_MODEL;
+  }
+
+  const input = inputJson as Record<string, unknown>;
+  if (Array.isArray(input.modelCalls)) {
+    const rewriteCall = input.modelCalls.find(
+      (call) =>
+        call !== null &&
+        typeof call === "object" &&
+        !Array.isArray(call) &&
+        (call as Record<string, unknown>).schemaName === "rewrite_output"
+    );
+    const model =
+      rewriteCall && typeof rewriteCall === "object"
+        ? (rewriteCall as Record<string, unknown>).model
+        : null;
+    if (typeof model === "string" && model.length > 0) return model;
+  }
+
+  const effort = input.reasoningEffortOverride;
+  if (effort === "xhigh" || effort === "max") {
+    return config.OPENAI_HARD_MODEL;
+  }
+  return config.OPENAI_MODEL;
+}
+
 async function upsertRewrite(args: {
   messageId: number;
   rewriteJson: Prisma.InputJsonValue;
@@ -2792,6 +2854,7 @@ async function upsertRewrite(args: {
   const rewriteJson = toPrismaJsonValue(args.rewriteJson);
   const validationJson = toPrismaJsonValue(args.validationJson);
   const inputJson = args.inputJson ? toPrismaJsonValue(args.inputJson) : undefined;
+  const rewriteModel = rewriteModelFromInputJson(inputJson);
   await prisma.rewrite.upsert({
     where: {
       messageId_version: {
@@ -2803,7 +2866,7 @@ async function upsertRewrite(args: {
       messageId: args.messageId,
       version,
       lang: "nb",
-      model: config.OPENAI_MODEL,
+      model: rewriteModel,
       promptVersion: PROMPT_VERSION,
       rewriteJson,
       validationJson,
@@ -2812,7 +2875,7 @@ async function upsertRewrite(args: {
     },
     update: {
       lang: "nb",
-      model: config.OPENAI_MODEL,
+      model: rewriteModel,
       promptVersion: PROMPT_VERSION,
       rewriteJson,
       validationJson,
@@ -2841,7 +2904,7 @@ async function upsertRewrite(args: {
           ...(inputJson ? { inputJson } : {}),
           outputJson: rewriteJson,
           validationJson,
-          model: config.OPENAI_MODEL,
+          model: rewriteModel,
           promptVersion: PROMPT_VERSION,
           promptChars: extractPromptChars(validationJson),
           errorText: extractRewriteErrorText(rewriteJson),
@@ -4396,7 +4459,7 @@ async function bootstrap(): Promise<void> {
   }
 
   console.log(
-    `[worker] started. polling=${config.NEWSWEB_POLLING_ENABLED} pollInterval=${config.POLL_INTERVAL_MS}ms model=${config.OPENAI_MODEL} fastModel=${config.OPENAI_FAST_MODEL}`
+    `[worker] started. polling=${config.NEWSWEB_POLLING_ENABLED} pollInterval=${config.POLL_INTERVAL_MS}ms model=${config.OPENAI_MODEL} fastModel=${config.OPENAI_FAST_MODEL} hardModel=${config.OPENAI_HARD_MODEL} serviceTier=${config.OPENAI_SERVICE_TIER}`
   );
 }
 

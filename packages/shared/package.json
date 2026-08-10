@@ -13,6 +13,10 @@
     "./db": {
       "types": "./dist/db.d.ts",
       "default": "./dist/db.js"
+    },
+    "./openai-responses": {
+      "types": "./dist/openai-responses.d.ts",
+      "default": "./dist/openai-responses.js"
     }
   },
   "scripts": {
@@ -22,6 +26,7 @@
   },
   "dependencies": {
     "@prisma/client": "^6.5.0",
+    "openai": "7.4.0",
     "zod": "^3.24.2"
   },
   "devDependencies": {

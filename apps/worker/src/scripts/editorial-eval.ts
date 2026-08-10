@@ -43,7 +43,10 @@ import {
   callOpenAIForJson,
   createOpenAIClient,
   openAIReasoningEfforts,
-  type OpenAIReasoningEffort
+  openAIServiceTiers,
+  type OpenAIJsonResult,
+  type OpenAIReasoningEffort,
+  type OpenAIServiceTier
 } from "../services/openai-responses.js";
 import { sanitizeRewriteStyle } from "../services/style-sanitizer.js";
 import { validateRewriteOutput } from "../services/rewrite-validation.js";
@@ -66,6 +69,8 @@ type EvalGeneration = EvalGenerationSummary & {
   promptVersion: string;
   model: string;
   reasoningEffort: OpenAIReasoningEffort;
+  serviceTier: OpenAIServiceTier;
+  modelCalls: EvalModelCall[];
   output: RewriteOutput | null;
   validation: {
     valid: boolean;
@@ -90,12 +95,23 @@ type EvalGeneration = EvalGenerationSummary & {
   errorText: string | null;
 };
 
+type EvalModelCall = Omit<OpenAIJsonResult, "content"> & {
+  schemaName: string;
+  model: string;
+  reasoningEffort: OpenAIReasoningEffort;
+  serviceTierRequested: OpenAIServiceTier;
+};
+
 type RunFile = {
-  schemaVersion: 1;
+  schemaVersion: 1 | 2;
   runId: string;
   createdAt: string;
   model: string;
   reasoningEffort: OpenAIReasoningEffort;
+  serviceTier?: OpenAIServiceTier;
+  controlProfile?: { model: string; reasoningEffort: OpenAIReasoningEffort };
+  challengerProfile?: { model: string; reasoningEffort: OpenAIReasoningEffort };
+  referenceProfile?: { model: string; reasoningEffort: OpenAIReasoningEffort };
   controlVariant: RegularPromptVariantId;
   challengerVariant: RegularPromptVariantId;
   sourceCasesPath: string;
@@ -322,10 +338,30 @@ async function runCommand(options: Map<string, string>): Promise<void> {
   const challengerVariant = parseVariant(requiredOption(options, "challenger"));
   const outPath = requiredOption(options, "out");
   const model = process.env.OPENAI_MODEL?.trim() || "gpt-5.5";
+  const controlModel = options.get("control-model")?.trim() || model;
+  const challengerModel = options.get("challenger-model")?.trim() || model;
   const timeoutMs = Number(process.env.OPENAI_TIMEOUT_MS ?? 240000);
   const reasoningEffort = parseReasoningEffort(
     process.env.OPENAI_DEFAULT_REASONING_EFFORT,
     "medium"
+  );
+  const controlReasoningEffort = parseReasoningEffort(
+    options.get("control-effort"),
+    reasoningEffort
+  );
+  const challengerReasoningEffort = parseReasoningEffort(
+    options.get("challenger-effort"),
+    reasoningEffort
+  );
+  const referenceModel =
+    options.get("reference-model")?.trim() || challengerModel;
+  const referenceReasoningEffort = parseReasoningEffort(
+    options.get("reference-effort"),
+    "medium"
+  );
+  const serviceTier = parseServiceTier(
+    options.get("service-tier") ?? process.env.OPENAI_SERVICE_TIER,
+    "flex"
   );
   const apiKey = process.env.OPENAI_API_KEY?.trim();
   if (!apiKey) {
@@ -336,14 +372,28 @@ async function runCommand(options: Map<string, string>): Promise<void> {
   const generations: EvalGeneration[] = [];
 
   for (const evalCase of casesFile.cases) {
-    for (const variantId of [controlVariant, challengerVariant]) {
-      console.log(`[eval] ${evalCase.caseId} ${variantId}`);
+    for (const profile of [
+      {
+        arm: "control" as const,
+        variantId: controlVariant,
+        model: controlModel,
+        reasoningEffort: controlReasoningEffort
+      },
+      {
+        arm: "challenger" as const,
+        variantId: challengerVariant,
+        model: challengerModel,
+        reasoningEffort: challengerReasoningEffort
+      }
+    ]) {
+      console.log(`[eval] ${evalCase.caseId} ${profile.arm} ${profile.model} ${profile.reasoningEffort}`);
       generations.push(
         await runGeneration({
           evalCase,
-          variantId,
-          model,
-          reasoningEffort,
+          ...profile,
+          referenceModel,
+          referenceReasoningEffort,
+          serviceTier,
           timeoutMs,
           client
         })
@@ -352,11 +402,21 @@ async function runCommand(options: Map<string, string>): Promise<void> {
   }
 
   const output: RunFile = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     runId: `editorial_eval_${timestampForFile(new Date())}`,
     createdAt: new Date().toISOString(),
     model,
     reasoningEffort,
+    serviceTier,
+    controlProfile: { model: controlModel, reasoningEffort: controlReasoningEffort },
+    challengerProfile: {
+      model: challengerModel,
+      reasoningEffort: challengerReasoningEffort
+    },
+    referenceProfile: {
+      model: referenceModel,
+      reasoningEffort: referenceReasoningEffort
+    },
     controlVariant,
     challengerVariant,
     sourceCasesPath: casesPath,
@@ -370,16 +430,24 @@ async function runCommand(options: Map<string, string>): Promise<void> {
 
 async function runGeneration({
   evalCase,
+  arm,
   variantId,
   model,
   reasoningEffort,
+  referenceModel,
+  referenceReasoningEffort,
+  serviceTier,
   timeoutMs,
   client
 }: {
   evalCase: EvalCase;
+  arm: "control" | "challenger";
   variantId: RegularPromptVariantId;
   model: string;
   reasoningEffort: OpenAIReasoningEffort;
+  referenceModel: string;
+  referenceReasoningEffort: OpenAIReasoningEffort;
+  serviceTier: OpenAIServiceTier;
   timeoutMs: number;
   client: ReturnType<typeof createOpenAIClient>;
 }): Promise<EvalGeneration> {
@@ -390,6 +458,7 @@ async function runGeneration({
     messages.developerPrompt.length +
     messages.userPrompt.length;
   let referencePromptChars = 0;
+  const modelCalls: EvalModelCall[] = [];
 
   // v6 variants pair with the extract-then-write schema order; zod parsing
   // and all downstream consumers are key-based, so outputs stay comparable.
@@ -397,7 +466,7 @@ async function runGeneration({
     variantId === "regular_v6_full" ? rewriteOutputJsonSchemaV6 : rewriteOutputJsonSchema;
 
   try {
-    const raw = await callOpenAIForJson(client, {
+    const rewriteResult = await callOpenAIForJson(client, {
       schemaName: "rewrite_output",
       schema: rewriteJsonSchema as Record<string, unknown>,
       systemPrompt: messages.systemPrompt,
@@ -405,9 +474,12 @@ async function runGeneration({
       userPrompt: messages.userPrompt,
       model,
       reasoningEffort,
+      serviceTier,
       timeoutMs,
       maxOutputTokens: 16384
     });
+    modelCalls.push(evalModelCall("rewrite_output", model, reasoningEffort, serviceTier, rewriteResult));
+    const raw = rewriteResult.content;
     const parsed = rewriteOutputSchema.parse(clampRewriteArrays(JSON.parse(raw)));
     const styleResult = sanitizeRewriteStyle(parsed);
     const output = styleResult.rewrite;
@@ -421,12 +493,14 @@ async function runGeneration({
     const referenceResult = await runReferenceCheck({
       payload: referencePayload,
       rewrite: output,
-      model,
-      reasoningEffort,
+      model: referenceModel,
+      reasoningEffort: referenceReasoningEffort,
+      serviceTier,
       timeoutMs,
       client
     });
     referencePromptChars = referenceResult.promptChars;
+    if (referenceResult.modelCall) modelCalls.push(referenceResult.modelCall);
     const referenceGate = assessReferenceCheckGate(referenceResult.coverage);
     const fatalStatus = fatalStatusFor({
       validationBlockingErrors: validation.blockingErrors,
@@ -435,13 +509,16 @@ async function runGeneration({
     });
 
     return {
-      id: `${evalCase.caseId}:${variantId}`,
+      id: `${evalCase.caseId}:${arm}`,
       caseId: evalCase.caseId,
+      arm,
       variantId,
       category: evalCase.category,
       promptVersion: messages.promptVersion,
       model,
       reasoningEffort,
+      serviceTier,
+      modelCalls,
       output,
       validation: {
         valid: validation.valid,
@@ -472,13 +549,16 @@ async function runGeneration({
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return {
-      id: `${evalCase.caseId}:${variantId}`,
+      id: `${evalCase.caseId}:${arm}`,
       caseId: evalCase.caseId,
+      arm,
       variantId,
       category: evalCase.category,
       promptVersion: messages.promptVersion,
       model,
       reasoningEffort,
+      serviceTier,
+      modelCalls,
       output: null,
       validation: null,
       referenceCheck: {
@@ -506,6 +586,7 @@ async function runReferenceCheck({
   rewrite,
   model,
   reasoningEffort,
+  serviceTier,
   timeoutMs,
   client
 }: {
@@ -513,9 +594,14 @@ async function runReferenceCheck({
   rewrite: RewriteOutput;
   model: string;
   reasoningEffort: OpenAIReasoningEffort;
+  serviceTier: OpenAIServiceTier;
   timeoutMs: number;
   client: ReturnType<typeof createOpenAIClient>;
-}): Promise<{ coverage: ReferenceCoverageReport; promptChars: number }> {
+}): Promise<{
+  coverage: ReferenceCoverageReport;
+  promptChars: number;
+  modelCall: EvalModelCall | null;
+}> {
   const referencePrompt = buildReferenceCheckPrompt(payload, rewrite);
   const promptChars =
     referencePrompt.systemPrompt.length +
@@ -523,10 +609,10 @@ async function runReferenceCheck({
     referencePrompt.userPrompt.length;
 
   if (referencePrompt.draftSentences.length === 0) {
-    return { coverage: emptyReferenceCoverageReport(), promptChars: 0 };
+    return { coverage: emptyReferenceCoverageReport(), promptChars: 0, modelCall: null };
   }
 
-  const raw = await callOpenAIForJson(client, {
+  const result = await callOpenAIForJson(client, {
     schemaName: "reference_check_result",
     schema: referenceCheckJsonSchema as Record<string, unknown>,
     systemPrompt: referencePrompt.systemPrompt,
@@ -534,15 +620,41 @@ async function runReferenceCheck({
     userPrompt: referencePrompt.userPrompt,
     model,
     reasoningEffort,
+    serviceTier,
     timeoutMs,
     maxOutputTokens: 16384
   });
+  const raw = result.content;
   const parsed = referenceCheckResultSchema.parse(JSON.parse(raw));
   return {
     coverage: buildCoverageReport(referencePrompt.draftSentences, parsed, {
       visibleArticleSentenceCount: referencePrompt.visibleDraftSentences.length
     }),
-    promptChars
+    promptChars,
+    modelCall: evalModelCall(
+      "reference_check_result",
+      model,
+      reasoningEffort,
+      serviceTier,
+      result
+    )
+  };
+}
+
+function evalModelCall(
+  schemaName: string,
+  model: string,
+  reasoningEffort: OpenAIReasoningEffort,
+  serviceTierRequested: OpenAIServiceTier,
+  result: OpenAIJsonResult
+): EvalModelCall {
+  const { content: _content, ...telemetry } = result;
+  return {
+    schemaName,
+    model,
+    reasoningEffort,
+    serviceTierRequested,
+    ...telemetry
   };
 }
 
@@ -754,6 +866,17 @@ function parseReasoningEffort(
     throw new Error(`Invalid reasoning effort: ${value}`);
   }
   return value as OpenAIReasoningEffort;
+}
+
+function parseServiceTier(
+  value: string | undefined,
+  fallback: OpenAIServiceTier
+): OpenAIServiceTier {
+  if (!value) return fallback;
+  if (!openAIServiceTiers.includes(value as OpenAIServiceTier)) {
+    throw new Error(`Invalid service tier: ${value}`);
+  }
+  return value as OpenAIServiceTier;
 }
 
 function clampRewriteArrays(raw: Record<string, unknown>): Record<string, unknown> {
@@ -1290,7 +1413,7 @@ function printUsage(): void {
   console.log([
     "Usage:",
     "  npm run eval:editorial -w apps/worker -- build-cases --from YYYY-MM-DD --to YYYY-MM-DD --limit 50 --out tmp/editorial-eval/cases.json",
-    "  npm run eval:editorial -w apps/worker -- run --cases tmp/editorial-eval/cases.json --control regular_v5_6_control --challenger audience_mechanism_v1 --out tmp/editorial-eval/run.json",
+    "  npm run eval:editorial -w apps/worker -- run --cases tmp/editorial-eval/cases.json --control regular_v5_6_control --challenger regular_v5_6_control --control-model gpt-5.5 --control-effort medium --challenger-model gpt-5.6-terra --challenger-effort medium --reference-model gpt-5.6-terra --reference-effort medium --service-tier flex --out tmp/editorial-eval/run.json",
     "  npm run eval:editorial -w apps/worker -- review-html --run tmp/editorial-eval/run.json --out tmp/editorial-eval/review.html",
     "  npm run eval:editorial -w apps/worker -- summarize --run tmp/editorial-eval/run.json --reviews tmp/editorial-eval/reviews.json --out tmp/editorial-eval/summary.json"
   ].join("\n"));

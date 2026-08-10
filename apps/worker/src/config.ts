@@ -1,6 +1,10 @@
 import path from "node:path";
 import { config as loadDotEnv } from "dotenv";
 import { z } from "zod";
+import {
+  openAIServiceTiers,
+  validateOpenAIModelReasoningEffort
+} from "@newsweb/shared/openai-responses";
 
 loadDotEnv({
   path: path.resolve(process.cwd(), ".env"),
@@ -18,8 +22,11 @@ const reasoningEffortEnvSchema = z.enum([
   "low",
   "medium",
   "high",
-  "xhigh"
+  "xhigh",
+  "max"
 ]);
+
+const serviceTierEnvSchema = z.enum(openAIServiceTiers);
 
 const configSchema = z
   .object({
@@ -32,14 +39,16 @@ const configSchema = z
       .string({ required_error: "OPENAI_KEY_MISSING" })
       .trim()
       .min(1, "OPENAI_KEY_MISSING"),
-    OPENAI_MODEL: z.string().default("gpt-5.5"),
-    OPENAI_FAST_MODEL: z.string().default("gpt-5.4-mini"),
+    OPENAI_MODEL: z.string().default("gpt-5.6-terra"),
+    OPENAI_FAST_MODEL: z.string().default("gpt-5.6-luna"),
+    OPENAI_HARD_MODEL: z.string().default("gpt-5.6-sol"),
+    OPENAI_SERVICE_TIER: serviceTierEnvSchema.default("default"),
     OPENAI_TIMEOUT_MS: z.coerce.number().int().min(1000).default(240000),
     OPENAI_FAST_TIMEOUT_MS: z.coerce.number().int().min(1000).default(15000),
     OPENAI_DEFAULT_REASONING_EFFORT: reasoningEffortEnvSchema.default("medium"),
     OPENAI_REPORT_REASONING_EFFORT: reasoningEffortEnvSchema.default("medium"),
-    OPENAI_HARD_REASONING_EFFORT: reasoningEffortEnvSchema.default("medium"),
-    OPENAI_TRIAGE_REASONING_EFFORT: reasoningEffortEnvSchema.default("minimal"),
+    OPENAI_HARD_REASONING_EFFORT: reasoningEffortEnvSchema.default("xhigh"),
+    OPENAI_TRIAGE_REASONING_EFFORT: reasoningEffortEnvSchema.default("none"),
     OPENAI_REFERENCE_REASONING_EFFORT: reasoningEffortEnvSchema.default("medium"),
     OPENAI_REVIEW_REASONING_EFFORT: reasoningEffortEnvSchema.default("medium"),
     NEWSWEB_POLLING_ENABLED: booleanEnvSchema,
@@ -50,7 +59,24 @@ const configSchema = z
 export type WorkerConfig = z.infer<typeof configSchema>;
 
 export function parseWorkerConfig(env: NodeJS.ProcessEnv): WorkerConfig {
-  return configSchema.parse(env);
+  const parsed = configSchema.parse(env);
+  for (const effort of [
+    parsed.OPENAI_DEFAULT_REASONING_EFFORT,
+    parsed.OPENAI_REPORT_REASONING_EFFORT,
+    parsed.OPENAI_REFERENCE_REASONING_EFFORT,
+    parsed.OPENAI_REVIEW_REASONING_EFFORT
+  ]) {
+    validateOpenAIModelReasoningEffort(parsed.OPENAI_MODEL, effort);
+  }
+  validateOpenAIModelReasoningEffort(
+    parsed.OPENAI_FAST_MODEL,
+    parsed.OPENAI_TRIAGE_REASONING_EFFORT
+  );
+  validateOpenAIModelReasoningEffort(
+    parsed.OPENAI_HARD_MODEL,
+    parsed.OPENAI_HARD_REASONING_EFFORT
+  );
+  return parsed;
 }
 
 export function loadConfig(): WorkerConfig {

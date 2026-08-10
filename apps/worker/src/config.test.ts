@@ -25,6 +25,8 @@ describe("parseWorkerConfig", () => {
       OPENAI_API_KEY: "sk-openai-test-key",
       OPENAI_MODEL: "gpt-5.5",
       OPENAI_FAST_MODEL: "gpt-5.4-mini",
+      OPENAI_HARD_MODEL: "gpt-5.5",
+      OPENAI_SERVICE_TIER: "default",
       OPENAI_TIMEOUT_MS: "60000",
       OPENAI_FAST_TIMEOUT_MS: "15000",
       OPENAI_DEFAULT_REASONING_EFFORT: "high",
@@ -37,6 +39,8 @@ describe("parseWorkerConfig", () => {
     });
     expect(config.OPENAI_MODEL).toBe("gpt-5.5");
     expect(config.OPENAI_FAST_MODEL).toBe("gpt-5.4-mini");
+    expect(config.OPENAI_HARD_MODEL).toBe("gpt-5.5");
+    expect(config.OPENAI_SERVICE_TIER).toBe("default");
     expect(config.OPENAI_TIMEOUT_MS).toBe(60000);
     expect(config.OPENAI_FAST_TIMEOUT_MS).toBe(15000);
     expect(config.OPENAI_DEFAULT_REASONING_EFFORT).toBe("high");
@@ -57,14 +61,16 @@ describe("parseWorkerConfig", () => {
       REDIS_URL: "redis://localhost:6379",
       OPENAI_API_KEY: "sk-openai-test-key"
     });
-    expect(config.OPENAI_MODEL).toBe("gpt-5.5");
-    expect(config.OPENAI_FAST_MODEL).toBe("gpt-5.4-mini");
+    expect(config.OPENAI_MODEL).toBe("gpt-5.6-terra");
+    expect(config.OPENAI_FAST_MODEL).toBe("gpt-5.6-luna");
+    expect(config.OPENAI_HARD_MODEL).toBe("gpt-5.6-sol");
+    expect(config.OPENAI_SERVICE_TIER).toBe("default");
     expect(config.OPENAI_TIMEOUT_MS).toBe(240000);
     expect(config.OPENAI_FAST_TIMEOUT_MS).toBe(15000);
     expect(config.OPENAI_DEFAULT_REASONING_EFFORT).toBe("medium");
     expect(config.OPENAI_REPORT_REASONING_EFFORT).toBe("medium");
-    expect(config.OPENAI_HARD_REASONING_EFFORT).toBe("medium");
-    expect(config.OPENAI_TRIAGE_REASONING_EFFORT).toBe("minimal");
+    expect(config.OPENAI_HARD_REASONING_EFFORT).toBe("xhigh");
+    expect(config.OPENAI_TRIAGE_REASONING_EFFORT).toBe("none");
     expect(config.OPENAI_REFERENCE_REASONING_EFFORT).toBe("medium");
     expect(config.OPENAI_REVIEW_REASONING_EFFORT).toBe("medium");
     expect(config.NEWSWEB_POLLING_ENABLED).toBe(true);
@@ -95,5 +101,19 @@ describe("parseWorkerConfig", () => {
         POLL_INTERVAL_MS: "4999"
       })
     ).toThrow();
+  });
+
+  it("rejects reasoning efforts unsupported by the selected model family", () => {
+    expect(() =>
+      parseWorkerConfig({
+        NODE_ENV: "development",
+        DATABASE_URL:
+          "postgresql://newsweb:newsweb@localhost:5432/newsweb_explain?schema=public",
+        REDIS_URL: "redis://localhost:6379",
+        OPENAI_API_KEY: "sk-openai-test-key",
+        OPENAI_MODEL: "gpt-5.6-terra",
+        OPENAI_TRIAGE_REASONING_EFFORT: "minimal"
+      })
+    ).toThrow(/does not support reasoning effort minimal/);
   });
 });

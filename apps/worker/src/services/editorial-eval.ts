@@ -91,6 +91,7 @@ export type EvalGenerationSummary = {
   id: string;
   caseId: string;
   variantId: RegularPromptVariantId;
+  arm?: "control" | "challenger";
   category: EvalCategoryId;
   fatalStatus: EvalFatalStatus;
   quoteTelemetry?: QuoteTelemetry;
@@ -433,12 +434,12 @@ export function createReviewAssignments(
   return [...byCase.entries()]
     .sort(([left], [right]) => left.localeCompare(right))
     .flatMap(([caseId, caseGenerations]) => {
-      const control = caseGenerations.find(
-        (generation) => generation.variantId === controlVariant
-      );
-      const challenger = caseGenerations.find(
-        (generation) => generation.variantId === challengerVariant
-      );
+      const control =
+        caseGenerations.find((generation) => generation.arm === "control") ??
+        caseGenerations.find((generation) => generation.variantId === controlVariant);
+      const challenger =
+        caseGenerations.find((generation) => generation.arm === "challenger") ??
+        caseGenerations.find((generation) => generation.variantId === challengerVariant);
       if (!control || !challenger) return [];
       const challengerIsA = hashText(`${caseId}:${challenger.id}`) % 2 === 0;
       return [
@@ -459,19 +460,21 @@ export function summarizeEditorialEval(
     challengerVariant: RegularPromptVariantId;
   }
 ): EditorialEvalSummary {
+  const comparisonKey = (generation: EvalGenerationSummary) =>
+    generation.arm ?? generation.variantId;
   const generationsById = new Map(run.generations.map((item) => [item.id, item]));
   const fatalCounts: Record<string, number> = {};
   for (const generation of run.generations) {
     if (!generation.fatalStatus.fatal) continue;
-    fatalCounts[generation.variantId] =
-      (fatalCounts[generation.variantId] ?? 0) + 1;
+    const key = comparisonKey(generation);
+    fatalCounts[key] = (fatalCounts[key] ?? 0) + 1;
   }
 
   const quoteMetrics: Record<string, EvalQuoteMetrics> = {};
   for (const generation of run.generations) {
     const telemetry = generation.quoteTelemetry;
     if (!telemetry) continue;
-    const metrics = (quoteMetrics[generation.variantId] ??= {
+    const metrics = (quoteMetrics[comparisonKey(generation)] ??= {
       generationsWithTelemetry: 0,
       quoteOpportunityCount: 0,
       quotePresenceCount: 0,
@@ -523,13 +526,19 @@ export function summarizeEditorialEval(
       review.winner === "A" ? review.aGenerationId : review.bGenerationId;
     const winningGeneration = generationsById.get(winningGenerationId);
     if (!winningGeneration) continue;
-    const delta =
-      winningGeneration.variantId === options.challengerVariant ? 1 : -1;
+    const winningKey = comparisonKey(winningGeneration);
+    const winnerIsChallenger = winningGeneration.arm
+      ? winningGeneration.arm === "challenger"
+      : winningGeneration.variantId === options.challengerVariant;
+    const delta = winnerIsChallenger ? 1 : -1;
     categoryNetWins[winningGeneration.category] =
       (categoryNetWins[winningGeneration.category] ?? 0) + delta;
-    if (winningGeneration.variantId === options.challengerVariant) {
+    if (winnerIsChallenger) {
       challengerWins += 1;
-    } else if (winningGeneration.variantId === options.controlVariant) {
+    } else if (
+      winningKey === "control" ||
+      winningGeneration.variantId === options.controlVariant
+    ) {
       controlWins += 1;
     }
   }
@@ -537,8 +546,9 @@ export function summarizeEditorialEval(
   const decidedComparisons = controlWins + challengerWins;
   const challengerWinRate =
     decidedComparisons > 0 ? challengerWins / decidedComparisons : 0;
-  const challengerFatalCount = fatalCounts[options.challengerVariant] ?? 0;
-  const controlFatalCount = fatalCounts[options.controlVariant] ?? 0;
+  const challengerFatalCount =
+    fatalCounts.challenger ?? fatalCounts[options.challengerVariant] ?? 0;
+  const controlFatalCount = fatalCounts.control ?? fatalCounts[options.controlVariant] ?? 0;
   const fatalRegression = challengerFatalCount > controlFatalCount;
   const hardCategoryRegression = [
     "financing",

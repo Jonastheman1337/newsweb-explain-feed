@@ -85,6 +85,42 @@ test("groups engagement and article-shape signals by prompt version", () => {
           reason: "new-message",
           status: "published",
           prompt_version: "v5.6.0",
+          model_calls: JSON.stringify([
+            {
+              schemaName: "rewrite_output",
+              model: "gpt-5.6-terra",
+              responseModel: "gpt-5.6-terra-2026-08-07",
+              serviceTier: "default",
+              reasoningEffort: "medium",
+              attemptCount: 2,
+              attempts: [{}, {}],
+              usage: {
+                inputTokens: 1000,
+                cachedInputTokens: 500,
+                cacheWriteInputTokens: 100,
+                outputTokens: 200,
+                reasoningTokens: 125,
+                totalTokens: 1200
+              }
+            },
+            {
+              schemaName: "reference_check",
+              model: "gpt-5.6-terra",
+              responseModel: "gpt-5.6-terra-2026-08-07",
+              serviceTier: "default",
+              reasoningEffort: "low",
+              attemptCount: 1,
+              attempts: [{}],
+              usage: {
+                inputTokens: 100,
+                cachedInputTokens: 0,
+                cacheWriteInputTokens: 0,
+                outputTokens: 20,
+                reasoningTokens: 15,
+                totalTokens: 120
+              }
+            }
+          ]),
           output_json: JSON.stringify({
             title: "Lavere inntekter for Test",
             lead:
@@ -151,4 +187,61 @@ test("groups engagement and article-shape signals by prompt version", () => {
     (row) => row.prompt_version === "unknown"
   );
   assert.equal(unknownShape.missing_output_count, 1);
+
+  const modelCalls = summary.qualityPipeline.modelCallsByPromptVersion.find(
+    (row) => row.prompt_version === "v5.6.0"
+  );
+  assert.equal(modelCalls.total_calls, 2);
+  assert.equal(modelCalls.calls_with_usage, 2);
+  assert.equal(modelCalls.usage_coverage_rate, 1);
+  assert.equal(modelCalls.total_api_attempts, 3);
+  assert.deepEqual(modelCalls.token_usage, {
+    input_tokens: 1100,
+    cached_input_tokens: 500,
+    cache_write_input_tokens: 100,
+    output_tokens: 220,
+    reasoning_tokens: 140,
+    total_tokens: 1320,
+    standard_input_tokens: 500
+  });
+  assert.equal(
+    modelCalls.usage_by_response_model_and_service_tier[0].key,
+    "gpt-5.6-terra-2026-08-07:default"
+  );
+  assert.equal(modelCalls.usage_by_response_model_and_service_tier[0].estimated_cost_usd, 0.00399);
+
+  const costs = summary.qualityPipeline.openAIUsageAndCost;
+  assert.equal(costs.pricing_snapshot.date, "2026-08-10");
+  assert.equal(costs.actual_cost_usd, 0.00399);
+  assert.equal(costs.successful_story_count, 2);
+  assert.equal(costs.actual_cost_per_successful_story_usd, 0.001995);
+  assert.equal(costs.counterfactual_standard["gpt-5.5"].cost_usd, 0.00985);
+});
+
+test("reports unavailable cost as null for historical rows without usage", () => {
+  const summary = analyze(
+    {
+      generations: [
+        {
+          requested_at: timestamp,
+          message_id: "9",
+          status: "published",
+          prompt_version: "legacy",
+          model_calls: JSON.stringify([
+            {
+              schemaName: "rewrite_output",
+              model: "gpt-5.5",
+              reasoningEffort: "medium"
+            }
+          ])
+        }
+      ]
+    },
+    "Europe/Oslo"
+  );
+  const costs = summary.qualityPipeline.openAIUsageAndCost;
+  assert.equal(costs.calls_with_usage, 0);
+  assert.equal(costs.actual_cost_usd, null);
+  assert.equal(costs.actual_cost_per_successful_story_usd, null);
+  assert.equal(costs.counterfactual_standard["gpt-5.6-terra"].cost_usd, null);
 });

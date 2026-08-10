@@ -1,0 +1,56 @@
+{
+  "snapshotDate": "2026-08-10",
+  "currency": "USD",
+  "unit": "per_million_tokens",
+  "source": "https://developers.openai.com/api/docs/pricing",
+  "longContext": {
+    "inputTokenThreshold": 272000,
+    "inputMultiplier": 2,
+    "outputMultiplier": 1.5
+  },
+  "gpt56ServiceTierMultipliers": {
+    "auto": 1,
+    "default": 1,
+    "flex": 0.5,
+    "batch": 0.5,
+    "priority": 2,
+    "fast": 2
+  },
+  "models": {
+    "gpt-5.5": {
+      "input": 5,
+      "cachedInput": 0.5,
+      "cacheWriteInput": 0,
+      "output": 30,
+      "supportsTierMultipliers": false
+    },
+    "gpt-5.4-mini": {
+      "input": 0.75,
+      "cachedInput": 0.075,
+      "cacheWriteInput": 0,
+      "output": 4.5,
+      "supportsTierMultipliers": false
+    },
+    "gpt-5.6-sol": {
+      "input": 5,
+      "cachedInput": 0.5,
+      "cacheWriteInput": 6.25,
+      "output": 30,
+      "supportsTierMultipliers": true
+    },
+    "gpt-5.6-terra": {
+      "input": 2,
+      "cachedInput": 0.2,
+      "cacheWriteInput": 2.5,
+      "output": 12,
+      "supportsTierMultipliers": true
+    },
+    "gpt-5.6-luna": {
+      "input": 0.2,
+      "cachedInput": 0.02,
+      "cacheWriteInput": 0.25,
+      "output": 1.2,
+      "supportsTierMultipliers": true
+    }
+  }
+}

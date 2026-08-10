@@ -312,7 +312,7 @@ async function main(): Promise<void> {
 
   try {
     const client = createOpenAIClient(apiKey);
-    const raw = await callOpenAIForJson(client, {
+    const { content: raw } = await callOpenAIForJson(client, {
       schemaName: "rewrite_output",
       schema: rewriteOutputJsonSchema as Record<string, unknown>,
       systemPrompt,

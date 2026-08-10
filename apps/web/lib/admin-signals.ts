@@ -115,6 +115,9 @@ export type GenerationSignal = {
   promptChars: number | null;
   reasoningEffortOverride: string | null;
   modelCalls: ModelCallSignal[];
+  modelCallCount: number;
+  modelCallAttemptCount: number;
+  modelCallUsage: ModelCallUsageSignal | null;
   referenceCheck: ReferenceCheckSignal | null;
   outputJson: Prisma.JsonValue | null;
   validationJson: Prisma.JsonValue | null;
@@ -130,10 +133,38 @@ export type GenerationSignal = {
 export type ModelCallSignal = {
   schemaName: string | null;
   model: string | null;
+  responseModel: string | null;
+  requestedServiceTier: string | null;
+  serviceTier: string | null;
   reasoningEffort: string | null;
   timeoutMs: number | null;
   maxOutputTokens: number | null;
   promptChars: number | null;
+  attemptCount: number | null;
+  attempts: ModelCallAttemptSignal[];
+  usage: ModelCallUsageSignal | null;
+};
+
+export type ModelCallUsageSignal = {
+  inputTokens: number;
+  cachedInputTokens: number;
+  cacheWriteInputTokens: number;
+  outputTokens: number;
+  reasoningTokens: number;
+  totalTokens: number;
+};
+
+export type ModelCallAttemptSignal = {
+  responseId: string | null;
+  status: string | null;
+  responseModel: string | null;
+  requestedServiceTier: string | null;
+  serviceTier: string | null;
+  durationMs: number | null;
+  requestedMaxOutputTokens: number | null;
+  error: string | null;
+  rawUsage: Prisma.JsonValue | null;
+  usage: ModelCallUsageSignal | null;
 };
 
 export type ReferenceCheckSignal = {
@@ -236,6 +267,46 @@ function numberValue(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
+function modelCallUsage(value: unknown): ModelCallUsageSignal | null {
+  const usage = asJsonRecord(value);
+  if (!usage) return null;
+  const inputTokens = numberValue(usage.inputTokens);
+  const outputTokens = numberValue(usage.outputTokens);
+  const totalTokens = numberValue(usage.totalTokens);
+  if (inputTokens == null && outputTokens == null && totalTokens == null) {
+    return null;
+  }
+  return {
+    inputTokens: inputTokens ?? 0,
+    cachedInputTokens: numberValue(usage.cachedInputTokens) ?? 0,
+    cacheWriteInputTokens: numberValue(usage.cacheWriteInputTokens) ?? 0,
+    outputTokens: outputTokens ?? 0,
+    reasoningTokens: numberValue(usage.reasoningTokens) ?? 0,
+    totalTokens: totalTokens ?? (inputTokens ?? 0) + (outputTokens ?? 0)
+  };
+}
+
+function modelCallAttempts(value: unknown): ModelCallAttemptSignal[] {
+  return asJsonArray(value)
+    .map(asJsonRecord)
+    .filter((attempt): attempt is Record<string, unknown> => attempt != null)
+    .map((attempt) => ({
+      responseId: stringValue(attempt.responseId),
+      status: stringValue(attempt.status),
+      responseModel: stringValue(attempt.responseModel),
+      requestedServiceTier: stringValue(attempt.requestedServiceTier),
+      serviceTier: stringValue(attempt.serviceTier),
+      durationMs: numberValue(attempt.durationMs),
+      requestedMaxOutputTokens: numberValue(attempt.requestedMaxOutputTokens),
+      error: stringValue(attempt.error),
+      rawUsage:
+        attempt.rawUsage == null
+          ? null
+          : (attempt.rawUsage as Prisma.JsonValue),
+      usage: modelCallUsage(attempt.usage)
+    }));
+}
+
 function booleanValue(value: unknown): boolean {
   return value === true;
 }
@@ -270,11 +341,42 @@ function extractModelCalls(inputJson: Prisma.JsonValue | null): ModelCallSignal[
     .map((call) => ({
       schemaName: stringValue(call.schemaName),
       model: stringValue(call.model),
+      responseModel: stringValue(call.responseModel),
+      requestedServiceTier: stringValue(call.requestedServiceTier),
+      serviceTier: stringValue(call.serviceTier),
       reasoningEffort: stringValue(call.reasoningEffort),
       timeoutMs: numberValue(call.timeoutMs),
       maxOutputTokens: numberValue(call.maxOutputTokens),
-      promptChars: numberValue(call.promptChars)
+      promptChars: numberValue(call.promptChars),
+      attemptCount: numberValue(call.attemptCount),
+      attempts: modelCallAttempts(call.attempts),
+      usage: modelCallUsage(call.usage)
     }));
+}
+
+function summarizeModelCalls(modelCalls: ModelCallSignal[]): {
+  attemptCount: number;
+  usage: ModelCallUsageSignal | null;
+} {
+  let attempts = 0;
+  let usageCount = 0;
+  const usage: ModelCallUsageSignal = {
+    inputTokens: 0,
+    cachedInputTokens: 0,
+    cacheWriteInputTokens: 0,
+    outputTokens: 0,
+    reasoningTokens: 0,
+    totalTokens: 0
+  };
+  for (const call of modelCalls) {
+    attempts += call.attemptCount ?? call.attempts.length;
+    if (!call.usage) continue;
+    usageCount += 1;
+    for (const key of Object.keys(usage) as Array<keyof ModelCallUsageSignal>) {
+      usage[key] += call.usage[key];
+    }
+  }
+  return { attemptCount: attempts, usage: usageCount > 0 ? usage : null };
 }
 
 function extractReasoningEffortOverride(inputJson: Prisma.JsonValue | null): string | null {
@@ -630,18 +732,25 @@ async function getGenerations(
         finishedAt: true
       }
     });
-    return rows.map((row) => ({
-      ...row,
-      sourceDb,
-      reasoningEffortOverride: extractReasoningEffortOverride(row.inputJson),
-      modelCalls: extractModelCalls(row.inputJson),
-      referenceCheck: extractReferenceCheck(row.validationJson),
-      outputJson: row.outputJson,
-      requestedAt: row.requestedAt.toISOString(),
-      startedAt: row.startedAt?.toISOString() ?? null,
-      finishedAt: row.finishedAt?.toISOString() ?? null,
-      notice: null
-    }));
+    return rows.map((row) => {
+      const modelCalls = extractModelCalls(row.inputJson);
+      const modelCallSummary = summarizeModelCalls(modelCalls);
+      return {
+        ...row,
+        sourceDb,
+        reasoningEffortOverride: extractReasoningEffortOverride(row.inputJson),
+        modelCalls,
+        modelCallCount: modelCalls.length,
+        modelCallAttemptCount: modelCallSummary.attemptCount,
+        modelCallUsage: modelCallSummary.usage,
+        referenceCheck: extractReferenceCheck(row.validationJson),
+        outputJson: row.outputJson,
+        requestedAt: row.requestedAt.toISOString(),
+        startedAt: row.startedAt?.toISOString() ?? null,
+        finishedAt: row.finishedAt?.toISOString() ?? null,
+        notice: null
+      };
+    });
   });
 
   const sortedRows = result.rows
@@ -897,6 +1006,14 @@ export async function getSignalsCsv(query: SignalsQuery): Promise<string> {
       "prompt_version",
       "prompt_chars",
       "reasoning_override",
+      "model_call_count",
+      "api_attempt_count",
+      "input_tokens",
+      "cached_input_tokens",
+      "cache_write_input_tokens",
+      "output_tokens",
+      "reasoning_tokens",
+      "total_tokens",
       "model_calls",
       "reference_check_summary",
       "reference_check_json",
@@ -923,6 +1040,14 @@ export async function getSignalsCsv(query: SignalsQuery): Promise<string> {
       row.promptVersion,
       row.promptChars,
       row.reasoningEffortOverride,
+      row.modelCallCount,
+      row.modelCallAttemptCount,
+      row.modelCallUsage?.inputTokens ?? null,
+      row.modelCallUsage?.cachedInputTokens ?? null,
+      row.modelCallUsage?.cacheWriteInputTokens ?? null,
+      row.modelCallUsage?.outputTokens ?? null,
+      row.modelCallUsage?.reasoningTokens ?? null,
+      row.modelCallUsage?.totalTokens ?? null,
       jsonText(row.modelCalls as unknown as Prisma.JsonValue),
       row.referenceCheck?.summary ?? null,
       jsonText(row.referenceCheck?.detailJson ?? null),

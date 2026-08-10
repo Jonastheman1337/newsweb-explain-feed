@@ -77,7 +77,7 @@ const cases = buildSmokeCases(defaultReasoning, reportReasoning);
 const results: SmokeResult[] = [];
 
 for (const smokeCase of cases) {
-  const raw = await callOpenAIForJson(client, {
+  const { content: raw } = await callOpenAIForJson(client, {
     schemaName: "rewrite_output",
     schema: rewriteOutputJsonSchema as Record<string, unknown>,
     systemPrompt: smokeCase.systemPrompt,

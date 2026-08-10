@@ -43,13 +43,16 @@ DATABASE_URL=postgresql://...
 GENERATION_LOG_DATABASE_URL=postgresql://...
 REDIS_URL=redis://...
 OPENAI_API_KEY=...
-OPENAI_MODEL=gpt-5.5
-OPENAI_FAST_MODEL=gpt-5.4-mini
+OPENAI_MODEL=gpt-5.6-terra
+OPENAI_FAST_MODEL=gpt-5.6-luna
+OPENAI_HARD_MODEL=gpt-5.6-sol
+OPENAI_SERVICE_TIER=default
 OPENAI_TIMEOUT_MS=240000
 OPENAI_FAST_TIMEOUT_MS=15000
 OPENAI_DEFAULT_REASONING_EFFORT=medium
 OPENAI_REPORT_REASONING_EFFORT=medium
-OPENAI_HARD_REASONING_EFFORT=medium
+OPENAI_HARD_REASONING_EFFORT=xhigh
+OPENAI_TRIAGE_REASONING_EFFORT=none
 POLL_INTERVAL_MS=5000
 SESSION_SECRET=...
 ADMIN_API_KEY=...
@@ -68,8 +71,11 @@ logs to a dedicated DB, provision a paid/dedicated Postgres instance, set
 `GENERATION_LOG_DATABASE_URL` to its internal connection string, and redeploy so
 the pre-deploy command initializes the log tables.
 
-`OPENAI_MODEL` is used for rewrites, report handling, reference checks, and
-corrections. `OPENAI_FAST_MODEL` is used for triage and title suggestions.
+`OPENAI_MODEL` is used for rewrites, report handling, reference checks, PDF
+fallback, and corrections. `OPENAI_FAST_MODEL` is used for triage and title
+suggestions. `OPENAI_HARD_MODEL` is reserved for manual `xhigh` rescue runs.
+Reader/editor-facing calls use `OPENAI_SERVICE_TIER=default`; offline bulk
+evaluations should use Flex.
 Local PDF text extraction remains the primary path; OpenAI PDF reading is only
 used as a fallback when local extraction diagnostics are weak.
 
@@ -262,7 +268,19 @@ page's raw `from`/`to` date filters directly.
 
 Use the artifact's `summary.feedback`, `summary.edits`, `summary.titles`,
 `summary.problematicGenerations`, `summary.generationErrorGroups`, and
-`summary.referenceCheckerErrors` first. Only fall back to direct SQL when the
+`summary.qualityPipeline.openAIUsageAndCost` first. The latter uses the dated
+rate card in `scripts/openai-pricing-2026-08-10.json` and reports actual plus
+GPT-5.5/Terra/Luna/Sol counterfactual Standard spend. Historical rows without
+provider usage correctly report cost as unavailable instead of zero.
+
+When an OpenAI organization Admin API key is available locally, reconcile the
+provider totals without adding that credential to Render:
+
+```bash
+npm run openai:usage -- --from 2026-08-10 --to 2026-08-16
+```
+
+Only fall back to direct SQL when the
 script fails or a row needs fields not included in the CSV export.
 
 Set the log DB URL in your shell:

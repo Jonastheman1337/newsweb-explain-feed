@@ -3,6 +3,12 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import {
+  COUNTERFACTUAL_MODELS,
+  OPENAI_PRICING_SNAPSHOT,
+  calculateOpenAICost,
+  roundUsd
+} from "./openai-costs.mjs";
 
 const DEFAULT_TABS = ["feedback", "edits", "titles", "events", "generations"];
 const DEFAULT_TIMEZONE = "Europe/Oslo";
@@ -943,6 +949,138 @@ function referenceRepairStats(generations) {
     .sort((a, b) => a.prompt_version.localeCompare(b.prompt_version));
 }
 
+function emptyTokenUsage() {
+  return {
+    input_tokens: 0,
+    cached_input_tokens: 0,
+    cache_write_input_tokens: 0,
+    output_tokens: 0,
+    reasoning_tokens: 0,
+    total_tokens: 0
+  };
+}
+
+function tokenCount(value) {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0
+    ? Math.trunc(value)
+    : null;
+}
+
+function modelCallUsage(call) {
+  const usage = call?.usage;
+  if (!usage || typeof usage !== "object" || Array.isArray(usage)) return null;
+  const inputTokens = tokenCount(usage.inputTokens);
+  const outputTokens = tokenCount(usage.outputTokens);
+  const totalTokens = tokenCount(usage.totalTokens);
+  if (inputTokens == null && outputTokens == null && totalTokens == null) return null;
+  return {
+    input_tokens: inputTokens ?? 0,
+    cached_input_tokens: tokenCount(usage.cachedInputTokens) ?? 0,
+    cache_write_input_tokens: tokenCount(usage.cacheWriteInputTokens) ?? 0,
+    output_tokens: outputTokens ?? 0,
+    reasoning_tokens: tokenCount(usage.reasoningTokens) ?? 0,
+    total_tokens: totalTokens ?? (inputTokens ?? 0) + (outputTokens ?? 0)
+  };
+}
+
+function modelCallUsageEntries(call) {
+  const attempts = Array.isArray(call?.attempts) ? call.attempts : [];
+  const attemptEntries = attempts
+    .map((attempt) => ({ attempt, usage: modelCallUsage(attempt) }))
+    .filter((entry) => entry.usage != null);
+  if (attemptEntries.length > 0) return attemptEntries;
+  const usage = modelCallUsage(call);
+  return usage ? [{ attempt: null, usage }] : [];
+}
+
+function modelCallCost(call, { modelOverride, serviceTierOverride } = {}) {
+  let costUsd = 0;
+  let known = true;
+  let longContextAttemptCount = 0;
+  const entries = modelCallUsageEntries(call);
+  for (const { attempt, usage } of entries) {
+    const estimate = calculateOpenAICost({
+      model:
+        modelOverride ??
+        attempt?.responseModel ??
+        call?.responseModel ??
+        call?.model,
+      serviceTier:
+        serviceTierOverride ??
+        attempt?.serviceTier ??
+        attempt?.requestedServiceTier ??
+        call?.serviceTier ??
+        call?.requestedServiceTier ??
+        "default",
+      usage
+    });
+    if (!estimate.knownModel) known = false;
+    else costUsd += estimate.costUsd;
+    if (estimate.longContext) longContextAttemptCount += 1;
+  }
+  return {
+    hasUsage: entries.length > 0,
+    known,
+    costUsd: known && entries.length > 0 ? costUsd : null,
+    longContextAttemptCount
+  };
+}
+
+function addTokenUsage(target, usage) {
+  for (const key of Object.keys(target)) target[key] += usage[key];
+}
+
+function tokenUsageSummary(usage) {
+  return {
+    ...usage,
+    standard_input_tokens: Math.max(
+      0,
+      usage.input_tokens -
+        usage.cached_input_tokens -
+        usage.cache_write_input_tokens
+    )
+  };
+}
+
+function addUsageGroup(map, key, usage, actualCost) {
+  let group = map.get(key);
+  if (!group) {
+    group = {
+      key,
+      call_count: 0,
+      calls_with_usage: 0,
+      calls_with_cost: 0,
+      estimated_cost_usd: 0,
+      token_usage: emptyTokenUsage()
+    };
+    map.set(key, group);
+  }
+  group.call_count += 1;
+  if (usage) {
+    group.calls_with_usage += 1;
+    addTokenUsage(group.token_usage, usage);
+  }
+  if (actualCost?.costUsd != null) {
+    group.calls_with_cost += 1;
+    group.estimated_cost_usd += actualCost.costUsd;
+  }
+}
+
+function usageGroups(map) {
+  return [...map.values()]
+    .map((group) => ({
+      key: group.key,
+      call_count: group.call_count,
+      calls_with_usage: group.calls_with_usage,
+      calls_with_cost: group.calls_with_cost,
+      usage_coverage_rate: rate(group.calls_with_usage, group.call_count),
+      estimated_cost_usd:
+        group.calls_with_cost > 0 ? roundUsd(group.estimated_cost_usd) : null,
+      token_usage: tokenUsageSummary(group.token_usage)
+    }))
+    .sort((a, b) => b.token_usage.total_tokens - a.token_usage.total_tokens);
+}
+
 function modelCallStats(generations) {
   const byVersion = new Map();
 
@@ -959,6 +1097,12 @@ function modelCallStats(generations) {
         rewrite_call_distribution: { "1": 0, "2": 0, "3": 0, "4+": 0 },
         runs_with_repair_calls: 0,
         reasoning_efforts: new Map(),
+        calls_with_usage: 0,
+        calls_with_attempt_count: 0,
+        total_api_attempts: 0,
+        token_usage: emptyTokenUsage(),
+        usage_by_model_tier: new Map(),
+        usage_by_schema_effort: new Map(),
         latency_seconds: []
       };
       byVersion.set(version, bucket);
@@ -985,6 +1129,26 @@ function modelCallStats(generations) {
         effortKey,
         (bucket.reasoning_efforts.get(effortKey) ?? 0) + 1
       );
+      const usage = modelCallUsage(call);
+      const actualCost = modelCallCost(call);
+      if (usage) {
+        bucket.calls_with_usage += 1;
+        addTokenUsage(bucket.token_usage, usage);
+      }
+      const attemptCount =
+        tokenCount(call.attemptCount) ??
+        (Array.isArray(call.attempts) ? call.attempts.length : null);
+      if (attemptCount != null) {
+        bucket.calls_with_attempt_count += 1;
+        bucket.total_api_attempts += attemptCount;
+      }
+      addUsageGroup(
+        bucket.usage_by_model_tier,
+        `${call.responseModel ?? call.model ?? "(unknown)"}:${call.serviceTier ?? call.requestedServiceTier ?? "(unknown)"}`,
+        usage,
+        actualCost
+      );
+      addUsageGroup(bucket.usage_by_schema_effort, effortKey, usage, actualCost);
     }
     if (rewriteCalls > 0) {
       const key = rewriteCalls >= 4 ? "4+" : String(rewriteCalls);
@@ -1000,12 +1164,22 @@ function modelCallStats(generations) {
         prompt_version: bucket.prompt_version,
         run_count: bucket.run_count,
         runs_with_model_calls: bucket.runs_with_model_calls,
+        total_calls: bucket.total_calls,
         avg_calls_per_run: bucket.runs_with_model_calls
           ? Number((bucket.total_calls / bucket.runs_with_model_calls).toFixed(2))
           : null,
         rewrite_call_distribution: bucket.rewrite_call_distribution,
         runs_with_repair_calls: bucket.runs_with_repair_calls,
         repair_call_rate: rate(bucket.runs_with_repair_calls, bucket.runs_with_model_calls),
+        calls_with_usage: bucket.calls_with_usage,
+        usage_coverage_rate: rate(bucket.calls_with_usage, bucket.total_calls),
+        calls_with_attempt_count: bucket.calls_with_attempt_count,
+        total_api_attempts: bucket.total_api_attempts,
+        token_usage: tokenUsageSummary(bucket.token_usage),
+        usage_by_response_model_and_service_tier: usageGroups(
+          bucket.usage_by_model_tier
+        ),
+        usage_by_schema_and_effort: usageGroups(bucket.usage_by_schema_effort),
         calls_by_schema_and_effort: [...bucket.reasoning_efforts.entries()]
           .map(([key, count]) => ({ key, count }))
           .sort((a, b) => b.count - a.count),
@@ -1015,6 +1189,86 @@ function modelCallStats(generations) {
       };
     })
     .sort((a, b) => a.prompt_version.localeCompare(b.prompt_version));
+}
+
+function openAICostStats(generations) {
+  let totalCalls = 0;
+  let callsWithUsage = 0;
+  let callsWithActualCost = 0;
+  let actualCostUsd = 0;
+  let longContextAttemptCount = 0;
+  let successfulStoryCount = 0;
+  const unknownActualModels = new Set();
+  const counterfactual = Object.fromEntries(
+    COUNTERFACTUAL_MODELS.map((model) => [model, { costUsd: 0, callsWithCost: 0 }])
+  );
+
+  for (const row of generations) {
+    const calls = parseJsonField(row.model_calls);
+    if (row.status === "published") successfulStoryCount += 1;
+    if (!Array.isArray(calls) || calls.length === 0) continue;
+    for (const call of calls) {
+      if (!call || typeof call !== "object") continue;
+      totalCalls += 1;
+      const actual = modelCallCost(call);
+      if (!actual.hasUsage) continue;
+      callsWithUsage += 1;
+      longContextAttemptCount += actual.longContextAttemptCount;
+      if (actual.costUsd == null) {
+        unknownActualModels.add(
+          String(call.responseModel ?? call.model ?? "(unknown)")
+        );
+      } else {
+        callsWithActualCost += 1;
+        actualCostUsd += actual.costUsd;
+      }
+      for (const model of COUNTERFACTUAL_MODELS) {
+        const estimate = modelCallCost(call, {
+          modelOverride: model,
+          serviceTierOverride: "default"
+        });
+        if (estimate.costUsd != null) {
+          counterfactual[model].costUsd += estimate.costUsd;
+          counterfactual[model].callsWithCost += 1;
+        }
+      }
+    }
+  }
+
+  return {
+    pricing_snapshot: {
+      date: OPENAI_PRICING_SNAPSHOT.snapshotDate,
+      source: OPENAI_PRICING_SNAPSHOT.source,
+      currency: OPENAI_PRICING_SNAPSHOT.currency
+    },
+    total_calls: totalCalls,
+    calls_with_usage: callsWithUsage,
+    usage_coverage_rate: rate(callsWithUsage, totalCalls),
+    calls_with_actual_cost: callsWithActualCost,
+    actual_cost_usd:
+      callsWithActualCost > 0 ? roundUsd(actualCostUsd) : null,
+    successful_story_count: successfulStoryCount,
+    actual_cost_per_successful_story_usd:
+      successfulStoryCount > 0 && callsWithActualCost > 0
+        ? roundUsd(actualCostUsd / successfulStoryCount)
+        : null,
+    long_context_attempt_count: longContextAttemptCount,
+    unknown_actual_models: [...unknownActualModels].sort(),
+    counterfactual_standard: Object.fromEntries(
+      Object.entries(counterfactual).map(([model, value]) => [
+        model,
+        {
+          calls_with_cost: value.callsWithCost,
+          cost_usd:
+            value.callsWithCost > 0 ? roundUsd(value.costUsd) : null,
+          cost_per_successful_story_usd:
+            successfulStoryCount > 0 && value.callsWithCost > 0
+              ? roundUsd(value.costUsd / successfulStoryCount)
+              : null
+        }
+      ])
+    )
+  };
 }
 
 function countSentencesApprox(text) {
@@ -1137,6 +1391,7 @@ export function analyze(data, timeZone) {
       validationIssues: validationIssueStats(generations),
       referenceRepairByPromptVersion: referenceRepairStats(generations),
       modelCallsByPromptVersion: modelCallStats(generations),
+      openAIUsageAndCost: openAICostStats(generations),
       editPatterns: editPatternStats(data.edits ?? [])
     },
     noticesByEventCount: groupEventsByMessage(events),
@@ -1281,6 +1536,7 @@ async function main() {
           artifact.summary.qualityPipeline.validationIssues.rankedIssueCodes.slice(0, 12),
         referenceRepair: artifact.summary.qualityPipeline.referenceRepairByPromptVersion,
         modelCalls: artifact.summary.qualityPipeline.modelCallsByPromptVersion,
+        openAIUsageAndCost: artifact.summary.qualityPipeline.openAIUsageAndCost,
         editPatterns: {
           ...artifact.summary.qualityPipeline.editPatterns,
           examples: undefined
