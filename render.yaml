@@ -57,13 +57,11 @@ services:
       - key: OPENAI_API_KEY
         sync: false
       - key: OPENAI_MODEL
-        value: gpt-5.5
+        value: gpt-5.6-terra
       - key: OPENAI_FAST_MODEL
-        value: gpt-5.4-mini
-      # Telemetry-first rollout baseline. Switch these model values only after
-      # the seven-day/100-run evaluation gates have passed.
+        value: gpt-5.6-luna
       - key: OPENAI_HARD_MODEL
-        value: gpt-5.5
+        value: gpt-5.6-sol
       - key: OPENAI_SERVICE_TIER
         value: default
       - key: OPENAI_TIMEOUT_MS
@@ -77,7 +75,7 @@ services:
       - key: OPENAI_HARD_REASONING_EFFORT
         value: xhigh
       - key: OPENAI_TRIAGE_REASONING_EFFORT
-        value: minimal
+        value: none
       - key: OPENAI_REFERENCE_REASONING_EFFORT
         value: medium
       - key: OPENAI_REVIEW_REASONING_EFFORT
