@@ -5,7 +5,8 @@ export const QUEUE_NAMES = {
 } as const;
 
 export const CACHE_KEYS = {
-  metaFilters: "newsweb:meta:filters"
+  // v2: values are de-mojibaked (fixDoubleEncodedUtf8) before caching
+  metaFilters: "newsweb:meta:filters:v2"
 } as const;
 
 export const REDIS_CHANNELS = {

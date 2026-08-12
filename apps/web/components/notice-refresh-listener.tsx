@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { useFeedStream } from "./use-feed-stream";
+import { useFeedStreamSubscription } from "./feed-stream-provider";
 
 type NoticeRefreshListenerProps = {
   messageId: number;
@@ -30,7 +30,7 @@ export function NoticeRefreshListener({ messageId }: NoticeRefreshListenerProps)
     };
   }, []);
 
-  useFeedStream({
+  useFeedStreamSubscription({
     onItem: (item) => {
       if (item.messageId === messageId) {
         scheduleRefresh();

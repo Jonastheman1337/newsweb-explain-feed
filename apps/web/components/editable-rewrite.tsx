@@ -241,6 +241,9 @@ async function copyNoticeToClipboard(plainText: string, html: string) {
     }
   }
 
+  if (!navigator.clipboard?.writeText) {
+    throw new Error("clipboard_unavailable");
+  }
   await navigator.clipboard.writeText(plainText);
 }
 
@@ -264,7 +267,8 @@ export function EditableRewrite({
   const [editedBodyHtml, setEditedBodyHtml] = useState(originalBodyHtml);
   const [storedDraft, setStoredDraft] = useState<RewriteDraft | null>(null);
   const [viewMode, setViewMode] = useState<"draft" | "original">("draft");
-  const [copied, setCopied] = useState(false);
+  const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle");
+  const copyResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [linkMode, setLinkMode] = useState(false);
   const [linkValue, setLinkValue] = useState("");
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -292,6 +296,25 @@ export function EditableRewrite({
     viewMode: "draft"
   });
   const { buildTelemetry } = useEditorialTelemetry(messageId, activeVersion);
+
+  function setCopyStateWithReset(state: "copied" | "failed") {
+    if (copyResetTimerRef.current) {
+      clearTimeout(copyResetTimerRef.current);
+    }
+    setCopyState(state);
+    copyResetTimerRef.current = setTimeout(() => {
+      copyResetTimerRef.current = null;
+      setCopyState("idle");
+    }, 2000);
+  }
+
+  useEffect(() => {
+    return () => {
+      if (copyResetTimerRef.current) {
+        clearTimeout(copyResetTimerRef.current);
+      }
+    };
+  }, []);
 
   function setStoredDraftValue(draft: RewriteDraft | null) {
     storedDraftRef.current = draft;
@@ -764,10 +787,14 @@ export function EditableRewrite({
 
     const text = `${editedTitle}\n\n${currentBody.body}`;
     const html = createNoticeClipboardHtml(editedTitle, currentBody.bodyHtml);
-    await copyNoticeToClipboard(text, html);
+    try {
+      await copyNoticeToClipboard(text, html);
+    } catch {
+      setCopyStateWithReset("failed");
+      return;
+    }
 
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    setCopyStateWithReset("copied");
 
     const hasEdits =
       editedTitle !== originalTitle ||
@@ -1044,6 +1071,7 @@ export function EditableRewrite({
         {children}
         <span className="actionsRight">
           {extraActions}
+          {!panelTitle && titleSuggestions.button}
           {hasDraft && (
             <>
               <span className="draftDot" title="Redigert utkast" aria-label="Redigert utkast" />
@@ -1080,8 +1108,14 @@ export function EditableRewrite({
               </button>
             </>
           )}
-          <button className="copyButton" onClick={handleCopy} title="Kopier tekst">
-            {copied ? "Kopiert!" : <>Kopier <svg className="copyIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></>}
+          <button
+            className="copyButton"
+            onClick={() => {
+              void handleCopy();
+            }}
+            title="Kopier tekst"
+          >
+            {copyState === "copied" ? "Kopiert!" : copyState === "failed" ? "Kunne ikke kopiere" : <>Kopier <svg className="copyIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></>}
           </button>
         </span>
       </div>

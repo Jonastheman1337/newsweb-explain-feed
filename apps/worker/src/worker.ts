@@ -2,6 +2,7 @@ import {
   QUEUE_NAMES,
   GENERATION_RUN_STALE_MS,
   REDIS_CHANNELS,
+  fixDoubleEncodedUtf8,
   isYearlyReportCategory,
   needsNewsworthinessTriage,
   newswebListResponseSchema,
@@ -12,6 +13,7 @@ import {
   rewriteOutputSchema,
   shouldSkipRewrite,
   toPrismaJsonValue,
+  type GenerationPhase,
   type OpenAIModelCallTelemetry,
   type RewriteOutput
 } from "@newsweb/shared";
@@ -110,6 +112,7 @@ import {
 } from "./services/latest-bootstrap.js";
 import {
   STALE_GENERATION_RECOVERY_ERROR,
+  STALE_GENERATION_RECOVERY_INTERVAL_MS,
   STALE_GENERATION_RECOVERY_LIMIT,
   STALE_GENERATION_RECOVERY_LOOKBACK_MS,
   shouldRecoverStaleGenerationRun,
@@ -243,12 +246,40 @@ const skippedMissingIssuerSign = new Set<number>();
 
 async function publishFeedUpdate(
   messageId: number,
-  state: FeedUpdateState
+  state: FeedUpdateState,
+  phase?: GenerationPhase
 ): Promise<void> {
   await redisPub.publish(
     REDIS_CHANNELS.feedNewItem,
-    JSON.stringify({ messageId, state })
+    JSON.stringify({ messageId, state, ...(phase ? { phase } : {}) })
   );
+}
+
+/**
+ * Persists the pipeline phase AND pushes it to the live feed so the feed's
+ * processing indicator tracks reality instead of a timer. Used only for the
+ * coarse phase transitions; skip branches terminate immediately and the
+ * publish worker emits its own "published" event.
+ */
+async function setGenerationPhaseAndNotify(
+  generationRunId: string | null | undefined,
+  messageId: number,
+  phase: GenerationPhase
+): Promise<void> {
+  await setGenerationPhase(logPrisma, generationRunId, phase);
+  try {
+    await publishFeedUpdate(messageId, "processing", phase);
+  } catch (error) {
+    console.warn(
+      JSON.stringify({
+        service: "worker",
+        event: "phase_feed_publish_failed",
+        messageId,
+        phase,
+        error: error instanceof Error ? error.message : String(error)
+      })
+    );
+  }
 }
 
 async function enqueuePublish(
@@ -261,37 +292,6 @@ async function enqueuePublish(
     { messageId, version, generationRunId },
     { removeOnComplete: 2000, removeOnFail: 2000 }
   );
-}
-
-/**
- * The Newsweb API returns category strings with double-encoded UTF-8
- * (UTF-8 bytes interpreted as Windows-1252, then re-encoded as UTF-8).
- * For example, Å (UTF-8: c3 85) becomes Ã… (c3→U+00C3, 85→U+2026 in CP1252).
- * This reverses the double-encoding so category comparisons work.
- */
-const CP1252_TO_BYTE = new Map<number, number>([
-  [0x20AC, 0x80], [0x201A, 0x82], [0x0192, 0x83], [0x201E, 0x84],
-  [0x2026, 0x85], [0x2020, 0x86], [0x2021, 0x87], [0x02C6, 0x88],
-  [0x2030, 0x89], [0x0160, 0x8A], [0x2039, 0x8B], [0x0152, 0x8C],
-  [0x017D, 0x8E], [0x2018, 0x91], [0x2019, 0x92], [0x201C, 0x93],
-  [0x201D, 0x94], [0x2022, 0x95], [0x2013, 0x96], [0x2014, 0x97],
-  [0x02DC, 0x98], [0x2122, 0x99], [0x0161, 0x9A], [0x203A, 0x9B],
-  [0x0153, 0x9C], [0x017E, 0x9E], [0x0178, 0x9F]
-]);
-
-function fixDoubleEncodedUtf8(text: string): string {
-  try {
-    const bytes = new Uint8Array([...text].map((ch) => {
-      const cp = ch.codePointAt(0) ?? 0;
-      if (cp <= 0xFF) return cp;
-      return CP1252_TO_BYTE.get(cp) ?? 0;
-    }));
-    // If unmapped characters produced zero bytes, keep the original
-    if (bytes.includes(0) && !text.includes("\0")) return text;
-    return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
-  } catch {
-    return text;
-  }
 }
 
 function buildListUrl(daysBack = 0): string {
@@ -1949,7 +1949,11 @@ async function processReportRewrite(
     Boolean(reportContent.referenceText?.trim());
 
   try {
-    await setGenerationPhase(logPrisma, revisionOptions.generationRunId, "writing_notice");
+    await setGenerationPhaseAndNotify(
+      revisionOptions.generationRunId,
+      messageId,
+      "writing_notice"
+    );
     const initialDraftResult = await callModelReportRewrite(
       reportPayload,
       revisionInstructionForPrompt,
@@ -1961,9 +1965,9 @@ async function processReportRewrite(
     hiddenDraft = initialDraftResult.rewrite;
     let rewrite = hiddenDraft;
 
-    await setGenerationPhase(
-      logPrisma,
+    await setGenerationPhaseAndNotify(
       revisionOptions.generationRunId,
+      messageId,
       "checking_references"
     );
     const referenceRepair = await applyReferenceCheckRepair({
@@ -1987,7 +1991,11 @@ async function processReportRewrite(
     initialCoverage = referenceRepair.initialCoverage;
     finalCoverage = referenceRepair.finalCoverage;
 
-    await setGenerationPhase(logPrisma, revisionOptions.generationRunId, "finalizing");
+    await setGenerationPhaseAndNotify(
+      revisionOptions.generationRunId,
+      messageId,
+      "finalizing"
+    );
     const attributionRisks = findAttributionRisks(rewrite);
     attributionRiskCount = attributionRisks.length;
     const attributionInstruction =
@@ -2415,7 +2423,11 @@ async function processYearlyReportRewrite(
   const attachmentTextAvailable = Boolean(combinedText.trim());
 
   try {
-    await setGenerationPhase(logPrisma, revisionOptions.generationRunId, "writing_notice");
+    await setGenerationPhaseAndNotify(
+      revisionOptions.generationRunId,
+      messageId,
+      "writing_notice"
+    );
     const initialDraftResult = await callModelYearlyReportRewrite(
       yearlyPayload,
       revisionInstructionForPrompt,
@@ -2434,9 +2446,9 @@ async function processYearlyReportRewrite(
       sourceBodyChars: combinedText.length
     };
 
-    await setGenerationPhase(
-      logPrisma,
+    await setGenerationPhaseAndNotify(
       revisionOptions.generationRunId,
+      messageId,
       "checking_references"
     );
     const referenceRepair = await applyReferenceCheckRepair({
@@ -2460,7 +2472,11 @@ async function processYearlyReportRewrite(
     initialCoverage = referenceRepair.initialCoverage;
     finalCoverage = referenceRepair.finalCoverage;
 
-    await setGenerationPhase(logPrisma, revisionOptions.generationRunId, "finalizing");
+    await setGenerationPhaseAndNotify(
+      revisionOptions.generationRunId,
+      messageId,
+      "finalizing"
+    );
     const attributionRisks = findAttributionRisks(rewrite);
     attributionRiskCount = attributionRisks.length;
     const attributionInstruction =
@@ -2926,9 +2942,53 @@ async function upsertRewrite(args: {
   }
 }
 
+const JOB_RUNS_CLEANUP_JOB_NAME = "cleanup-job-runs";
+const JOB_RUNS_CLEANUP_INTERVAL_MS = 24 * 60 * 60 * 1000;
+const POLL_JOB_RUN_RETENTION_MS = 14 * 24 * 60 * 60 * 1000;
+const JOB_RUNS_CLEANUP_BATCH_SIZE = 1000;
+const JOB_RUNS_CLEANUP_MAX_BATCHES = 200;
+
+/**
+ * The poll heartbeat writes one job_runs row every POLL_INTERVAL_MS
+ * (~17k rows/day) — pure liveness data with no analytical value beyond
+ * recency. Deleting only jobType='poll' keeps rewrite/ingest/publish
+ * history (health p95 reads the latest rewrite rows) while stopping the
+ * fastest-growing table on the free-tier database.
+ */
+async function cleanupPollJobRuns(): Promise<void> {
+  const cutoff = new Date(Date.now() - POLL_JOB_RUN_RETENTION_MS);
+  let deleted = 0;
+  for (let batch = 0; batch < JOB_RUNS_CLEANUP_MAX_BATCHES; batch++) {
+    const rows = await prisma.jobRun.findMany({
+      where: { jobType: "poll", startedAt: { lt: cutoff } },
+      select: { id: true },
+      orderBy: { startedAt: "asc" },
+      take: JOB_RUNS_CLEANUP_BATCH_SIZE
+    });
+    if (rows.length === 0) {
+      break;
+    }
+    await prisma.jobRun.deleteMany({
+      where: { id: { in: rows.map((row) => row.id) } }
+    });
+    deleted += rows.length;
+  }
+  console.log(
+    JSON.stringify({
+      service: "worker",
+      event: "job_runs_cleanup",
+      deleted,
+      cutoff: cutoff.toISOString()
+    })
+  );
+}
+
 const ingestWorker = new Worker<IngestJobData>(
   QUEUE_NAMES.ingest,
   async (job: Job<IngestJobData>) => {
+    if (job.name === JOB_RUNS_CLEANUP_JOB_NAME) {
+      return withJobRun("cleanup", null, cleanupPollJobRuns);
+    }
     if (job.name === "poll-list") {
       return withJobRun("poll", null, async () => {
         const list = await fetchList();
@@ -3143,9 +3203,11 @@ const rewriteWorker = new Worker<RewriteJobData>(
   async (job: Job<RewriteJobData>) => {
     const messageId = job.data.messageId;
     return withJobRun("rewrite", messageId, async () => {
-      await setGenerationPhase(
-        logPrisma,
+      // Also publishes the "processing" event that bootstrap and retry jobs
+      // otherwise miss (they skip the ingest-time publish).
+      await setGenerationPhaseAndNotify(
         job.data.generationRunId,
+        messageId,
         "reading_notice"
       );
       const source = await prisma.sourceNotice.findUnique({
@@ -3154,10 +3216,6 @@ const rewriteWorker = new Worker<RewriteJobData>(
       if (!source) {
         throw new Error(`source_notices missing for ${messageId}`);
       }
-
-      // Bootstrap and retry jobs reach this point without the ingest-time
-      // "processing" event, so emit it here to keep open feeds live.
-      await publishFeedUpdate(messageId, "processing");
 
       const categories = ((source.categoriesJson as string[]) ?? []).map(fixDoubleEncodedUtf8);
 
@@ -3299,7 +3357,11 @@ const rewriteWorker = new Worker<RewriteJobData>(
 
       // Three-tier PDF processing for notices with attachments
       if (source.hasAttachments) {
-        await setGenerationPhase(logPrisma, generationRunId, "reading_pdf_attachment");
+        await setGenerationPhaseAndNotify(
+          generationRunId,
+          messageId,
+          "reading_pdf_attachment"
+        );
         try {
           // If stored attachments lack filenames (old ingestion), re-fetch from API
           let rawJson = source.rawMessageJson;
@@ -3502,7 +3564,7 @@ const rewriteWorker = new Worker<RewriteJobData>(
       }
 
       // Deterministic low-value triage before model calls.
-      await setGenerationPhase(logPrisma, generationRunId, "analyzing_content");
+      await setGenerationPhaseAndNotify(generationRunId, messageId, "analyzing_content");
       if (job.data.reason !== "manual-reprocess") {
         const deterministicSkip = getDeterministicTriageSkip(
           source.title,
@@ -3654,7 +3716,7 @@ const rewriteWorker = new Worker<RewriteJobData>(
       }
 
       try {
-        await setGenerationPhase(logPrisma, generationRunId, "writing_notice");
+        await setGenerationPhaseAndNotify(generationRunId, messageId, "writing_notice");
         const initialDraftResult = await callModelRewrite(
           payload,
           revisionInstructionForPrompt,
@@ -3669,7 +3731,7 @@ const rewriteWorker = new Worker<RewriteJobData>(
           ? { ...payload, bodyText: payload.bodyText + "\n\n" + payload.pdfSupplementText }
           : payload;
 
-        await setGenerationPhase(logPrisma, generationRunId, "checking_references");
+        await setGenerationPhaseAndNotify(generationRunId, messageId, "checking_references");
         const referenceRepair = await applyReferenceCheckRepair({
           referencePayload: refPayload,
           rewritePayload: payload,
@@ -3691,7 +3753,7 @@ const rewriteWorker = new Worker<RewriteJobData>(
         initialCoverage = referenceRepair.initialCoverage;
         finalCoverage = referenceRepair.finalCoverage;
 
-        await setGenerationPhase(logPrisma, generationRunId, "finalizing");
+        await setGenerationPhaseAndNotify(generationRunId, messageId, "finalizing");
         const attributionRisks = findAttributionRisks(rewrite);
         attributionRiskCount = attributionRisks.length;
         const attributionInstruction =
@@ -4267,9 +4329,15 @@ async function recoverStaleNewMessageRuns(): Promise<{
         continue;
       }
 
+      // Guarded like the publish path: a run the live worker advanced in the
+      // meantime is no longer in an active-stale status and must be left alone
+      // (the sweep now runs concurrently with live jobs, not just at boot).
       const phaseUpdatedAt = new Date();
-      await logPrisma.generationRun.update({
-        where: { id: candidate.id },
+      const resumed = await logPrisma.generationRun.updateMany({
+        where: {
+          id: candidate.id,
+          status: { in: ["queued", "started", "pending"] }
+        },
         data: {
           status: "queued",
           phase: "queued",
@@ -4278,6 +4346,11 @@ async function recoverStaleNewMessageRuns(): Promise<{
           finishedAt: null
         }
       });
+      if (resumed.count === 0) {
+        skipped += 1;
+        resumedExistingJob = true;
+        break;
+      }
       await publishFeedUpdate(candidate.messageId, "processing");
       recovered += 1;
       resumedExistingJob = true;
@@ -4293,8 +4366,15 @@ async function recoverStaleNewMessageRuns(): Promise<{
     let recoveryRunId: string | null = null;
 
     try {
-      await logPrisma.generationRun.update({
-        where: { id: candidate.id },
+      // Optimistic lock: only kill the run if it is still in the exact stale
+      // state the candidate query saw — a run whose phase advanced since then
+      // is alive and must not be requeued.
+      const flipped = await logPrisma.generationRun.updateMany({
+        where: {
+          id: candidate.id,
+          status: { in: ["queued", "started", "pending"] },
+          phaseUpdatedAt: candidate.phaseUpdatedAt
+        },
         data: {
           status: "failed",
           phase: "failed",
@@ -4303,6 +4383,10 @@ async function recoverStaleNewMessageRuns(): Promise<{
           finishedAt: phaseUpdatedAt
         }
       });
+      if (flipped.count === 0) {
+        skipped += 1;
+        continue;
+      }
 
       const recoveryRun = await logPrisma.generationRun.create({
         data: {
@@ -4396,10 +4480,29 @@ async function recoverStaleNewMessageRuns(): Promise<{
 async function bootstrap(): Promise<void> {
   const repeatables = await ingestQueue.getRepeatableJobs();
   for (const repeatable of repeatables) {
-    if (repeatable.name === "poll-list") {
+    if (
+      repeatable.name === "poll-list" ||
+      repeatable.name === JOB_RUNS_CLEANUP_JOB_NAME
+    ) {
       await ingestQueue.removeRepeatableByKey(repeatable.key);
     }
   }
+
+  // Daily job_runs cleanup — scheduled regardless of polling so backlog
+  // drains even on deployments with polling switched off.
+  await ingestQueue.add(
+    JOB_RUNS_CLEANUP_JOB_NAME,
+    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+    {} as IngestJobData,
+    {
+      jobId: "cleanup-job-runs-repeat",
+      repeat: {
+        every: JOB_RUNS_CLEANUP_INTERVAL_MS
+      },
+      removeOnComplete: 10,
+      removeOnFail: 10
+    }
+  );
 
   if (config.NEWSWEB_POLLING_ENABLED) {
     await ingestQueue.add(
@@ -4445,22 +4548,54 @@ async function bootstrap(): Promise<void> {
     }
   }
 
-  try {
-    const recovered = await recoverStaleNewMessageRuns();
-    console.log(
-      `[worker] stale generation recovery candidates=${recovered.candidates} recovered=${recovered.recovered} skipped=${recovered.skipped} failed=${recovered.failed}`
-    );
-  } catch (error) {
-    console.error(
-      `[worker] stale generation recovery failed: ${
-        error instanceof Error ? error.message : String(error)
-      }`
-    );
-  }
+  await runStaleRecoverySweep("boot");
+  staleRecoveryTimer = setInterval(() => {
+    void runStaleRecoverySweep("interval");
+  }, STALE_GENERATION_RECOVERY_INTERVAL_MS);
 
   console.log(
     `[worker] started. polling=${config.NEWSWEB_POLLING_ENABLED} pollInterval=${config.POLL_INTERVAL_MS}ms model=${config.OPENAI_MODEL} fastModel=${config.OPENAI_FAST_MODEL} hardModel=${config.OPENAI_HARD_MODEL} serviceTier=${config.OPENAI_SERVICE_TIER}`
   );
+}
+
+let staleRecoveryTimer: ReturnType<typeof setInterval> | null = null;
+let staleRecoveryRunning = false;
+
+async function runStaleRecoverySweep(trigger: "boot" | "interval"): Promise<void> {
+  if (staleRecoveryRunning) {
+    console.log(
+      JSON.stringify({
+        service: "worker",
+        event: "stale_generation_recovery_skipped",
+        trigger,
+        reason: "already_running"
+      })
+    );
+    return;
+  }
+  staleRecoveryRunning = true;
+  try {
+    const recovered = await recoverStaleNewMessageRuns();
+    console.log(
+      JSON.stringify({
+        service: "worker",
+        event: "stale_generation_recovery",
+        trigger,
+        ...recovered
+      })
+    );
+  } catch (error) {
+    console.error(
+      JSON.stringify({
+        service: "worker",
+        event: "stale_generation_recovery_sweep_failed",
+        trigger,
+        error: error instanceof Error ? error.message : String(error)
+      })
+    );
+  } finally {
+    staleRecoveryRunning = false;
+  }
 }
 
 ingestWorker.on("completed", (job) => {
@@ -4519,6 +4654,10 @@ for (const [queueName, worker] of [
 }
 
 async function shutdown(): Promise<void> {
+  if (staleRecoveryTimer) {
+    clearInterval(staleRecoveryTimer);
+    staleRecoveryTimer = null;
+  }
   await Promise.all([
     ingestWorker.close(),
     rewriteWorker.close(),

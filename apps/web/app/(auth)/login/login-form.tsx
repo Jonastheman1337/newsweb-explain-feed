@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { loginWithPassword, verifyMagicLink } from "../../../lib/api";
-import { SESSION_COOKIE } from "../../../lib/session-cookie";
 
 type LoginFormProps = {
   token?: string;
@@ -24,15 +23,12 @@ export function LoginForm({ token }: LoginFormProps) {
     async function verify(): Promise<void> {
       if (!token) return;
       try {
-        const result = await verifyMagicLink(token);
-        document.cookie = `${SESSION_COOKIE}=${encodeURIComponent(
-          result.sessionToken
-        )}; path=/; max-age=604800; samesite=lax`;
+        await verifyMagicLink(token);
         router.replace("/feed");
       } catch (error) {
         setStatus("error");
         setMessage(
-          error instanceof Error ? error.message : "Innloggingslenken er ugyldig eller utlopet."
+          error instanceof Error ? error.message : "Innloggingslenken er ugyldig eller utløpt."
         );
       }
     }
@@ -44,10 +40,7 @@ export function LoginForm({ token }: LoginFormProps) {
     setStatus("sending");
     setMessage("");
     try {
-      const result = await loginWithPassword(username, password);
-      document.cookie = `${SESSION_COOKIE}=${encodeURIComponent(
-        result.sessionToken
-      )}; path=/; max-age=604800; samesite=lax`;
+      await loginWithPassword(username, password);
       router.replace("/feed");
     } catch (error) {
       setStatus("error");

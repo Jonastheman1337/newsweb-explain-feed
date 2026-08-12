@@ -180,7 +180,7 @@ a {
 .filterGrid {
   display: grid;
   gap: 0.5rem;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   padding: 0.5rem 0;
   margin-bottom: 1rem;
   background: transparent;
@@ -1084,17 +1084,21 @@ a {
   flex-shrink: 0; font-size: 0.7rem; color: var(--ink-soft);
 }
 .searchSelectDropdown {
-  position: absolute; top: 100%; left: 0; right: 0; z-index: 20;
+  position: absolute; top: 100%; left: 0; z-index: 20;
+  min-width: 100%; width: max-content; max-width: min(26rem, 90vw);
   margin-top: 2px; border: 1px solid var(--line); border-radius: var(--radius);
   background: var(--bg-panel); box-shadow: 0 4px 12px rgba(0,0,0,0.3);
 }
+.filterGrid .searchSelect:nth-child(n+4) .searchSelectDropdown {
+  left: auto; right: 0;
+}
 .searchSelectSearch {
-  width: 100%; padding: 0.4rem 0.5rem; border: none;
+  width: 100%; padding: 0.45rem 0.6rem; border: none;
   border-bottom: 1px solid var(--line); background: transparent;
-  color: var(--ink); font: inherit; font-size: 0.85rem; outline: none;
+  color: var(--ink); font: inherit; font-size: 0.9rem; outline: none;
 }
 .searchSelectList {
-  max-height: 220px; overflow-y: auto;
+  max-height: 320px; overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--line) transparent;
 }
@@ -1102,12 +1106,13 @@ a {
 .searchSelectList::-webkit-scrollbar-track { background: transparent; }
 .searchSelectList::-webkit-scrollbar-thumb { background: var(--line); border-radius: 2px; }
 .searchSelectOption {
-  display: block; width: 100%; padding: 0.3rem 0.5rem; border: none;
-  background: transparent; color: var(--ink); font: inherit; font-size: 0.82rem;
+  display: block; width: 100%; padding: 0.45rem 0.6rem; border: none;
+  background: transparent; color: var(--ink); font: inherit; font-size: 0.9rem;
   text-align: left; cursor: pointer; white-space: nowrap; overflow: hidden;
   text-overflow: ellipsis;
 }
-.searchSelectOption:hover { background: var(--bg-soft); }
+.searchSelectOption:hover,
+.searchSelectOption.highlighted { background: var(--bg-soft); }
 .searchSelectOption.active { font-weight: 600; }
 .searchSelectMore {
   padding: 0.3rem 0.5rem; font-size: 0.78rem; color: var(--ink-soft);

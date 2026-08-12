@@ -16,7 +16,7 @@ const bodyFont = IBM_Plex_Sans({
 
 export const metadata: Metadata = {
   title: "Autoweb",
-  description: "Forenklet, norsk feed for borsemeldinger."
+  description: "Forenklet, norsk feed for børsmeldinger."
 };
 
 export default function RootLayout({

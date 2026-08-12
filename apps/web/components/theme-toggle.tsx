@@ -24,8 +24,8 @@ export function ThemeToggle() {
     <button
       className="themeToggle"
       onClick={toggle}
-      aria-label={dark ? "Bytt til lyst tema" : "Bytt til morkt tema"}
-      title={dark ? "Lyst tema" : "Morkt tema"}
+      aria-label={dark ? "Bytt til lyst tema" : "Bytt til mørkt tema"}
+      title={dark ? "Lyst tema" : "Mørkt tema"}
     >
       {dark ? "\u263C" : "\u25CF"}
     </button>

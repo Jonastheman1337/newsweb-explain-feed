@@ -6,6 +6,9 @@ import {
 export const STALE_GENERATION_RECOVERY_LOOKBACK_MS = 72 * 60 * 60 * 1000;
 export const STALE_GENERATION_RECOVERY_LIMIT = 500;
 export const STALE_GENERATION_RECOVERY_ERROR = "STALE_GENERATION_REQUEUED";
+// Staleness itself is 20 min (GENERATION_RUN_STALE_MS); a 5-min sweep bounds
+// wedged-run detection at ~25 min while the candidate query is usually empty.
+export const STALE_GENERATION_RECOVERY_INTERVAL_MS = 5 * 60 * 1000;
 
 const ACTIVE_GENERATION_RUN_STATUSES = new Set(["queued", "started", "pending"]);
 const RECOVERABLE_REWRITE_STATUSES = new Set<RewriteStatus>([

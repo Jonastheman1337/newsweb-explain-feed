@@ -1,6 +1,7 @@
 import {
   CACHE_KEYS,
   META_CACHE_TTL_SECONDS,
+  fixDoubleEncodedUtf8,
   newswebMetaCategoriesSchema,
   newswebMetaIssuersSchema,
   newswebMetaMarketsSchema
@@ -52,16 +53,19 @@ export async function getMetaFilters(redis: Redis): Promise<MetaFilters> {
   const markets = newswebMetaMarketsSchema.parse(rawMarkets).data.markets;
   const issuers = newswebMetaIssuersSchema.parse(rawIssuers).data.issuers;
 
+  // Newsweb meta endpoints return the same double-encoded UTF-8 as the list
+  // endpoint; the worker fixes list values on ingest, so filter values must be
+  // fixed the same way or Æ/Ø/Å categories never match stored rows.
   const payload: MetaFilters = {
     categories: categories.map((item) => ({
       id: item.id,
-      categoryNo: item.category_no,
-      categoryEn: item.category_en
+      categoryNo: fixDoubleEncodedUtf8(item.category_no),
+      categoryEn: fixDoubleEncodedUtf8(item.category_en)
     })),
     markets: markets.map((item) => ({
       id: item.id,
       symbol: item.symbol,
-      name: item.name
+      name: fixDoubleEncodedUtf8(item.name)
     })),
     issuers: issuers
       .filter(
@@ -75,7 +79,7 @@ export async function getMetaFilters(redis: Redis): Promise<MetaFilters> {
       .map((item) => ({
         issuerId: item.issuerId,
         symbol: item.symbol,
-        name: item.name
+        name: fixDoubleEncodedUtf8(item.name)
       }))
   };
 

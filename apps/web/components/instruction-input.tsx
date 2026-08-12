@@ -8,6 +8,7 @@ import { useEditorialTelemetry } from "../lib/editorial-telemetry";
 import { E24Loader } from "./e24-loader";
 import {
   GENERATION_STEP_DURATION_MS,
+  getGenerationStepIndex,
   getGenerationSteps
 } from "./generation-steps";
 
@@ -32,6 +33,7 @@ type RewriteStatusResponse = {
   version?: number | null;
   generatedAt?: string | null;
   jobState?: string | null;
+  phase?: string | null;
 };
 
 type InstructionInputProps = {
@@ -86,7 +88,6 @@ export function InstructionInput({ messageId, activeVersion, hasAttachments }: I
       clearInterval(progressRef.current);
       progressRef.current = null;
     }
-    setProgressStep(0);
   }, []);
 
   useEffect(() => {
@@ -361,6 +362,10 @@ export function InstructionInput({ messageId, activeVersion, hasAttachments }: I
         let data: RewriteStatusResponse | null = null;
         try {
           data = await fetchRewriteStatus(jobId);
+          const phaseStep = getGenerationStepIndex(data?.phase, hasAttachments);
+          if (phaseStep >= 0) {
+            setProgressStep((prev) => Math.max(prev, phaseStep));
+          }
           if (data?.ready && statusChanged(data)) {
             stopPolling();
             setStatus("idle");
@@ -638,7 +643,7 @@ export function InstructionInput({ messageId, activeVersion, hasAttachments }: I
         {status === "polling" && <E24Loader />}
         {status === "error" && (
           <span className="muted">
-            Noe gikk galt — prov igjen
+            Noe gikk galt — prøv igjen
           </span>
         )}
         <span className="actionsRight">

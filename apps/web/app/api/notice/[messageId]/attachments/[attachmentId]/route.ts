@@ -27,8 +27,9 @@ export async function GET(
   );
 
   if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as { message?: string } | null;
     return NextResponse.json(
-      { message: "Kunne ikke laste ned vedlegg." },
+      { message: body?.message ?? "Kunne ikke laste ned vedlegg." },
       { status: response.status }
     );
   }

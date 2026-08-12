@@ -27,13 +27,22 @@ function unavailableResponse(): Response {
   });
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE)?.value;
 
   const headers: Record<string, string> = {};
   if (token) {
     headers.Authorization = `Bearer ${token}`;
+  }
+
+  // Browser-native reconnects send the header; hook-managed reconnects can
+  // only pass a query param (manually created EventSources cannot set headers).
+  const lastEventId =
+    request.headers.get("last-event-id") ??
+    new URL(request.url).searchParams.get("lastEventId");
+  if (lastEventId) {
+    headers["Last-Event-ID"] = lastEventId;
   }
 
   let upstream: Response;

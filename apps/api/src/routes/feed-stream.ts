@@ -1,7 +1,13 @@
-import { REDIS_CHANNELS, type FeedItem } from "@newsweb/shared";
+import {
+  REDIS_CHANNELS,
+  isGenerationPhase,
+  type FeedItem,
+  type GenerationPhase
+} from "@newsweb/shared";
 import { prisma } from "@newsweb/shared/db";
 import type { FastifyPluginAsync } from "fastify";
 import { Redis } from "ioredis";
+import type { ServerResponse } from "node:http";
 import { mapDbItemToFeedItem } from "../services/feed-item-mapper.js";
 
 type FeedUpdateState = "source" | "processing" | "published" | "failed";
@@ -9,10 +15,12 @@ type FeedUpdateState = "source" | "processing" | "published" | "failed";
 export function parseFeedUpdate(message: string): {
   messageId: number;
   state?: FeedUpdateState;
+  phase?: GenerationPhase;
 } {
   const parsed = JSON.parse(message) as {
     messageId: number;
     state?: string;
+    phase?: string;
   };
   return {
     messageId: parsed.messageId,
@@ -22,13 +30,15 @@ export function parseFeedUpdate(message: string): {
       parsed.state === "published" ||
       parsed.state === "failed"
         ? parsed.state
-        : undefined
+        : undefined,
+    phase: isGenerationPhase(parsed.phase) ? parsed.phase : undefined
   };
 }
 
 export function applyFeedUpdateState(
   item: FeedItem,
-  state: FeedUpdateState | undefined
+  state: FeedUpdateState | undefined,
+  phase?: GenerationPhase
 ): FeedItem {
   if (state === "source") {
     return {
@@ -58,7 +68,8 @@ export function applyFeedUpdateState(
       return {
         ...item,
         processing: false,
-        regenerating: true
+        regenerating: true,
+        ...(phase ? { phase } : {})
       };
     }
 
@@ -74,14 +85,143 @@ export function applyFeedUpdateState(
       skipped: false,
       failed: false,
       processing: true,
-      regenerating: false
+      regenerating: false,
+      ...(phase ? { phase } : {})
     };
   }
 
   return item;
 }
 
+export type BufferedFeedEvent = {
+  id: string;
+  frame: string;
+};
+
+export function appendToRingBuffer(
+  buffer: BufferedFeedEvent[],
+  event: BufferedFeedEvent,
+  cap = 256
+): void {
+  buffer.push(event);
+  while (buffer.length > cap) {
+    buffer.shift();
+  }
+}
+
+/**
+ * Events emitted after the given id, or null when the id is unknown
+ * (evicted from the buffer, or from a previous process epoch) — the
+ * caller must then tell the client to do a full resync.
+ */
+export function eventsAfter(
+  buffer: BufferedFeedEvent[],
+  lastEventId: string
+): BufferedFeedEvent[] | null {
+  const index = buffer.findIndex((event) => event.id === lastEventId);
+  if (index < 0) {
+    return null;
+  }
+  return buffer.slice(index + 1);
+}
+
 export const feedStreamRoutes: FastifyPluginAsync = async (fastify) => {
+  // Event ids are epoch-prefixed so a Last-Event-ID from before a restart
+  // never matches and the client falls back to a full resync.
+  const processEpoch = Date.now();
+  let seq = 0;
+  const eventBuffer: BufferedFeedEvent[] = [];
+  const connections = new Set<ServerResponse>();
+
+  // One Redis subscription shared by every SSE connection.
+  const subscriber = new Redis(fastify.config.REDIS_URL, {
+    maxRetriesPerRequest: null
+  });
+  subscriber.on("error", (err) => {
+    fastify.log.error(err, "feed-stream redis subscriber error");
+  });
+  // ioredis restores subscriptions itself on reconnect; this is belt-and-braces.
+  subscriber.on("ready", () => {
+    subscriber.subscribe(REDIS_CHANNELS.feedNewItem).catch((err) => {
+      fastify.log.error(err, "feed-stream redis resubscribe error");
+    });
+  });
+  await subscriber.subscribe(REDIS_CHANNELS.feedNewItem);
+
+  // Serializes event processing AND connection registration so a replaying
+  // client can neither miss nor double-receive an event around registration.
+  let writeChain = Promise.resolve();
+  function enqueue(task: () => Promise<void> | void): void {
+    writeChain = writeChain.then(async () => {
+      try {
+        await task();
+      } catch (err) {
+        fastify.log.error(err, "SSE feed-stream task error");
+      }
+    });
+  }
+
+  function writeToConnection(raw: ServerResponse, chunk: string): void {
+    if (raw.writableEnded || raw.destroyed) {
+      connections.delete(raw);
+      return;
+    }
+    try {
+      raw.write(chunk);
+    } catch {
+      connections.delete(raw);
+    }
+  }
+
+  async function broadcastFeedUpdate(message: string): Promise<void> {
+    const { messageId, state, phase } = parseFeedUpdate(message);
+
+    const dbItem = await prisma.feedItem.findUnique({
+      where: { messageId },
+      include: {
+        sourceNotice: {
+          include: {
+            rewrites: {
+              orderBy: { generatedAt: "desc" },
+              select: {
+                status: true,
+                generatedAt: true,
+                version: true,
+                rewriteJson: true
+              }
+            }
+          }
+        }
+      }
+    });
+
+    if (!dbItem) return;
+    // The /feed query filters on visibilityStatus; the stream must agree,
+    // or hidden items (e.g. bilingual duplicates) get pushed live.
+    if (dbItem.visibilityStatus !== "published") return;
+
+    const feedItem = mapDbItemToFeedItem(dbItem);
+    if (!feedItem) return;
+
+    const id = `${processEpoch}-${++seq}`;
+    const frame = `id: ${id}\ndata: ${JSON.stringify(
+      applyFeedUpdateState(feedItem, state, phase)
+    )}\n\n`;
+    appendToRingBuffer(eventBuffer, { id, frame });
+
+    for (const raw of connections) {
+      writeToConnection(raw, frame);
+    }
+  }
+
+  subscriber.on("message", (_channel: string, message: string) => {
+    enqueue(() => broadcastFeedUpdate(message));
+  });
+
+  fastify.addHook("onClose", async () => {
+    await subscriber.quit().catch(() => {});
+  });
+
   fastify.get(
     "/feed/stream",
     {
@@ -102,56 +242,33 @@ export const feedStreamRoutes: FastifyPluginAsync = async (fastify) => {
       // Flush an initial comment so the client sees the connection is open
       reply.raw.write(": connected\n\n");
 
-      const subscriber = new Redis(fastify.config.REDIS_URL, {
-        maxRetriesPerRequest: null
-      });
-
-      await subscriber.subscribe(REDIS_CHANNELS.feedNewItem);
-
-      let writeChain = Promise.resolve();
-
-      async function writeFeedUpdate(message: string): Promise<void> {
-        try {
-          const { messageId, state } = parseFeedUpdate(message);
-
-          const dbItem = await prisma.feedItem.findUnique({
-            where: { messageId },
-            include: {
-              sourceNotice: {
-                include: {
-                  rewrites: {
-                    orderBy: { generatedAt: "desc" }
-                  }
-                }
-              }
-            }
-          });
-
-          if (!dbItem) return;
-
-          const feedItem = mapDbItemToFeedItem(dbItem);
-          if (!feedItem) return;
-
-          reply.raw.write(
-            `data: ${JSON.stringify(applyFeedUpdateState(feedItem, state))}\n\n`
-          );
-        } catch (err) {
-          fastify.log.error(err, "SSE feed-stream message error");
-        }
-      }
-
-      subscriber.on("message", (_channel: string, message: string) => {
-        writeChain = writeChain.then(() => writeFeedUpdate(message));
-      });
+      const rawLastEventId = request.headers["last-event-id"];
+      const lastEventId = Array.isArray(rawLastEventId)
+        ? rawLastEventId[0]
+        : rawLastEventId;
 
       const heartbeat = setInterval(() => {
-        reply.raw.write(": heartbeat\n\n");
+        writeToConnection(reply.raw, ": heartbeat\n\n");
       }, 30_000);
+
+      enqueue(() => {
+        if (lastEventId) {
+          const missed = eventsAfter(eventBuffer, lastEventId);
+          if (missed) {
+            writeToConnection(reply.raw, `event: control\ndata: {"type":"resumed"}\n\n`);
+            for (const event of missed) {
+              writeToConnection(reply.raw, event.frame);
+            }
+          } else {
+            writeToConnection(reply.raw, `event: control\ndata: {"type":"reset"}\n\n`);
+          }
+        }
+        connections.add(reply.raw);
+      });
 
       request.raw.on("close", () => {
         clearInterval(heartbeat);
-        subscriber.unsubscribe().catch(() => {});
-        subscriber.quit().catch(() => {});
+        connections.delete(reply.raw);
       });
     }
   );

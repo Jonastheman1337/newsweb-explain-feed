@@ -46,6 +46,14 @@ model Invite {
   @@map("invites")
 }
 
+model AppSetting {
+  key       String   @id
+  valueJson Json     @map("value_json")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("app_settings")
+}
+
 model SourceNotice {
   messageId      Int       @id @map("message_id")
   newsId         Int       @map("news_id")
@@ -67,6 +75,8 @@ model SourceNotice {
   @@index([publishedAt(sort: Desc)])
   @@index([issuerSign])
   @@index([categoriesJson], type: Gin)
+  @@index([title(ops: raw("gin_trgm_ops"))], type: Gin, map: "source_notices_title_trgm_idx")
+  @@index([bodyText(ops: raw("gin_trgm_ops"))], type: Gin, map: "source_notices_body_text_trgm_idx")
   @@map("source_notices")
 }
 

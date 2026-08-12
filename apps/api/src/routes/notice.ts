@@ -436,7 +436,7 @@ export const noticeRoutes: FastifyPluginAsync = async (fastify) => {
       const isPdf =
         file.mimetype === "application/pdf" || fileName.toLowerCase().endsWith(".pdf");
       if (!isPdf) {
-        return reply.code(415).send({ message: "Bare PDF-filer stottes." });
+        return reply.code(415).send({ message: "Bare PDF-filer støttes." });
       }
 
       const buffer = await file.toBuffer();

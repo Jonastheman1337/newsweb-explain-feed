@@ -14,6 +14,7 @@ import { feedStreamRoutes } from "./routes/feed-stream.js";
 import { healthRoutes } from "./routes/health.js";
 import { metaRoutes } from "./routes/meta.js";
 import { noticeRoutes } from "./routes/notice.js";
+import { settingsRoutes } from "./routes/settings.js";
 import { MAX_MATERIAL_FILE_BYTES } from "./services/notice-materials.js";
 
 function isLocalHostRequest(hostHeader?: string): boolean {
@@ -89,6 +90,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(feedStreamRoutes);
   await app.register(noticeRoutes);
   await app.register(metaRoutes);
+  await app.register(settingsRoutes);
   await app.register(adminRoutes);
   await app.register(healthRoutes);
 

@@ -1,9 +1,9 @@
 import type { RewriteOutput } from "@newsweb/shared";
 
 const MARKET_CODE_MAP: Record<string, string> = {
-  XHEL: "Helsinki-borsen",
-  XSTO: "Stockholm-borsen",
-  XCSE: "Kobenhavn-borsen"
+  XHEL: "Helsinki-børsen",
+  XSTO: "Stockholm-børsen",
+  XCSE: "København-børsen"
 };
 
 export type StyleSanitizationStats = {
@@ -26,9 +26,9 @@ export type StyleSanitizationResult = {
 function normalizeFiscalYearToken(rawYear: string): string {
   const year = rawYear.trim();
   if (year.length === 2) {
-    return `regnskapsaret 20${year}`;
+    return `regnskapsåret 20${year}`;
   }
-  return `regnskapsaret ${year}`;
+  return `regnskapsåret ${year}`;
 }
 
 function parseNorwegianInteger(raw: string): number | null {

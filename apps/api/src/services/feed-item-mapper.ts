@@ -2,11 +2,25 @@ import { normalizeRewriteJson, rewriteOutputSchema, type FeedItem } from "@newsw
 import type { FeedItem as PrismaFeedItem, Rewrite, SourceNotice } from "@prisma/client";
 import { normalizeNewswebAttachments } from "./newsweb-attachments.js";
 
+// Feed queries select only these rewrite columns; the mapper must not
+// depend on anything heavier (validation_json stays in the database).
+export type FeedRewriteRecord = Pick<
+  Rewrite,
+  "status" | "generatedAt" | "version" | "rewriteJson"
+>;
+
 type FeedItemWithRelations = PrismaFeedItem & {
   sourceNotice: SourceNotice & {
-    rewrites: Rewrite[];
+    rewrites: FeedRewriteRecord[];
   };
 };
+
+function sourceCategories(item: FeedItemWithRelations): string[] {
+  const raw = item.sourceNotice.categoriesJson;
+  return Array.isArray(raw)
+    ? raw.filter((value): value is string => typeof value === "string")
+    : [];
+}
 
 function sourceOnlyFeedItem(
   item: FeedItemWithRelations,
@@ -40,6 +54,7 @@ function sourceOnlyFeedItem(
     attachments,
     sourceTitle: item.sourceNotice.title,
     sourceBodyText: item.sourceNotice.bodyText,
+    categories: sourceCategories(item),
     notGenerated: flags.notGenerated ?? false,
     skipped: flags.skipped ?? false,
     failed: flags.failed ?? false,
@@ -96,6 +111,7 @@ export function mapDbItemToFeedItem(item: FeedItemWithRelations): FeedItem | nul
     attachments,
     sourceTitle: item.sourceNotice.title,
     sourceBodyText: item.sourceNotice.bodyText,
+    categories: sourceCategories(item),
     notGenerated: false,
     skipped: false,
     failed: false,

@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent
+} from "react";
 
 type Option = {
   value: string;
@@ -15,6 +21,22 @@ type SearchableSelectProps = {
   defaultValue?: string;
 };
 
+const VISIBLE_OPTION_CAP = 100;
+
+/**
+ * Folds Norwegian text for matching so "sok" finds "SØK" (and vice versa).
+ * NFKD strips the å-ring; ø and æ do not decompose and need the explicit map.
+ * Note: æ folds to "ae", so "sarlig" will not match "særlig" — "saerlig" will.
+ */
+export function normalizeSearchText(text: string): string {
+  return text
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/\p{M}/gu, "")
+    .replace(/ø/g, "o")
+    .replace(/æ/g, "ae");
+}
+
 export function SearchableSelect({
   name,
   options,
@@ -25,14 +47,39 @@ export function SearchableSelect({
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState(defaultValue ?? "");
+  const [highlightIndex, setHighlightIndex] = useState(0);
   const wrapRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    setSelected(defaultValue ?? "");
+  }, [defaultValue]);
+
+  const sortedOptions = useMemo(
+    () => [...options].sort((a, b) => a.label.localeCompare(b.label, "nb")),
+    [options]
+  );
 
   const selectedOption = options.find((o) => o.value === selected);
-  const query = search.toLowerCase();
+  const query = normalizeSearchText(search);
   const filtered = query
-    ? options.filter((o) => o.label.toLowerCase().includes(query))
-    : options;
+    ? sortedOptions.filter((o) => normalizeSearchText(o.label).includes(query))
+    : sortedOptions;
+
+  const pinnedSelected = !query && selectedOption ? selectedOption : null;
+  const listOptions = pinnedSelected
+    ? [pinnedSelected, ...filtered.filter((o) => o.value !== pinnedSelected.value)]
+    : filtered;
+  const visibleOptions = listOptions.slice(0, VISIBLE_OPTION_CAP);
+  const overflowCount = listOptions.length - visibleOptions.length;
+
+  // Row 0 is the clear-selection row; option rows follow.
+  const rowCount = visibleOptions.length + 1;
+
+  useEffect(() => {
+    setHighlightIndex(0);
+  }, [search, open]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -45,12 +92,57 @@ export function SearchableSelect({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  function commitSelection(value: string) {
+    setSelected(value);
+    setOpen(false);
+    setSearch("");
+  }
+
+  function closeAndRefocus() {
+    setOpen(false);
+    setSearch("");
+    triggerRef.current?.focus();
+  }
+
+  function handleSearchKeyDown(e: ReactKeyboardEvent<HTMLInputElement>) {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setHighlightIndex((prev) => Math.min(prev + 1, rowCount - 1));
+      return;
+    }
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlightIndex((prev) => Math.max(prev - 1, 0));
+      return;
+    }
+    if (e.key === "Enter") {
+      // The select lives inside a GET form — Enter must pick, not submit.
+      e.preventDefault();
+      if (highlightIndex === 0) {
+        commitSelection("");
+      } else {
+        const option = visibleOptions[highlightIndex - 1];
+        if (option) {
+          commitSelection(option.value);
+        }
+      }
+      return;
+    }
+    if (e.key === "Escape") {
+      e.preventDefault();
+      closeAndRefocus();
+    }
+  }
+
   return (
     <div ref={wrapRef} className="searchSelect">
       <input type="hidden" name={name} value={selected} />
       <button
+        ref={triggerRef}
         type="button"
         className="searchSelectTrigger"
+        aria-expanded={open}
+        aria-haspopup="listbox"
         onClick={() => {
           setOpen(!open);
           setSearch("");
@@ -71,40 +163,42 @@ export function SearchableSelect({
             placeholder={searchPlaceholder}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={handleSearchKeyDown}
             autoFocus
           />
-          <div className="searchSelectList">
+          <div className="searchSelectList" role="listbox">
             <button
               type="button"
-              className={`searchSelectOption${!selected ? " active" : ""}`}
-              onClick={() => {
-                setSelected("");
-                setOpen(false);
-                setSearch("");
-              }}
+              role="option"
+              aria-selected={!selected}
+              className={`searchSelectOption${!selected ? " active" : ""}${
+                highlightIndex === 0 ? " highlighted" : ""
+              }`}
+              onClick={() => commitSelection("")}
             >
               {placeholder}
             </button>
-            {filtered.slice(0, 100).map((option, i) => (
+            {visibleOptions.map((option, i) => (
               <button
                 type="button"
+                role="option"
+                aria-selected={selected === option.value}
                 key={`${option.value}-${i}`}
-                className={`searchSelectOption${selected === option.value ? " active" : ""}`}
-                onClick={() => {
-                  setSelected(option.value);
-                  setOpen(false);
-                  setSearch("");
-                }}
+                title={option.label}
+                className={`searchSelectOption${
+                  selected === option.value ? " active" : ""
+                }${highlightIndex === i + 1 ? " highlighted" : ""}`}
+                onClick={() => commitSelection(option.value)}
               >
                 {option.label}
               </button>
             ))}
-            {filtered.length > 100 && (
+            {overflowCount > 0 && (
               <div className="searchSelectMore">
-                Skriv for a filtrere ({filtered.length - 100} flere)
+                Skriv for å filtrere ({overflowCount} flere)
               </div>
             )}
-            {filtered.length === 0 && (
+            {listOptions.length === 0 && (
               <div className="searchSelectMore">Ingen treff</div>
             )}
           </div>

@@ -76,7 +76,7 @@ export function NoticeCard({ item }: NoticeCardProps) {
           </Link>
         </h2>
         {item.regenerating ? (
-          <FeedProcessingIndicator hasAttachments={item.hasAttachments} />
+          <FeedProcessingIndicator hasAttachments={item.hasAttachments} phase={item.phase} />
         ) : (
           <p className="muted">Ikke generert enda</p>
         )}
@@ -103,7 +103,7 @@ export function NoticeCard({ item }: NoticeCardProps) {
             {item.title}
           </Link>
         </h2>
-        <FeedProcessingIndicator hasAttachments={item.hasAttachments} />
+        <FeedProcessingIndicator hasAttachments={item.hasAttachments} phase={item.phase} />
         <div className="editableActions">
           <MaxAiLink messageId={item.messageId} />
           <span className="actionsRight">
@@ -151,7 +151,7 @@ export function NoticeCard({ item }: NoticeCardProps) {
           </Link>
         </h2>
         {item.regenerating ? (
-          <FeedProcessingIndicator hasAttachments={item.hasAttachments} />
+          <FeedProcessingIndicator hasAttachments={item.hasAttachments} phase={item.phase} />
         ) : null}
         <div className="editableActions">
           <MaxAiLink messageId={item.messageId} />
@@ -209,7 +209,10 @@ export function NoticeCard({ item }: NoticeCardProps) {
           </EditableRewrite>
           {item.regenerating && (
             <div className="feedRegenerationStatus">
-              <FeedProcessingIndicator hasAttachments={item.hasAttachments} />
+              <FeedProcessingIndicator
+                hasAttachments={item.hasAttachments}
+                phase={item.phase}
+              />
             </div>
           )}
         </div>

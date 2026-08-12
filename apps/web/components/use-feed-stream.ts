@@ -49,9 +49,15 @@ export function useFeedStream({
     let reconnectDelay = INITIAL_RECONNECT_DELAY_MS;
     let hasConnectedBefore = false;
     let disposed = false;
+    let lastEventId: string | null = null;
 
     function connect() {
-      const es = new EventSource("/api/feed/stream");
+      // Hook-managed reconnects cannot set the Last-Event-ID header on a
+      // fresh EventSource, so the resume id travels as a query param instead.
+      const url = lastEventId
+        ? `/api/feed/stream?lastEventId=${encodeURIComponent(lastEventId)}`
+        : "/api/feed/stream";
+      const es = new EventSource(url);
       source = es;
 
       es.onopen = () => {
@@ -66,6 +72,9 @@ export function useFeedStream({
       };
 
       es.onmessage = (event) => {
+        if (event.lastEventId) {
+          lastEventId = event.lastEventId;
+        }
         try {
           const item: FeedItem = JSON.parse(event.data);
           handlersRef.current.onItem(item);
@@ -73,6 +82,23 @@ export function useFeedStream({
           // Ignore parse errors
         }
       };
+
+      // The server confirms whether a reconnect was fully replayed from its
+      // buffer ("resumed" — no refresh needed) or the gap was too big
+      // ("reset" — fall through to the grace-timer resync below).
+      es.addEventListener("control", (event) => {
+        try {
+          const control = JSON.parse((event as MessageEvent).data) as {
+            type?: string;
+          };
+          if (control.type === "resumed" && resyncTimer) {
+            clearTimeout(resyncTimer);
+            resyncTimer = null;
+          }
+        } catch {
+          // Ignore parse errors
+        }
+      });
 
       es.onerror = () => {
         if (resyncTimer) {

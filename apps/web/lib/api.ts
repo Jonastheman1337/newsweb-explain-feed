@@ -74,12 +74,17 @@ export async function apiGet<T>(
 export async function getFeed(token: string | null | undefined, query: Partial<FeedQuery>) {
   return apiGet<FeedResponse>(token, "/feed", {
     cursor: query.cursor,
+    cursorId: query.cursorId != null ? String(query.cursorId) : undefined,
     limit: query.limit ? String(query.limit) : undefined,
     market: query.market,
     category: query.category,
     issuer: query.issuer,
     q: query.q
   });
+}
+
+export async function getMutedCategories(token: string | null | undefined) {
+  return apiGet<{ mutedCategories: string[] }>(token, "/settings/muted-categories");
 }
 
 type NoticeSource = {
@@ -177,8 +182,7 @@ export async function requestMagicLink(email: string): Promise<{
 }
 
 export async function loginWithPassword(username: string, password: string): Promise<{
-  sessionToken: string;
-  user: { id: string; username: string };
+  user: { id: string; username: string } | null;
 }> {
   const response = await fetch(createUrl("/auth/login"), {
     method: "POST",
@@ -193,14 +197,12 @@ export async function loginWithPassword(username: string, password: string): Pro
   }
 
   return response.json() as Promise<{
-    sessionToken: string;
-    user: { id: string; username: string };
+    user: { id: string; username: string } | null;
   }>;
 }
 
 export async function verifyMagicLink(token: string): Promise<{
-  sessionToken: string;
-  user: { id: string; email: string };
+  user: { id: string; email: string } | null;
 }> {
   const response = await fetch(createUrl("/auth/verify-magic-link"), {
     method: "POST",
@@ -215,7 +217,6 @@ export async function verifyMagicLink(token: string): Promise<{
   }
 
   return response.json() as Promise<{
-    sessionToken: string;
-    user: { id: string; email: string };
+    user: { id: string; email: string } | null;
   }>;
 }

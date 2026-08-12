@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useFeedStream } from "./use-feed-stream";
+import { useFeedStreamSubscription } from "./feed-stream-provider";
 
 export function NotificationToggle() {
   const [enabled, setEnabled] = useState(false);
@@ -23,16 +23,18 @@ export function NotificationToggle() {
     }
   }, []);
 
-  useFeedStream({
-    enabled,
-    onItem: (item) => {
-      new Notification(item.title, {
-        body: item.issuerName,
-        tag: String(item.messageId),
-        icon: "/favicon.ico"
-      });
-    }
-  });
+  useFeedStreamSubscription(
+    {
+      onItem: (item) => {
+        new Notification(item.title, {
+          body: item.issuerName,
+          tag: String(item.messageId),
+          icon: "/favicon.ico"
+        });
+      }
+    },
+    enabled
+  );
 
   async function toggle() {
     if (enabled) {

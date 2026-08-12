@@ -823,6 +823,33 @@ export async function getSignalsData(query: SignalsQuery): Promise<SignalsResult
   };
 }
 
+export type DatabaseSizes = {
+  primaryBytes: number;
+  // null when no dedicated log DB is configured (it would be the same DB).
+  logBytes: number | null;
+};
+
+export async function getDatabaseSizes(): Promise<DatabaseSizes> {
+  async function sizeOf(client: PrismaClient): Promise<number> {
+    const rows = await client.$queryRaw<Array<{ size: bigint }>>`
+      SELECT pg_database_size(current_database()) AS size
+    `;
+    return Number(rows[0]?.size ?? 0n);
+  }
+
+  const primaryBytes = await sizeOf(prisma);
+  const logBytes = isDedicatedLogDatabaseConfigured ? await sizeOf(logPrisma) : null;
+  return { primaryBytes, logBytes };
+}
+
+export function formatDatabaseSize(bytes: number): string {
+  const mb = bytes / (1024 * 1024);
+  if (mb >= 1024) {
+    return `${(mb / 1024).toFixed(2)} GB`;
+  }
+  return `${Math.round(mb)} MB`;
+}
+
 export function queryToSearchParams(query: SignalsQuery): URLSearchParams {
   const params = new URLSearchParams();
   params.set("tab", query.tab);

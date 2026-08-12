@@ -40,10 +40,10 @@ describe("sanitizeRewriteStyle", () => {
     expect(result.rewrite.body.join(" ")).not.toContain("%");
     expect(result.rewrite.body.join(" ")).toContain("10 prosent");
 
-    expect(result.rewrite.title).toContain("regnskapsaret 2025");
-    expect(result.rewrite.lead).toContain("Stockholm-borsen");
-    expect(result.rewrite.lead).toContain("Kobenhavn-borsen");
-    expect(result.rewrite.company_sentence).toContain("Helsinki-borsen");
+    expect(result.rewrite.title).toContain("regnskapsåret 2025");
+    expect(result.rewrite.lead).toContain("Stockholm-børsen");
+    expect(result.rewrite.lead).toContain("København-børsen");
+    expect(result.rewrite.company_sentence).toContain("Helsinki-børsen");
     expect(result.stats.changed).toBe(true);
     expect(result.stats.replacedFiscalYearAbbrev).toBeGreaterThan(0);
     expect(result.stats.expandedMarketCodes).toBeGreaterThan(0);

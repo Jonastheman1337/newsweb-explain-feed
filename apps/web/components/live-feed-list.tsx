@@ -1,10 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode
+} from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { FeedItem } from "@newsweb/shared";
 import { NoticeCard } from "./notice-card";
-import { useFeedStream } from "./use-feed-stream";
+import { useFeedStreamSubscription } from "./feed-stream-provider";
 
 type LiveFeedListProps = {
   initialItems: FeedItem[];
@@ -15,6 +22,8 @@ type LiveFeedListProps = {
     q?: string;
   };
   emptyState?: ReactNode;
+  emptyStateUnfiltered?: ReactNode;
+  mutedCategories?: string[];
 };
 
 const FEED_REFRESH_DEBOUNCE_MS = 250;
@@ -28,7 +37,13 @@ function sortFeedItems(items: FeedItem[]): FeedItem[] {
   });
 }
 
-export function LiveFeedList({ initialItems, filters, emptyState }: LiveFeedListProps) {
+export function LiveFeedList({
+  initialItems,
+  filters,
+  emptyState,
+  emptyStateUnfiltered,
+  mutedCategories
+}: LiveFeedListProps) {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -36,6 +51,16 @@ export function LiveFeedList({ initialItems, filters, emptyState }: LiveFeedList
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasFilters = Boolean(
     filters?.market || filters?.category || filters?.issuer || filters?.q
+  );
+  const mutedSet = useMemo(
+    () => new Set(mutedCategories ?? []),
+    [mutedCategories]
+  );
+  const isMuted = useCallback(
+    (item: FeedItem) =>
+      mutedSet.size > 0 &&
+      (item.categories ?? []).some((category) => mutedSet.has(category)),
+    [mutedSet]
   );
 
   useEffect(() => {
@@ -92,8 +117,11 @@ export function LiveFeedList({ initialItems, filters, emptyState }: LiveFeedList
     };
   }, []);
 
-  useFeedStream({
+  useFeedStreamSubscription({
     onItem: (item) => {
+      if (isMuted(item)) {
+        return;
+      }
       if (hasFilters) {
         refreshFeed();
         return;
@@ -112,13 +140,17 @@ export function LiveFeedList({ initialItems, filters, emptyState }: LiveFeedList
     onReconnect: refreshFeed
   });
 
-  if (items.length === 0) {
-    return <>{emptyState}</>;
+  // Belt-and-braces: the server query already excludes muted categories, but
+  // a mute applied between renders must hide already-listed items immediately.
+  const visibleItems = items.filter((item) => !isMuted(item));
+
+  if (visibleItems.length === 0) {
+    return <>{hasFilters ? emptyState : emptyStateUnfiltered ?? emptyState}</>;
   }
 
   return (
     <>
-      {items.map((item) => (
+      {visibleItems.map((item) => (
         <NoticeCard key={item.messageId} item={item} />
       ))}
     </>

@@ -6,6 +6,7 @@ import { useEditorialTelemetry } from "../lib/editorial-telemetry";
 import { E24Loader } from "./e24-loader";
 import {
   GENERATION_STEP_DURATION_MS,
+  getGenerationStepIndex,
   getGenerationSteps
 } from "./generation-steps";
 
@@ -30,6 +31,7 @@ type RewriteStatusResponse = {
   version?: number | null;
   generatedAt?: string | null;
   jobState?: string | null;
+  phase?: string | null;
 };
 
 type GenerateButtonProps = {
@@ -64,7 +66,6 @@ export function GenerateButton({
       clearInterval(progressRef.current);
       progressRef.current = null;
     }
-    setProgressStep(0);
   }, []);
 
   useEffect(() => {
@@ -170,6 +171,10 @@ export function GenerateButton({
         let data: RewriteStatusResponse | null = null;
         try {
           data = await fetchRewriteStatus(jobId);
+          const phaseStep = getGenerationStepIndex(data?.phase, hasAttachments);
+          if (phaseStep >= 0) {
+            setProgressStep((prev) => Math.max(prev, phaseStep));
+          }
           if (data?.ready && hasStatusChanged(data, versionBefore, generatedAtBefore)) {
             stopPolling();
             setStatus("done");
@@ -202,7 +207,7 @@ export function GenerateButton({
   if (status === "error") {
     return (
       <button className="ghostButton" onClick={handleClick}>
-        Feilet — prov igjen
+        Feilet — prøv igjen
       </button>
     );
   }

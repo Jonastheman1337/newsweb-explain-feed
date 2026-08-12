@@ -15,8 +15,12 @@ export const healthRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get("/health", async (_request, reply) => {
     let db: "up" | "down" = "up";
     let redis: "up" | "down" = "up";
+    let worker: "up" | "down" | "disabled" = "disabled";
     let queueLagSec = 0;
     let modelLatencyP95 = 0;
+
+    const workerExpected =
+      fastify.config.NEWSWEB_POLLING_ENABLED && fastify.config.START_WORKER;
 
     try {
       await prisma.$queryRaw`SELECT 1`;
@@ -49,6 +53,27 @@ export const healthRoutes: FastifyPluginAsync = async (fastify) => {
       redis = "down";
     }
 
+    if (db === "up" && workerExpected) {
+      // The worker heartbeat is its poll job: one job_runs row per poll cycle.
+      // A stale (or missing) latest row means the process is alive-but-wedged;
+      // the resulting 503 makes Render restart the container — the same
+      // recovery path the process supervisor already uses for crashes.
+      try {
+        const lastPoll = await prisma.jobRun.aggregate({
+          where: { jobType: "poll" },
+          _max: { startedAt: true }
+        });
+        const lastPollAt = lastPoll._max.startedAt;
+        worker =
+          lastPollAt &&
+          Date.now() - lastPollAt.getTime() < fastify.config.WORKER_HEARTBEAT_STALE_MS
+            ? "up"
+            : "down";
+      } catch {
+        db = "down";
+      }
+    }
+
     if (db === "up") {
       try {
         const recentRuns = await prisma.jobRun.findMany({
@@ -74,9 +99,10 @@ export const healthRoutes: FastifyPluginAsync = async (fastify) => {
     }
 
     const payload = healthResponseSchema.parse({
-      ok: db === "up" && redis === "up",
+      ok: db === "up" && redis === "up" && worker !== "down",
       db,
       redis,
+      worker,
       queueLagSec,
       modelLatencyP95
     });

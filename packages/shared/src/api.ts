@@ -17,7 +17,13 @@ export const passwordLoginInputSchema = z.object({
 
 export const feedQuerySchema = z.object({
   cursor: z.string().datetime().optional(),
-  limit: z.coerce.number().int().min(1).max(60).default(30),
+  cursorId: z.coerce.number().int().positive().optional(),
+  limit: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .default(30)
+    .transform((value) => Math.min(value, 60)),
   market: z.string().max(20).optional(),
   category: z.string().max(100).optional(),
   issuer: z.string().max(32).optional(),
@@ -28,6 +34,7 @@ export const healthResponseSchema = z.object({
   ok: z.boolean(),
   db: z.enum(["up", "down"]),
   redis: z.enum(["up", "down"]),
+  worker: z.enum(["up", "down", "disabled"]),
   queueLagSec: z.number().nonnegative(),
   modelLatencyP95: z.number().nonnegative()
 });
@@ -58,16 +65,27 @@ export const feedItemSchema = z.object({
   ),
   sourceTitle: z.string(),
   sourceBodyText: z.string(),
+  categories: z.array(z.string()).default([]),
   notGenerated: z.boolean().default(false),
   skipped: z.boolean().default(false),
   failed: z.boolean().default(false),
   processing: z.boolean().default(false),
-  regenerating: z.boolean().default(false)
+  regenerating: z.boolean().default(false),
+  phase: generationPhaseSchema.optional()
 });
 
 export const feedResponseSchema = z.object({
   items: z.array(feedItemSchema),
-  nextCursor: z.string().datetime().nullable()
+  nextCursor: z.string().datetime().nullable(),
+  nextCursorId: z.number().int().nullable()
+});
+
+export const mutedCategoriesResponseSchema = z.object({
+  mutedCategories: z.array(z.string())
+});
+
+export const mutedCategoriesUpdateSchema = z.object({
+  mutedCategories: z.array(z.string().min(1).max(200)).max(200)
 });
 
 export const noticeResponseSchema = z.object({
@@ -143,6 +161,7 @@ export const noticeMaterialsResponseSchema = z.object({
 export type FeedQuery = z.infer<typeof feedQuerySchema>;
 export type FeedResponse = z.infer<typeof feedResponseSchema>;
 export type FeedItem = z.infer<typeof feedItemSchema>;
+export type MutedCategoriesResponse = z.infer<typeof mutedCategoriesResponseSchema>;
 export type RewriteStatusResponse = z.infer<typeof rewriteStatusResponseSchema>;
 export type OutputMode = z.infer<typeof outputModeSchema>;
 export type NoticeMaterialKind = z.infer<typeof noticeMaterialKindSchema>;

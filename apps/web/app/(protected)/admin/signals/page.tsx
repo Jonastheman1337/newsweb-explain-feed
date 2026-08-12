@@ -8,6 +8,8 @@ import {
   SIGNAL_TABS,
   type SignalsQuery,
   type TitleSignal,
+  formatDatabaseSize,
+  getDatabaseSizes,
   getSignalsData,
   parseSignalsQuery,
   previewJson,
@@ -315,6 +317,7 @@ export default async function SignalsPage({ searchParams }: SignalsPageProps) {
   const query = parseSignalsQuery(params);
   const result = await getSignalsData(query);
   const rowCount = result.data.rows.length;
+  const dbSizes = await getDatabaseSizes().catch(() => null);
 
   return (
     <section className="signalsPage">
@@ -324,6 +327,14 @@ export default async function SignalsPage({ searchParams }: SignalsPageProps) {
           <p className="muted">
             Read-only view of feedback, edits, title activity, action events, and generation runs.
           </p>
+          {dbSizes ? (
+            <p className="muted">
+              DB {formatDatabaseSize(dbSizes.primaryBytes)}
+              {dbSizes.logBytes != null
+                ? ` · Log DB ${formatDatabaseSize(dbSizes.logBytes)}`
+                : ""}
+            </p>
+          ) : null}
         </div>
         <Link className="ghostButton" href={exportHref(query)}>
           Export CSV
