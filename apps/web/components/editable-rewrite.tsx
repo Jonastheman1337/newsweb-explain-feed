@@ -895,6 +895,20 @@ export function EditableRewrite({
 
   const hasDraft = storedDraft != null;
   const showingOriginal = viewMode === "original";
+  const titleEditor = (
+    <h2
+      ref={titleRef}
+      className="editableTitle"
+      contentEditable
+      tabIndex={0}
+      suppressContentEditableWarning
+      onInput={(e) => {
+        enterDraftMode();
+        setEditedTitle(e.currentTarget.textContent ?? "");
+      }}
+    >
+    </h2>
+  );
 
   return (
     <div className={`editableWrap${className ? ` ${className}` : ""}`}>
@@ -904,18 +918,12 @@ export function EditableRewrite({
           {titleSuggestions.button}
         </div>
       )}
-      <h2
-        ref={titleRef}
-        className="editableTitle"
-        contentEditable
-        tabIndex={0}
-        suppressContentEditableWarning
-        onInput={(e) => {
-          enterDraftMode();
-          setEditedTitle(e.currentTarget.textContent ?? "");
-        }}
-      >
-      </h2>
+      {panelTitle ? titleEditor : (
+        <div className="editableTitleRow">
+          {titleEditor}
+          <span className="titleSuggestWrap">{titleSuggestions.button}</span>
+        </div>
+      )}
       {titleSuggestions.dropdown}
       {dateline}
       <div
@@ -1071,7 +1079,6 @@ export function EditableRewrite({
         {children}
         <span className="actionsRight">
           {extraActions}
-          {!panelTitle && titleSuggestions.button}
           {hasDraft && (
             <>
               <span className="draftDot" title="Redigert utkast" aria-label="Redigert utkast" />

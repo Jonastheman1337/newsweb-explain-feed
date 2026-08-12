@@ -546,6 +546,22 @@ a {
   cursor: text;
 }
 
+.editableTitleRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.editableTitleRow .editableTitle {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.editableTitleRow .titleSuggestWrap {
+  margin-top: 0.1rem;
+}
+
 .panelTitleRow {
   display: flex;
   align-items: center;
