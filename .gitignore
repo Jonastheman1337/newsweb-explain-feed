@@ -14,3 +14,4 @@ infra/data/
 tmp/
 test-results/
 .claude/
+prompts/
