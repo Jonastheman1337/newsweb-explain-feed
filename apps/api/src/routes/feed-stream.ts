@@ -8,6 +8,7 @@ import { prisma } from "@newsweb/shared/db";
 import type { FastifyPluginAsync } from "fastify";
 import { Redis } from "ioredis";
 import type { ServerResponse } from "node:http";
+import { getMutedCategories } from "../services/app-settings.js";
 import { mapDbItemToFeedItem } from "../services/feed-item-mapper.js";
 
 type FeedUpdateState = "source" | "processing" | "published" | "failed";
@@ -202,6 +203,16 @@ export const feedStreamRoutes: FastifyPluginAsync = async (fastify) => {
 
     const feedItem = mapDbItemToFeedItem(dbItem);
     if (!feedItem) return;
+
+    // Muting must hold for every live subscriber (including desktop
+    // notifications), not just the paginated feed query.
+    const mutedCategories = await getMutedCategories();
+    if (
+      mutedCategories.length > 0 &&
+      feedItem.categories.some((category) => mutedCategories.includes(category))
+    ) {
+      return;
+    }
 
     const id = `${processEpoch}-${++seq}`;
     const frame = `id: ${id}\ndata: ${JSON.stringify(

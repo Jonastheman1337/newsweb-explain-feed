@@ -4329,14 +4329,16 @@ async function recoverStaleNewMessageRuns(): Promise<{
         continue;
       }
 
-      // Guarded like the publish path: a run the live worker advanced in the
-      // meantime is no longer in an active-stale status and must be left alone
+      // Optimistic lock like the flip-to-failed path below: only resume a run
+      // that is still in the exact stale state the candidate query saw — a run
+      // whose phase advanced since then is alive and must be left alone
       // (the sweep now runs concurrently with live jobs, not just at boot).
       const phaseUpdatedAt = new Date();
       const resumed = await logPrisma.generationRun.updateMany({
         where: {
           id: candidate.id,
-          status: { in: ["queued", "started", "pending"] }
+          status: { in: ["queued", "started", "pending"] },
+          phaseUpdatedAt: candidate.phaseUpdatedAt
         },
         data: {
           status: "queued",
