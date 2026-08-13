@@ -92,6 +92,8 @@ test("groups engagement and article-shape signals by prompt version", () => {
               responseModel: "gpt-5.6-terra-2026-08-07",
               serviceTier: "default",
               reasoningEffort: "medium",
+              promptCacheMode: "implicit",
+              promptCacheKey: "newsweb:rewrite-regular:v5.9.1",
               attemptCount: 2,
               attempts: [{}, {}],
               usage: {
@@ -202,8 +204,14 @@ test("groups engagement and article-shape signals by prompt version", () => {
     output_tokens: 220,
     reasoning_tokens: 140,
     total_tokens: 1320,
-    standard_input_tokens: 500
+    standard_input_tokens: 500,
+    cache_read_share: 0.4545,
+    cache_write_share: 0.0909
   });
+  assert.deepEqual(modelCalls.calls_by_prompt_cache_mode, [
+    { mode: "implicit", count: 1 },
+    { mode: "(unset)", count: 1 }
+  ]);
   assert.equal(
     modelCalls.usage_by_response_model_and_service_tier[0].key,
     "gpt-5.6-terra-2026-08-07:default"

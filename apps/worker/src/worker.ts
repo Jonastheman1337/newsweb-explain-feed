@@ -102,6 +102,7 @@ import {
   createOpenAIClient,
   getOpenAIErrorTelemetry,
   type OpenAIFileInput,
+  type OpenAIPromptCacheMode,
   type OpenAIReasoningEffort,
   type OpenAIServiceTier
 } from "./services/openai-responses.js";
@@ -973,6 +974,7 @@ type JsonModelCallInput = {
   timeoutMs?: number;
   maxOutputTokens?: number;
   promptCacheKey?: string;
+  promptCacheMode?: OpenAIPromptCacheMode;
   file?: OpenAIFileInput;
 };
 
@@ -987,7 +989,31 @@ type ModelCallLog = OpenAIModelCallTelemetry & {
   developerPrompt: string;
   userPrompt: string;
   promptChars: number;
+  promptCacheMode: OpenAIPromptCacheMode;
+  promptCacheKey: string | null;
 };
+
+type PromptCacheFlow =
+  | "triage"
+  | "editorial-review"
+  | "rewrite-regular"
+  | "reference-check"
+  | "rewrite-report"
+  | "rewrite-yearly"
+  | "pdf-context";
+
+function promptCacheModeForFlow(flow: PromptCacheFlow): OpenAIPromptCacheMode {
+  const overrides: Record<PromptCacheFlow, OpenAIPromptCacheMode | undefined> = {
+    triage: config.OPENAI_PROMPT_CACHE_MODE_TRIAGE,
+    "editorial-review": config.OPENAI_PROMPT_CACHE_MODE_EDITORIAL_REVIEW,
+    "rewrite-regular": config.OPENAI_PROMPT_CACHE_MODE_REWRITE_REGULAR,
+    "reference-check": config.OPENAI_PROMPT_CACHE_MODE_REFERENCE_CHECK,
+    "rewrite-report": config.OPENAI_PROMPT_CACHE_MODE_REWRITE_REPORT,
+    "rewrite-yearly": config.OPENAI_PROMPT_CACHE_MODE_REWRITE_YEARLY,
+    "pdf-context": config.OPENAI_PROMPT_CACHE_MODE_PDF_CONTEXT
+  };
+  return overrides[flow] ?? config.OPENAI_PROMPT_CACHE_MODE;
+}
 
 type ModelCallFailureCarrier = Error & {
   modelCall?: ModelCallLog;
@@ -1057,6 +1083,7 @@ async function callModelForJson({
   // ceiling must cover reasoning + JSON output, not just the JSON.
   maxOutputTokens = 16384,
   promptCacheKey,
+  promptCacheMode = config.OPENAI_PROMPT_CACHE_MODE,
   file
 }: JsonModelCallInput): Promise<{
   content: string;
@@ -1076,6 +1103,8 @@ async function callModelForJson({
     developerPrompt,
     userPrompt,
     promptChars,
+    promptCacheMode,
+    promptCacheKey: promptCacheKey ?? null,
     responseModel: null,
     requestedServiceTier: serviceTier,
     serviceTier: null,
@@ -1097,6 +1126,7 @@ async function callModelForJson({
       timeoutMs,
       maxOutputTokens,
       promptCacheKey,
+      promptCacheMode,
       file
     });
     applyOpenAITelemetry(modelCall, result);
@@ -1141,7 +1171,8 @@ async function callModelTriage(
       reasoningEffort: config.OPENAI_TRIAGE_REASONING_EFFORT,
       timeoutMs: config.OPENAI_FAST_TIMEOUT_MS,
       maxOutputTokens: 768,
-      promptCacheKey: `newsweb:triage:${PROMPT_VERSION}`
+      promptCacheKey: `newsweb:triage:${PROMPT_VERSION}`,
+      promptCacheMode: promptCacheModeForFlow("triage")
     });
 
     return {
@@ -1186,7 +1217,8 @@ async function callModelEditorialRevisionReview({
       draftRewrite
     }),
     reasoningEffort,
-    promptCacheKey: `newsweb:editorial-review:${PROMPT_VERSION}`
+    promptCacheKey: `newsweb:editorial-review:${PROMPT_VERSION}`,
+    promptCacheMode: promptCacheModeForFlow("editorial-review")
   });
 
   return {
@@ -1227,7 +1259,8 @@ async function callModelRewrite(
     developerPrompt,
     userPrompt,
     reasoningEffort,
-    promptCacheKey: `newsweb:rewrite-regular:${PROMPT_VERSION}`
+    promptCacheKey: `newsweb:rewrite-regular:${PROMPT_VERSION}`,
+    promptCacheMode: promptCacheModeForFlow("rewrite-regular")
   });
 
   return {
@@ -1263,7 +1296,8 @@ async function callModelReferenceCheck(
     developerPrompt: referencePrompt.developerPrompt,
     userPrompt: referencePrompt.userPrompt,
     reasoningEffort,
-    promptCacheKey: `newsweb:reference-check:${PROMPT_VERSION}`
+    promptCacheKey: `newsweb:reference-check:${PROMPT_VERSION}`,
+    promptCacheMode: promptCacheModeForFlow("reference-check")
   });
 
   const parsed = referenceCheckResultSchema.parse(JSON.parse(result.content));
@@ -1307,7 +1341,8 @@ async function callModelReportRewrite(
     developerPrompt,
     userPrompt,
     reasoningEffort,
-    promptCacheKey: `newsweb:rewrite-report:${PROMPT_VERSION}`
+    promptCacheKey: `newsweb:rewrite-report:${PROMPT_VERSION}`,
+    promptCacheMode: promptCacheModeForFlow("rewrite-report")
   });
 
   return {
@@ -1348,7 +1383,8 @@ async function callModelYearlyReportRewrite(
     developerPrompt,
     userPrompt,
     reasoningEffort,
-    promptCacheKey: `newsweb:rewrite-yearly:${PROMPT_VERSION}`
+    promptCacheKey: `newsweb:rewrite-yearly:${PROMPT_VERSION}`,
+    promptCacheMode: promptCacheModeForFlow("rewrite-yearly")
   });
 
   return {
@@ -1749,6 +1785,7 @@ async function callOpenAIPdfContext({
     reasoningEffort,
     timeoutMs: config.OPENAI_TIMEOUT_MS,
     promptCacheKey: `newsweb:pdf-context:${PROMPT_VERSION}`,
+    promptCacheMode: promptCacheModeForFlow("pdf-context"),
     file: {
       filename: pdf.attachmentName ?? `attachment-${pdf.attachmentId}.pdf`,
       mimeType: "application/pdf",

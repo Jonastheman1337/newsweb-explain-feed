@@ -80,6 +80,8 @@ services:
         value: medium
       - key: OPENAI_REVIEW_REASONING_EFFORT
         value: medium
+      - key: OPENAI_PROMPT_CACHE_MODE
+        value: implicit
       - key: POLL_INTERVAL_MS
         value: 5000
       - key: LATEST_BOOTSTRAP_COUNT

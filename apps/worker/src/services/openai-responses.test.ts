@@ -228,6 +228,149 @@ describe("callOpenAIForJson", () => {
     expect(calls[1]!.body.prompt_cache_key).toBe("newsweb:rewrite-regular:v5.8.0");
   });
 
+  it("omits prompt_cache_options for default and implicit modes", async () => {
+    const calls: CapturedCall[] = [];
+    const client = createMockClient({ calls, outputText: '{"ok":true}' });
+
+    await callOpenAIForJson(client, baseRequest);
+    await callOpenAIForJson(client, {
+      ...baseRequest,
+      promptCacheMode: "implicit"
+    });
+
+    for (const call of calls) {
+      expect(call.body).not.toHaveProperty("prompt_cache_options");
+      expect(JSON.stringify(call.body)).not.toContain("prompt_cache_breakpoint");
+      expect(call.body.input).toEqual([
+        { role: "system", content: "system" },
+        { role: "developer", content: "developer" },
+        { role: "user", content: "user" }
+      ]);
+    }
+  });
+
+  it("places an explicit cache breakpoint on the developer block in explicit mode", async () => {
+    const calls: CapturedCall[] = [];
+    const client = createMockClient({ calls, outputText: '{"ok":true}' });
+
+    await callOpenAIForJson(client, {
+      ...baseRequest,
+      promptCacheKey: "newsweb:rewrite-regular:v5.9.1",
+      promptCacheMode: "explicit"
+    });
+
+    const { body } = calls[0]!;
+    expect(body.prompt_cache_options).toEqual({ mode: "explicit" });
+    expect(body.prompt_cache_key).toBe("newsweb:rewrite-regular:v5.9.1");
+    expect(body.input[0]).toEqual({
+      role: "system",
+      content: [{ type: "input_text", text: "system" }]
+    });
+    expect(body.input[1]).toEqual({
+      role: "developer",
+      content: [
+        {
+          type: "input_text",
+          text: "developer",
+          prompt_cache_breakpoint: { mode: "explicit" }
+        }
+      ]
+    });
+    expect(body.input[2]).toEqual({ role: "user", content: "user" });
+  });
+
+  it("keeps the user file content uncached in explicit mode", async () => {
+    const calls: CapturedCall[] = [];
+    const client = createMockClient({ calls, outputText: '{"ok":true}' });
+
+    await callOpenAIForJson(client, {
+      ...baseRequest,
+      promptCacheMode: "explicit",
+      file: {
+        filename: "report.pdf",
+        mimeType: "application/pdf",
+        data: Buffer.from("pdf-bytes")
+      }
+    });
+
+    const { body } = calls[0]!;
+    expect(body.input[1].content[0].prompt_cache_breakpoint).toEqual({
+      mode: "explicit"
+    });
+    expect(body.input[2].content).toEqual([
+      {
+        type: "input_file",
+        filename: "report.pdf",
+        file_data: `data:application/pdf;base64,${Buffer.from("pdf-bytes").toString("base64")}`
+      },
+      { type: "input_text", text: "user" }
+    ]);
+    expect(JSON.stringify(body.input[2])).not.toContain("prompt_cache_breakpoint");
+  });
+
+  it("keeps the breakpoint on developer when the system prompt is empty in explicit mode", async () => {
+    const calls: CapturedCall[] = [];
+    const client = createMockClient({ calls, outputText: '{"ok":true}' });
+
+    await callOpenAIForJson(client, {
+      ...baseRequest,
+      systemPrompt: "",
+      promptCacheMode: "explicit"
+    });
+
+    const { body } = calls[0]!;
+    expect(body.input).toHaveLength(2);
+    expect(body.input[0].role).toBe("developer");
+    expect(body.input[0].content[0].prompt_cache_breakpoint).toEqual({
+      mode: "explicit"
+    });
+  });
+
+  it("disables caching via explicit mode with zero breakpoints when mode is off", async () => {
+    const calls: CapturedCall[] = [];
+    const client = createMockClient({ calls, outputText: '{"ok":true}' });
+
+    await callOpenAIForJson(client, {
+      ...baseRequest,
+      promptCacheKey: "newsweb:pdf-context:v5.9.1",
+      promptCacheMode: "off"
+    });
+
+    const { body } = calls[0]!;
+    expect(body.prompt_cache_options).toEqual({ mode: "explicit" });
+    expect(body.prompt_cache_key).toBe("newsweb:pdf-context:v5.9.1");
+    expect(JSON.stringify(body)).not.toContain("prompt_cache_breakpoint");
+    expect(body.input).toEqual([
+      { role: "system", content: "system" },
+      { role: "developer", content: "developer" },
+      { role: "user", content: "user" }
+    ]);
+  });
+
+  it("preserves the cache mode across the max_output_tokens retry", async () => {
+    const calls: CapturedCall[] = [];
+    const client = createMockClient({
+      calls,
+      outputText: "",
+      response: {
+        status: "incomplete",
+        incomplete_details: { reason: "max_output_tokens" }
+      }
+    });
+
+    await expect(
+      callOpenAIForJson(client, { ...baseRequest, promptCacheMode: "explicit" })
+    ).rejects.toThrow(/incomplete/);
+
+    expect(calls).toHaveLength(2);
+    for (const call of calls) {
+      expect(call.body.prompt_cache_options).toEqual({ mode: "explicit" });
+      expect(
+        call.body.input[1].content[0].prompt_cache_breakpoint
+      ).toEqual({ mode: "explicit" });
+    }
+  });
+
   it("wraps API errors with the schema name", async () => {
     const client = createMockClient({ error: new Error("rate limited") });
     try {

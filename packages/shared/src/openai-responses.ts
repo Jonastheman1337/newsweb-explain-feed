@@ -30,6 +30,10 @@ export const openAIServiceTiers = [
 export type OpenAIServiceTier = (typeof openAIServiceTiers)[number];
 export type OpenAIReasoningContext = "auto" | "current_turn" | "all_turns";
 
+export const openAIPromptCacheModes = ["implicit", "explicit", "off"] as const;
+
+export type OpenAIPromptCacheMode = (typeof openAIPromptCacheModes)[number];
+
 export type OpenAIResponsesClient = {
   responses: {
     create: (
@@ -77,6 +81,7 @@ export type OpenAIJsonRequest = {
   serviceTier?: OpenAIServiceTier;
   reasoningContext?: OpenAIReasoningContext;
   promptCacheKey?: string;
+  promptCacheMode?: OpenAIPromptCacheMode;
   file?: OpenAIFileInput;
 };
 
@@ -238,6 +243,10 @@ async function callOpenAIResponse(
   client: OpenAIResponsesClient,
   request: OpenAIJsonRequest
 ): Promise<OpenAIJsonResponse> {
+  const cacheMode = request.promptCacheMode ?? "implicit";
+  // "off" disables caching by requesting explicit mode with zero breakpoints;
+  // omitting prompt_cache_key would not stop implicit caching.
+  const explicitBreakpoint = cacheMode === "explicit";
   return client.responses.create(
       {
         model: request.model,
@@ -251,11 +260,32 @@ async function callOpenAIResponse(
         ...(request.promptCacheKey
           ? { prompt_cache_key: request.promptCacheKey }
           : {}),
+        ...(cacheMode === "implicit"
+          ? {}
+          : { prompt_cache_options: { mode: "explicit" } }),
         input: [
           ...(request.systemPrompt
-            ? [{ role: "system", content: request.systemPrompt }]
+            ? [
+                {
+                  role: "system",
+                  content: explicitBreakpoint
+                    ? [{ type: "input_text", text: request.systemPrompt }]
+                    : request.systemPrompt
+                }
+              ]
             : []),
-          { role: "developer", content: request.developerPrompt },
+          {
+            role: "developer",
+            content: explicitBreakpoint
+              ? [
+                  {
+                    type: "input_text",
+                    text: request.developerPrompt,
+                    prompt_cache_breakpoint: { mode: "explicit" }
+                  }
+                ]
+              : request.developerPrompt
+          },
           {
             role: "user",
             content: request.file

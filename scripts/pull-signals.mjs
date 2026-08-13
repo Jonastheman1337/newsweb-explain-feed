@@ -1038,7 +1038,9 @@ function tokenUsageSummary(usage) {
       usage.input_tokens -
         usage.cached_input_tokens -
         usage.cache_write_input_tokens
-    )
+    ),
+    cache_read_share: rate(usage.cached_input_tokens, usage.input_tokens),
+    cache_write_share: rate(usage.cache_write_input_tokens, usage.input_tokens)
   };
 }
 
@@ -1103,6 +1105,7 @@ function modelCallStats(generations) {
         token_usage: emptyTokenUsage(),
         usage_by_model_tier: new Map(),
         usage_by_schema_effort: new Map(),
+        prompt_cache_modes: new Map(),
         latency_seconds: []
       };
       byVersion.set(version, bucket);
@@ -1128,6 +1131,12 @@ function modelCallStats(generations) {
       bucket.reasoning_efforts.set(
         effortKey,
         (bucket.reasoning_efforts.get(effortKey) ?? 0) + 1
+      );
+      const cacheModeKey =
+        typeof call.promptCacheMode === "string" ? call.promptCacheMode : "(unset)";
+      bucket.prompt_cache_modes.set(
+        cacheModeKey,
+        (bucket.prompt_cache_modes.get(cacheModeKey) ?? 0) + 1
       );
       const usage = modelCallUsage(call);
       const actualCost = modelCallCost(call);
@@ -1182,6 +1191,9 @@ function modelCallStats(generations) {
         usage_by_schema_and_effort: usageGroups(bucket.usage_by_schema_effort),
         calls_by_schema_and_effort: [...bucket.reasoning_efforts.entries()]
           .map(([key, count]) => ({ key, count }))
+          .sort((a, b) => b.count - a.count),
+        calls_by_prompt_cache_mode: [...bucket.prompt_cache_modes.entries()]
+          .map(([mode, count]) => ({ mode, count }))
           .sort((a, b) => b.count - a.count),
         latency_seconds_p50: percentile(latencies, 50),
         latency_seconds_p90: percentile(latencies, 90),

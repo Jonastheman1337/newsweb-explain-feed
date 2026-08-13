@@ -103,6 +103,52 @@ describe("parseWorkerConfig", () => {
     ).toThrow();
   });
 
+  it("defaults prompt cache mode to implicit with no per-flow overrides", () => {
+    const config = parseWorkerConfig({
+      NODE_ENV: "development",
+      DATABASE_URL:
+        "postgresql://newsweb:newsweb@localhost:5432/newsweb_explain?schema=public",
+      REDIS_URL: "redis://localhost:6379",
+      OPENAI_API_KEY: "sk-openai-test-key"
+    });
+    expect(config.OPENAI_PROMPT_CACHE_MODE).toBe("implicit");
+    expect(config.OPENAI_PROMPT_CACHE_MODE_TRIAGE).toBeUndefined();
+    expect(config.OPENAI_PROMPT_CACHE_MODE_EDITORIAL_REVIEW).toBeUndefined();
+    expect(config.OPENAI_PROMPT_CACHE_MODE_REWRITE_REGULAR).toBeUndefined();
+    expect(config.OPENAI_PROMPT_CACHE_MODE_REFERENCE_CHECK).toBeUndefined();
+    expect(config.OPENAI_PROMPT_CACHE_MODE_REWRITE_REPORT).toBeUndefined();
+    expect(config.OPENAI_PROMPT_CACHE_MODE_REWRITE_YEARLY).toBeUndefined();
+    expect(config.OPENAI_PROMPT_CACHE_MODE_PDF_CONTEXT).toBeUndefined();
+  });
+
+  it("parses per-flow prompt cache mode overrides", () => {
+    const config = parseWorkerConfig({
+      NODE_ENV: "development",
+      DATABASE_URL:
+        "postgresql://newsweb:newsweb@localhost:5432/newsweb_explain?schema=public",
+      REDIS_URL: "redis://localhost:6379",
+      OPENAI_API_KEY: "sk-openai-test-key",
+      OPENAI_PROMPT_CACHE_MODE_PDF_CONTEXT: "off",
+      OPENAI_PROMPT_CACHE_MODE_REWRITE_REGULAR: "explicit"
+    });
+    expect(config.OPENAI_PROMPT_CACHE_MODE).toBe("implicit");
+    expect(config.OPENAI_PROMPT_CACHE_MODE_PDF_CONTEXT).toBe("off");
+    expect(config.OPENAI_PROMPT_CACHE_MODE_REWRITE_REGULAR).toBe("explicit");
+  });
+
+  it("rejects unknown prompt cache modes", () => {
+    expect(() =>
+      parseWorkerConfig({
+        NODE_ENV: "development",
+        DATABASE_URL:
+          "postgresql://newsweb:newsweb@localhost:5432/newsweb_explain?schema=public",
+        REDIS_URL: "redis://localhost:6379",
+        OPENAI_API_KEY: "sk-openai-test-key",
+        OPENAI_PROMPT_CACHE_MODE: "disabled"
+      })
+    ).toThrow();
+  });
+
   it("rejects reasoning efforts unsupported by the selected model family", () => {
     expect(() =>
       parseWorkerConfig({

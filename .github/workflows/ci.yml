@@ -23,6 +23,8 @@ jobs:
         run: npm run typecheck
       - name: Test
         run: npm run test
+      - name: Signals test
+        run: npm run signals:test
       - name: Build
         run: npm run build
 

@@ -2,6 +2,7 @@ import path from "node:path";
 import { config as loadDotEnv } from "dotenv";
 import { z } from "zod";
 import {
+  openAIPromptCacheModes,
   openAIServiceTiers,
   validateOpenAIModelReasoningEffort
 } from "@newsweb/shared/openai-responses";
@@ -28,6 +29,8 @@ const reasoningEffortEnvSchema = z.enum([
 
 const serviceTierEnvSchema = z.enum(openAIServiceTiers);
 
+const promptCacheModeEnvSchema = z.enum(openAIPromptCacheModes);
+
 const configSchema = z
   .object({
     NODE_ENV: z
@@ -51,6 +54,14 @@ const configSchema = z
     OPENAI_TRIAGE_REASONING_EFFORT: reasoningEffortEnvSchema.default("none"),
     OPENAI_REFERENCE_REASONING_EFFORT: reasoningEffortEnvSchema.default("medium"),
     OPENAI_REVIEW_REASONING_EFFORT: reasoningEffortEnvSchema.default("medium"),
+    OPENAI_PROMPT_CACHE_MODE: promptCacheModeEnvSchema.default("implicit"),
+    OPENAI_PROMPT_CACHE_MODE_TRIAGE: promptCacheModeEnvSchema.optional(),
+    OPENAI_PROMPT_CACHE_MODE_EDITORIAL_REVIEW: promptCacheModeEnvSchema.optional(),
+    OPENAI_PROMPT_CACHE_MODE_REWRITE_REGULAR: promptCacheModeEnvSchema.optional(),
+    OPENAI_PROMPT_CACHE_MODE_REFERENCE_CHECK: promptCacheModeEnvSchema.optional(),
+    OPENAI_PROMPT_CACHE_MODE_REWRITE_REPORT: promptCacheModeEnvSchema.optional(),
+    OPENAI_PROMPT_CACHE_MODE_REWRITE_YEARLY: promptCacheModeEnvSchema.optional(),
+    OPENAI_PROMPT_CACHE_MODE_PDF_CONTEXT: promptCacheModeEnvSchema.optional(),
     NEWSWEB_POLLING_ENABLED: booleanEnvSchema,
     POLL_INTERVAL_MS: z.coerce.number().int().min(5000).default(5000),
     LATEST_BOOTSTRAP_COUNT: z.coerce.number().int().min(0).max(50).default(30)
