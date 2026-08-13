@@ -253,3 +253,72 @@ test("reports unavailable cost as null for historical rows without usage", () =>
   assert.equal(costs.actual_cost_per_successful_story_usd, null);
   assert.equal(costs.counterfactual_standard["gpt-5.6-terra"].cost_usd, null);
 });
+
+test("aggregates numeric assessments by prompt version", () => {
+  const summary = analyze(
+    {
+      generations: [
+        {
+          requested_at: timestamp,
+          message_id: "11",
+          status: "published",
+          prompt_version: "v5.9.1",
+          validation_json: JSON.stringify({
+            issues: [],
+            numberAssessments: [
+              {
+                display: "500",
+                disposition: "matched",
+                ruleId: "exact_source_match",
+                count: 2
+              },
+              {
+                display: "1,02",
+                disposition: "matched",
+                ruleId: "scaled_unit_amount",
+                count: 1,
+                provenance: { unit: "nok", scale: "billion" }
+              },
+              {
+                display: "101",
+                disposition: "unexpected",
+                ruleId: null,
+                count: 1
+              }
+            ]
+          })
+        },
+        {
+          requested_at: timestamp,
+          message_id: "12",
+          status: "published",
+          prompt_version: "v5.9.1",
+          validation_json: JSON.stringify({ issues: [] })
+        }
+      ]
+    },
+    "Europe/Oslo"
+  );
+
+  const numeric = summary.qualityPipeline.numericAssessmentsByPromptVersion;
+  assert.deepEqual(numeric.byPromptVersion, [
+    {
+      prompt_version: "v5.9.1",
+      runs_with_assessments: 1,
+      assessed_number_count: 4,
+      matched_count: 3,
+      unexpected_count: 1,
+      unexpected_rate: 0.25,
+      dispositions: [
+        { disposition: "matched", rule_id: "exact_source_match", count: 2 },
+        { disposition: "unexpected", rule_id: "(none)", count: 1 },
+        { disposition: "matched", rule_id: "scaled_unit_amount", count: 1 }
+      ]
+    }
+  ]);
+  assert.deepEqual(numeric.rankedDispositions, [
+    { disposition: "matched", rule_id: "exact_source_match", count: 2 },
+    { disposition: "unexpected", rule_id: "(none)", count: 1 },
+    { disposition: "matched", rule_id: "scaled_unit_amount", count: 1 }
+  ]);
+});

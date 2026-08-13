@@ -8,9 +8,11 @@
 - **Plan date:** 2026-08-13.
 - **Canonical evidence:** `prompts/production-editorial-ab-combined-report-2026-06-02_2026-08-13-final.md` from the source checkout at `C:\Users\WJX270\Documents\Kode\newsweb-explain-feed`.
 - **Production baseline:** Regular prompt `v5.9.1` and the current mechanism-first production workflow.
-- **Active next gate:** Execute the approved next-phase plan: P1 explicit prompt
-  caching (code lands as a production no-op, then per-flow env flips) in parallel
-  with E1 curated release gates in the split shape; P2 numeric provenance follows.
+- **Active next gate:** P1 code and E1 gate code are landed; P1 per-flow env
+  flips proceed on their own calendar per `docs/prompt-caching.md`. The next
+  implementation package is P2 numeric provenance in the two-phase shape of the
+  2026-08-13 next-stage amendment below; E1 fixture seeding is its only external
+  blocker (`RENDER_LOG_DATABASE_EXTERNAL_URL`).
 - **Planning rule:** Where older evaluation notes conflict with the canonical final report, the final report governs findings and this plan governs sequencing.
 
 This is a durable production-integration plan, not an execution log. `docs/editorial-eval.md` remains useful as operational and historical context, but it is not the decision record for prompt promotion.
@@ -62,6 +64,86 @@ Owner decisions recorded at landing:
   Rollout order: PDF context `off`, reference check `off` (stable prefix below
   the cacheable minimum), regular rewrite `explicit`, then report/yearly;
   triage stays implicit.
+
+## Next-stage amendment — 2026-08-13: P2 numeric provenance
+
+Planned after the E1 landing. P1 and E1 code are on `main`; P1 env flips run on
+their own calendar (`docs/prompt-caching.md`) and occupy their own release
+windows. P2 development proceeds in parallel because its Phase A is shadow-only;
+P2 enforcement flips never share a window with a cache flip.
+
+**Single external blocker.** `RENDER_LOG_DATABASE_EXTERNAL_URL` in `.env` is an
+empty placeholder. One owner action unblocks everything downstream: paste the
+log-database external URL from the Render dashboard. Then, in one sitting:
+`node scripts/clone-render-db.mjs` (local clones of both prod DBs), point
+`GENERATION_LOG_DATABASE_URL` at the log clone, run
+`npm run eval:editorial -w apps/worker -- build-safety-fixtures` (seeds all
+seven safety classes; marker/loaded-language come from the legacy A/B artifact
+automatically), review, commit. The same log clone is the P2 replay corpus —
+no second data pull.
+
+**Amended P2 shape.** `packages/prompt-kit/src/numbers.ts` already implements
+eight implicit acceptance rules (exact match, thousands-separator equivalent,
+clock time, shared percent range, explicit-thousands scale, scaled unit
+million/billion, trade-arithmetic pair, trade-arithmetic aggregate). The
+planned "structured assessment" is a refactor of that engine, not a parallel
+system.
+
+*Phase A — assessment engine, no behavior change (not blocked; starts now):*
+
+1. Refactor `findUnexpectedNumbers` into an assessment function returning one
+   record per rewrite number: display, span, disposition
+   (`matched | derived | unexpected`), rule ID, and provenance (source span or
+   operands, rule parameters, tolerance). The existing eight paths become named
+   rules; `findUnexpectedNumbers` stays as a thin wrapper over
+   `disposition === "unexpected"`.
+2. Behavior-identity gate: all existing numbers/validation tests pass unchanged;
+   once fixtures are seeded, `safety-gates.test.ts` replay shows zero drift.
+3. Persist assessments in the validation detail the worker already stores
+   (`validation_json` / `generation_runs.input_json`) on every call — this is
+   the shadow telemetry, on from the day Phase A deploys. Export disposition
+   counts by rule ID in `scripts/pull-signals.mjs` / `apps/web/lib/admin-signals.ts`.
+
+*Phase B — corpus-driven acceptance rules (needs the log clone):*
+
+4. Replay harness: run all 135 production `UNEXPECTED_NUMBERS` rows from the
+   clone through the assessment engine; report per-case dispositions and which
+   candidate rule would clear each false block. Targets: the 128 later-supported
+   rows; the seven unresolved cases must stay `unexpected` (the safety gate
+   enforces this permanently).
+5. Implement only rule classes the replay actually demands, in the whitelist
+   order already approved (scale/normalization, simple sums/differences,
+   ratio/percent change, weighted-average price). No speculative rules. Each
+   new rule: narrow trigger, full provenance, unit tests taken from real corpus
+   cases, own entry in the enablement switch.
+6. Config: `NUMERIC_ACCEPTANCE_RULES` (comma-separated list of enabled new-rule
+   IDs; legacy rules are unconditionally on because they are today's behavior)
+   in `apps/worker/src/config.ts`, `.env.example`, `render.yaml`. Default empty
+   = shadow only.
+7. Audit = owner reviews the replay diff (every newly accepted case, all seven
+   unresolved still blocked). No other ceremony.
+
+*Rollout:* deploy Phase A (shadow) → a few days of live shadow dispositions via
+`signals:pull` → enable one rule class per release window by env flip, never in
+a window with a cache flip → after each flip, re-run
+`build-safety-fixtures --update-expected` and commit; that diff is the release
+record. Rollback per rule class = remove it from the env list.
+
+*Deferred decisions:* the `omtrent`/approximate-wording policy is decided only
+when a rounding rule class actually surfaces in the replay, not up front. P4 is
+the package after P2; its fixture classes (checker-error, marker leak) arrive in
+the same seeding run, so it starts unblocked.
+
+*Status 2026-08-13:* Phase A implemented and landed on `main` — assessment
+engine in `numbers.ts` (named rules, provenance, `assessNumbers` /
+`unexpectedNumberDisplays`), `numberAssessments` persisted in
+`validation_json` across all three rewrite flows, and
+`numericAssessmentsByPromptVersion` in the signals pull. Zero behavior change
+verified by unchanged test suites plus a byte-identical replay of all 100
+stored legacy-artifact generations. The same session found and fixed a P1
+telemetry defect: the admin-signals export dropped
+`promptCacheMode`/`promptCacheKey` from `model_calls`, which would have made
+the cache rollout gates unverifiable in production.
 
 ## Outcome
 

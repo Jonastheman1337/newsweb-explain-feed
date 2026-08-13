@@ -862,6 +862,80 @@ function validationIssueStats(generations) {
   };
 }
 
+function numericAssessmentStats(generations) {
+  const byVersion = new Map();
+  const dispositionTotals = new Map();
+
+  for (const row of generations) {
+    const validation = parseJsonField(row.validation_json);
+    if (!validation || typeof validation !== "object") continue;
+    const assessments = Array.isArray(validation.numberAssessments)
+      ? validation.numberAssessments
+      : null;
+    if (!assessments) continue;
+    const version = promptVersionBucket(row);
+    let bucket = byVersion.get(version);
+    if (!bucket) {
+      bucket = {
+        prompt_version: version,
+        runs_with_assessments: 0,
+        assessed_number_count: 0,
+        matched_count: 0,
+        unexpected_count: 0,
+        disposition_counts: new Map()
+      };
+      byVersion.set(version, bucket);
+    }
+    bucket.runs_with_assessments += 1;
+    for (const assessment of assessments) {
+      if (!assessment || typeof assessment !== "object") continue;
+      const disposition = String(assessment.disposition ?? "(unknown)");
+      const ruleId =
+        typeof assessment.ruleId === "string" ? assessment.ruleId : "(none)";
+      const count =
+        typeof assessment.count === "number" && Number.isFinite(assessment.count)
+          ? assessment.count
+          : 1;
+      const key = `${disposition}:${ruleId}`;
+      bucket.assessed_number_count += count;
+      if (disposition === "matched") bucket.matched_count += count;
+      if (disposition === "unexpected") bucket.unexpected_count += count;
+      bucket.disposition_counts.set(
+        key,
+        (bucket.disposition_counts.get(key) ?? 0) + count
+      );
+      dispositionTotals.set(key, (dispositionTotals.get(key) ?? 0) + count);
+    }
+  }
+
+  const toRanked = (map) =>
+    [...map.entries()]
+      .map(([key, count]) => {
+        const separator = key.indexOf(":");
+        return {
+          disposition: key.slice(0, separator),
+          rule_id: key.slice(separator + 1),
+          count
+        };
+      })
+      .sort((a, b) => b.count - a.count || a.rule_id.localeCompare(b.rule_id));
+
+  return {
+    byPromptVersion: [...byVersion.values()]
+      .map((bucket) => ({
+        prompt_version: bucket.prompt_version,
+        runs_with_assessments: bucket.runs_with_assessments,
+        assessed_number_count: bucket.assessed_number_count,
+        matched_count: bucket.matched_count,
+        unexpected_count: bucket.unexpected_count,
+        unexpected_rate: rate(bucket.unexpected_count, bucket.assessed_number_count),
+        dispositions: toRanked(bucket.disposition_counts)
+      }))
+      .sort((a, b) => a.prompt_version.localeCompare(b.prompt_version)),
+    rankedDispositions: toRanked(dispositionTotals)
+  };
+}
+
 function referenceRepairStats(generations) {
   const byVersion = new Map();
 
@@ -1401,6 +1475,7 @@ export function analyze(data, timeZone) {
     },
     qualityPipeline: {
       validationIssues: validationIssueStats(generations),
+      numericAssessmentsByPromptVersion: numericAssessmentStats(generations),
       referenceRepairByPromptVersion: referenceRepairStats(generations),
       modelCallsByPromptVersion: modelCallStats(generations),
       openAIUsageAndCost: openAICostStats(generations),
@@ -1546,6 +1621,9 @@ async function main() {
         problematicGenerationCount: artifact.summary.problematicGenerations.length,
         rankedValidationIssues:
           artifact.summary.qualityPipeline.validationIssues.rankedIssueCodes.slice(0, 12),
+        numericAssessments:
+          artifact.summary.qualityPipeline.numericAssessmentsByPromptVersion
+            .byPromptVersion,
         referenceRepair: artifact.summary.qualityPipeline.referenceRepairByPromptVersion,
         modelCalls: artifact.summary.qualityPipeline.modelCallsByPromptVersion,
         openAIUsageAndCost: artifact.summary.qualityPipeline.openAIUsageAndCost,
