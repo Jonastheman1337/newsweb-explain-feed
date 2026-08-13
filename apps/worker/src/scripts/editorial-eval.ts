@@ -427,18 +427,26 @@ async function buildCasesFromMessageIds(
   });
   const payloadByMessageId = new Map<
     number,
-    { payload: PromptPayload; validationJson: Prisma.JsonValue | null; fromRun: boolean }
+    {
+      payload: PromptPayload;
+      validationJson: Prisma.JsonValue | null;
+      fromRun: boolean;
+      fromPublished: boolean;
+    }
   >();
+  // Rows are ordered latest-first: keep the latest published row's payload,
+  // falling back to the latest row of any status.
   for (const row of rows) {
     const existing = payloadByMessageId.get(row.messageId);
-    if (existing?.fromRun && row.status !== "published") continue;
+    if (existing?.fromPublished) continue;
     const payload = extractRegularPayload(row.inputJson);
     if (!payload) continue;
     if (!existing || row.status === "published") {
       payloadByMessageId.set(row.messageId, {
         payload,
         validationJson: row.validationJson,
-        fromRun: true
+        fromRun: true,
+        fromPublished: row.status === "published"
       });
     }
   }
@@ -464,7 +472,8 @@ async function buildCasesFromMessageIds(
       payloadByMessageId.set(row.messageId, {
         payload: payloadFromSourceNotice(row),
         validationJson: null,
-        fromRun: false
+        fromRun: false,
+        fromPublished: false
       });
     }
   }
@@ -547,9 +556,16 @@ async function lockCasesCommand(options: Map<string, string>): Promise<void> {
 
 const SAFETY_SEED_MESSAGE_IDS: Partial<Record<SafetyGateClass, number[]>> = {
   checker_error_published: [679311, 677571, 677082, 675348],
-  marker_leak: [675713],
-  loaded_language: [675772],
   numeric_unresolved: [679626, 679552, 679469, 678266, 676662, 676354, 675221]
+};
+
+// The marker leak and loaded-language evidence exists only in the rejected
+// challenger's outputs inside the legacy A/B artifact; the production rows for
+// these message IDs hold clean published outputs and would freeze the wrong
+// evidence.
+const AB_SOURCED_SEED_MESSAGE_IDS: Partial<Record<SafetyGateClass, number[]>> = {
+  marker_leak: [675713],
+  loaded_language: [675772]
 };
 
 type SafetySeedRow = {
@@ -757,6 +773,63 @@ async function buildSafetyFixturesCommand(
         continue;
       }
       await addCase(gateClass, row);
+    }
+  }
+
+  const legacyRunPath =
+    options.get("legacy-run") ??
+    path.join(rootDir, "tmp", "editorial-eval", "run-v6draft-50.json");
+  let legacyRun: LegacyRunFile | null = null;
+  try {
+    legacyRun = await readJson<LegacyRunFile>(legacyRunPath);
+  } catch {
+    console.warn(
+      `[safety-fixtures] legacy A/B artifact not readable at ${legacyRunPath}; marker_leak and loaded_language classes will be missing`
+    );
+  }
+  if (legacyRun) {
+    for (const [gateClass, ids] of Object.entries(
+      AB_SOURCED_SEED_MESSAGE_IDS
+    ) as Array<[SafetyGateClass, number[]]>) {
+      for (const id of ids) {
+        const evalCase = legacyRun.cases.find((item) => item.messageId === id);
+        const generation = evalCase
+          ? legacyRun.generations.find(
+              (item) =>
+                item.caseId === evalCase.caseId &&
+                item.variantId === legacyRun.challengerVariant
+            )
+          : undefined;
+        if (!evalCase || !generation) {
+          console.warn(
+            `[safety-fixtures] no challenger generation for ${gateClass} ${id} in ${legacyRunPath}`
+          );
+          continue;
+        }
+        const parsedOutput = rewriteOutputSchema.safeParse(generation.output);
+        const item: SafetyCase = {
+          messageId: id,
+          generationRunId: generation.id,
+          promptVersion: generation.promptVersion ?? null,
+          sourcePayload: evalCase.payload,
+          storedOutput: parsedOutput.success ? parsedOutput.data : null,
+          storedValidation: {
+            validation: generation.validation ?? null,
+            referenceCheck: generation.referenceCheck ?? null
+          },
+          labels: {
+            class: gateClass,
+            note: `challenger (${legacyRun.challengerVariant}) output from legacy A/B run ${legacyRun.runId}`,
+            reportRef: "final report 2026-06-02_2026-08-13"
+          },
+          expected: {},
+          provenance: { window, status: "ab_challenger_output" }
+        };
+        item.expected = replayExpected(item);
+        const list = classes.get(gateClass) ?? [];
+        list.push(item);
+        classes.set(gateClass, list);
+      }
     }
   }
 
@@ -2250,7 +2323,8 @@ function printUsage(): void {
     "  npm run eval:editorial -w apps/worker -- summarize --run tmp/editorial-eval/run.json --reviews tmp/editorial-eval/reviews.json --out tmp/editorial-eval/summary.json",
     "  npm run eval:editorial -w apps/worker -- build-cases --message-ids 679311,677571 --out tmp/editorial-eval/curated.json  (curated corpus; also accepts @path/to/ids.txt)",
     "  npm run eval:editorial -w apps/worker -- lock-cases --cases tmp/editorial-eval/cases-v6-50.json --out apps/worker/src/fixtures/editorial-eval/editorial/cases-locked-2026-08.json",
-    "  npm run eval:editorial -w apps/worker -- build-safety-fixtures [--from YYYY-MM-DD] [--to YYYY-MM-DD] [--numeric-limit 40] [--not-news-ids IDS] [--false-skip-ids IDS] [--out DIR]",
+    "  npm run eval:editorial -w apps/worker -- build-safety-fixtures [--from YYYY-MM-DD] [--to YYYY-MM-DD] [--numeric-limit 40] [--not-news-ids IDS] [--false-skip-ids IDS] [--legacy-run PATH] [--out DIR]",
+    "  (marker_leak/loaded_language seed from the legacy A/B artifact --legacy-run, default tmp/editorial-eval/run-v6draft-50.json; the rest from the generation-log DB)",
     "  npm run eval:editorial -w apps/worker -- build-safety-fixtures --update-expected  (offline; re-replays validators and rewrites expected blocks)",
     "  Seeding commands need DATABASE_URL / GENERATION_LOG_DATABASE_URL in .env (Render external URLs or local prod clone). Paths resolve from apps/worker under npm -w; absolute paths are safest."
   ].join("\n"));

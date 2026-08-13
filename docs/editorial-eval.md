@@ -190,12 +190,16 @@ endings never matter):
   ```
 
   The seeder pins the curated message IDs from the final report (checker-error
-  publications, marker leak 675713, loaded language 675772, the seven
-  unresolved numeric cases), samples the recoverable `UNEXPECTED_NUMBERS`
-  pool, and derives routine-notice/false-skip candidates (override with
-  `--not-news-ids` / `--false-skip-ids` after owner curation). Each case's
-  `expected` block is filled by replaying the current validators — never by
-  hand.
+  publications and the seven unresolved numeric cases from the generation-log
+  DB), samples the recoverable `UNEXPECTED_NUMBERS` pool, and derives
+  routine-notice/false-skip candidates (override with `--not-news-ids` /
+  `--false-skip-ids` after owner curation). The marker-leak (675713) and
+  loaded-language (675772) classes seed from the rejected challenger's outputs
+  in the legacy A/B artifact (`--legacy-run`, default
+  `tmp/editorial-eval/run-v6draft-50.json`) — the production rows for those
+  message IDs hold clean published outputs, not the failure evidence. Each
+  case's `expected` block is filled by replaying the current validators —
+  never by hand.
 
   `apps/worker/src/services/safety-gates.test.ts` replays every case in CI
   (offline, no DB) and fails on any drift. When P2/P3/P4 deliberately change
