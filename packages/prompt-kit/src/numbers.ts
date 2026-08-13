@@ -645,6 +645,8 @@ type TradeArithmeticCandidate = {
   value: number;
   usesAveragePrice: boolean;
   paired: boolean;
+  quantity?: number;
+  price?: number;
 };
 
 type TradeArithmeticTarget = {
@@ -739,7 +741,9 @@ function uniqueCandidates(
       value: candidate.value,
       usesAveragePrice:
         candidate.usesAveragePrice || existing?.usesAveragePrice === true,
-      paired: candidate.paired || existing?.paired === true
+      paired: candidate.paired || existing?.paired === true,
+      quantity: existing?.quantity ?? candidate.quantity,
+      price: existing?.price ?? candidate.price
     });
   }
   return [...byValue.values()];
@@ -798,7 +802,9 @@ function collectPairedTradeArithmeticCandidates(
       candidates.push({
         value: quantity * price,
         usesAveragePrice: hasAnyPattern(match[0], averagePriceContextPatterns),
-        paired: true
+        paired: true,
+        quantity,
+        price
       });
     }
   }
@@ -831,7 +837,9 @@ function collectLooseTradeArithmeticCandidates(
       candidates.push({
         value: larger * smaller,
         usesAveragePrice,
-        paired: false
+        paired: false,
+        quantity: larger,
+        price: smaller
       });
     }
   }
@@ -867,19 +875,19 @@ function candidateMatchesTarget(
   return roughlyEqual(candidate.value, target.value);
 }
 
-function aggregateCandidateMatchesTarget(
+function findAggregateCandidateMatch(
   candidates: TradeArithmeticCandidate[],
   target: TradeArithmeticTarget,
   parsed: ParsedNumberToken,
   context: string
-): boolean {
+): { terms: number[]; sum: number } | null {
   const pairedCandidates = candidates.filter((candidate) => candidate.paired);
   if (
     pairedCandidates.length < 2 ||
     pairedCandidates.length > 8 ||
     !aggregateTotalContextPattern.test(context)
   ) {
-    return false;
+    return null;
   }
 
   const maxMask = 1 << pairedCandidates.length;
@@ -887,6 +895,7 @@ function aggregateCandidateMatchesTarget(
     let count = 0;
     let sum = 0;
     let usesAveragePrice = false;
+    const terms: number[] = [];
     for (let index = 0; index < pairedCandidates.length; index += 1) {
       if ((mask & (1 << index)) === 0) {
         continue;
@@ -897,6 +906,7 @@ function aggregateCandidateMatchesTarget(
       }
       count += 1;
       sum += candidate.value;
+      terms.push(candidate.value);
       usesAveragePrice = usesAveragePrice || candidate.usesAveragePrice;
     }
     if (count < 2) {
@@ -910,32 +920,36 @@ function aggregateCandidateMatchesTarget(
         Math.abs(sum - target.value) <=
         roundedMagnitudeTolerance(parsed, target.factor, sum)
       ) {
-        return true;
+        return { terms, sum };
       }
       continue;
     }
     if (roughlyEqual(sum, target.value)) {
-      return true;
+      return { terms, sum };
     }
   }
 
-  return false;
+  return null;
 }
 
-function isSimpleTradeArithmeticNumber(
+type TradeArithmeticMatch =
+  | { kind: "single"; candidate: TradeArithmeticCandidate }
+  | { kind: "aggregate"; terms: number[]; sum: number };
+
+function matchTradeArithmetic(
   parsed: ParsedNumberToken,
   rewriteText: string,
   match: NumberTokenMatch,
   sourceText: string
-): boolean {
+): TradeArithmeticMatch | null {
   if (parsed.hasPercent) {
-    return false;
+    return null;
   }
   if (
     !hasAnyPattern(sourceText, tradeArithmeticContextPatterns) ||
     !hasAnyPattern(sourceText, moneyContextPatterns)
   ) {
-    return false;
+    return null;
   }
 
   const context = visibleContextAround(rewriteText, match);
@@ -943,7 +957,7 @@ function isSimpleTradeArithmeticNumber(
     !hasAnyPattern(context, moneyContextPatterns) ||
     !hasAnyPattern(context, tradeTotalContextPatterns)
   ) {
-    return false;
+    return null;
   }
 
   const targetValues = targetValuesForRewriteNumber(
@@ -952,77 +966,196 @@ function isSimpleTradeArithmeticNumber(
     match
   ).filter((target) => target.value >= 1000);
   if (targetValues.length === 0) {
-    return false;
+    return null;
   }
 
   const candidates = collectTradeArithmeticCandidates(sourceText);
   for (const target of targetValues) {
-    if (
-      candidates.some((candidate) =>
-        candidateMatchesTarget(candidate, target, parsed, context)
-      )
-    ) {
-      return true;
+    const single = candidates.find((candidate) =>
+      candidateMatchesTarget(candidate, target, parsed, context)
+    );
+    if (single) {
+      return { kind: "single", candidate: single };
     }
-    if (aggregateCandidateMatchesTarget(candidates, target, parsed, context)) {
-      return true;
+    const aggregate = findAggregateCandidateMatch(
+      candidates,
+      target,
+      parsed,
+      context
+    );
+    if (aggregate) {
+      return { kind: "aggregate", ...aggregate };
     }
   }
 
-  return false;
+  return null;
 }
 
-export function findUnexpectedNumbers(
+// Rule IDs name the rewrite-side mechanism that accepted a number. Notes:
+// - exact_source_match is broader than literal string presence: the source
+//   index also holds clock-time keys, sub-token split parts, and source-side
+//   percent-range equivalents.
+// - trade_arithmetic_pair with provenance.paired === false comes from loose
+//   operand pairing (any two source numbers), not a regex-paired share/price.
+export type NumberAssessmentRuleId =
+  | "exact_source_match"
+  | "thousands_separator_equivalent"
+  | "scaled_million_report_table"
+  | "scaled_unit_amount"
+  | "shared_percent_range"
+  | "trade_arithmetic_pair"
+  | "trade_arithmetic_aggregate";
+
+export type NumberAssessmentDisposition = "matched" | "unexpected";
+
+export type NumberAssessment = {
+  display: string;
+  disposition: NumberAssessmentDisposition;
+  ruleId: NumberAssessmentRuleId | null;
+  count: number;
+  provenance?: Record<string, number | string | boolean | number[]>;
+};
+
+type TokenAssessment = {
+  disposition: NumberAssessmentDisposition;
+  ruleId: NumberAssessmentRuleId | null;
+  provenance?: Record<string, number | string | boolean | number[]>;
+};
+
+// The rule evaluation order below is frozen: telemetry attribution depends on
+// which rule is named first, and consumers compare rule mixes across releases.
+// The order reproduces the original OR-ed boolean evaluation, so accept/reject
+// behavior is unchanged; only the first passing rule is credited.
+function assessRewriteToken(
+  parsed: ParsedNumberToken,
+  token: NumberTokenMatch,
+  rewriteText: string,
+  sourceNumberIndex: SourceNumberIndex,
+  sourceText: string
+): TokenAssessment {
+  if (sourceNumberIndex.exactKeys.has(parsed.key)) {
+    return { disposition: "matched", ruleId: "exact_source_match" };
+  }
+  const equivalentKey = integerThousandsEquivalentKey(parsed);
+  if (equivalentKey != null && sourceNumberIndex.exactKeys.has(equivalentKey)) {
+    return { disposition: "matched", ruleId: "thousands_separator_equivalent" };
+  }
+  const rewriteKeys = rewriteNumberKeys(parsed);
+  if (
+    hasRewriteMillionContext(rewriteText, token.index, token.token) &&
+    rewriteKeys.some((key) => sourceNumberIndex.scaledMillionKeys.has(key))
+  ) {
+    return { disposition: "matched", ruleId: "scaled_million_report_table" };
+  }
+  const rewriteScale = rewriteScaleContext(rewriteText, token.index, token.token);
+  const rewriteUnit = detectScaledNumberUnit(
+    rewriteText,
+    token.index,
+    token.token
+  );
+  if (
+    rewriteScale != null &&
+    rewriteUnit != null &&
+    rewriteKeys.some((key) =>
+      sourceNumberIndex.scaledUnitKeys.has(
+        scaledUnitIndexKey(rewriteScale, rewriteUnit, key)
+      )
+    )
+  ) {
+    return {
+      disposition: "matched",
+      ruleId: "scaled_unit_amount",
+      provenance: { unit: rewriteUnit, scale: rewriteScale }
+    };
+  }
+  if (
+    !parsed.hasPercent &&
+    hasSharedPercentRangeAfter(rewriteText, token.index, token.token) &&
+    sourceNumberIndex.exactKeys.has(percentEquivalentKey(parsed))
+  ) {
+    return { disposition: "matched", ruleId: "shared_percent_range" };
+  }
+  const tradeMatch = matchTradeArithmetic(parsed, rewriteText, token, sourceText);
+  if (tradeMatch) {
+    if (tradeMatch.kind === "aggregate") {
+      return {
+        disposition: "matched",
+        ruleId: "trade_arithmetic_aggregate",
+        provenance: { terms: tradeMatch.terms, sum: tradeMatch.sum }
+      };
+    }
+    const provenance: Record<string, number | string | boolean | number[]> = {
+      paired: tradeMatch.candidate.paired
+    };
+    if (tradeMatch.candidate.quantity != null) {
+      provenance.quantity = tradeMatch.candidate.quantity;
+    }
+    if (tradeMatch.candidate.price != null) {
+      provenance.price = tradeMatch.candidate.price;
+    }
+    return {
+      disposition: "matched",
+      ruleId: "trade_arithmetic_pair",
+      provenance
+    };
+  }
+  return { disposition: "unexpected", ruleId: null };
+}
+
+export function assessNumbers(
   rewrite: RewriteOutput,
   sourceText: string
-): string[] {
+): NumberAssessment[] {
   const sourceNumberIndex = collectSourceNumberIndex(sourceText);
   const rewriteText = JSON.stringify(rewrite);
   const rewriteTokens = collectNumberTokenMatches(rewriteText);
-  const unexpected = new Set<string>();
+  const assessments = new Map<string, NumberAssessment>();
 
   for (const token of rewriteTokens) {
     const parsed = parseNumberToken(token.token);
     if (!parsed) {
       continue;
     }
-    const rewriteKeys = rewriteNumberKeys(parsed);
-    const hasExactMatch = rewriteKeys.some((key) =>
-      sourceNumberIndex.exactKeys.has(key)
-    );
-    const hasScaledMillionMatch =
-      hasRewriteMillionContext(rewriteText, token.index, token.token) &&
-      rewriteKeys.some((key) => sourceNumberIndex.scaledMillionKeys.has(key));
-    const rewriteScale = rewriteScaleContext(rewriteText, token.index, token.token);
-    const rewriteUnit = detectScaledNumberUnit(
+    const result = assessRewriteToken(
+      parsed,
+      token,
       rewriteText,
-      token.index,
-      token.token
+      sourceNumberIndex,
+      sourceText
     );
-    const hasScaledUnitMatch =
-      rewriteScale != null &&
-      rewriteUnit != null &&
-      rewriteKeys.some((key) =>
-        sourceNumberIndex.scaledUnitKeys.has(
-          scaledUnitIndexKey(rewriteScale, rewriteUnit, key)
-        )
-      );
-    const hasSharedPercentRangeMatch =
-      !parsed.hasPercent &&
-      hasSharedPercentRangeAfter(rewriteText, token.index, token.token) &&
-      sourceNumberIndex.exactKeys.has(percentEquivalentKey(parsed));
-    if (
-      !hasExactMatch &&
-      !hasScaledMillionMatch &&
-      !hasScaledUnitMatch &&
-      !hasSharedPercentRangeMatch
-    ) {
-      if (isSimpleTradeArithmeticNumber(parsed, rewriteText, token, sourceText)) {
-        continue;
-      }
-      unexpected.add(parsed.display);
+    const foldKey = [
+      parsed.display,
+      result.disposition,
+      result.ruleId ?? ""
+    ].join("\u0000");
+    const existing = assessments.get(foldKey);
+    if (existing) {
+      existing.count += 1;
+      continue;
     }
+    assessments.set(foldKey, {
+      display: parsed.display,
+      disposition: result.disposition,
+      ruleId: result.ruleId,
+      count: 1,
+      ...(result.provenance ? { provenance: result.provenance } : {})
+    });
   }
 
-  return [...unexpected];
+  return [...assessments.values()];
+}
+
+export function unexpectedNumberDisplays(
+  assessments: NumberAssessment[]
+): string[] {
+  return assessments
+    .filter((assessment) => assessment.disposition === "unexpected")
+    .map((assessment) => assessment.display);
+}
+
+export function findUnexpectedNumbers(
+  rewrite: RewriteOutput,
+  sourceText: string
+): string[] {
+  return unexpectedNumberDisplays(assessNumbers(rewrite, sourceText));
 }
