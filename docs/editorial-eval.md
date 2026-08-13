@@ -106,7 +106,10 @@ historical review surface.
 
 ## Commands
 
-Run commands from the repo root.
+Run commands from the repo root. Note that `npm run ... -w apps/worker` sets
+the working directory to `apps/worker`, so relative `--cases/--run/--out`
+paths resolve from there; absolute paths are safest (the examples below show
+the repo-root-relative shape for readability).
 
 Build cases:
 
@@ -170,6 +173,42 @@ Known local artifacts from the June 2, 2026 run:
 - `tmp/editorial-eval/run-15.json`
 - `tmp/editorial-eval/review-15.html`
 - `tmp/editorial-eval/summary-15.json`
+
+## Curated fixtures and safety gates (E1)
+
+Version-controlled corpora live under `apps/worker/src/fixtures/editorial-eval/`
+(pinned to LF via `.gitattributes`; all hashes use canonical JSON, so line
+endings never matter):
+
+- `safety/` — deterministic safety fixture classes plus `manifest.json`.
+  Seed or reseed with production DB access
+  (`DATABASE_URL`/`GENERATION_LOG_DATABASE_URL` in `.env` pointing at the
+  Render external URLs, or the local prod clone):
+
+  ```powershell
+  npm run eval:editorial -w apps/worker -- build-safety-fixtures --from 2026-06-02 --to 2026-08-13 --numeric-limit 40
+  ```
+
+  The seeder pins the curated message IDs from the final report (checker-error
+  publications, marker leak 675713, loaded language 675772, the seven
+  unresolved numeric cases), samples the recoverable `UNEXPECTED_NUMBERS`
+  pool, and derives routine-notice/false-skip candidates (override with
+  `--not-news-ids` / `--false-skip-ids` after owner curation). Each case's
+  `expected` block is filled by replaying the current validators — never by
+  hand.
+
+  `apps/worker/src/services/safety-gates.test.ts` replays every case in CI
+  (offline, no DB) and fails on any drift. When P2/P3/P4 deliberately change
+  validator behavior, run
+  `build-safety-fixtures --update-expected` (offline) and review the diff —
+  that diff is the release record. The seven `numeric_unresolved` cases must
+  keep `UNEXPECTED_NUMBERS` forever; the gate enforces this.
+
+- `editorial/` — locked human-review corpora for the runner, created with
+  `lock-cases` (stamps corpus identity) and consumed via `run --cases`.
+  Curated additions are built with `build-cases --message-ids id1,id2,...`.
+  Scoring dimensions and the promotion procedure live in
+  `docs/editorial-eval-rubric.md`.
 
 ## Environment
 

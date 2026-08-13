@@ -50,6 +50,7 @@ import {
   promptHashes,
   resolveEvalArmRunProfile,
   resolveReferenceRunProfile,
+  sha256CanonicalJson,
   sourcePayloadSha256,
   writeNewJsonArtifact,
   type EvalArmRunProfile,
@@ -58,6 +59,13 @@ import {
   type EvalReferenceRunProfile,
   type RunArtifactV3
 } from "../services/editorial-eval-artifact.js";
+import {
+  replayExpected,
+  type SafetyCase,
+  type SafetyFixtureFile,
+  type SafetyFixtureManifest,
+  type SafetyGateClass
+} from "../services/safety-fixtures.js";
 import {
   callOpenAIForJson,
   createOpenAIClient,
@@ -77,7 +85,10 @@ type CasesFile = {
     from: string;
     to: string;
     limit: number;
-    selection: "direct_prisma_generation_runs" | "direct_prisma_mixed";
+    selection:
+      | "direct_prisma_generation_runs"
+      | "direct_prisma_mixed"
+      | "curated_message_ids";
   };
   quotas: Record<EvalCategoryId, number>;
   totalCases: number;
@@ -199,6 +210,10 @@ async function main(): Promise<void> {
     await reviewHtmlCommand(parsed.options);
   } else if (parsed.command === "summarize") {
     await summarizeCommand(parsed.options);
+  } else if (parsed.command === "lock-cases") {
+    await lockCasesCommand(parsed.options);
+  } else if (parsed.command === "build-safety-fixtures") {
+    await buildSafetyFixturesCommand(parsed.options, rootDir);
   } else {
     throw new Error(`Unknown command: ${parsed.command}`);
   }
@@ -247,6 +262,10 @@ function optionalInt(
 }
 
 async function buildCasesCommand(options: Map<string, string>): Promise<void> {
+  if (options.has("message-ids")) {
+    await buildCasesFromMessageIds(options);
+    return;
+  }
   const from = requiredOption(options, "from");
   const to = requiredOption(options, "to");
   const limit = optionalInt(options, "limit", 50);
@@ -377,6 +396,549 @@ async function buildCasesCommand(options: Map<string, string>): Promise<void> {
 
   await writeNewJsonArtifact(outPath, output);
   console.log(`Wrote ${cases.length} eval cases to ${outPath}`);
+}
+
+function parseMessageIdList(raw: string): number[] {
+  const ids = raw
+    .split(/[\s,]+/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .map((item) => Number(item));
+  if (ids.length === 0 || ids.some((id) => !Number.isInteger(id) || id <= 0)) {
+    throw new Error("--message-ids must be a comma-separated list of message IDs");
+  }
+  return [...new Set(ids)];
+}
+
+async function buildCasesFromMessageIds(
+  options: Map<string, string>
+): Promise<void> {
+  const rawIds = requiredOption(options, "message-ids");
+  const messageIds = parseMessageIdList(
+    rawIds.startsWith("@") ? await fs.readFile(rawIds.slice(1), "utf8") : rawIds
+  );
+  const outPath = requiredOption(options, "out");
+  const { logPrisma, prisma } = await import("@newsweb/shared/db");
+
+  const rows = await logPrisma.generationRun.findMany({
+    where: { messageId: { in: messageIds } },
+    orderBy: { requestedAt: "desc" },
+    select: { messageId: true, status: true, inputJson: true, validationJson: true }
+  });
+  const payloadByMessageId = new Map<
+    number,
+    { payload: PromptPayload; validationJson: Prisma.JsonValue | null; fromRun: boolean }
+  >();
+  for (const row of rows) {
+    const existing = payloadByMessageId.get(row.messageId);
+    if (existing?.fromRun && row.status !== "published") continue;
+    const payload = extractRegularPayload(row.inputJson);
+    if (!payload) continue;
+    if (!existing || row.status === "published") {
+      payloadByMessageId.set(row.messageId, {
+        payload,
+        validationJson: row.validationJson,
+        fromRun: true
+      });
+    }
+  }
+
+  const missing = messageIds.filter((id) => !payloadByMessageId.has(id));
+  if (missing.length > 0) {
+    const sourceRows = await prisma.sourceNotice.findMany({
+      where: { messageId: { in: missing } },
+      select: {
+        messageId: true,
+        newsId: true,
+        title: true,
+        issuerName: true,
+        issuerSign: true,
+        publishedAt: true,
+        categoriesJson: true,
+        marketsJson: true,
+        bodyText: true,
+        hasAttachments: true
+      }
+    });
+    for (const row of sourceRows) {
+      payloadByMessageId.set(row.messageId, {
+        payload: payloadFromSourceNotice(row),
+        validationJson: null,
+        fromRun: false
+      });
+    }
+  }
+
+  const unresolved = messageIds.filter((id) => !payloadByMessageId.has(id));
+  if (unresolved.length > 0) {
+    throw new Error(
+      `No source payload found for message IDs: ${unresolved.join(", ")}`
+    );
+  }
+
+  const cases: EvalCase[] = messageIds.map((messageId, index) => {
+    const entry = payloadByMessageId.get(messageId)!;
+    const category = categorizeEvalPayload(entry.payload);
+    return {
+      caseId: `case_${String(index + 1).padStart(3, "0")}_${messageId}`,
+      messageId,
+      company: entry.payload.issuerName,
+      issuerSign: entry.payload.issuerSign,
+      sourceTitle: entry.payload.title,
+      publishedAt: entry.payload.publishedAt,
+      category,
+      difficultyTags: [
+        entry.fromRun ? "from_generation_run" : "from_source_notice",
+        "curated_message_id",
+        ...difficultyTagsForPayload(entry.payload),
+        ...difficultyTagsForValidation(entry.validationJson)
+      ],
+      payload: entry.payload,
+      sourceSha256: sourcePayloadSha256(entry.payload)
+    };
+  });
+
+  const corpus = createCorpusIdentity(cases, outPath);
+  const quotas = {} as Record<EvalCategoryId, number>;
+  const output: CasesFile = {
+    schemaVersion: 2,
+    createdAt: new Date().toISOString(),
+    source: {
+      from: options.get("from") ?? "curated",
+      to: options.get("to") ?? "curated",
+      limit: cases.length,
+      selection: "curated_message_ids"
+    },
+    quotas,
+    totalCases: cases.length,
+    corpusId: corpus.corpusId,
+    corpusSha256: corpus.corpusSha256,
+    cases
+  };
+
+  await writeNewJsonArtifact(outPath, output);
+  console.log(
+    `Wrote ${cases.length} curated eval cases (${corpus.corpusId}) to ${outPath}`
+  );
+}
+
+async function lockCasesCommand(options: Map<string, string>): Promise<void> {
+  const casesPath = requiredOption(options, "cases");
+  const outPath = requiredOption(options, "out");
+  const casesFile = await readJson<CasesFile>(casesPath);
+  const cases = casesFile.cases.map((item) => ({
+    ...item,
+    sourceSha256: item.sourceSha256 ?? sourcePayloadSha256(item.payload)
+  }));
+  const corpus = createCorpusIdentity(cases, outPath);
+  const output: CasesFile = {
+    ...casesFile,
+    schemaVersion: 2,
+    totalCases: cases.length,
+    corpusId: corpus.corpusId,
+    corpusSha256: corpus.corpusSha256,
+    cases
+  };
+  await writeNewJsonArtifact(outPath, output);
+  console.log(
+    `Locked ${cases.length} cases from ${casesPath} as ${corpus.corpusId} at ${outPath}`
+  );
+}
+
+const SAFETY_SEED_MESSAGE_IDS: Partial<Record<SafetyGateClass, number[]>> = {
+  checker_error_published: [679311, 677571, 677082, 675348],
+  marker_leak: [675713],
+  loaded_language: [675772],
+  numeric_unresolved: [679626, 679552, 679469, 678266, 676662, 676354, 675221]
+};
+
+type SafetySeedRow = {
+  id: string;
+  messageId: number;
+  status: string;
+  reason: string;
+  promptVersion: string | null;
+  requestedAt: Date;
+  inputJson: Prisma.JsonValue | null;
+  outputJson: Prisma.JsonValue | null;
+  validationJson: Prisma.JsonValue | null;
+};
+
+const SAFETY_SEED_ROW_SELECT = {
+  id: true,
+  messageId: true,
+  status: true,
+  reason: true,
+  promptVersion: true,
+  requestedAt: true,
+  inputJson: true,
+  outputJson: true,
+  validationJson: true
+} as const;
+
+function hasUnexpectedNumbersIssue(validationJson: Prisma.JsonValue | null): boolean {
+  const validation = asRecord(validationJson);
+  if (!Array.isArray(validation?.issues)) return false;
+  return validation.issues.some(
+    (issue) => asRecord(issue)?.code === "UNEXPECTED_NUMBERS"
+  );
+}
+
+function strideSample<T>(items: T[], limit: number): T[] {
+  if (items.length <= limit) return items;
+  const sampled: T[] = [];
+  for (let index = 0; index < limit; index += 1) {
+    sampled.push(items[Math.floor((index * items.length) / limit)]!);
+  }
+  return sampled;
+}
+
+async function safetyCaseFromRow(
+  gateClass: SafetyGateClass,
+  row: SafetySeedRow,
+  window: { from: string; to: string },
+  feedback: string[] | undefined,
+  fetchSourceNotice: (messageId: number) => Promise<PromptPayload | null>
+): Promise<SafetyCase | null> {
+  const payload =
+    extractRegularPayload(row.inputJson) ??
+    (await fetchSourceNotice(row.messageId));
+  if (!payload) {
+    console.warn(
+      `[safety-fixtures] skipping ${gateClass} ${row.messageId}: no source payload`
+    );
+    return null;
+  }
+  const parsedOutput = rewriteOutputSchema.safeParse(row.outputJson);
+  const item: SafetyCase = {
+    messageId: row.messageId,
+    generationRunId: row.id,
+    promptVersion: row.promptVersion,
+    sourcePayload: payload,
+    storedOutput: parsedOutput.success ? parsedOutput.data : null,
+    storedValidation: row.validationJson ?? null,
+    labels: { class: gateClass, reportRef: "final report 2026-06-02_2026-08-13" },
+    expected: {},
+    provenance: {
+      window,
+      status: row.status,
+      ...(feedback && feedback.length > 0 ? { feedback } : {})
+    }
+  };
+  item.expected = replayExpected(item);
+  return item;
+}
+
+async function buildSafetyFixturesCommand(
+  options: Map<string, string>,
+  rootDir: string
+): Promise<void> {
+  const outDir =
+    options.get("out") ??
+    path.join(rootDir, "apps", "worker", "src", "fixtures", "editorial-eval", "safety");
+  const manifestPath = path.join(outDir, "manifest.json");
+
+  if (options.has("update-expected")) {
+    const manifest = await readJson<SafetyFixtureManifest>(manifestPath);
+    for (const entry of manifest.files) {
+      const filePath = path.join(outDir, entry.path);
+      const file = await readJson<SafetyFixtureFile>(filePath);
+      for (const item of file.cases) {
+        item.expected = replayExpected(item);
+      }
+      await writeJson(filePath, file);
+      entry.caseCount = file.cases.length;
+      entry.contentSha256 = sha256CanonicalJson(file);
+    }
+    manifest.createdAt = new Date().toISOString();
+    manifest.corpusId = `editorial_safety_${sha256CanonicalJson(
+      manifest.files.map((entry) => entry.contentSha256)
+    ).slice(0, 16)}`;
+    await writeJson(manifestPath, manifest);
+    console.log(
+      `Updated expected dispositions for ${manifest.files.length} fixture classes in ${outDir}`
+    );
+    console.log("Review the diff before committing; it is the release record.");
+    return;
+  }
+
+  const from = options.get("from") ?? "2026-06-02";
+  const to = options.get("to") ?? "2026-08-13";
+  const numericLimit = optionalInt(options, "numeric-limit", 40);
+  const window = { from, to };
+  const dateRange = {
+    gte: new Date(`${from}T00:00:00.000Z`),
+    lte: new Date(`${to}T23:59:59.999Z`)
+  };
+  const { logPrisma, prisma } = await import("@newsweb/shared/db");
+
+  const fetchSourceNotice = async (
+    messageId: number
+  ): Promise<PromptPayload | null> => {
+    const row = await prisma.sourceNotice.findUnique({
+      where: { messageId },
+      select: {
+        messageId: true,
+        newsId: true,
+        title: true,
+        issuerName: true,
+        issuerSign: true,
+        publishedAt: true,
+        categoriesJson: true,
+        marketsJson: true,
+        bodyText: true,
+        hasAttachments: true
+      }
+    });
+    return row ? payloadFromSourceNotice(row) : null;
+  };
+
+  const latestRowPerMessage = (
+    rows: SafetySeedRow[],
+    prefer?: (row: SafetySeedRow) => boolean
+  ): Map<number, SafetySeedRow> => {
+    const byMessage = new Map<number, SafetySeedRow>();
+    const sorted = [...rows].sort(
+      (a, b) => b.requestedAt.getTime() - a.requestedAt.getTime()
+    );
+    for (const row of sorted) {
+      const existing = byMessage.get(row.messageId);
+      if (!existing) {
+        byMessage.set(row.messageId, row);
+        continue;
+      }
+      if (prefer && !prefer(existing) && prefer(row)) {
+        byMessage.set(row.messageId, row);
+      }
+    }
+    return byMessage;
+  };
+
+  const curatedIds = Object.values(SAFETY_SEED_MESSAGE_IDS).flat();
+  const curatedRows = (await logPrisma.generationRun.findMany({
+    where: { messageId: { in: curatedIds } },
+    select: SAFETY_SEED_ROW_SELECT
+  })) as SafetySeedRow[];
+
+  const classes = new Map<SafetyGateClass, SafetyCase[]>();
+  const addCase = async (
+    gateClass: SafetyGateClass,
+    row: SafetySeedRow,
+    feedback?: string[]
+  ) => {
+    const item = await safetyCaseFromRow(
+      gateClass,
+      row,
+      window,
+      feedback,
+      fetchSourceNotice
+    );
+    if (!item) return;
+    const list = classes.get(gateClass) ?? [];
+    list.push(item);
+    classes.set(gateClass, list);
+  };
+
+  for (const [gateClass, ids] of Object.entries(SAFETY_SEED_MESSAGE_IDS) as Array<
+    [SafetyGateClass, number[]]
+  >) {
+    const preferPublished = gateClass !== "numeric_unresolved";
+    const rows = curatedRows.filter((row) => ids.includes(row.messageId));
+    const byMessage = latestRowPerMessage(
+      rows,
+      preferPublished
+        ? (row) => row.status === "published"
+        : (row) => hasUnexpectedNumbersIssue(row.validationJson)
+    );
+    for (const id of ids) {
+      const row = byMessage.get(id);
+      if (!row) {
+        console.warn(`[safety-fixtures] no generation run found for ${gateClass} ${id}`);
+        continue;
+      }
+      await addCase(gateClass, row);
+    }
+  }
+
+  const failedRows = (await logPrisma.generationRun.findMany({
+    where: { status: "failed", requestedAt: dateRange },
+    select: SAFETY_SEED_ROW_SELECT
+  })) as SafetySeedRow[];
+  const unresolvedIds = new Set(SAFETY_SEED_MESSAGE_IDS.numeric_unresolved ?? []);
+  const numericByMessage = latestRowPerMessage(
+    failedRows.filter(
+      (row) =>
+        hasUnexpectedNumbersIssue(row.validationJson) &&
+        !unresolvedIds.has(row.messageId)
+    )
+  );
+  const numericRows = [...numericByMessage.values()].sort(
+    (a, b) => a.messageId - b.messageId
+  );
+  const sampledNumericRows = strideSample(numericRows, numericLimit);
+  const sampledIds = new Set(sampledNumericRows.map((row) => row.messageId));
+  const excludedNumericMessageIds = numericRows
+    .map((row) => row.messageId)
+    .filter((id) => !sampledIds.has(id));
+  for (const row of sampledNumericRows) {
+    await addCase("numeric_false_block", row);
+  }
+  console.log(
+    `[safety-fixtures] numeric false-block pool ${numericRows.length}, sampled ${sampledNumericRows.length}, excluded ${excludedNumericMessageIds.length}`
+  );
+
+  const notNewsIdsRaw = options.get("not-news-ids");
+  let notNewsFeedback = new Map<number, string[]>();
+  if (notNewsIdsRaw) {
+    for (const id of parseMessageIdList(notNewsIdsRaw)) {
+      notNewsFeedback.set(id, []);
+    }
+  } else {
+    const feedbackRows = await prisma.feedback.findMany({
+      where: { createdAt: dateRange },
+      select: { messageId: true, text: true }
+    });
+    notNewsFeedback = feedbackRows.reduce((map, row) => {
+      const list = map.get(row.messageId) ?? [];
+      list.push(row.text);
+      map.set(row.messageId, list);
+      return map;
+    }, new Map<number, string[]>());
+    console.log(
+      `[safety-fixtures] derived ${notNewsFeedback.size} feedback message IDs for routine_not_news; curate with --not-news-ids if this includes non-"not news" feedback`
+    );
+  }
+  if (notNewsFeedback.size > 0) {
+    const rows = (await logPrisma.generationRun.findMany({
+      where: { messageId: { in: [...notNewsFeedback.keys()] } },
+      select: SAFETY_SEED_ROW_SELECT
+    })) as SafetySeedRow[];
+    const byMessage = latestRowPerMessage(rows, (row) => row.status === "published");
+    for (const [id, texts] of [...notNewsFeedback.entries()].sort(
+      (a, b) => a[0] - b[0]
+    )) {
+      const row = byMessage.get(id);
+      if (!row) {
+        console.warn(`[safety-fixtures] no generation run for routine_not_news ${id}`);
+        continue;
+      }
+      await addCase("routine_not_news", row, texts);
+    }
+  }
+
+  const falseSkipIdsRaw = options.get("false-skip-ids");
+  let falseSkipIds: number[];
+  if (falseSkipIdsRaw) {
+    falseSkipIds = parseMessageIdList(falseSkipIdsRaw);
+  } else {
+    // Index-only query: the full JSON columns are far too heavy for the whole
+    // window, and derivation needs only status/reason ordering per message.
+    const windowIndexRows = await logPrisma.generationRun.findMany({
+      where: { requestedAt: dateRange },
+      select: { messageId: true, status: true, reason: true, requestedAt: true }
+    });
+    const byMessage = new Map<
+      number,
+      Array<{ status: string; reason: string; requestedAt: Date }>
+    >();
+    for (const row of windowIndexRows) {
+      const list = byMessage.get(row.messageId) ?? [];
+      list.push(row);
+      byMessage.set(row.messageId, list);
+    }
+    falseSkipIds = [...byMessage.entries()]
+      .filter(([, rows]) => {
+        const ordered = [...rows].sort(
+          (a, b) => a.requestedAt.getTime() - b.requestedAt.getTime()
+        );
+        const firstSkip = ordered.findIndex((row) => row.status === "skipped");
+        if (firstSkip === -1) return false;
+        return ordered
+          .slice(firstSkip + 1)
+          .some((row) => row.reason === "manual-reprocess");
+      })
+      .map(([messageId]) => messageId)
+      .sort((a, b) => a - b);
+    console.log(
+      `[safety-fixtures] derived ${falseSkipIds.length} skip-then-regenerate message IDs for false_skip`
+    );
+  }
+  if (falseSkipIds.length > 0) {
+    const falseSkipRows = (await logPrisma.generationRun.findMany({
+      where: { messageId: { in: falseSkipIds }, requestedAt: dateRange },
+      select: SAFETY_SEED_ROW_SELECT
+    })) as SafetySeedRow[];
+    const byMessage = latestRowPerMessage(
+      falseSkipRows,
+      (row) => row.status === "skipped"
+    );
+    for (const id of falseSkipIds) {
+      const row = byMessage.get(id);
+      if (!row) {
+        console.warn(`[safety-fixtures] no generation run for false_skip ${id}`);
+        continue;
+      }
+      await addCase("false_skip", row);
+    }
+  }
+
+  const createdAt = new Date().toISOString();
+  const gitHead = (await collectGitSourceState(rootDir)).headRevision;
+  const fileEntries: SafetyFixtureManifest["files"] = [];
+  for (const [gateClass, cases] of [...classes.entries()].sort(([a], [b]) =>
+    a.localeCompare(b)
+  )) {
+    cases.sort((a, b) => a.messageId - b.messageId);
+    const fileName = `${gateClass.replaceAll("_", "-")}.json`;
+    const file: SafetyFixtureFile = {
+      schemaVersion: 1,
+      class: gateClass,
+      createdAt,
+      source: {
+        db: "render-prod",
+        query: `generation_runs/source_notices/feedback ${from}..${to}`,
+        gitHead
+      },
+      cases
+    };
+    await writeJson(path.join(outDir, fileName), file);
+    fileEntries.push({
+      path: fileName,
+      class: gateClass,
+      caseCount: cases.length,
+      contentSha256: sha256CanonicalJson(file)
+    });
+    console.log(`[safety-fixtures] wrote ${cases.length} ${gateClass} cases`);
+  }
+
+  const manifest: SafetyFixtureManifest = {
+    schemaVersion: 1,
+    corpusId: `editorial_safety_${sha256CanonicalJson(
+      fileEntries.map((entry) => entry.contentSha256)
+    ).slice(0, 16)}`,
+    createdAt,
+    files: fileEntries,
+    uniformExpectations: {
+      numeric_false_block:
+        "UNEXPECTED_NUMBERS present under current validator; P2 flips per approved rule class via --update-expected",
+      numeric_unresolved:
+        "UNEXPECTED_NUMBERS present; hard invariant, never flips"
+    },
+    excludedNumericMessageIds,
+    sourceQueries: {
+      numeric_false_block: `generation_runs status=failed requestedAt ${from}..${to} with issues[].code=UNEXPECTED_NUMBERS, latest row per message, stride-sampled to ${numericLimit}`,
+      routine_not_news: notNewsIdsRaw
+        ? `curated --not-news-ids`
+        : `feedback createdAt ${from}..${to} joined to latest published generation run`,
+      false_skip: falseSkipIdsRaw
+        ? `curated --false-skip-ids`
+        : `generation_runs requestedAt ${from}..${to} with status=skipped followed by reason=manual-reprocess`
+    }
+  };
+  await writeJson(manifestPath, manifest);
+  console.log(
+    `Wrote safety fixture manifest ${manifest.corpusId} (${fileEntries.length} classes) to ${manifestPath}`
+  );
 }
 
 async function runCommand(options: Map<string, string>): Promise<void> {
@@ -1685,6 +2247,11 @@ function printUsage(): void {
     "  npm run eval:editorial -w apps/worker -- run --cases tmp/editorial-eval/cases.json --control regular_v5_6_control --challenger regular_v5_6_control --control-model gpt-5.5 --control-effort medium --challenger-model gpt-5.6-terra --challenger-effort medium --reference-model gpt-5.6-terra --reference-effort medium --service-tier flex [--assignment-seed SEED] [--ordering-seed SEED] --out tmp/editorial-eval/run.json",
     "  npm run eval:editorial -w apps/worker -- review-html --run tmp/editorial-eval/run.json --out tmp/editorial-eval/review.html",
     "  Legacy run schemas 1-2 require --reviews when rendering review HTML.",
-    "  npm run eval:editorial -w apps/worker -- summarize --run tmp/editorial-eval/run.json --reviews tmp/editorial-eval/reviews.json --out tmp/editorial-eval/summary.json"
+    "  npm run eval:editorial -w apps/worker -- summarize --run tmp/editorial-eval/run.json --reviews tmp/editorial-eval/reviews.json --out tmp/editorial-eval/summary.json",
+    "  npm run eval:editorial -w apps/worker -- build-cases --message-ids 679311,677571 --out tmp/editorial-eval/curated.json  (curated corpus; also accepts @path/to/ids.txt)",
+    "  npm run eval:editorial -w apps/worker -- lock-cases --cases tmp/editorial-eval/cases-v6-50.json --out apps/worker/src/fixtures/editorial-eval/editorial/cases-locked-2026-08.json",
+    "  npm run eval:editorial -w apps/worker -- build-safety-fixtures [--from YYYY-MM-DD] [--to YYYY-MM-DD] [--numeric-limit 40] [--not-news-ids IDS] [--false-skip-ids IDS] [--out DIR]",
+    "  npm run eval:editorial -w apps/worker -- build-safety-fixtures --update-expected  (offline; re-replays validators and rewrites expected blocks)",
+    "  Seeding commands need DATABASE_URL / GENERATION_LOG_DATABASE_URL in .env (Render external URLs or local prod clone). Paths resolve from apps/worker under npm -w; absolute paths are safest."
   ].join("\n"));
 }
