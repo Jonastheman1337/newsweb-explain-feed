@@ -972,3 +972,70 @@ describe("validateRewriteOutput", () => {
     );
   });
 });
+
+describe("validateRewriteOutput number assessments", () => {
+  it("exposes per-number assessments alongside the unexpected-number issue", () => {
+    const payload = createPayload();
+    const rewrite = createRewrite({
+      lead: "Selskapet la frem kvartalstall med nye detaljer.",
+      body: [
+        "Omsetningen i kvartalet var 101 i denne omtalen.",
+        "Meldingen oppgir ingen ny guiding."
+      ]
+    });
+
+    const result = validateRewriteOutput(rewrite, payload);
+
+    expect(result.numberAssessments).toContainEqual({
+      display: "101",
+      disposition: "unexpected",
+      ruleId: null,
+      count: 1
+    });
+    expect(result.numberAssessments).toContainEqual(
+      expect.objectContaining({
+        display: "100",
+        disposition: "matched",
+        ruleId: "exact_source_match"
+      })
+    );
+  });
+
+  it("keeps the issue message consistent with unexpected assessments", () => {
+    const payload = createPayload();
+    const rewrite = createRewrite({
+      lead: "Selskapet la frem kvartalstall med nye detaljer.",
+      body: [
+        "Omsetningen i kvartalet var 101 i denne omtalen.",
+        "Resultatet i perioden var 21 ifolge omtalen.",
+        "Kontantbeholdningen var 303 ved periodens slutt."
+      ]
+    });
+
+    const result = validateRewriteOutput(rewrite, payload);
+    const unexpected = result.numberAssessments
+      .filter((assessment) => assessment.disposition === "unexpected")
+      .map((assessment) => assessment.display);
+
+    expect(result.errors).toContain(
+      `Unexpected numbers: ${unexpected.join(", ")}`
+    );
+  });
+
+  it("returns only matched assessments for a fully supported rewrite", () => {
+    const payload = createPayload();
+    const rewrite = createRewrite();
+
+    const result = validateRewriteOutput(rewrite, payload);
+
+    expect(
+      result.issues.some((issue) => issue.code === "UNEXPECTED_NUMBERS")
+    ).toBe(false);
+    expect(result.numberAssessments.length).toBeGreaterThan(0);
+    expect(
+      result.numberAssessments.every(
+        (assessment) => assessment.disposition === "matched"
+      )
+    ).toBe(true);
+  });
+});

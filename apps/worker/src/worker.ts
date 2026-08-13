@@ -619,6 +619,7 @@ function validateRewriteWithRevisionCompliance(
   blockingErrors: string[];
   warnings: string[];
   quoteTelemetry: ReturnType<typeof validateRewriteOutput>["quoteTelemetry"];
+  numberAssessments: ReturnType<typeof validateRewriteOutput>["numberAssessments"];
   revisionCompliance: RevisionInstructionCompliance | null;
 } {
   const revisionCompliance = validateRevisionInstructionCompliance(rewrite, {
@@ -653,6 +654,7 @@ function validateRewriteWithRevisionCompliance(
     blockingErrors,
     warnings,
     quoteTelemetry: validation.quoteTelemetry,
+    numberAssessments: validation.numberAssessments,
     revisionCompliance
   };
 }
@@ -2254,6 +2256,7 @@ async function processReportRewrite(
         blockingErrors: validation.blockingErrors,
         warnings: validation.warnings,
         quoteTelemetry: validation.quoteTelemetry,
+        numberAssessments: validation.numberAssessments,
         revisionInstructionCompliance: validation.revisionCompliance,
         sourceBodyChars: payload.sourceBodyChars,
         promptChars,
@@ -2717,6 +2720,7 @@ async function processYearlyReportRewrite(
         blockingErrors: validation.blockingErrors,
         warnings: validation.warnings,
         quoteTelemetry: validation.quoteTelemetry,
+        numberAssessments: validation.numberAssessments,
         revisionInstructionCompliance: validation.revisionCompliance,
         sourceBodyChars: payload.sourceBodyChars,
         promptChars,
@@ -3991,6 +3995,7 @@ const rewriteWorker = new Worker<RewriteJobData>(
             blockingErrors: validation.blockingErrors,
             warnings: validation.warnings,
             quoteTelemetry: validation.quoteTelemetry,
+            numberAssessments: validation.numberAssessments,
             revisionInstructionCompliance: validation.revisionCompliance,
             sourceBodyChars: payload.sourceBodyChars,
             promptChars,

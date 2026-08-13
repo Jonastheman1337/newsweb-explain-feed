@@ -1,4 +1,9 @@
-import { findUnexpectedNumbers, type PromptPayload } from "@newsweb/prompt-kit";
+import {
+  assessNumbers,
+  unexpectedNumberDisplays,
+  type NumberAssessment,
+  type PromptPayload
+} from "@newsweb/prompt-kit";
 import type { RewriteOutput } from "@newsweb/shared";
 
 const MAX_ALLOWED_UNEXPECTED_NUMBERS = 0;
@@ -610,6 +615,7 @@ export function validateRewriteOutput(
   blockingErrors: string[];
   warnings: string[];
   quoteTelemetry: QuoteTelemetry;
+  numberAssessments: NumberAssessment[];
 } {
   const issues: RewriteValidationIssue[] = [];
   const validationSourceText = buildValidationSourceText(payload);
@@ -618,10 +624,8 @@ export function validateRewriteOutput(
   const maxVisibleArticleChars =
     options?.maxVisibleArticleChars ?? MAX_VISIBLE_ARTICLE_CHARS;
 
-  const numberErrors = findUnexpectedNumbers(
-    rewrite,
-    validationSourceText
-  );
+  const numberAssessments = assessNumbers(rewrite, validationSourceText);
+  const numberErrors = unexpectedNumberDisplays(numberAssessments);
   if (numberErrors.length > MAX_ALLOWED_UNEXPECTED_NUMBERS) {
     addIssue(
       issues,
@@ -839,6 +843,7 @@ export function validateRewriteOutput(
     issues,
     blockingErrors,
     warnings,
-    quoteTelemetry
+    quoteTelemetry,
+    numberAssessments
   };
 }
