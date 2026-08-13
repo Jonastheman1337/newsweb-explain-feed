@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type { PromptPayload, RegularPromptVariantId } from "@newsweb/prompt-kit";
 
 import type { QuoteTelemetry } from "./rewrite-validation.js";
@@ -78,6 +79,7 @@ export type EvalCase = {
   category: EvalCategoryId;
   difficultyTags: string[];
   payload: PromptPayload;
+  sourceSha256?: string;
 };
 
 export type EvalCandidate = Omit<EvalCase, "caseId">;
@@ -94,6 +96,7 @@ export type EvalGenerationSummary = {
   arm?: "control" | "challenger";
   category: EvalCategoryId;
   fatalStatus: EvalFatalStatus;
+  errorText?: string | null;
   quoteTelemetry?: QuoteTelemetry;
 };
 
@@ -128,6 +131,38 @@ export type ReviewAssignment = {
   caseId: string;
   aGenerationId: string;
   bGenerationId: string;
+  challengerSide: "A" | "B";
+  presentationPosition: number;
+};
+
+export type ReviewProtocol = {
+  assignmentAlgorithmVersion: "balanced_sha256_v1" | "legacy_reviews_v1";
+  orderingAlgorithmVersion: "sha256_order_v1" | "legacy_reviews_v1";
+  assignmentSeed: string | null;
+  orderingSeed: string | null;
+  assignments: ReviewAssignment[];
+};
+
+export type EditorialEvalOrderBand = {
+  band: number;
+  startPosition: number;
+  endPosition: number;
+  caseCount: number;
+  reviewed: number;
+  decided: number;
+  aWins: number;
+  bWins: number;
+  challengerWins: number;
+};
+
+export type EditorialEvalIntegrityDiagnostics = {
+  promotionEligible: boolean;
+  reasons: string[];
+  warnings: string[];
+  assignmentCount: number;
+  reviewCount: number;
+  missingReviewCaseIds: string[];
+  invalidReviewCaseIds: string[];
 };
 
 export type EditorialEvalSummary = {
@@ -140,6 +175,21 @@ export type EditorialEvalSummary = {
   fatalCounts: Record<string, number>;
   categoryNetWins: Record<string, number>;
   quoteMetrics: Record<string, EvalQuoteMetrics>;
+  challengerPlacement: { A: number; B: number; difference: number };
+  displayedSidePreference: {
+    A: number;
+    B: number;
+    tie: number;
+    bothBad: number;
+  };
+  challengerResultsBySide: Record<
+    "A" | "B",
+    { decided: number; wins: number; losses: number }
+  >;
+  categoryBySide: Record<string, { challengerOnA: number; challengerOnB: number }>;
+  orderBands: EditorialEvalOrderBand[];
+  generationFailures: { control: number; challenger: number };
+  integrity: EditorialEvalIntegrityDiagnostics;
   recommendation: "ship_candidate" | "iterate" | "reject";
   reasons: string[];
 };
@@ -410,22 +460,30 @@ function candidatePriorityScore(candidate: EvalCandidate): number {
   return score;
 }
 
-function hashText(text: string): number {
-  let hash = 2166136261;
-  for (let index = 0; index < text.length; index += 1) {
-    hash ^= text.charCodeAt(index);
-    hash = Math.imul(hash, 16777619);
-  }
-  return hash >>> 0;
+type GenerationPair = {
+  caseId: string;
+  control: EvalGenerationSummary;
+  challenger: EvalGenerationSummary;
+};
+
+function protocolDigest(domain: string, seed: string, caseId: string): string {
+  return createHash("sha256")
+    .update(`${domain}\0${seed}\0${caseId}`)
+    .digest("hex");
 }
 
-export function createReviewAssignments(
+function generationPairs(
   generations: EvalGenerationSummary[],
   controlVariant: RegularPromptVariantId,
   challengerVariant: RegularPromptVariantId
-): ReviewAssignment[] {
+): GenerationPair[] {
   const byCase = new Map<string, EvalGenerationSummary[]>();
+  const generationIds = new Set<string>();
   for (const generation of generations) {
+    if (generationIds.has(generation.id)) {
+      throw new Error(`Duplicate evaluation generation id: ${generation.id}`);
+    }
+    generationIds.add(generation.id);
     const existing = byCase.get(generation.caseId) ?? [];
     existing.push(generation);
     byCase.set(generation.caseId, existing);
@@ -433,23 +491,221 @@ export function createReviewAssignments(
 
   return [...byCase.entries()]
     .sort(([left], [right]) => left.localeCompare(right))
-    .flatMap(([caseId, caseGenerations]) => {
-      const control =
-        caseGenerations.find((generation) => generation.arm === "control") ??
-        caseGenerations.find((generation) => generation.variantId === controlVariant);
-      const challenger =
-        caseGenerations.find((generation) => generation.arm === "challenger") ??
-        caseGenerations.find((generation) => generation.variantId === challengerVariant);
-      if (!control || !challenger) return [];
-      const challengerIsA = hashText(`${caseId}:${challenger.id}`) % 2 === 0;
-      return [
-        {
-          caseId,
-          aGenerationId: challengerIsA ? challenger.id : control.id,
-          bGenerationId: challengerIsA ? control.id : challenger.id
-        }
-      ];
+    .map(([caseId, caseGenerations]) => {
+      const controls = caseGenerations.filter(
+        (generation) =>
+          generation.arm === "control" ||
+          (!generation.arm &&
+            controlVariant !== challengerVariant &&
+            generation.variantId === controlVariant)
+      );
+      const challengers = caseGenerations.filter(
+        (generation) =>
+          generation.arm === "challenger" ||
+          (!generation.arm &&
+            controlVariant !== challengerVariant &&
+            generation.variantId === challengerVariant)
+      );
+      if (controls.length !== 1 || challengers.length !== 1) {
+        throw new Error(
+          `Case ${caseId} must have exactly one control and one challenger generation; found ${controls.length}/${challengers.length}`
+        );
+      }
+      return { caseId, control: controls[0]!, challenger: challengers[0]! };
     });
+}
+
+export function createReviewProtocol(
+  generations: EvalGenerationSummary[],
+  controlVariant: RegularPromptVariantId,
+  challengerVariant: RegularPromptVariantId,
+  options: { assignmentSeed: string; orderingSeed: string }
+): ReviewProtocol {
+  const pairs = generationPairs(generations, controlVariant, challengerVariant);
+  const extraChallengerOnA =
+    pairs.length % 2 === 1 &&
+    Number.parseInt(
+      protocolDigest("balanced_sha256_v1_extra", options.assignmentSeed, "").slice(
+        0,
+        2
+      ),
+      16
+    ) %
+      2 ===
+      0;
+  const challengerOnATarget =
+    Math.floor(pairs.length / 2) + (extraChallengerOnA ? 1 : 0);
+  const assignmentRank = [...pairs].sort((left, right) => {
+    const leftDigest = protocolDigest(
+      "balanced_sha256_v1",
+      options.assignmentSeed,
+      left.caseId
+    );
+    const rightDigest = protocolDigest(
+      "balanced_sha256_v1",
+      options.assignmentSeed,
+      right.caseId
+    );
+    return leftDigest.localeCompare(rightDigest) || left.caseId.localeCompare(right.caseId);
+  });
+  const challengerOnA = new Set(
+    assignmentRank.slice(0, challengerOnATarget).map((item) => item.caseId)
+  );
+  const presentationOrder = [...pairs].sort((left, right) => {
+    const leftDigest = protocolDigest(
+      "sha256_order_v1",
+      options.orderingSeed,
+      left.caseId
+    );
+    const rightDigest = protocolDigest(
+      "sha256_order_v1",
+      options.orderingSeed,
+      right.caseId
+    );
+    return leftDigest.localeCompare(rightDigest) || left.caseId.localeCompare(right.caseId);
+  });
+
+  const protocol: ReviewProtocol = {
+    assignmentAlgorithmVersion: "balanced_sha256_v1",
+    orderingAlgorithmVersion: "sha256_order_v1",
+    assignmentSeed: options.assignmentSeed,
+    orderingSeed: options.orderingSeed,
+    assignments: presentationOrder.map((pair, index) => {
+      const challengerSide = challengerOnA.has(pair.caseId) ? "A" : "B";
+      return {
+        caseId: pair.caseId,
+        aGenerationId:
+          challengerSide === "A" ? pair.challenger.id : pair.control.id,
+        bGenerationId:
+          challengerSide === "A" ? pair.control.id : pair.challenger.id,
+        challengerSide,
+        presentationPosition: index + 1
+      };
+    })
+  };
+  assertReviewProtocolIntegrity(
+    protocol,
+    generations,
+    controlVariant,
+    challengerVariant
+  );
+  return protocol;
+}
+
+export function createLegacyReviewProtocol(
+  generations: EvalGenerationSummary[],
+  reviews: EvalReview[],
+  controlVariant: RegularPromptVariantId,
+  challengerVariant: RegularPromptVariantId
+): ReviewProtocol {
+  const pairs = generationPairs(generations, controlVariant, challengerVariant);
+  const pairByCase = new Map(pairs.map((item) => [item.caseId, item]));
+  const reviewedCases = new Set<string>();
+  const assignments = reviews.map((review, index) => {
+    if (reviewedCases.has(review.caseId)) {
+      throw new Error(`Duplicate legacy review case: ${review.caseId}`);
+    }
+    reviewedCases.add(review.caseId);
+    const pair = pairByCase.get(review.caseId);
+    if (!pair) throw new Error(`Legacy review references unknown case: ${review.caseId}`);
+    const ids = new Set([review.aGenerationId, review.bGenerationId]);
+    if (!ids.has(pair.control.id) || !ids.has(pair.challenger.id)) {
+      throw new Error(`Legacy review assignment does not match case ${review.caseId}`);
+    }
+    return {
+      caseId: review.caseId,
+      aGenerationId: review.aGenerationId,
+      bGenerationId: review.bGenerationId,
+      challengerSide:
+        review.aGenerationId === pair.challenger.id ? ("A" as const) : ("B" as const),
+      presentationPosition: index + 1
+    };
+  });
+  if (assignments.length !== pairs.length) {
+    throw new Error(
+      `Legacy review reconstruction requires all ${pairs.length} cases; received ${assignments.length}`
+    );
+  }
+  const protocol: ReviewProtocol = {
+    assignmentAlgorithmVersion: "legacy_reviews_v1",
+    orderingAlgorithmVersion: "legacy_reviews_v1",
+    assignmentSeed: null,
+    orderingSeed: null,
+    assignments
+  };
+  assertReviewProtocolIntegrity(
+    protocol,
+    generations,
+    controlVariant,
+    challengerVariant
+  );
+  return protocol;
+}
+
+export function assertReviewProtocolIntegrity(
+  protocol: ReviewProtocol,
+  generations: EvalGenerationSummary[],
+  controlVariant: RegularPromptVariantId,
+  challengerVariant: RegularPromptVariantId
+): void {
+  const pairs = generationPairs(generations, controlVariant, challengerVariant);
+  if (protocol.assignments.length !== pairs.length) {
+    throw new Error(
+      `Review protocol has ${protocol.assignments.length} assignments for ${pairs.length} generation pairs`
+    );
+  }
+  const pairByCase = new Map(pairs.map((item) => [item.caseId, item]));
+  const seenCases = new Set<string>();
+  const seenPositions = new Set<number>();
+  let challengerOnA = 0;
+  for (const assignment of protocol.assignments) {
+    if (seenCases.has(assignment.caseId)) {
+      throw new Error(`Duplicate review protocol case: ${assignment.caseId}`);
+    }
+    if (seenPositions.has(assignment.presentationPosition)) {
+      throw new Error(
+        `Duplicate review protocol position: ${assignment.presentationPosition}`
+      );
+    }
+    seenCases.add(assignment.caseId);
+    seenPositions.add(assignment.presentationPosition);
+    const pair = pairByCase.get(assignment.caseId);
+    if (!pair) {
+      throw new Error(`Review protocol references unknown case: ${assignment.caseId}`);
+    }
+    const expectedA =
+      assignment.challengerSide === "A" ? pair.challenger.id : pair.control.id;
+    const expectedB =
+      assignment.challengerSide === "A" ? pair.control.id : pair.challenger.id;
+    if (
+      assignment.aGenerationId !== expectedA ||
+      assignment.bGenerationId !== expectedB
+    ) {
+      throw new Error(`Review protocol assignment mismatch for ${assignment.caseId}`);
+    }
+    if (assignment.challengerSide === "A") challengerOnA += 1;
+  }
+  const expectedPositions = Array.from(
+    { length: pairs.length },
+    (_, index) => index + 1
+  );
+  if (
+    [...seenPositions].sort((left, right) => left - right).join(",") !==
+    expectedPositions.join(",")
+  ) {
+    throw new Error("Review protocol positions must be contiguous and one-based");
+  }
+  if (protocol.assignmentAlgorithmVersion === "balanced_sha256_v1") {
+    if (!protocol.assignmentSeed || !protocol.orderingSeed) {
+      throw new Error("Seeded review protocols must persist both seeds");
+    }
+    const challengerOnB = pairs.length - challengerOnA;
+    if (Math.abs(challengerOnA - challengerOnB) > 1) {
+      throw new Error(
+        `Seeded review protocol is imbalanced (${challengerOnA}/${challengerOnB})`
+      );
+    }
+  }
 }
 
 export function summarizeEditorialEval(
@@ -458,6 +714,12 @@ export function summarizeEditorialEval(
   options: {
     controlVariant: RegularPromptVariantId;
     challengerVariant: RegularPromptVariantId;
+    reviewProtocol?: ReviewProtocol;
+    artifactIntegrity?: {
+      promotionEligible: boolean;
+      reasons: string[];
+      warnings?: string[];
+    };
   }
 ): EditorialEvalSummary {
   const comparisonKey = (generation: EvalGenerationSummary) =>
@@ -506,13 +768,138 @@ export function summarizeEditorialEval(
         : 0;
   }
 
+  const inferredAssignments: ReviewAssignment[] = reviews.map((review, index) => {
+    const a = generationsById.get(review.aGenerationId);
+    const challengerOnA = a
+      ? a.arm === "challenger" ||
+        (!a.arm && a.variantId === options.challengerVariant)
+      : false;
+    return {
+      caseId: review.caseId,
+      aGenerationId: review.aGenerationId,
+      bGenerationId: review.bGenerationId,
+      challengerSide: challengerOnA ? "A" : "B",
+      presentationPosition: index + 1
+    };
+  });
+  const assignments = options.reviewProtocol?.assignments ?? inferredAssignments;
+  const assignmentByCase = new Map(
+    assignments.map((assignment) => [assignment.caseId, assignment])
+  );
+  const duplicateReviewCases = new Set<string>();
+  const reviewByCase = new Map<string, EvalReview>();
+  for (const review of reviews) {
+    if (reviewByCase.has(review.caseId)) duplicateReviewCases.add(review.caseId);
+    reviewByCase.set(review.caseId, review);
+  }
+  const invalidReviewCaseIds = new Set<string>(duplicateReviewCases);
+  for (const review of reviews) {
+    const assignment = assignmentByCase.get(review.caseId);
+    if (
+      !assignment ||
+      assignment.aGenerationId !== review.aGenerationId ||
+      assignment.bGenerationId !== review.bGenerationId ||
+      !generationsById.has(review.aGenerationId) ||
+      !generationsById.has(review.bGenerationId)
+    ) {
+      invalidReviewCaseIds.add(review.caseId);
+    }
+  }
+  const missingReviewCaseIds = assignments
+    .filter((assignment) => !reviewByCase.has(assignment.caseId))
+    .map((assignment) => assignment.caseId);
+  const validReviews = reviews.filter(
+    (review) => !invalidReviewCaseIds.has(review.caseId)
+  );
+
+  const challengerPlacement = { A: 0, B: 0, difference: 0 };
+  const categoryBySide: Record<
+    string,
+    { challengerOnA: number; challengerOnB: number }
+  > = {};
+  for (const assignment of assignments) {
+    challengerPlacement[assignment.challengerSide] += 1;
+    const challengerId =
+      assignment.challengerSide === "A"
+        ? assignment.aGenerationId
+        : assignment.bGenerationId;
+    const challenger = generationsById.get(challengerId);
+    if (!challenger) continue;
+    const category = (categoryBySide[challenger.category] ??= {
+      challengerOnA: 0,
+      challengerOnB: 0
+    });
+    if (assignment.challengerSide === "A") category.challengerOnA += 1;
+    else category.challengerOnB += 1;
+  }
+  challengerPlacement.difference = Math.abs(
+    challengerPlacement.A - challengerPlacement.B
+  );
+
+  const displayedSidePreference = { A: 0, B: 0, tie: 0, bothBad: 0 };
+  const challengerResultsBySide = {
+    A: { decided: 0, wins: 0, losses: 0 },
+    B: { decided: 0, wins: 0, losses: 0 }
+  };
+  const bandCount = Math.min(5, Math.max(assignments.length, 1));
+  const orderBands: EditorialEvalOrderBand[] = Array.from(
+    { length: bandCount },
+    (_, index) => ({
+      band: index + 1,
+      startPosition: Math.floor((index * assignments.length) / bandCount) + 1,
+      endPosition: Math.floor(((index + 1) * assignments.length) / bandCount),
+      caseCount: 0,
+      reviewed: 0,
+      decided: 0,
+      aWins: 0,
+      bWins: 0,
+      challengerWins: 0
+    })
+  );
+  for (const assignment of assignments) {
+    const bandIndex = Math.min(
+      bandCount - 1,
+      Math.floor(
+        ((assignment.presentationPosition - 1) * bandCount) /
+          Math.max(assignments.length, 1)
+      )
+    );
+    const band = orderBands[bandIndex]!;
+    band.caseCount += 1;
+    const review = reviewByCase.get(assignment.caseId);
+    if (!review || invalidReviewCaseIds.has(review.caseId)) continue;
+    band.reviewed += 1;
+    if (review.winner === "both_bad") displayedSidePreference.bothBad += 1;
+    else displayedSidePreference[review.winner] += 1;
+    if (review.winner === "A" || review.winner === "B") {
+      band.decided += 1;
+      if (review.winner === "A") band.aWins += 1;
+      else band.bWins += 1;
+      const sideResults = challengerResultsBySide[assignment.challengerSide];
+      sideResults.decided += 1;
+      if (review.winner === assignment.challengerSide) {
+        sideResults.wins += 1;
+        band.challengerWins += 1;
+      } else {
+        sideResults.losses += 1;
+      }
+    }
+  }
+
+  const generationFailures = { control: 0, challenger: 0 };
+  for (const generation of run.generations) {
+    if (!generation.errorText) continue;
+    const arm = generation.arm;
+    if (arm) generationFailures[arm] += 1;
+  }
+
   let controlWins = 0;
   let challengerWins = 0;
   let ties = 0;
   let bothBad = 0;
   const categoryNetWins: Record<string, number> = {};
 
-  for (const review of reviews) {
+  for (const review of validReviews) {
     if (review.winner === "tie") {
       ties += 1;
       continue;
@@ -555,7 +942,34 @@ export function summarizeEditorialEval(
     "warrants_options_convertibles"
   ].some((category) => (categoryNetWins[category] ?? 0) <= -2);
 
+  const integrityReasons = [...(options.artifactIntegrity?.reasons ?? [])];
+  const integrityWarnings = [...(options.artifactIntegrity?.warnings ?? [])];
+  if (challengerPlacement.difference > 1) {
+    integrityReasons.push(
+      `Challenger placement is imbalanced (${challengerPlacement.A}/${challengerPlacement.B}).`
+    );
+  }
+  if (missingReviewCaseIds.length > 0) {
+    integrityReasons.push(`${missingReviewCaseIds.length} review cases are missing.`);
+  }
+  if (invalidReviewCaseIds.size > 0) {
+    integrityReasons.push(`${invalidReviewCaseIds.size} reviews do not match assignments.`);
+  }
+  const promotionEligible =
+    (options.artifactIntegrity?.promotionEligible ?? true) &&
+    integrityReasons.length === 0;
+  const integrity: EditorialEvalIntegrityDiagnostics = {
+    promotionEligible,
+    reasons: [...new Set(integrityReasons)],
+    warnings: [...new Set(integrityWarnings)],
+    assignmentCount: assignments.length,
+    reviewCount: validReviews.length,
+    missingReviewCaseIds,
+    invalidReviewCaseIds: [...invalidReviewCaseIds]
+  };
+
   const reasons: string[] = [];
+  if (!promotionEligible) reasons.push("Evaluation integrity is not promotion-eligible.");
   if (decidedComparisons === 0) reasons.push("No decided non-tie comparisons.");
   if (challengerWinRate < 0.65) {
     reasons.push("Challenger win rate is below 65 percent.");
@@ -572,10 +986,11 @@ export function summarizeEditorialEval(
     decidedComparisons > 0 &&
     challengerWinRate >= 0.65 &&
     !fatalRegression &&
-    !hardCategoryRegression
+    !hardCategoryRegression &&
+    promotionEligible
   ) {
     recommendation = "ship_candidate";
-  } else if (challengerWinRate >= 0.5 && !fatalRegression) {
+  } else if (challengerWinRate >= 0.5 && !fatalRegression && promotionEligible) {
     recommendation = "iterate";
   }
 
@@ -589,6 +1004,13 @@ export function summarizeEditorialEval(
     fatalCounts,
     categoryNetWins,
     quoteMetrics,
+    challengerPlacement,
+    displayedSidePreference,
+    challengerResultsBySide,
+    categoryBySide,
+    orderBands,
+    generationFailures,
+    integrity,
     recommendation,
     reasons
   };

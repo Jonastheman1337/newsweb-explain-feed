@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { PromptPayload } from "@newsweb/prompt-kit";
 import {
+  assertReviewProtocolIntegrity,
   categorizeEvalPayload,
-  createReviewAssignments,
+  createLegacyReviewProtocol,
+  createReviewProtocol,
   difficultyTagsForPayload,
   evalCategoryQuotasForLimit,
   selectBalancedEvalCases,
@@ -163,8 +165,8 @@ describe("selectBalancedEvalCases", () => {
   });
 });
 
-describe("createReviewAssignments", () => {
-  it("creates deterministic A/B assignments", () => {
+describe("createReviewProtocol", () => {
+  it("creates deterministic A/B assignments and order", () => {
     const generations: EvalGenerationSummary[] = [
       {
         id: "case1-control",
@@ -183,18 +185,179 @@ describe("createReviewAssignments", () => {
     ];
 
     expect(
-      createReviewAssignments(
+      createReviewProtocol(
         generations,
         "regular_v5_6_control",
-        "audience_mechanism_v1"
+        "audience_mechanism_v1",
+        { assignmentSeed: "assign-1", orderingSeed: "order-1" }
       )
     ).toEqual(
-      createReviewAssignments(
+      createReviewProtocol(
+        generations,
+        "regular_v5_6_control",
+        "audience_mechanism_v1",
+        { assignmentSeed: "assign-1", orderingSeed: "order-1" }
+      )
+    );
+  });
+
+  it("varies which side the challenger lands on across cases", () => {
+    // Generation ids follow the run script's `${caseId}:${arm}` scheme, which
+    // duplicates the caseId inside the hash input — the exact shape that made
+    // FNV-1a bit 0 constant across all cases.
+    const generations: EvalGenerationSummary[] = Array.from(
+      { length: 40 },
+      (_, index) => {
+        const caseId = `case_${String(index + 1).padStart(3, "0")}_${675000 + index}`;
+        return (["control", "challenger"] as const).map((arm) => ({
+          id: `${caseId}:${arm}`,
+          caseId,
+          arm,
+          variantId:
+            arm === "control"
+              ? ("regular_v5_6_control" as const)
+              : ("audience_mechanism_v1" as const),
+          category: "financing" as const,
+          fatalStatus: { fatal: false, reasons: [] }
+        }));
+      }
+    ).flat();
+
+    const assignments = createReviewProtocol(
+      generations,
+      "regular_v5_6_control",
+      "audience_mechanism_v1",
+      { assignmentSeed: "balanced", orderingSeed: "randomized" }
+    ).assignments;
+    const challengerOnA = assignments.filter((assignment) =>
+      assignment.aGenerationId.endsWith(":challenger")
+    ).length;
+
+    expect(assignments).toHaveLength(40);
+    expect(challengerOnA).toBe(20);
+    expect(assignments.map((item) => item.presentationPosition)).toEqual(
+      Array.from({ length: 40 }, (_, index) => index + 1)
+    );
+    expect(assignments.map((item) => item.caseId)).not.toEqual(
+      [...assignments.map((item) => item.caseId)].sort()
+    );
+  });
+
+  it("keeps odd runs within one side and isolates assignment/order seeds", () => {
+    const nineCases = 9;
+    const generations: EvalGenerationSummary[] = Array.from(
+      { length: nineCases },
+      (_, index) => {
+        const caseId = `odd_${index}`;
+        return (["control", "challenger"] as const).map((arm) => ({
+          id: `${caseId}:${arm}`,
+          caseId,
+          arm,
+          variantId:
+            arm === "control"
+              ? ("regular_v5_6_control" as const)
+              : ("audience_mechanism_v1" as const),
+          category: "hard_other" as const,
+          fatalStatus: { fatal: false, reasons: [] }
+        }));
+      }
+    ).flat();
+    const first = createReviewProtocol(
+      generations,
+      "regular_v5_6_control",
+      "audience_mechanism_v1",
+      { assignmentSeed: "assign-a", orderingSeed: "order-a" }
+    );
+    const changedOrder = createReviewProtocol(
+      generations,
+      "regular_v5_6_control",
+      "audience_mechanism_v1",
+      { assignmentSeed: "assign-a", orderingSeed: "order-b" }
+    );
+    const changedAssignment = createReviewProtocol(
+      generations,
+      "regular_v5_6_control",
+      "audience_mechanism_v1",
+      { assignmentSeed: "assign-b", orderingSeed: "order-a" }
+    );
+    const countA = first.assignments.filter(
+      (item) => item.challengerSide === "A"
+    ).length;
+    expect(Math.abs(countA - (nineCases - countA))).toBe(1);
+    expect(changedOrder.assignments.map((item) => item.caseId)).not.toEqual(
+      first.assignments.map((item) => item.caseId)
+    );
+    expect(
+      Object.fromEntries(
+        changedOrder.assignments.map((item) => [item.caseId, item.challengerSide])
+      )
+    ).toEqual(
+      Object.fromEntries(
+        first.assignments.map((item) => [item.caseId, item.challengerSide])
+      )
+    );
+    expect(changedAssignment.assignments.map((item) => item.caseId)).toEqual(
+      first.assignments.map((item) => item.caseId)
+    );
+  });
+
+  it("rejects incomplete generation pairs", () => {
+    expect(() =>
+      createReviewProtocol(
+        [
+          {
+            id: "only-control",
+            caseId: "broken",
+            arm: "control",
+            variantId: "regular_v5_6_control",
+            category: "hard_other",
+            fatalStatus: { fatal: false, reasons: [] }
+          }
+        ],
+        "regular_v5_6_control",
+        "audience_mechanism_v1",
+        { assignmentSeed: "a", orderingSeed: "b" }
+      )
+    ).toThrow(/exactly one control and one challenger/);
+  });
+
+  it("rejects a stored protocol whose assignment was tampered with", () => {
+    const generations: EvalGenerationSummary[] = [
+      {
+        id: "c:control",
+        caseId: "c",
+        arm: "control",
+        variantId: "regular_v5_6_control",
+        category: "hard_other",
+        fatalStatus: { fatal: false, reasons: [] }
+      },
+      {
+        id: "c:challenger",
+        caseId: "c",
+        arm: "challenger",
+        variantId: "audience_mechanism_v1",
+        category: "hard_other",
+        fatalStatus: { fatal: false, reasons: [] }
+      }
+    ];
+    const protocol = createReviewProtocol(
+      generations,
+      "regular_v5_6_control",
+      "audience_mechanism_v1",
+      { assignmentSeed: "a", orderingSeed: "b" }
+    );
+    protocol.assignments[0] = {
+      ...protocol.assignments[0]!,
+      aGenerationId: "c:missing"
+    };
+    expect(() =>
+      assertReviewProtocolIntegrity(
+        protocol,
         generations,
         "regular_v5_6_control",
         "audience_mechanism_v1"
       )
-    );
+    ).toThrow(/assignment mismatch/);
   });
 });
 
@@ -362,5 +525,64 @@ describe("summarizeEditorialEval", () => {
       guillemetsCount: 1,
       attributionOnlyCount: 0
     });
+  });
+
+  it("exposes the known legacy placement and displayed-side bias", () => {
+    const legacyGenerations: EvalGenerationSummary[] = Array.from(
+      { length: 50 },
+      (_, index) => {
+        const caseId = `legacy_${String(index + 1).padStart(2, "0")}`;
+        return (["control", "challenger"] as const).map((arm) => ({
+          id: `${caseId}:${arm}`,
+          caseId,
+          arm,
+          variantId:
+            arm === "control"
+              ? ("regular_v5_6_control" as const)
+              : ("regular_v6_draft" as const),
+          category: "hard_other" as const,
+          fatalStatus: { fatal: false, reasons: [] }
+        }));
+      }
+    ).flat();
+    const legacyReviews: EvalReview[] = Array.from({ length: 50 }, (_, index) => {
+      const caseId = `legacy_${String(index + 1).padStart(2, "0")}`;
+      const challengerOnA = index < 36;
+      return {
+        caseId,
+        aGenerationId: `${caseId}:${challengerOnA ? "challenger" : "control"}`,
+        bGenerationId: `${caseId}:${challengerOnA ? "control" : "challenger"}`,
+        winner: index < 31 ? "B" : index < 46 ? "A" : "both_bad"
+      };
+    });
+    const reviewProtocol = createLegacyReviewProtocol(
+      legacyGenerations,
+      legacyReviews,
+      "regular_v5_6_control",
+      "regular_v6_draft"
+    );
+    const summary = summarizeEditorialEval(
+      { generations: legacyGenerations },
+      legacyReviews,
+      {
+        controlVariant: "regular_v5_6_control",
+        challengerVariant: "regular_v6_draft",
+        reviewProtocol,
+        artifactIntegrity: {
+          promotionEligible: false,
+          reasons: ["Legacy run schema lacks stored protocol metadata."]
+        }
+      }
+    );
+
+    expect(summary.challengerPlacement).toEqual({ A: 36, B: 14, difference: 22 });
+    expect(summary.displayedSidePreference).toEqual({
+      A: 15,
+      B: 31,
+      tie: 0,
+      bothBad: 4
+    });
+    expect(summary.integrity.promotionEligible).toBe(false);
+    expect(summary.recommendation).toBe("reject");
   });
 });

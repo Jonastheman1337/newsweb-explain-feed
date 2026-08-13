@@ -10,6 +10,7 @@ import {
 } from "./prompt.js";
 import {
   createRegularPromptVariantMessages,
+  getRegularPromptVariantProfile,
   regularPromptVariantIds
 } from "./regular-prompt-variants.js";
 import {
@@ -213,8 +214,32 @@ describe("OpenAI prompt contract", () => {
     expect(regularPromptVariantIds).toEqual([
       "regular_v5_6_control",
       "audience_mechanism_v1",
-      "regular_v6_full"
+      "regular_v6_full",
+      "regular_v6_draft",
+      "regular_v6_draft_2"
     ]);
+    expect(
+      regularPromptVariantIds.map(
+        (variantId) => getRegularPromptVariantProfile(variantId).responseSchemaId
+      )
+    ).toEqual([
+      "rewrite_v5_title_first_v1",
+      "rewrite_v5_title_first_v1",
+      "rewrite_v6_extract_first_v1",
+      "rewrite_v6_extract_first_v1",
+      "rewrite_v6_extract_first_v1"
+    ]);
+    for (const variantId of regularPromptVariantIds) {
+      const profile = getRegularPromptVariantProfile(variantId);
+      expect(profile.variantId).toBe(variantId);
+      expect(profile.parserProfileId).toBe("rewrite_output_zod_v1");
+      expect(profile.validationProfileId).toBe(
+        "regular_rewrite_validation_v1"
+      );
+      expect(createRegularPromptVariantMessages(variantId, samplePayload).promptVersion).toBe(
+        profile.promptVersion
+      );
+    }
 
     const control = createRegularPromptVariantMessages(
       "regular_v5_6_control",

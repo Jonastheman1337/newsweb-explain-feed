@@ -23,6 +23,18 @@ This note is for future agents who need to find or rerun the OpenAI-only editori
   regenerate the run before any ship decision.** Ship only on the acceptance rule
   below; the production flip steps are in the v6 plan (PROMPT_VERSION → v6.0.0,
   schema order swap, test-string updates).
+- The first `regular_v6_draft` prompt pack was reviewed on 50 cases in August
+  2026 and rejected: 21 challenger wins, 25 control wins and four both-bad
+  decisions. It remains registered so the run is reproducible. The artifacts are
+  `tmp/editorial-eval/run-v6draft-50.json`,
+  `reviews-user-v6draft-50.json` and `summary-v6draft-50-user.json`.
+- A review-led `regular_v6_draft_2` variant is registered but has **not** been
+  run. It starts from `regular_v6_full`, keeps the Bokmål and source-delimiter
+  guards, replaces exhaustive quote bookkeeping with editorial selection, and
+  adds source-perspective, status, financing, detail-selection and
+  company-description checks. Design rationale and a future isolated test plan
+  are in `docs/prompt-v6-draft-2.md`; the complete readable prompt pack is in
+  the git-ignored `prompts/v6-draft-2/` folder.
 - Report and yearly-report prompt paths were not changed by the ship.
 - Note for Windows: `npm run eval:editorial -w apps/worker -- run ...` can swallow
   `--flags` on some npm versions. Run the underlying tool directly from
@@ -58,6 +70,40 @@ Variants used by the historical eval:
 
 Important caveat: the eval tests the source payload sent to the model. If the production payload does not include extracted PDF text, the eval model will not separately read the PDF.
 
+## E0 Evaluation Integrity Protocol
+
+New evaluation runs use run-artifact schema version 3. The runner resolves each
+prompt variant through a typed profile before creating an OpenAI client:
+
+- `regular_v5_6_control` and `audience_mechanism_v1` use
+  `rewrite_v5_title_first_v1`.
+- `regular_v6_full`, `regular_v6_draft` and `regular_v6_draft_2` use
+  `rewrite_v6_extract_first_v1`.
+- Every profile records its prompt version, schema/parser/validator identity,
+  requested model, reasoning effort, verbosity, service tier and profile hash.
+
+The runner refuses incompatible prompt/schema profiles before an API call. Each
+generation also stores hashes for the schema and rendered system, developer and
+user prompts. Cases use canonical source-payload hashes; the ordered set of case
+IDs and source hashes defines the corpus hash.
+
+A run creates its blind-review protocol exactly once. `--assignment-seed`
+controls an exactly balanced (or one-case-difference) A/B placement, while the
+independent `--ordering-seed` controls the randomized case order. Omitted seeds
+are generated independently and stored. The Responses API does not expose a
+model-generation seed, so artifacts record that field as `null` rather than
+claiming deterministic model output.
+
+`review-html` renders only the assignments and presentation positions stored in
+a version-3 artifact. The run file is written atomically and an existing output
+path is never overwritten. Choose a new output path for every run.
+
+Run schemas 1 and 2 remain readable but are always non-promotable because they
+lack the complete profile and review-protocol metadata. Summaries reconstruct
+their side diagnostics from saved reviews. Re-rendering legacy review HTML
+requires `--reviews` with a complete export; the runner will not invent a new
+historical review surface.
+
 ## Commands
 
 Run commands from the repo root.
@@ -68,16 +114,23 @@ Build cases:
 npm run eval:editorial -w apps/worker -- build-cases --from 2026-05-01 --to 2026-06-02 --limit 15 --out tmp/editorial-eval/cases-15.json
 ```
 
-Run both variants:
+Run both variants (provide seeds to replay a planned review protocol, or omit
+them and retain the generated values from the artifact):
 
 ```powershell
-npm run eval:editorial -w apps/worker -- run --cases tmp/editorial-eval/cases-15.json --control regular_v5_6_control --challenger audience_mechanism_v1 --out tmp/editorial-eval/run-15.json
+npm run eval:editorial -w apps/worker -- run --cases tmp/editorial-eval/cases-15.json --control regular_v5_6_control --challenger audience_mechanism_v1 --assignment-seed review-sides-2026-08 --ordering-seed review-order-2026-08 --out tmp/editorial-eval/run-15.json
 ```
 
 Create the review UI:
 
 ```powershell
 npm run eval:editorial -w apps/worker -- review-html --run tmp/editorial-eval/run-15.json --out tmp/editorial-eval/review-15.html
+```
+
+For a legacy schema-1/2 artifact, add its complete review export:
+
+```powershell
+npm run eval:editorial -w apps/worker -- review-html --run tmp/editorial-eval/run-v6draft-50.json --reviews tmp/editorial-eval/reviews-user-v6draft-50.json --out tmp/editorial-eval/review-v6draft-50.html
 ```
 
 Open the review UI on Windows:
@@ -99,10 +152,14 @@ Artifacts are written under `tmp/editorial-eval` and should stay gitignored.
 Common files:
 
 - `cases-15.json`: selected notices and source payloads.
-- `run-15.json`: generated outputs, validation, reference-check results, latency, model, and reasoning effort.
+- `run-15.json`: immutable version-3 run artifact with source/corpus identity,
+  arm profiles, stored review protocol, generated outputs, validation,
+  reference-check results and model-call telemetry.
 - `review-15.html`: static blind-review page.
 - `reviews.json`: exported browser review choices.
-- `summary-15.json`: win rates, fatal counts, category net wins, per-variant
+- `summary-15.json`: win rates, fatal counts, category net wins, side placement,
+  displayed-side preference, category-by-side counts, five order bands,
+  missing/invalid reviews, generation failures, promotion eligibility, per-variant
   `quoteMetrics` (quote opportunity count from `sourceContainsNamedQuoteLikePattern`,
   quote presence rate given opportunity, dash/guillemets counts), and recommendation.
   Runs created before the quote-telemetry field produce empty `quoteMetrics`.

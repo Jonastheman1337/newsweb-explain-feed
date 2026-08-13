@@ -4,14 +4,13 @@ import { fileURLToPath } from "node:url";
 import { config as loadDotEnv } from "dotenv";
 import {
   createRegularPromptVariantMessages,
+  getRegularPromptVariantProfile,
   isRegularPromptVariantId,
   regularPromptVariantIds,
   type PromptPayload,
   type RegularPromptVariantId
 } from "@newsweb/prompt-kit";
 import {
-  rewriteOutputJsonSchema,
-  rewriteOutputJsonSchemaV6,
   rewriteOutputSchema,
   type RewriteOutput
 } from "@newsweb/shared";
@@ -26,8 +25,10 @@ import {
   type ReferenceCoverageReport
 } from "../services/reference-check.js";
 import {
+  assertReviewProtocolIntegrity,
   categorizeEvalPayload,
-  createReviewAssignments,
+  createLegacyReviewProtocol,
+  createReviewProtocol,
   difficultyTagsForPayload,
   evalCategoryQuotasForLimit,
   selectBalancedEvalCases,
@@ -37,8 +38,26 @@ import {
   type EvalCase,
   type EvalFatalStatus,
   type EvalGenerationSummary,
-  type EvalReview
+  type EvalReview,
+  type ReviewAssignment,
+  type ReviewProtocol
 } from "../services/editorial-eval.js";
+import {
+  collectGitSourceState,
+  createArtifactSeed,
+  createCorpusIdentity,
+  getEvalResponseSchemaProfile,
+  promptHashes,
+  resolveEvalArmRunProfile,
+  resolveReferenceRunProfile,
+  sourcePayloadSha256,
+  writeNewJsonArtifact,
+  type EvalArmRunProfile,
+  type EvalArtifactIntegrity,
+  type EvalPromptHashes,
+  type EvalReferenceRunProfile,
+  type RunArtifactV3
+} from "../services/editorial-eval-artifact.js";
 import {
   callOpenAIForJson,
   createOpenAIClient,
@@ -52,7 +71,7 @@ import { sanitizeRewriteStyle } from "../services/style-sanitizer.js";
 import { validateRewriteOutput } from "../services/rewrite-validation.js";
 
 type CasesFile = {
-  schemaVersion: 1;
+  schemaVersion: 1 | 2;
   createdAt: string;
   source: {
     from: string;
@@ -62,6 +81,8 @@ type CasesFile = {
   };
   quotas: Record<EvalCategoryId, number>;
   totalCases: number;
+  corpusId?: string;
+  corpusSha256?: string;
   cases: EvalCase[];
 };
 
@@ -70,6 +91,22 @@ type EvalGeneration = EvalGenerationSummary & {
   model: string;
   reasoningEffort: OpenAIReasoningEffort;
   serviceTier: OpenAIServiceTier;
+  startedAt: string;
+  completedAt: string;
+  responseSchemaId: EvalArmRunProfile["responseSchemaId"];
+  schemaSha256: string;
+  parserProfileId: EvalArmRunProfile["parserProfileId"];
+  validationProfileId: EvalArmRunProfile["validationProfileId"];
+  promptHashes: EvalPromptHashes;
+  requestMetadata: {
+    requestedModel: string;
+    requestedReasoningEffort: OpenAIReasoningEffort;
+    requestedVerbosity: "low";
+    requestedServiceTier: OpenAIServiceTier;
+    reasoningContext: "current_turn";
+    maxOutputTokens: number;
+    modelGenerationSeed: null;
+  };
   modelCalls: EvalModelCall[];
   output: RewriteOutput | null;
   validation: {
@@ -102,7 +139,7 @@ type EvalModelCall = Omit<OpenAIJsonResult, "content"> & {
   serviceTierRequested: OpenAIServiceTier;
 };
 
-type RunFile = {
+type LegacyRunFile = {
   schemaVersion: 1 | 2;
   runId: string;
   createdAt: string;
@@ -118,6 +155,10 @@ type RunFile = {
   cases: EvalCase[];
   generations: EvalGeneration[];
 };
+
+type RunFile =
+  | LegacyRunFile
+  | RunArtifactV3<EvalCase, EvalGeneration>;
 
 type ParsedArgs = {
   command: string;
@@ -310,9 +351,13 @@ async function buildCasesCommand(options: Map<string, string>): Promise<void> {
   const cases = selectBalancedEvalCases(candidates, {
     limit,
     quotas
-  });
+  }).map((item) => ({
+    ...item,
+    sourceSha256: sourcePayloadSha256(item.payload)
+  }));
+  const corpus = createCorpusIdentity(cases, outPath);
   const output: CasesFile = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     createdAt: new Date().toISOString(),
     source: {
       from,
@@ -325,14 +370,17 @@ async function buildCasesCommand(options: Map<string, string>): Promise<void> {
     },
     quotas,
     totalCases: cases.length,
+    corpusId: corpus.corpusId,
+    corpusSha256: corpus.corpusSha256,
     cases
   };
 
-  await writeJson(outPath, output);
+  await writeNewJsonArtifact(outPath, output);
   console.log(`Wrote ${cases.length} eval cases to ${outPath}`);
 }
 
 async function runCommand(options: Map<string, string>): Promise<void> {
+  const startedAt = new Date().toISOString();
   const casesPath = requiredOption(options, "cases");
   const controlVariant = parseVariant(requiredOption(options, "control"));
   const challengerVariant = parseVariant(requiredOption(options, "challenger"));
@@ -363,37 +411,67 @@ async function runCommand(options: Map<string, string>): Promise<void> {
     options.get("service-tier") ?? process.env.OPENAI_SERVICE_TIER,
     "flex"
   );
+  const controlProfile = resolveEvalArmRunProfile({
+    arm: "control",
+    variantId: controlVariant,
+    model: controlModel,
+    reasoningEffort: controlReasoningEffort,
+    serviceTier
+  });
+  const challengerProfile = resolveEvalArmRunProfile({
+    arm: "challenger",
+    variantId: challengerVariant,
+    model: challengerModel,
+    reasoningEffort: challengerReasoningEffort,
+    serviceTier
+  });
+  const referenceProfile = resolveReferenceRunProfile({
+    schema: referenceCheckJsonSchema as Record<string, unknown>,
+    model: referenceModel,
+    reasoningEffort: referenceReasoningEffort,
+    serviceTier
+  });
+  const assignmentSeed =
+    options.get("assignment-seed")?.trim() || createArtifactSeed();
+  const orderingSeed = options.get("ordering-seed")?.trim() || createArtifactSeed();
+  const casesFile = await readJson<CasesFile>(casesPath);
+  const cases = casesFile.cases.map((item) => {
+    const calculatedSourceSha256 = sourcePayloadSha256(item.payload);
+    if (
+      item.sourceSha256 &&
+      item.sourceSha256 !== calculatedSourceSha256
+    ) {
+      throw new Error(
+        `Source hash mismatch for ${item.caseId}: stored ${item.sourceSha256}, calculated ${calculatedSourceSha256}`
+      );
+    }
+    return { ...item, sourceSha256: calculatedSourceSha256 };
+  });
+  const corpus = createCorpusIdentity(cases, casesPath);
+  if (casesFile.corpusSha256 && casesFile.corpusSha256 !== corpus.corpusSha256) {
+    throw new Error(
+      `Cases file corpus hash mismatch: stored ${casesFile.corpusSha256}, calculated ${corpus.corpusSha256}`
+    );
+  }
+  const repoRoot = await findRepoRoot();
+  const sourceState = await collectGitSourceState(repoRoot);
   const apiKey = process.env.OPENAI_API_KEY?.trim();
   if (!apiKey) {
     throw new Error("OPENAI_API_KEY is required for eval run.");
   }
   const client = createOpenAIClient(apiKey);
-  const casesFile = await readJson<CasesFile>(casesPath);
   const generations: EvalGeneration[] = [];
 
-  for (const evalCase of casesFile.cases) {
-    for (const profile of [
-      {
-        arm: "control" as const,
-        variantId: controlVariant,
-        model: controlModel,
-        reasoningEffort: controlReasoningEffort
-      },
-      {
-        arm: "challenger" as const,
-        variantId: challengerVariant,
-        model: challengerModel,
-        reasoningEffort: challengerReasoningEffort
-      }
-    ]) {
-      console.log(`[eval] ${evalCase.caseId} ${profile.arm} ${profile.model} ${profile.reasoningEffort}`);
+  for (const evalCase of cases) {
+    for (const profile of [controlProfile, challengerProfile]) {
+      console.log(
+        `[eval] ${evalCase.caseId} ${profile.arm} ${profile.requestedModel} ${profile.requestedReasoningEffort}`
+      );
       generations.push(
         await runGeneration({
           evalCase,
-          ...profile,
-          referenceModel,
-          referenceReasoningEffort,
-          serviceTier,
+          profile,
+          referenceProfile,
           timeoutMs,
           client
         })
@@ -401,58 +479,76 @@ async function runCommand(options: Map<string, string>): Promise<void> {
     }
   }
 
-  const output: RunFile = {
-    schemaVersion: 2,
-    runId: `editorial_eval_${timestampForFile(new Date())}`,
-    createdAt: new Date().toISOString(),
-    model,
-    reasoningEffort,
-    serviceTier,
-    controlProfile: { model: controlModel, reasoningEffort: controlReasoningEffort },
-    challengerProfile: {
-      model: challengerModel,
-      reasoningEffort: challengerReasoningEffort
-    },
-    referenceProfile: {
-      model: referenceModel,
-      reasoningEffort: referenceReasoningEffort
+  const reviewProtocol = createReviewProtocol(
+    generations,
+    controlVariant,
+    challengerVariant,
+    { assignmentSeed, orderingSeed }
+  );
+  const integrity: EvalArtifactIntegrity = {
+    promotionEligible: true,
+    reasons: [],
+    warnings: sourceState.dirty
+      ? [
+          `Evaluation was generated from a dirty worktree (${sourceState.sourceStateSha256}).`
+        ]
+      : []
+  };
+  const output: RunArtifactV3<EvalCase, EvalGeneration> = {
+    schemaVersion: 3,
+    runId: `editorial_eval_${timestampForFile(new Date())}_${assignmentSeed.slice(0, 8)}`,
+    createdAt: startedAt,
+    startedAt,
+    completedAt: new Date().toISOString(),
+    sourceState,
+    corpus,
+    profiles: {
+      control: controlProfile,
+      challenger: challengerProfile,
+      reference: referenceProfile
     },
     controlVariant,
     challengerVariant,
-    sourceCasesPath: casesPath,
-    cases: casesFile.cases,
+    reviewProtocol,
+    integrity,
+    cases,
     generations
   };
 
-  await writeJson(outPath, output);
+  await writeNewJsonArtifact(outPath, output);
   console.log(`Wrote eval run to ${outPath}`);
 }
 
 async function runGeneration({
   evalCase,
-  arm,
-  variantId,
-  model,
-  reasoningEffort,
-  referenceModel,
-  referenceReasoningEffort,
-  serviceTier,
+  profile,
+  referenceProfile,
   timeoutMs,
   client
 }: {
   evalCase: EvalCase;
-  arm: "control" | "challenger";
-  variantId: RegularPromptVariantId;
-  model: string;
-  reasoningEffort: OpenAIReasoningEffort;
-  referenceModel: string;
-  referenceReasoningEffort: OpenAIReasoningEffort;
-  serviceTier: OpenAIServiceTier;
+  profile: EvalArmRunProfile;
+  referenceProfile: EvalReferenceRunProfile;
   timeoutMs: number;
   client: ReturnType<typeof createOpenAIClient>;
 }): Promise<EvalGeneration> {
+  const generationStartedAt = new Date().toISOString();
   const startedAt = Date.now();
-  const messages = createRegularPromptVariantMessages(variantId, evalCase.payload);
+  const messages = createRegularPromptVariantMessages(
+    profile.variantId,
+    evalCase.payload
+  );
+  const registeredProfile = getRegularPromptVariantProfile(profile.variantId);
+  if (
+    messages.promptVersion !== profile.promptVersion ||
+    registeredProfile.responseSchemaId !== profile.responseSchemaId
+  ) {
+    throw new Error(
+      `Evaluation profile changed after preflight for ${profile.variantId}`
+    );
+  }
+  const responseSchema = getEvalResponseSchemaProfile(profile.responseSchemaId);
+  const generationPromptHashes = promptHashes(messages);
   const rewritePromptChars =
     messages.systemPrompt.length +
     messages.developerPrompt.length +
@@ -460,25 +556,48 @@ async function runGeneration({
   let referencePromptChars = 0;
   const modelCalls: EvalModelCall[] = [];
 
-  // v6 variants pair with the extract-then-write schema order; zod parsing
-  // and all downstream consumers are key-based, so outputs stay comparable.
-  const rewriteJsonSchema =
-    variantId === "regular_v6_full" ? rewriteOutputJsonSchemaV6 : rewriteOutputJsonSchema;
+  const requestMetadata = {
+    requestedModel: profile.requestedModel,
+    requestedReasoningEffort: profile.requestedReasoningEffort,
+    requestedVerbosity: profile.requestedVerbosity,
+    requestedServiceTier: profile.requestedServiceTier,
+    reasoningContext: profile.reasoningContext,
+    maxOutputTokens: profile.maxOutputTokens,
+    modelGenerationSeed: profile.modelGenerationSeed
+  };
+  const artifactMetadata = {
+    startedAt: generationStartedAt,
+    responseSchemaId: profile.responseSchemaId,
+    schemaSha256: profile.schemaSha256,
+    parserProfileId: profile.parserProfileId,
+    validationProfileId: profile.validationProfileId,
+    promptHashes: generationPromptHashes,
+    requestMetadata
+  };
 
   try {
     const rewriteResult = await callOpenAIForJson(client, {
-      schemaName: "rewrite_output",
-      schema: rewriteJsonSchema as Record<string, unknown>,
+      schemaName: responseSchema.schemaName,
+      schema: responseSchema.schema as Record<string, unknown>,
       systemPrompt: messages.systemPrompt,
       developerPrompt: messages.developerPrompt,
       userPrompt: messages.userPrompt,
-      model,
-      reasoningEffort,
-      serviceTier,
+      model: profile.requestedModel,
+      reasoningEffort: profile.requestedReasoningEffort,
+      serviceTier: profile.requestedServiceTier,
+      reasoningContext: profile.reasoningContext,
       timeoutMs,
-      maxOutputTokens: 16384
+      maxOutputTokens: profile.maxOutputTokens
     });
-    modelCalls.push(evalModelCall("rewrite_output", model, reasoningEffort, serviceTier, rewriteResult));
+    modelCalls.push(
+      evalModelCall(
+        responseSchema.schemaName,
+        profile.requestedModel,
+        profile.requestedReasoningEffort,
+        profile.requestedServiceTier,
+        rewriteResult
+      )
+    );
     const raw = rewriteResult.content;
     const parsed = rewriteOutputSchema.parse(clampRewriteArrays(JSON.parse(raw)));
     const styleResult = sanitizeRewriteStyle(parsed);
@@ -493,9 +612,7 @@ async function runGeneration({
     const referenceResult = await runReferenceCheck({
       payload: referencePayload,
       rewrite: output,
-      model: referenceModel,
-      reasoningEffort: referenceReasoningEffort,
-      serviceTier,
+      profile: referenceProfile,
       timeoutMs,
       client
     });
@@ -509,15 +626,17 @@ async function runGeneration({
     });
 
     return {
-      id: `${evalCase.caseId}:${arm}`,
+      id: `${evalCase.caseId}:${profile.arm}`,
       caseId: evalCase.caseId,
-      arm,
-      variantId,
+      arm: profile.arm,
+      variantId: profile.variantId,
       category: evalCase.category,
       promptVersion: messages.promptVersion,
-      model,
-      reasoningEffort,
-      serviceTier,
+      model: profile.requestedModel,
+      reasoningEffort: profile.requestedReasoningEffort,
+      serviceTier: profile.requestedServiceTier,
+      ...artifactMetadata,
+      completedAt: new Date().toISOString(),
       modelCalls,
       output,
       validation: {
@@ -549,15 +668,17 @@ async function runGeneration({
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return {
-      id: `${evalCase.caseId}:${arm}`,
+      id: `${evalCase.caseId}:${profile.arm}`,
       caseId: evalCase.caseId,
-      arm,
-      variantId,
+      arm: profile.arm,
+      variantId: profile.variantId,
       category: evalCase.category,
       promptVersion: messages.promptVersion,
-      model,
-      reasoningEffort,
-      serviceTier,
+      model: profile.requestedModel,
+      reasoningEffort: profile.requestedReasoningEffort,
+      serviceTier: profile.requestedServiceTier,
+      ...artifactMetadata,
+      completedAt: new Date().toISOString(),
       modelCalls,
       output: null,
       validation: null,
@@ -584,17 +705,13 @@ async function runGeneration({
 async function runReferenceCheck({
   payload,
   rewrite,
-  model,
-  reasoningEffort,
-  serviceTier,
+  profile,
   timeoutMs,
   client
 }: {
   payload: PromptPayload;
   rewrite: RewriteOutput;
-  model: string;
-  reasoningEffort: OpenAIReasoningEffort;
-  serviceTier: OpenAIServiceTier;
+  profile: EvalReferenceRunProfile;
   timeoutMs: number;
   client: ReturnType<typeof createOpenAIClient>;
 }): Promise<{
@@ -618,11 +735,12 @@ async function runReferenceCheck({
     systemPrompt: referencePrompt.systemPrompt,
     developerPrompt: referencePrompt.developerPrompt,
     userPrompt: referencePrompt.userPrompt,
-    model,
-    reasoningEffort,
-    serviceTier,
+    model: profile.requestedModel,
+    reasoningEffort: profile.requestedReasoningEffort,
+    serviceTier: profile.requestedServiceTier,
+    reasoningContext: profile.reasoningContext,
     timeoutMs,
-    maxOutputTokens: 16384
+    maxOutputTokens: profile.maxOutputTokens
   });
   const raw = result.content;
   const parsed = referenceCheckResultSchema.parse(JSON.parse(raw));
@@ -633,9 +751,9 @@ async function runReferenceCheck({
     promptChars,
     modelCall: evalModelCall(
       "reference_check_result",
-      model,
-      reasoningEffort,
-      serviceTier,
+      profile.requestedModel,
+      profile.requestedReasoningEffort,
+      profile.requestedServiceTier,
       result
     )
   };
@@ -662,12 +780,42 @@ async function reviewHtmlCommand(options: Map<string, string>): Promise<void> {
   const runPath = requiredOption(options, "run");
   const outPath = requiredOption(options, "out");
   const run = await readJson<RunFile>(runPath);
-  const assignments = createReviewAssignments(
-    run.generations,
-    run.controlVariant,
-    run.challengerVariant
+  let reviewProtocol: ReviewProtocol;
+  let integrity: EvalArtifactIntegrity;
+  if (run.schemaVersion === 3) {
+    assertReviewProtocolIntegrity(
+      run.reviewProtocol,
+      run.generations,
+      run.controlVariant,
+      run.challengerVariant
+    );
+    reviewProtocol = run.reviewProtocol;
+    integrity = run.integrity;
+  } else {
+    const reviewsPath = requiredOption(options, "reviews");
+    const reviews = await readReviews(reviewsPath);
+    reviewProtocol = createLegacyReviewProtocol(
+      run.generations,
+      reviews,
+      run.controlVariant,
+      run.challengerVariant
+    );
+    integrity = {
+      promotionEligible: false,
+      reasons: [
+        `Legacy run schema ${run.schemaVersion} lacks stored profiles and review protocol.`
+      ],
+      warnings: []
+    };
+  }
+  await writeText(
+    outPath,
+    renderReviewHtml({
+      run,
+      assignments: reviewProtocol.assignments,
+      integrity
+    })
   );
-  await writeText(outPath, renderReviewHtml({ run, assignments }));
   console.log(`Wrote blind review HTML to ${outPath}`);
 }
 
@@ -676,23 +824,48 @@ async function summarizeCommand(options: Map<string, string>): Promise<void> {
   const reviewsPath = requiredOption(options, "reviews");
   const outPath = requiredOption(options, "out");
   const run = await readJson<RunFile>(runPath);
-  const rawReviews = await readJson<unknown>(reviewsPath);
-  const reviews = Array.isArray(rawReviews)
-    ? (rawReviews as EvalReview[])
-    : ((rawReviews as { reviews?: EvalReview[] }).reviews ?? []);
+  const reviews = await readReviews(reviewsPath);
+  const artifactIntegrity =
+    run.schemaVersion === 3
+      ? run.integrity
+      : {
+          promotionEligible: false,
+          reasons: [
+            `Legacy run schema ${run.schemaVersion} lacks stored profiles and review protocol.`
+          ],
+          warnings: []
+        };
+  if (run.schemaVersion === 3) {
+    assertReviewProtocolIntegrity(
+      run.reviewProtocol,
+      run.generations,
+      run.controlVariant,
+      run.challengerVariant
+    );
+  }
   const summary = summarizeEditorialEval(run, reviews, {
     controlVariant: run.controlVariant,
-    challengerVariant: run.challengerVariant
+    challengerVariant: run.challengerVariant,
+    reviewProtocol: run.schemaVersion === 3 ? run.reviewProtocol : undefined,
+    artifactIntegrity
   });
   await writeJson(outPath, {
-    schemaVersion: 1,
+    schemaVersion: 2,
     createdAt: new Date().toISOString(),
     runId: run.runId,
     controlVariant: run.controlVariant,
     challengerVariant: run.challengerVariant,
+    sourceRunSchemaVersion: run.schemaVersion,
     summary
   });
   console.log(`Wrote eval summary to ${outPath}`);
+}
+
+async function readReviews(filePath: string): Promise<EvalReview[]> {
+  const rawReviews = await readJson<unknown>(filePath);
+  return Array.isArray(rawReviews)
+    ? (rawReviews as EvalReview[])
+    : ((rawReviews as { reviews?: EvalReview[] }).reviews ?? []);
 }
 
 function fatalStatusFor({
@@ -898,12 +1071,17 @@ function clampRewriteArrays(raw: Record<string, unknown>): Record<string, unknow
 
 function renderReviewHtml({
   run,
-  assignments
+  assignments,
+  integrity
 }: {
   run: RunFile;
-  assignments: ReturnType<typeof createReviewAssignments>;
+  assignments: ReviewAssignment[];
+  integrity: EvalArtifactIntegrity;
 }): string {
-  const payload = JSON.stringify({ run, assignments }).replace(/</g, "\\u003c");
+  const payload = JSON.stringify({ run, assignments, integrity }).replace(
+    /</g,
+    "\\u003c"
+  );
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -918,10 +1096,41 @@ function renderReviewHtml({
       --ink: #fffbf8;
       --ink-soft: #9b9b9b;
       --accent: #ffffff;
-      --accent-2: #36c89a;
       --line: #3d3d3d;
       --warning: #fa4747;
       --radius: 8px;
+    }
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg-main: #f5f5f5;
+        --bg-panel: #ffffff;
+        --bg-soft: #ebebeb;
+        --ink: #1a1a1a;
+        --ink-soft: #6b6b6b;
+        --accent: #1a1a1a;
+        --line: #d5d5d5;
+        --warning: #d93025;
+      }
+    }
+    :root[data-theme="light"] {
+      --bg-main: #f5f5f5;
+      --bg-panel: #ffffff;
+      --bg-soft: #ebebeb;
+      --ink: #1a1a1a;
+      --ink-soft: #6b6b6b;
+      --accent: #1a1a1a;
+      --line: #d5d5d5;
+      --warning: #d93025;
+    }
+    :root[data-theme="dark"] {
+      --bg-main: #1d1d1d;
+      --bg-panel: #2a2a2a;
+      --bg-soft: #333333;
+      --ink: #fffbf8;
+      --ink-soft: #9b9b9b;
+      --accent: #ffffff;
+      --line: #3d3d3d;
+      --warning: #fa4747;
     }
     * { box-sizing: border-box; }
     html, body { margin: 0; min-height: 100%; }
@@ -941,50 +1150,44 @@ function renderReviewHtml({
     }
     button:hover:not(:disabled) { border-color: var(--ink-soft); }
     button:disabled { cursor: default; opacity: 0.38; }
+    button:focus-visible, summary:focus-visible, textarea:focus-visible {
+      outline: 2px solid var(--ink-soft);
+      outline-offset: 2px;
+    }
     .pageShell {
-      width: calc(100% - 2rem);
-      max-width: 1100px;
+      width: min(1060px, 92vw);
       margin: 0 auto;
-      padding: 1.5rem 0 3rem;
+      padding: 1.1rem 0 11rem;
     }
     .topBar {
       display: flex;
       align-items: flex-start;
       justify-content: space-between;
       gap: 1rem;
-      margin-bottom: 1.5rem;
+      padding-bottom: 0.9rem;
+      border-bottom: 1px solid var(--line);
     }
-    .topBar > div { min-width: 0; }
-    .topBar h1 {
-      margin: 0;
-      font-size: clamp(1.4rem, 3vw, 2rem);
-      line-height: 1.1;
-      font-weight: 800;
-      opacity: 0.4;
-    }
-    .muted { color: var(--ink-soft); }
-    .meta {
-      color: var(--ink-soft);
-      font-size: 0.82rem;
-      line-height: 1.4;
-    }
+    .topLead { min-width: 0; flex: 1; }
+    .eyebrow { color: var(--ink-soft); font-size: 0.8rem; }
+    .meta { color: var(--ink-soft); font-size: 0.8rem; line-height: 1.45; }
+    #progress { margin-top: 0.35rem; font-variant-numeric: tabular-nums; }
+    .warn { color: var(--warning); margin-top: 0.25rem; }
+    .warn:empty { display: none; }
+    .topActions { display: flex; gap: 0.4rem; flex-shrink: 0; }
     .ghostButton {
-      padding: 0;
+      padding: 0.35rem 0.6rem;
       border: none;
-      border-radius: 0;
+      border-radius: var(--radius);
       background: transparent;
       color: var(--ink-soft);
-      font-size: 0.75rem;
-      font-weight: 600;
-      letter-spacing: 0.03em;
-      text-transform: uppercase;
+      font-size: 0.78rem;
       white-space: nowrap;
     }
     .ghostButton:hover { color: var(--ink); }
     .progressTrack {
       width: min(360px, 100%);
       height: 3px;
-      margin-top: 0.65rem;
+      margin-top: 0.5rem;
       overflow: hidden;
       border-radius: 2px;
       background: var(--bg-soft);
@@ -996,25 +1199,17 @@ function renderReviewHtml({
       background: var(--accent);
       transition: width 0.18s ease;
     }
-    .caseBlock {
-      min-width: 0;
-      padding: 1rem 0 1.2rem;
-      border-bottom: 1px solid var(--line);
-    }
-    .caseBlock h2,
-    .versionPanel h2 {
-      margin: 0.35rem 0 0.45rem;
+    .caseBlock { min-width: 0; padding: 1rem 0 0.5rem; }
+    .caseMeta { font-size: 0.8rem; }
+    #case-title {
+      margin: 0.4rem 0 0.5rem;
       font-size: 1.25rem;
       line-height: 1.3;
       font-weight: 700;
+      letter-spacing: -0.03em;
       overflow-wrap: anywhere;
     }
-    .caseTags {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.45rem;
-      margin-top: 0.75rem;
-    }
+    .caseTags { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.4rem 0 0.6rem; }
     .chip {
       display: inline-flex;
       align-items: center;
@@ -1022,40 +1217,54 @@ function renderReviewHtml({
       border-radius: var(--radius);
       background: var(--bg-soft);
       color: var(--ink-soft);
-      padding: 0.18rem 0.48rem;
+      padding: 0.16rem 0.5rem;
       font-size: 0.76rem;
     }
+    .fold { border-top: 1px solid var(--line); }
+    .fold summary {
+      list-style: none;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.65rem 0;
+      cursor: pointer;
+      color: var(--ink-soft);
+      font-size: 0.8rem;
+    }
+    .fold summary::-webkit-details-marker { display: none; }
+    .fold summary::before { content: "+"; width: 1rem; }
+    .fold[open] summary::before { content: "\\2212"; }
     .sourceBlock {
       min-width: 0;
-      max-height: 280px;
+      max-height: 44vh;
       overflow-y: auto;
       overflow-x: hidden;
-      padding-right: 0.5rem;
+      padding: 0 0.5rem 0.8rem 1.5rem;
       scrollbar-width: thin;
       scrollbar-color: var(--line) transparent;
     }
     .sourceBlock::-webkit-scrollbar { width: 4px; }
     .sourceBlock::-webkit-scrollbar-track { background: transparent; }
     .sourceBlock::-webkit-scrollbar-thumb { background: var(--line); border-radius: 2px; }
-    .sourceBlock p,
-    .articleBody p {
-      margin: 0.6rem 0;
+    .sourceBlock p {
+      margin: 0 0 0.7rem;
+      font-size: 0.9rem;
       line-height: 1.6;
+      color: var(--ink-soft);
       overflow-wrap: anywhere;
       word-break: break-word;
     }
-    .articleBody { min-width: 0; overflow-x: hidden; }
     .compareGrid {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-      gap: 1.5rem;
+      grid-template-columns: 1fr;
+      gap: 0;
       align-items: start;
-      margin-top: 0.25rem;
     }
     .versionPanel {
       min-width: 0;
-      padding: 1rem 0 1.2rem;
+      padding: 1.2rem 0;
       border-bottom: 1px solid var(--line);
+      background: transparent;
     }
     .versionLabel {
       display: flex;
@@ -1064,72 +1273,42 @@ function renderReviewHtml({
       gap: 1rem;
       margin-bottom: 0.25rem;
     }
-    .fatal {
-      color: var(--warning);
-      font-size: 0.78rem;
+    .versionPanel h2 {
+      margin: 0 0 0.4rem;
+      font-size: 1.25rem;
+      line-height: 1.3;
       font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.03em;
-    }
-    .reviewPanel {
-      min-width: 0;
-      margin-top: 1rem;
-      padding: 1rem;
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      background: var(--bg-panel);
-    }
-    .reviewPanel h2 {
-      margin: 0 0 0.85rem;
-      font-size: 1rem;
-      line-height: 1.35;
-    }
-    .choiceRow,
-    .navRow,
-    .tagRow {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.5rem;
-    }
-    .choiceButton {
-      min-width: 7.5rem;
-      padding: 0.55rem 0.7rem;
-      text-align: center;
+      letter-spacing: -0.03em;
       overflow-wrap: anywhere;
     }
-    .choiceButton.selected {
-      border-color: var(--ink);
-      background: var(--ink);
-      color: var(--bg-main);
+    .articleBody { min-width: 0; overflow-x: hidden; }
+    .articleBody p {
+      margin: 0.55rem 0;
+      font-size: 0.95rem;
+      line-height: 1.6;
+      overflow-wrap: anywhere;
+      word-break: break-word;
     }
-    .decisionLine {
-      min-height: 1.25rem;
-      margin: 0.8rem 0;
-      color: var(--ink-soft);
-      font-size: 0.84rem;
-    }
-    .tagRow {
-      margin: 0.45rem 0 0.75rem;
-    }
+    .tagRow { display: flex; flex-wrap: wrap; gap: 0.45rem; margin: 0.2rem 0 0.6rem; padding-left: 1.5rem; }
     .tagRow label {
       display: inline-flex;
       align-items: center;
       gap: 0.35rem;
-      padding: 0.28rem 0.48rem;
+      padding: 0.26rem 0.5rem;
       border: 1px solid var(--line);
       border-radius: var(--radius);
       color: var(--ink-soft);
       background: var(--bg-soft);
-      font-size: 0.8rem;
+      font-size: 0.78rem;
       cursor: pointer;
     }
-    .tagRow input { accent-color: var(--accent-2); }
+    .tagRow input { accent-color: var(--ink); }
     textarea {
       display: block;
-      width: 100%;
-      min-height: 74px;
-      margin: 0.75rem 0 0.85rem;
-      padding: 0.65rem 0.75rem;
+      width: calc(100% - 1.5rem);
+      min-height: 70px;
+      margin: 0 0 0.9rem 1.5rem;
+      padding: 0.6rem 0.7rem;
       border: 1px solid var(--line);
       border-radius: var(--radius);
       background: var(--bg-soft);
@@ -1138,88 +1317,147 @@ function renderReviewHtml({
       outline: none;
     }
     textarea:focus { border-color: var(--ink-soft); }
-    .navRow {
-      align-items: center;
-      justify-content: space-between;
-      gap: 0.75rem;
+    .verdictBar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 10;
+      background: var(--bg-panel);
+      border-top: 1px solid var(--line);
+      padding: 0.55rem max(1.2rem, env(safe-area-inset-right)) max(0.75rem, env(safe-area-inset-bottom)) max(1.2rem, env(safe-area-inset-left));
     }
-    .navButtons {
-      display: inline-flex;
-      gap: 0.5rem;
+    .verdictInner { max-width: 1060px; margin: 0 auto; }
+    .reviewQuestion {
+      font-size: 0.84rem;
+      color: var(--ink-soft);
+      margin-bottom: 0.45rem;
     }
-    .navButtons button {
-      padding: 0.5rem 0.7rem;
+    .choiceRow { display: flex; gap: 0.45rem; align-items: stretch; }
+    .choiceButton {
+      flex: 1 1 auto;
+      min-height: 2.7rem;
+      padding: 0.45rem 0.5rem;
+      text-align: center;
+      font-size: 0.88rem;
+      overflow-wrap: anywhere;
     }
-    @media (max-width: 900px) {
-      .topBar {
-        display: grid;
-        grid-template-columns: 1fr;
-      }
-      .ghostButton { justify-self: start; }
-      .compareGrid { grid-template-columns: 1fr; gap: 0; }
-      .choiceButton { flex: 1 1 calc(50% - 0.5rem); }
-      .navRow { align-items: stretch; }
-      .navButtons { width: 100%; }
-      .navButtons button { flex: 1; }
+    .choiceButton.big { flex: 1.6 1 auto; }
+    .choiceButton.selected {
+      border-color: var(--ink);
+      background: var(--ink);
+      color: var(--bg-main);
+    }
+    .navButton {
+      flex: 0 0 3.2rem;
+      min-height: 2.7rem;
+      font-size: 0.88rem;
+      color: var(--ink-soft);
+    }
+    .navButton:hover:not(:disabled) { color: var(--ink); }
+    .verdictStatus { display: flex; justify-content: space-between; gap: 1rem; margin-top: 0.4rem; }
+    .verdictStatus .meta {
+      font-size: 0.72rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    @media (min-width: 940px) {
+      .compareGrid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 2rem; }
+      .pageShell { padding-bottom: 9.5rem; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      * { transition: none !important; }
     }
   </style>
 </head>
 <body>
   <main class="pageShell">
     <header class="topBar">
-      <div>
-        <h1>Editorial Eval</h1>
+      <div class="topLead">
+        <div class="eyebrow">Editorial eval &middot; blind A/B</div>
         <div class="meta" id="progress"></div>
         <div class="progressTrack" aria-hidden="true"><div class="progressFill" id="progress-fill"></div></div>
+        <div class="meta warn" id="integrity-note"></div>
+        <div class="meta warn" id="storage-note"></div>
       </div>
-      <button class="ghostButton" id="export" type="button">Export reviews.json</button>
+      <div class="topActions">
+        <button class="ghostButton" id="copy" type="button">Copy JSON</button>
+        <button class="ghostButton" id="export" type="button">Export reviews.json</button>
+      </div>
     </header>
 
     <section class="caseBlock">
-      <div class="meta" id="case-meta"></div>
+      <div class="meta caseMeta" id="case-meta"></div>
       <h2 id="case-title"></h2>
       <div class="caseTags" id="case-tags"></div>
     </section>
 
-    <section class="caseBlock">
-      <div class="meta">Original notice</div>
+    <details class="fold" open>
+      <summary>Original notice</summary>
       <div class="sourceBlock" id="source"></div>
-    </section>
+    </details>
 
     <div class="compareGrid">
       <section class="versionPanel" id="article-a"></section>
       <section class="versionPanel" id="article-b"></section>
     </div>
 
-    <section class="reviewPanel">
-      <h2>Which version would require less editing before publication?</h2>
-      <div class="choiceRow">
-        <button class="choiceButton" data-winner="A" type="button">A wins</button>
-        <button class="choiceButton" data-winner="B" type="button">B wins</button>
-        <button class="choiceButton" data-winner="tie" type="button">Tie</button>
-        <button class="choiceButton" data-winner="both_bad" type="button">Both bad</button>
-      </div>
-      <div class="decisionLine" id="decision-status"></div>
+    <details class="fold">
+      <summary>Tags &amp; comment (optional)</summary>
       <div class="tagRow" id="tags"></div>
       <textarea id="comment" placeholder="Optional comment"></textarea>
-      <div class="navRow">
-        <div class="meta" id="nav-status"></div>
-        <div class="navButtons">
-          <button id="prev" type="button">Previous</button>
-          <button id="next" type="button">Next case</button>
-        </div>
-      </div>
-    </section>
+    </details>
   </main>
+
+  <footer class="verdictBar">
+    <div class="verdictInner">
+      <div class="reviewQuestion">Which version would require less editing before publication?</div>
+      <div class="choiceRow">
+        <button class="navButton" id="prev" type="button" aria-label="Previous case">&#8249;</button>
+        <button class="choiceButton big" data-winner="A" type="button">A wins</button>
+        <button class="choiceButton" data-winner="tie" type="button">Tie</button>
+        <button class="choiceButton" data-winner="both_bad" type="button">Both bad</button>
+        <button class="choiceButton big" data-winner="B" type="button">B wins</button>
+        <button class="navButton" id="next" type="button" aria-label="Next case">&#8250;</button>
+      </div>
+      <div class="verdictStatus">
+        <span class="meta" id="decision-status"></span>
+        <span class="meta" id="nav-status"></span>
+      </div>
+    </div>
+  </footer>
   <script type="application/json" id="eval-data">${payload}</script>
   <script>
     const data = JSON.parse(document.getElementById("eval-data").textContent);
+    if (!data.integrity.promotionEligible) {
+      document.getElementById("integrity-note").textContent =
+        "Non-promotable evaluation: " + data.integrity.reasons.join(" ");
+    } else if (data.integrity.warnings.length > 0) {
+      document.getElementById("integrity-note").textContent =
+        data.integrity.warnings.join(" ");
+    }
+    let storage;
+    try {
+      storage = window.localStorage;
+      storage.setItem("__eval_probe__", "1");
+      storage.removeItem("__eval_probe__");
+    } catch (err) {
+      const memoryStore = new Map();
+      storage = {
+        getItem: (key) => (memoryStore.has(key) ? memoryStore.get(key) : null),
+        setItem: (key, value) => { memoryStore.set(key, String(value)); },
+        removeItem: (key) => { memoryStore.delete(key); }
+      };
+      document.getElementById("storage-note").textContent =
+        "This device cannot save progress between visits - copy or export your reviews before closing.";
+    }
     const storageKey = "editorial-eval:" + data.run.runId + ":reviews";
     const tags = ["clearer explanation", "better financial language", "better structure", "better Norwegian", "less robotic", "less overexplaining", "less underexplaining", "safer"];
     const byCase = Object.fromEntries(data.run.cases.map(item => [item.caseId, item]));
     const byGeneration = Object.fromEntries(data.run.generations.map(item => [item.id, item]));
-    let reviews = JSON.parse(localStorage.getItem(storageKey) || "[]");
-    let index = Number(localStorage.getItem(storageKey + ":index") || "0");
+    let reviews = JSON.parse(storage.getItem(storageKey) || "[]");
+    let index = Number(storage.getItem(storageKey + ":index") || "0");
     let renderedAt = Date.now();
 
     const winnerLabels = {
@@ -1230,8 +1468,8 @@ function renderReviewHtml({
     };
 
     function save() {
-      localStorage.setItem(storageKey, JSON.stringify(reviews));
-      localStorage.setItem(storageKey + ":index", String(index));
+      storage.setItem(storageKey, JSON.stringify(reviews));
+      storage.setItem(storageKey + ":index", String(index));
     }
     function currentReview(caseId) {
       return reviews.find(item => item.caseId === caseId) || null;
@@ -1243,16 +1481,18 @@ function renderReviewHtml({
     function articleHtml(label, generation) {
       const output = generation.output;
       if (!output) {
-        return "<div class='versionLabel'><div class='meta'>Version " + label + "</div><span class='fatal'>Fatal</span></div><h2>No output</h2><div class='articleBody'><p>" + escapeHtml(generation.errorText || "No output") + "</p></div>";
+        return "<div class='versionLabel'><div class='meta'>Version " + label + "</div></div><h2>No output</h2><div class='articleBody'><p>" + escapeHtml(generation.errorText || "No output") + "</p></div>";
       }
+      // Pipeline signals (fatal status, coverage, reference reasons) are
+      // deliberately not shown: the blind review should reflect only what a
+      // reader would see, without machine-check anchoring.
       return [
-        "<div class='versionLabel'><div class='meta'>Version " + label + "</div>" + (generation.fatalStatus.fatal ? "<span class='fatal'>Fatal</span>" : "<span class='meta'>" + generation.referenceCheck.coveragePercent + "% coverage</span>") + "</div>",
+        "<div class='versionLabel'><div class='meta'>Version " + label + "</div></div>",
         "<h2>" + escapeHtml(output.title) + "</h2>",
         "<div class='articleBody'>",
         "<p>" + escapeHtml(output.lead) + "</p>",
         ...output.body.map(p => "<p>" + escapeHtml(p) + "</p>"),
-        "</div>",
-        generation.referenceCheck.blockingReason ? "<div class='meta'>Reference: " + escapeHtml(generation.referenceCheck.blockingReason) + "</div>" : ""
+        "</div>"
       ].join("");
     }
     function sourceHtml(text) {
@@ -1317,7 +1557,7 @@ function renderReviewHtml({
       document.getElementById("nav-status").textContent = review ? "Ready for next case." : "Pick a decision to enable Next.";
       document.getElementById("prev").disabled = index === 0;
       document.getElementById("next").disabled = !review || index >= data.assignments.length - 1;
-      document.getElementById("next").textContent = index >= data.assignments.length - 1 ? "Last case" : "Next case";
+      document.getElementById("next").innerHTML = index >= data.assignments.length - 1 ? "&#8250;|" : "&#8250;";
       renderedAt = Date.now();
     }
     function record(winner) {
@@ -1367,6 +1607,35 @@ function renderReviewHtml({
       link.click();
       URL.revokeObjectURL(url);
     });
+    function fallbackCopy(text, done) {
+      const area = document.createElement("textarea");
+      area.value = text;
+      area.style.position = "fixed";
+      area.style.opacity = "0";
+      document.body.appendChild(area);
+      area.focus();
+      area.select();
+      try {
+        document.execCommand("copy");
+        done();
+      } catch (err) {
+        window.prompt("Copy the JSON below:", text);
+      }
+      document.body.removeChild(area);
+    }
+    document.getElementById("copy").addEventListener("click", () => {
+      const text = JSON.stringify({ runId: data.run.runId, reviews: orderedReviews() }, null, 2);
+      const button = document.getElementById("copy");
+      const done = () => {
+        button.textContent = "Copied " + orderedReviews().length + "/" + data.assignments.length;
+        setTimeout(() => { button.textContent = "Copy JSON"; }, 1800);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done, () => fallbackCopy(text, done));
+      } else {
+        fallbackCopy(text, done);
+      }
+    });
     render();
   </script>
 </body>
@@ -1413,8 +1682,9 @@ function printUsage(): void {
   console.log([
     "Usage:",
     "  npm run eval:editorial -w apps/worker -- build-cases --from YYYY-MM-DD --to YYYY-MM-DD --limit 50 --out tmp/editorial-eval/cases.json",
-    "  npm run eval:editorial -w apps/worker -- run --cases tmp/editorial-eval/cases.json --control regular_v5_6_control --challenger regular_v5_6_control --control-model gpt-5.5 --control-effort medium --challenger-model gpt-5.6-terra --challenger-effort medium --reference-model gpt-5.6-terra --reference-effort medium --service-tier flex --out tmp/editorial-eval/run.json",
+    "  npm run eval:editorial -w apps/worker -- run --cases tmp/editorial-eval/cases.json --control regular_v5_6_control --challenger regular_v5_6_control --control-model gpt-5.5 --control-effort medium --challenger-model gpt-5.6-terra --challenger-effort medium --reference-model gpt-5.6-terra --reference-effort medium --service-tier flex [--assignment-seed SEED] [--ordering-seed SEED] --out tmp/editorial-eval/run.json",
     "  npm run eval:editorial -w apps/worker -- review-html --run tmp/editorial-eval/run.json --out tmp/editorial-eval/review.html",
+    "  Legacy run schemas 1-2 require --reviews when rendering review HTML.",
     "  npm run eval:editorial -w apps/worker -- summarize --run tmp/editorial-eval/run.json --reviews tmp/editorial-eval/reviews.json --out tmp/editorial-eval/summary.json"
   ].join("\n"));
 }
