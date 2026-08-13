@@ -137,6 +137,8 @@ export type ModelCallSignal = {
   requestedServiceTier: string | null;
   serviceTier: string | null;
   reasoningEffort: string | null;
+  promptCacheMode: string | null;
+  promptCacheKey: string | null;
   timeoutMs: number | null;
   maxOutputTokens: number | null;
   promptChars: number | null;
@@ -345,6 +347,8 @@ function extractModelCalls(inputJson: Prisma.JsonValue | null): ModelCallSignal[
       requestedServiceTier: stringValue(call.requestedServiceTier),
       serviceTier: stringValue(call.serviceTier),
       reasoningEffort: stringValue(call.reasoningEffort),
+      promptCacheMode: stringValue(call.promptCacheMode),
+      promptCacheKey: stringValue(call.promptCacheKey),
       timeoutMs: numberValue(call.timeoutMs),
       maxOutputTokens: numberValue(call.maxOutputTokens),
       promptChars: numberValue(call.promptChars),
