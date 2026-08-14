@@ -1020,7 +1020,16 @@ export type NumberAssessmentRuleId =
 // ONLY when (a) it sits inside the non-visible source_spans field and (b) its
 // space-separated groups appear as a consecutive, string-exact subsequence of
 // a strictly longer source digit run. Visible-text numbers never qualify.
-export const numberDerivationRuleIds = ["source_cell_subrun"] as const;
+//
+// verbal_minus_match (2026-08-14, corpus-demanded): Norwegian style writes
+// negative source figures as "minus 161" while the source table carries
+// "-161"; the unsigned rewrite token then fails key matching on sign alone.
+// The rule accepts an unsigned token immediately preceded by the word
+// "minus" when the sign-flipped key exists in the source index.
+export const numberDerivationRuleIds = [
+  "source_cell_subrun",
+  "verbal_minus_match"
+] as const;
 
 export type NumberDerivationRuleId = (typeof numberDerivationRuleIds)[number];
 
@@ -1146,6 +1155,28 @@ const numberDerivationRules: readonly NumberDerivationRule[] = [
         }
       }
       return null;
+    }
+  },
+  {
+    id: "verbal_minus_match",
+    match: (context) => {
+      if (!context.parsed.key.startsWith("+|")) return null;
+      const before = context.rewriteText.slice(
+        Math.max(0, context.token.index - 10),
+        context.token.index
+      );
+      if (!/\bminus\s+$/i.test(before)) return null;
+      const flippedKey = `-|${context.parsed.key.slice(2)}`;
+      if (!context.sourceIndex.exactKeys.has(flippedKey)) return null;
+      const sourceMatch = context
+        .sourceNumbers()
+        .find((source) => source.key === flippedKey);
+      return {
+        provenance: {
+          verbal_sign: "minus",
+          ...(sourceMatch ? { source_display: sourceMatch.display } : {})
+        }
+      };
     }
   }
 ];

@@ -237,7 +237,10 @@ describe("derivation slot", () => {
     // Updating these expectations is a deliberate release act: appending a
     // rule id must come with corpus-replay evidence, and enabling one must
     // come with refreshed fixture expectations (see the plan doc).
-    expect([...numberDerivationRuleIds]).toEqual(["source_cell_subrun"]);
+    expect([...numberDerivationRuleIds]).toEqual([
+      "source_cell_subrun",
+      "verbal_minus_match"
+    ]);
     expect([...defaultEnabledDerivationRules]).toEqual([]);
   });
 
@@ -362,6 +365,73 @@ describe("source_cell_subrun rule", () => {
     });
     expect(assessments).toContainEqual({
       display: "999888",
+      disposition: "unexpected",
+      ruleId: null,
+      count: 1
+    });
+  });
+});
+
+describe("verbal_minus_match rule", () => {
+  // Real corpus shape (679517): the source table writes "-161"; the rewrite
+  // states the magnitude with a verbal sign ("minus 161 tusen kroner").
+  const signedSource =
+    "Resultatregnskap\nResultat for perioden -161 12.562 4.485 25.047 37.625";
+  const verbalRewrite = createRewrite({
+    lead: "Resultatet snudde til minus 161 tusen kroner, fra pluss 12.562 tusen kroner."
+  });
+
+  it("shadows the unsigned magnitude while disabled by default", () => {
+    const assessments = assessNumbers(verbalRewrite, signedSource);
+    expect(assessments).toContainEqual({
+      display: "161",
+      disposition: "unexpected",
+      ruleId: null,
+      count: 1,
+      candidateRuleId: "verbal_minus_match"
+    });
+    expect(findUnexpectedNumbers(verbalRewrite, signedSource)).toContain("161");
+  });
+
+  it("derives the magnitude with sign provenance when enabled", () => {
+    const enabled = {
+      enabledDerivationRules: ["verbal_minus_match"] as const
+    };
+    const assessments = assessNumbers(verbalRewrite, signedSource, enabled);
+    expect(assessments).toContainEqual({
+      display: "161",
+      disposition: "derived",
+      ruleId: "verbal_minus_match",
+      count: 1,
+      provenance: { verbal_sign: "minus", source_display: "-161" }
+    });
+    expect(
+      findUnexpectedNumbers(verbalRewrite, signedSource, enabled)
+    ).not.toContain("161");
+  });
+
+  it("requires the signed form to exist in the source", () => {
+    const assessments = assessNumbers(
+      createRewrite({ lead: "Resultatet ble minus 999 tusen kroner." }),
+      signedSource,
+      { enabledDerivationRules: ["verbal_minus_match"] }
+    );
+    expect(assessments).toContainEqual({
+      display: "999",
+      disposition: "unexpected",
+      ruleId: null,
+      count: 1
+    });
+  });
+
+  it("requires the verbal minus immediately before the token", () => {
+    const assessments = assessNumbers(
+      createRewrite({ lead: "Resultatet for perioden ble 161 tusen kroner." }),
+      signedSource,
+      { enabledDerivationRules: ["verbal_minus_match"] }
+    );
+    expect(assessments).toContainEqual({
+      display: "161",
       disposition: "unexpected",
       ruleId: null,
       count: 1
