@@ -326,8 +326,15 @@ async function login(baseUrl, username, password) {
     throw new Error(`Login failed: ${response.status} ${text.slice(0, 300)}`);
   }
   const body = JSON.parse(text);
-  if (!body.sessionToken) throw new Error("Login response did not include sessionToken");
-  return body.sessionToken;
+  if (body.sessionToken) return body.sessionToken;
+  // The public /api/auth/login is served by the web proxy route, which returns
+  // the JWT only as the httpOnly newsweb_session cookie, not in the body.
+  const setCookie = response.headers.get("set-cookie") ?? "";
+  const cookieMatch = setCookie.match(/newsweb_session=([^;]+)/);
+  if (cookieMatch) return decodeURIComponent(cookieMatch[1]);
+  throw new Error(
+    "Login response did not include sessionToken or newsweb_session cookie"
+  );
 }
 
 function parseCsv(text) {
