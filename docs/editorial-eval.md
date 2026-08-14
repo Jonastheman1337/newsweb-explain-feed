@@ -205,14 +205,51 @@ endings never matter):
   (offline, no DB) and fails on any drift. When P2/P3/P4 deliberately change
   validator behavior, run
   `build-safety-fixtures --update-expected` (offline) and review the diff —
-  that diff is the release record. The seven `numeric_unresolved` cases must
-  keep `UNEXPECTED_NUMBERS` forever; the gate enforces this.
+  that diff is the release record. The `numeric_unresolved` cases (five after
+  the 675221 and 679626 adjudications) must keep `UNEXPECTED_NUMBERS`
+  forever; the gate enforces this. Validation-class payloads are seeded as
+  the payload production validated against (report flows get the
+  `reportReferencePayload` join, checked against the persisted
+  `validationSourceChars` tripwire); rows that cannot be reconstructed are
+  excluded loudly.
 
 - `editorial/` — locked human-review corpora for the runner, created with
   `lock-cases` (stamps corpus identity) and consumed via `run --cases`.
   Curated additions are built with `build-cases --message-ids id1,id2,...`.
   Scoring dimensions and the promotion procedure live in
   `docs/editorial-eval-rubric.md`.
+
+## Offline numeric replay (P2 Phase B)
+
+The exported corpus `tmp/editorial-eval/replay-corpus-2026-06-02_2026-08-13.jsonl`
+(gitignored; 144 failed `UNEXPECTED_NUMBERS` rows with exact
+`sourcePayload`/`outputJson`/`validationJson`) is the offline evidence base for
+numeric derivation rules. It was produced by `tmp/export-replay-corpus.mts`
+against the production DB under a temporary IP rule; keep a copy outside
+`tmp/` — production access is sealed and the export is not expected to run
+again. No command below needs a database.
+
+```powershell
+# Replay all 110 deduped messages through the current assessment engine
+# (all derivation rules off vs all on), write the deterministic artifact
+# tmp/editorial-eval/replay-numbers-<window>.json, print pool/fidelity/
+# per-rule clears and the unresolved table with a hard would-clear warning:
+npm run eval:editorial -w apps/worker -- replay-numbers
+
+# One-time fixture fidelity repair (2026-08-14; kept for provenance): rebuild
+# the two numeric fixture classes' payloads run-matched from the corpus,
+# recompute expected, hard-stop on any unresolved flip or disagreement with
+# the replay artifact's already-clean set:
+npm run eval:editorial -w apps/worker -- refresh-numeric-payloads
+```
+
+Enabling a derivation rule (owner-paced, one class per release window, never
+with a cache flip): add the id to `defaultEnabledDerivationRules` in
+`packages/prompt-kit/src/numbers.ts` **and** run
+`build-safety-fixtures --update-expected` in the same commit — the fixture
+diff must flip exactly the replay-predicted `numeric_false_block` cases.
+Emergency rollback: set `NUMERIC_ACCEPTANCE_RULES` in the Render dashboard
+(unset = code default; set, even `""`, = exact enabled set; no deploy).
 
 ## Environment
 

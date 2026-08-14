@@ -82,6 +82,10 @@ services:
         value: medium
       - key: OPENAI_PROMPT_CACHE_MODE
         value: implicit
+      # NUMERIC_ACCEPTANCE_RULES is deliberately NOT declared here: an unset
+      # env means "use the prompt-kit code default", while any set value -
+      # including "" - overrides it exactly ("" = every derivation rule off).
+      # Emergency rollback: add the var in the Render dashboard, no deploy.
       - key: POLL_INTERVAL_MS
         value: 5000
       - key: LATEST_BOOTSTRAP_COUNT

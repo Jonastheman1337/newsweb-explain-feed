@@ -8,11 +8,13 @@
 - **Plan date:** 2026-08-13.
 - **Canonical evidence:** `prompts/production-editorial-ab-combined-report-2026-06-02_2026-08-13-final.md` from the source checkout at `C:\Users\WJX270\Documents\Kode\newsweb-explain-feed`.
 - **Production baseline:** Regular prompt `v5.9.1` and the current mechanism-first production workflow.
-- **Active next gate:** P1 code and E1 gate code are landed; P1 per-flow env
-  flips proceed on their own calendar per `docs/prompt-caching.md`. The next
-  implementation package is P2 numeric provenance in the two-phase shape of the
-  2026-08-13 next-stage amendment below; E1 fixture seeding is its only external
-  blocker (`RENDER_LOG_DATABASE_EXTERNAL_URL`).
+- **Active next gate:** P1 cache flips proceed on their own calendar per
+  `docs/prompt-caching.md`. P2 Phase B is code-complete in shadow (2026-08-14
+  amendment below): deploy starts live `shadow_candidates` telemetry, then
+  derivation rules are enabled one class per release window via the code
+  default + `--update-expected` (the fixture diff is the release record).
+  After P2 enablement: P4 checker/marker safety, then P3 routine-notice
+  triage.
 - **Planning rule:** Where older evaluation notes conflict with the canonical final report, the final report governs findings and this plan governs sequencing.
 
 This is a durable production-integration plan, not an execution log. `docs/editorial-eval.md` remains useful as operational and historical context, but it is not the decision record for prompt promotion.
@@ -173,6 +175,73 @@ the cache rollout gates unverifiable in production.
   135, because production accumulated further number blocks after the report
   was frozen on 2026-08-13. Phase B replay iterates on this file; the
   temporary IP rule is removed after the export and does not need to return.
+
+## P2 Phase B amendment — 2026-08-14
+
+**Enablement model (amends the env-flip wording above).** The enabled-rule
+default is the code constant `defaultEnabledDerivationRules` in
+`packages/prompt-kit/src/numbers.ts`, because the E1 fixture gate replays
+`validateRewriteOutput` bare — only a code default makes CI match production.
+Enabling a rule class = append its id to the constant **and** run
+`build-safety-fixtures --update-expected` in the same commit; that fixture
+diff is the release record and must flip exactly the replay-predicted
+`numeric_false_block` cases. `NUMERIC_ACCEPTANCE_RULES` is the emergency
+kill-switch override only: unset → code default; set (even the empty string)
+→ the exact enabled set; unknown ids fail at boot; ids beyond the default
+boot with a warning. Rollback is a dashboard env change, no deploy (the var
+is deliberately absent from `render.yaml` — declaring it empty would mean
+all-off).
+
+**Phase B status (all landed 2026-08-14, one release; production behavior
+unchanged — both new rules are shadow-only):**
+
+- Derivation-rule slot in the assessment engine: disposition `derived`,
+  shadow `candidateRuleId` on blocked numbers whose disabled rule would have
+  accepted them, fold key extended, `assessNumbers` options argument, kill
+  switch threaded through the single worker choke point. Zero behavior change
+  proven byte-identical on the legacy 50-case artifact and a new 110-message
+  corpus-mode replay.
+- Offline replay harness `replay-numbers` over the exported corpus
+  (`tmp/editorial-eval/replay-corpus-2026-06-02_2026-08-13.jsonl`, gitignored
+  — keep a copy; the export needs prod access that is sealed): 110-message
+  pool, zero skips, report-payload tripwire 54/54, stored-vs-replayed
+  fidelity cross-check, deterministic artifact.
+- **Fixture fidelity re-freeze.** The 2026-08-14 freeze had seeded 21 of 46
+  numeric cases (17 false-block, 4 unresolved) with the raw notice body while
+  production validated the `reportReferencePayload` join — the flip gate was
+  blind to report-text rule classes. `refresh-numeric-payloads` repaired all
+  46 offline (run-matched by generationRunId, stored-output equality assert,
+  tripwire hard-required, end-state cross-checked against the replay
+  artifact). The seeder now derives validation-class payloads faithfully, so
+  rebuilds cannot reintroduce the bug. Only 675167, 675221 and 675466 replay
+  clean (validator evolution).
+- **679626 adjudicated recoverable (unresolved 6 → 5).** Its three blocking
+  displays are digit-exact contiguous quotes of source table rows in the
+  non-visible `source_spans` field; visible numbers already pass. The
+  report's label was a reference-coverage artifact (675221 precedent).
+  679469 was examined and stays unresolved: its "139,3 millioner"-style
+  forms assume a table scale the source never states.
+- **Two corpus-demanded shadow rules** (registered, not enabled):
+  `source_cell_subrun` (source_spans quotes of contiguous table cells;
+  span-field-gated so visible-text numbers never qualify) and
+  `verbal_minus_match` ("minus 161" vs source "-161"; sign-flipped key).
+  Force-enabled corpus replay: 17 of 106 blocked rows fully clear, zero of
+  the unresolved five, derived/candidate cross-check clean.
+- Rejected hypotheses, recorded so they are not re-litigated: a
+  Norwegian-header table-scale rule (merged multi-cell rows defeat
+  cell-level scaling — the same ambiguity that keeps 679469 unresolved), and
+  permissive sum/ratio/scale arithmetic (coincidence-grade over report-scale
+  texts; it "explains" the unresolved set too). Remaining demand should come
+  from live `shadow_candidates` telemetry, not broader triggers.
+- Signals: `derived_count`, per-bucket `shadow_candidates`, global
+  `rankedShadowCandidates` in the numeric assessment stats.
+
+*Rollout from here:* deploy (shadow telemetry starts; `signals:pull` shows
+`shadow_candidates` on live traffic) → enable `source_cell_subrun` in its own
+release window per the enablement model above → next-day signals check
+(`derived:source_cell_subrun` present, unexpected rate down) →
+`verbal_minus_match` in a later window. Never share a window with a P1 cache
+flip.
 
 ## Outcome
 
