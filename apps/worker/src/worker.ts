@@ -34,6 +34,7 @@ import {
   createYearlyReportRevisionUserPrompt,
   createYearlyReportSystemPrompt,
   createYearlyReportUserPrompt,
+  defaultEnabledDerivationRules,
   maxVisibleArticleCharsForOutputMode,
   type PromptPayload,
   type SupplementalMaterialPayload,
@@ -159,6 +160,19 @@ type FeedUpdateState = "source" | "processing" | "published" | "failed";
 
 const config = loadConfig();
 const openAIClient = createOpenAIClient(config.OPENAI_API_KEY);
+
+if (config.NUMERIC_ACCEPTANCE_RULES) {
+  const extraDerivationRules = config.NUMERIC_ACCEPTANCE_RULES.filter(
+    (ruleId) => !defaultEnabledDerivationRules.includes(ruleId)
+  );
+  if (extraDerivationRules.length > 0) {
+    console.warn(
+      `NUMERIC_ACCEPTANCE_RULES enables derivation rules beyond the code default: ${extraDerivationRules.join(", ")}. ` +
+        "CI safety gates replay the code default only; these rules stay unverified by gates until they are " +
+        "added to defaultEnabledDerivationRules with refreshed fixture expectations."
+    );
+  }
+}
 
 function modelForReasoningEffort(effort: OpenAIReasoningEffort): string {
   return routeOpenAIModel({
@@ -630,7 +644,12 @@ function validateRewriteWithRevisionCompliance(
   const validation = validateRewriteOutput(rewrite, payload, {
     maxVisibleArticleChars:
       revisionCompliance?.maxVisibleArticleChars ?? payload.maxVisibleArticleChars,
-    reportExtraction: context.reportExtraction
+    reportExtraction: context.reportExtraction,
+    // Kill-switch only: unset env keeps the prompt-kit code default, which is
+    // exactly what the CI safety-gate replay uses.
+    ...(config.NUMERIC_ACCEPTANCE_RULES
+      ? { enabledDerivationRules: config.NUMERIC_ACCEPTANCE_RULES }
+      : {})
   });
   const revisionWarnings = revisionCompliance?.warnings ?? [];
   const revisionIssues: RewriteValidationIssue[] = revisionWarnings.map((message) => ({

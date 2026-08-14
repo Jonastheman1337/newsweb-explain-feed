@@ -2,6 +2,10 @@ import path from "node:path";
 import { config as loadDotEnv } from "dotenv";
 import { z } from "zod";
 import {
+  numberDerivationRuleIds,
+  type NumberDerivationRuleId
+} from "@newsweb/prompt-kit";
+import {
   openAIPromptCacheModes,
   openAIServiceTiers,
   validateOpenAIModelReasoningEffort
@@ -30,6 +34,40 @@ const reasoningEffortEnvSchema = z.enum([
 const serviceTierEnvSchema = z.enum(openAIServiceTiers);
 
 const promptCacheModeEnvSchema = z.enum(openAIPromptCacheModes);
+
+// Emergency kill-switch override for the numeric derivation rules enabled in
+// code (defaultEnabledDerivationRules in @newsweb/prompt-kit). Semantics
+// deliberately differ from the cache-mode envs above: UNSET means "use the
+// code default", while a SET value — including the empty string — is the
+// exact enabled set ("" = every derivation rule off). Rollback of a bad rule
+// therefore needs an env change only, no deploy. CI safety gates always
+// replay the code default, so any env-enabled rule beyond the default is
+// prod-only and unverified by gates (worker boot logs a warning).
+const numericAcceptanceRulesEnvSchema = z
+  .string()
+  .transform((value, ctx) => {
+    const entries = [
+      ...new Set(
+        value
+          .split(",")
+          .map((entry) => entry.trim())
+          .filter((entry) => entry.length > 0)
+      )
+    ];
+    const known = new Set<string>(numberDerivationRuleIds);
+    const unknown = entries.filter((entry) => !known.has(entry));
+    if (unknown.length > 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Unknown numeric acceptance rule id(s): ${unknown.join(", ")} (known: ${
+          numberDerivationRuleIds.join(", ") || "none"
+        })`
+      });
+      return z.NEVER;
+    }
+    return entries as NumberDerivationRuleId[];
+  })
+  .optional();
 
 const configSchema = z
   .object({
@@ -62,6 +100,7 @@ const configSchema = z
     OPENAI_PROMPT_CACHE_MODE_REWRITE_REPORT: promptCacheModeEnvSchema.optional(),
     OPENAI_PROMPT_CACHE_MODE_REWRITE_YEARLY: promptCacheModeEnvSchema.optional(),
     OPENAI_PROMPT_CACHE_MODE_PDF_CONTEXT: promptCacheModeEnvSchema.optional(),
+    NUMERIC_ACCEPTANCE_RULES: numericAcceptanceRulesEnvSchema,
     NEWSWEB_POLLING_ENABLED: booleanEnvSchema,
     POLL_INTERVAL_MS: z.coerce.number().int().min(5000).default(5000),
     LATEST_BOOTSTRAP_COUNT: z.coerce.number().int().min(0).max(50).default(30)

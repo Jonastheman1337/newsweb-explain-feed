@@ -149,6 +149,54 @@ describe("parseWorkerConfig", () => {
     ).toThrow();
   });
 
+  it("leaves NUMERIC_ACCEPTANCE_RULES undefined when unset (code default applies)", () => {
+    const config = parseWorkerConfig({
+      NODE_ENV: "development",
+      DATABASE_URL:
+        "postgresql://newsweb:newsweb@localhost:5432/newsweb_explain?schema=public",
+      REDIS_URL: "redis://localhost:6379",
+      OPENAI_API_KEY: "sk-openai-test-key"
+    });
+    expect(config.NUMERIC_ACCEPTANCE_RULES).toBeUndefined();
+  });
+
+  it("parses empty NUMERIC_ACCEPTANCE_RULES as the all-off kill switch", () => {
+    const config = parseWorkerConfig({
+      NODE_ENV: "development",
+      DATABASE_URL:
+        "postgresql://newsweb:newsweb@localhost:5432/newsweb_explain?schema=public",
+      REDIS_URL: "redis://localhost:6379",
+      OPENAI_API_KEY: "sk-openai-test-key",
+      NUMERIC_ACCEPTANCE_RULES: ""
+    });
+    expect(config.NUMERIC_ACCEPTANCE_RULES).toEqual([]);
+  });
+
+  it("normalizes NUMERIC_ACCEPTANCE_RULES whitespace and empty entries to all-off", () => {
+    const config = parseWorkerConfig({
+      NODE_ENV: "development",
+      DATABASE_URL:
+        "postgresql://newsweb:newsweb@localhost:5432/newsweb_explain?schema=public",
+      REDIS_URL: "redis://localhost:6379",
+      OPENAI_API_KEY: "sk-openai-test-key",
+      NUMERIC_ACCEPTANCE_RULES: " , ,"
+    });
+    expect(config.NUMERIC_ACCEPTANCE_RULES).toEqual([]);
+  });
+
+  it("rejects unknown NUMERIC_ACCEPTANCE_RULES ids at boot", () => {
+    expect(() =>
+      parseWorkerConfig({
+        NODE_ENV: "development",
+        DATABASE_URL:
+          "postgresql://newsweb:newsweb@localhost:5432/newsweb_explain?schema=public",
+        REDIS_URL: "redis://localhost:6379",
+        OPENAI_API_KEY: "sk-openai-test-key",
+        NUMERIC_ACCEPTANCE_RULES: "no_such_rule"
+      })
+    ).toThrow(/Unknown numeric acceptance rule id/);
+  });
+
   it("rejects reasoning efforts unsupported by the selected model family", () => {
     expect(() =>
       parseWorkerConfig({

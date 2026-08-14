@@ -1038,4 +1038,18 @@ describe("validateRewriteOutput number assessments", () => {
       )
     ).toBe(true);
   });
+
+  it("passes enabledDerivationRules through without changing behavior for the empty set", () => {
+    const payload = createPayload();
+    const rewrite = createRewrite({
+      lead: "Selskapet la frem kvartalstall med nye detaljer.",
+      body: ["Omsetningen i kvartalet var 101 i denne omtalen."]
+    });
+
+    const withKillSwitch = validateRewriteOutput(rewrite, payload, {
+      enabledDerivationRules: []
+    });
+
+    expect(withKillSwitch).toEqual(validateRewriteOutput(rewrite, payload));
+  });
 });

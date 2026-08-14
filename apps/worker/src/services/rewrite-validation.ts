@@ -2,6 +2,7 @@ import {
   assessNumbers,
   unexpectedNumberDisplays,
   type NumberAssessment,
+  type NumberDerivationRuleId,
   type PromptPayload
 } from "@newsweb/prompt-kit";
 import type { RewriteOutput } from "@newsweb/shared";
@@ -607,6 +608,9 @@ export function validateRewriteOutput(
   options?: {
     maxVisibleArticleChars?: number;
     reportExtraction?: ReportExtractionValidationContext;
+    // Kill-switch passthrough only; when absent the engine uses the code
+    // default (defaultEnabledDerivationRules), which is what CI gates replay.
+    enabledDerivationRules?: readonly NumberDerivationRuleId[];
   }
 ): {
   valid: boolean;
@@ -624,7 +628,13 @@ export function validateRewriteOutput(
   const maxVisibleArticleChars =
     options?.maxVisibleArticleChars ?? MAX_VISIBLE_ARTICLE_CHARS;
 
-  const numberAssessments = assessNumbers(rewrite, validationSourceText);
+  const numberAssessments = assessNumbers(
+    rewrite,
+    validationSourceText,
+    options?.enabledDerivationRules
+      ? { enabledDerivationRules: options.enabledDerivationRules }
+      : undefined
+  );
   const numberErrors = unexpectedNumberDisplays(numberAssessments);
   if (numberErrors.length > MAX_ALLOWED_UNEXPECTED_NUMBERS) {
     addIssue(
