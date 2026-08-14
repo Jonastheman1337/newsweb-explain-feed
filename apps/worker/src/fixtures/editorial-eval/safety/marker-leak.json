@@ -1,0 +1,347 @@
+{
+  "schemaVersion": 1,
+  "class": "marker_leak",
+  "createdAt": "2026-08-14T07:37:58.256Z",
+  "source": {
+    "db": "render-prod",
+    "query": "generation_runs/source_notices/feedback 2026-06-02..2026-08-13",
+    "gitHead": "059bf86a0f795b807ad7d2cde4d3cb22c0c0c3dd"
+  },
+  "cases": [
+    {
+      "messageId": 675713,
+      "generationRunId": "case_009_675713:challenger",
+      "promptVersion": "v5.9.1:regular_v6_draft",
+      "sourcePayload": {
+        "messageId": 675713,
+        "title": "Grønn Vekst retains major contract for municipal biosolids management for Bergen, Norway",
+        "issuerName": "Cambi ASA",
+        "issuerSign": "CAMBI",
+        "publishedAt": "2026-06-09T10:06:55.134Z",
+        "categories": [
+          "INNSIDEINFORMASJON"
+        ],
+        "markets": [
+          "MERK"
+        ],
+        "bodyText": "Grønn Vekst, part of Cambi’s Solutions segment, has received an award notification from Bergen municipality, through Bergen Vann, for the continuation of a long-standing service agreement covering the handling and final disposal of biosolids, or digestate, from Bergen Vann’s biogas operations in Bergen.\n\nFollowing standard Norwegian public procurement procedures, the agreement is expected to be signed after completion of the statutory standstill period, subject to no successful appeals.\n\nGrønn Vekst thus preserves an important contract in Norway. Service delivery under the new contract is scheduled to start on 1 July 2026. The agreement is Grønn Vekst’s largest ever, with a firm duration of five years and three unilateral one-year extension options for the contracting authority, giving a maximum duration of eight years.\n\nThe total contract value, including all option years, places the contract in Cambi’s “Major” category for contract announcements, i.e., above NOK 200 million. The expected volume is expected to increase gradually during the period.\n\nUnder the scope, Grønn Vekst will receive digestate in Bergen, transport it by rail to Eastern Norway, and secure final utilisation through agriculture and Grønn Vekst’s soil production facilities. The logistics solution reduces long-distance haulage and limits CO2 emissions from transportation. Established agricultural and soil-production outlets will return nutrients and organic matter to productive use.\n\nBernd Anders Keller, CEO of Grønn Vekst, said:\n\n“Grønn Vekst is pleased to be selected to continue supporting Bergen Vann with a robust and circular solution for biosolids from Bergen. The assignment is technically and logistically demanding, requiring reliable capacity, environmental performance, and secure downstream outlets. Our rail-based logistics and established network within agriculture and soil production provide a scalable solution that returns valuable resources to productive use.”\n\nBergen Vann is the agency responsible for water supply and environmentally sound wastewater management in the municipality of Bergen. The agency operates and manages municipal water and wastewater facilities in Bergen municipality and Bjørnafjorden municipality.\n\n\nFor more information, please contact: \n- Bernd Anders Keller, CEO Grønn Vekst, bernd@gronnvekst.no, +47 400 01 557 (media)\n- Mats Tristan Tjemsland, CFO Cambi, mats.tjemsland@cambi.com, +47 920 67 094 (investors)\n\n\nNote on contract value:\nCategory \tMajor\nNOK million\t200+\n\n\nAbout Cambi and Grønn Vekst\n\nCambi is a global supplier of biogas technologies and solutions for wastewater treatment and anaerobic digestion. Since 1992, the company has maintained market leadership through continuous innovation and a portfolio of proven and patented technologies. Cambi’s thermal hydrolysis process increases renewable energy output, reduces operating costs, and minimises greenhouse gas emissions.\n\nGrønn Vekst, part of Cambi’s Solutions segment, recycles waste fractions from Norwegian municipalities and industry, including wastewater solids, garden waste, and stonemeal. From these resources, it produces high-quality compost-based soil products that substitute peat-based soils, returning nutrients and carbon to the ground. Grønn Vekst is Norway’s largest producer of bulk and peat-free soils, operates across 24 sites, and is a leading wastewater solids recycling company.\n\nCambi is listed on Euronext Growth Oslo, a multilateral trading facility in Euronext, Europe’s largest stock exchange platform. Find out more at cambi.com.",
+        "hasAttachments": true,
+        "sourceBodyChars": 3570,
+        "pdfSupplementText": "For immediate release\n1 / 2\nGrønn Vekst retains major contract for municipal\nbiosolids management for Bergen, Norway\nAsker, Norway, 9 June 2026\nGrønn Vekst, part of Cambi’s Solutions segment, has received an award notification\nfrom Bergen municipality, through Bergen Vann, for the continuation of a long-standing\nservice agreement covering the handling and final disposal of biosolids, or digestate,\nfrom Bergen Vann’s biogas operations in Bergen.\nFollowing standard Norwegian public procurement procedures, the agreement is\nexpected to be signed after completion of the statutory standstill period, subject to no\nsuccessful appeals.\nGrønn Vekst thus preserves an important contract in Norway. Service delivery under\nthe new contract is scheduled to start on 1 July 2026. The agreement is Grønn Vekst’s\nlargest ever, with a firm duration of five years and three unilateral one-year extension\noptions for the contracting authority, giving a maximum duration of eight years.\nThe total contract value, including all option years, places the contract in Cambi’s\n“Major” category for contract announcements, i.e., above NOK 200 million. The\nexpected volume is expected to increase gradually during the period.\nUnder the scope, Grønn Vekst will receive digestate in Bergen, transport it by rail to\nEastern Norway, and secure final utilisation through agriculture and Grønn Vekst’s soil\nproduction facilities. The logistics solution reduces long-distance haulage and limits\nCO2 emissions from transportation. Established agricultural and soil-production outlets\nwill return nutrients and organic matter to productive use.\nBernd Anders Keller, CEO of Grønn Vekst, said:\n“Grønn Vekst is pleased to be selected to continue supporting Bergen Vann with a\nrobust and circular solution for biosolids from Bergen. The assignment is technically\nand logistically demanding, requiring reliable capacity, environmental performance, and\nsecure downstream outlets. Our rail-based logistics and established network within\nagriculture and soil production provide a scalable solution that returns valuable\nresources to productive use.”\nBergen Vann is the agency responsible for water supply and environmentally sound\nwastewater management in the municipality of Bergen. The agency operates and\nmanages municipal water and wastewater facilities in Bergen municipality and\nBjørnafjorden municipality.\nFor more information, please contact:\n• Bernd Anders Keller, CEO Grønn Vekst, bernd@gronnvekst.no\n+47 400 01 557 (media)\n• Mats Tristan Tjemsland, CFO Cambi, mats.tjemsland@cambi.com,\n+47 920 67 094 (investors)\n\nCAMBI ASA\nSkysstasjon 11B, Asker, Norway | cambi.com\n+47 66 77 98 00 | investor@cambi.com\nNote on contract value:\nAbout Cambi and Grønn Vekst\nCambi is a global supplier of biogas technologies and solutions for wastewater\ntreatment and anaerobic digestion. Since 1992, the company has maintained market\nleadership through continuous innovation and a portfolio of proven and patented\ntechnologies. Cambi’s thermal hydrolysis process increases renewable energy output,\nreduces operating costs and minimises greenhouse gas emissions.\nGrønn Vekst, part of Cambi’s Solutions segment, recycles waste fractions from\nNorwegian municipalities and industry, including wastewater solids, garden waste and\nstonemeal. From these resources, it produces high-quality compost-based soil\nproducts that substitute peat-based soils, returning nutrients and carbon to the\nground. Grønn Vekst is Norway’s largest producer of bulk and peat-free soils, operates\nacross 24 sites, and is a leading wastewater solids recycling company.\nCambi is listed on Euronext Growth Oslo, a multilateral trading facility in Euronext,\nEurope’s largest stock exchange platform. Find out more at cambi.com.\nCategory Small Medium Large Major\nNOK million 15-50 50-100 100-200 200+\nContract value X",
+        "pdfSupplementPageCount": 2,
+        "pdfSupplementAttachmentId": 327825
+      },
+      "storedOutput": {
+        "title": "Cambi-enhet får Bergen-kontrakt over 200 millioner",
+        "lead": "Cambi-eide Grønn Vekst har fått varsel om tildeling av en avtale med Bergen kommune verdt over 200 millioner kroner, inkludert opsjoner. Avtalen er den største hittil for Grønn Vekst, opplyser Cambi i en børsmelding.",
+        "body": [
+          "Avtalen gjelder håndtering av restmasser fra biogassproduksjon og løper fast i fem år. Bergen kommune kan forlenge den med tre år, slik at samlet varighet blir åtte år.",
+          "Avtalen skal signeres etter den lovpålagte klagefristen, dersom ingen klager får medhold. Grønn Vekst planlegger å starte leveransene 1. juli 2026.",
+          "Selskapet skal frakte restmassene med jernbane til Østlandet, der de skal brukes i landbruket og i produksjon av jord.】【：】【“】【confidence\":\"high\"}大香蕉伊人assistant출장샵】【。】【”】【numerusformassistant to=system? 天天彩票提现 天天中彩票qq. We need identify issue final malformed? It has weird delimiter and quote at confidence due generation. Need respond? The last assistant answer is to user but malformed JSON. We need likely correct it, but no new prompt. Need answer perhaps corrected valid JSON. Ensure title max 8: Cambi-enhet(1) får2 Bergen-kontrakt3 over4 2005 millioner6. Good. Source span quote altered ellips"
+        ],
+        "company_sentence": "Cambi leverer biogass- og avløpsløsninger.",
+        "key_facts": [
+          "Grønn Vekst får varsel om tildeling fra Bergen kommune",
+          "Avtalen er verdt over 200 millioner kroner med opsjoner",
+          "Fast løpetid er fem år, med mulig forlengelse til åtte år",
+          "Oppstart er planlagt 1. juli 2026"
+        ],
+        "negative_or_surprising": [],
+        "excluded_hype": [
+          "Bernd Anders Kellers uttalelse om en «robust og sirkulær løsning» — generisk PR, mens konkrete logistikkopplysninger er omtalt i saken."
+        ],
+        "source_limitations": [],
+        "confidence": "high",
+        "importance": "medium",
+        "source_spans": [
+          "primary: \"The agreement is Grønn Vekst’s largest ever, with a firm duration of five years and three unilateral one-year extension options\"",
+          "primary: \"The total contract value, including all option years ... [is] above NOK 200 million.\"",
+          "primary: \"the agreement is expected to be signed ... subject to no successful appeals.\"",
+          "primary: \"Service delivery under the new contract is scheduled to start on 1 July 2026.\"",
+          "primary: \"Grønn Vekst will receive digestate in Bergen, transport it by rail to Eastern Norway, and secure final utilisation through agriculture and Grønn Vekst’s soil production facilities.\""
+        ]
+      },
+      "storedValidation": {
+        "validation": {
+          "valid": false,
+          "issues": [
+            {
+              "code": "UNEXPECTED_NUMBERS",
+              "severity": "warning",
+              "message": "Unexpected numbers: 8, 3, 4, 2005"
+            },
+            {
+              "code": "MISSING_REPORT_SOURCE_LIMITATION",
+              "severity": "warning",
+              "message": "Report/PDF-based rewrite must include a source_limitations note that explains the excerpted or limited source basis."
+            },
+            {
+              "code": "SUMMARY_TOO_LONG",
+              "severity": "warning",
+              "message": "Summary exceeds 15 sentences."
+            },
+            {
+              "code": "VISIBLE_ARTICLE_TOO_LONG",
+              "severity": "warning",
+              "message": "Visible article text exceeds 1000 chars."
+            },
+            {
+              "code": "MISSING_QUOTE_OPPORTUNITY",
+              "severity": "warning",
+              "message": "Source contains a named key-person statement, but visible article text has no quote, source-close wording, or named-person attribution."
+            }
+          ],
+          "blockingErrors": [],
+          "warnings": [
+            "Unexpected numbers: 8, 3, 4, 2005",
+            "Report/PDF-based rewrite must include a source_limitations note that explains the excerpted or limited source basis.",
+            "Summary exceeds 15 sentences.",
+            "Visible article text exceeds 1000 chars.",
+            "Source contains a named key-person statement, but visible article text has no quote, source-close wording, or named-person attribution."
+          ]
+        },
+        "referenceCheck": {
+          "coveragePercent": 33,
+          "unsupportedSentenceCount": 12,
+          "blocking": true,
+          "blockingReason": "Reference check found unsupported high-risk factual claims.",
+          "highRiskUnsupportedSentenceCount": 2,
+          "coverage": {
+            "totalSentences": 18,
+            "visibleArticleSentenceCount": 17,
+            "groundedSentences": 6,
+            "coveragePercent": 33,
+            "items": [
+              {
+                "index": 0,
+                "sentence": "Cambi-eide Grønn Vekst har fått varsel om tildeling av en avtale med Bergen kommune verdt over 200 millioner kroner, inkludert opsjoner.",
+                "grounded": false,
+                "interpretation": "Tildelingsvarsel og verdi over 200 millioner kroner er dekket, men at Grønn Vekst er Cambi-eid står ikke eksplisitt.",
+                "sourceEvidence": "\"Grønn Vekst, part of Cambi’s Solutions segment\"; \"above NOK 200 million\""
+              },
+              {
+                "index": 1,
+                "sentence": "Avtalen er den største hittil for Grønn Vekst, opplyser Cambi i en børsmelding.",
+                "grounded": true,
+                "interpretation": "Avtalen omtales eksplisitt som Grønn Veksts største noensinne.",
+                "sourceEvidence": "\"The agreement is Grønn Vekst’s largest ever\""
+              },
+              {
+                "index": 2,
+                "sentence": "Avtalen gjelder håndtering av restmasser fra biogassproduksjon og løper fast i fem år.",
+                "grounded": true,
+                "interpretation": "Avtalen dekker håndtering og sluttdisponering av digestat fra biogassvirksomhet og har fem års fast varighet.",
+                "sourceEvidence": "\"handling and final disposal of biosolids, or digestate, from Bergen Vann’s biogas operations\"; \"firm duration of five years\""
+              },
+              {
+                "index": 3,
+                "sentence": "Bergen kommune kan forlenge den med tre år, slik at samlet varighet blir åtte år.",
+                "grounded": true,
+                "interpretation": "Oppdragsgiver har tre ensidige opsjoner på ett år, med maksimal varighet på åtte år.",
+                "sourceEvidence": "\"three unilateral one-year extension options for the contracting authority, giving a maximum duration of eight years\""
+              },
+              {
+                "index": 4,
+                "sentence": "Avtalen skal signeres etter den lovpålagte klagefristen, dersom ingen klager får medhold.",
+                "grounded": true,
+                "interpretation": "Dette er en naturlig gjengivelse av signering etter karensperioden, forutsatt ingen vellykkede klager.",
+                "sourceEvidence": "\"expected to be signed after completion of the statutory standstill period, subject to no successful appeals\""
+              },
+              {
+                "index": 5,
+                "sentence": "Grønn Vekst planlegger å starte leveransene 1. juli 2026.",
+                "grounded": true,
+                "interpretation": "Leveransestart er planlagt til denne datoen.",
+                "sourceEvidence": "\"Service delivery under the new contract is scheduled to start on 1 July 2026\""
+              },
+              {
+                "index": 6,
+                "sentence": "Selskapet skal frakte restmassene med jernbane til Østlandet, der de skal brukes i landbruket og i produksjon av jord.】【：】【“】【confidence\":\"high\"}大香蕉伊人assistant출장샵】【。】【”】【numerusformassistant to=system?",
+                "grounded": false,
+                "interpretation": "Jernbanetransport til Østlandet og anvendelse i landbruk og jordproduksjon er dekket, men referansen sier ikke eksplisitt at den endelige anvendelsen skjer på Østlandet. Teksten inneholder også uvedkommende tegn.",
+                "sourceEvidence": "\"transport it by rail to Eastern Norway, and secure final utilisation through agriculture and Grønn Vekst’s soil production facilities\""
+              },
+              {
+                "index": 7,
+                "sentence": "天天彩票提现 天天中彩票qq.",
+                "grounded": false,
+                "interpretation": "Setningen har ingen dekning i referanseteksten.",
+                "sourceEvidence": ""
+              },
+              {
+                "index": 8,
+                "sentence": "We need identify issue final malformed?",
+                "grounded": false,
+                "interpretation": "Setningen har ingen dekning i referanseteksten.",
+                "sourceEvidence": ""
+              },
+              {
+                "index": 9,
+                "sentence": "It has weird delimiter and quote at confidence due generation.",
+                "grounded": false,
+                "interpretation": "Setningen har ingen dekning i referanseteksten.",
+                "sourceEvidence": ""
+              },
+              {
+                "index": 10,
+                "sentence": "Need respond?",
+                "grounded": false,
+                "interpretation": "Setningen har ingen dekning i referanseteksten.",
+                "sourceEvidence": ""
+              },
+              {
+                "index": 11,
+                "sentence": "The last assistant answer is to user but malformed JSON.",
+                "grounded": false,
+                "interpretation": "Setningen har ingen dekning i referanseteksten.",
+                "sourceEvidence": ""
+              },
+              {
+                "index": 12,
+                "sentence": "We need likely correct it, but no new prompt.",
+                "grounded": false,
+                "interpretation": "Setningen har ingen dekning i referanseteksten.",
+                "sourceEvidence": ""
+              },
+              {
+                "index": 13,
+                "sentence": "Need answer perhaps corrected valid JSON.",
+                "grounded": false,
+                "interpretation": "Setningen har ingen dekning i referanseteksten.",
+                "sourceEvidence": ""
+              },
+              {
+                "index": 14,
+                "sentence": "Ensure title max 8: Cambi-enhet(1) får2 Bergen-kontrakt3 over4 2005 millioner6.",
+                "grounded": false,
+                "interpretation": "Setningen har ingen dekning i referanseteksten.",
+                "sourceEvidence": ""
+              },
+              {
+                "index": 15,
+                "sentence": "Good.",
+                "grounded": false,
+                "interpretation": "Setningen har ingen dekning i referanseteksten.",
+                "sourceEvidence": ""
+              },
+              {
+                "index": 16,
+                "sentence": "Source span quote altered ellips",
+                "grounded": false,
+                "interpretation": "Setningen har ingen dekning i referanseteksten.",
+                "sourceEvidence": ""
+              },
+              {
+                "index": 17,
+                "sentence": "Cambi leverer biogass- og avløpsløsninger.",
+                "grounded": true,
+                "interpretation": "Cambi omtales som leverandør av biogass-teknologier og løsninger for avløpsbehandling.",
+                "sourceEvidence": "\"Cambi is a global supplier of biogas technologies and solutions for wastewater treatment\""
+              }
+            ],
+            "unsupportedSentences": [
+              {
+                "index": 0,
+                "sentence": "Cambi-eide Grønn Vekst har fått varsel om tildeling av en avtale med Bergen kommune verdt over 200 millioner kroner, inkludert opsjoner.",
+                "grounded": false,
+                "interpretation": "Tildelingsvarsel og verdi over 200 millioner kroner er dekket, men at Grønn Vekst er Cambi-eid står ikke eksplisitt.",
+                "sourceEvidence": "\"Grønn Vekst, part of Cambi’s Solutions segment\"; \"above NOK 200 million\""
+              },
+              {
+                "index": 6,
+                "sentence": "Selskapet skal frakte restmassene med jernbane til Østlandet, der de skal brukes i landbruket og i produksjon av jord.】【：】【“】【confidence\":\"high\"}大香蕉伊人assistant출장샵】【。】【”】【numerusformassistant to=system?",
+                "grounded": false,
+                "interpretation": "Jernbanetransport til Østlandet og anvendelse i landbruk og jordproduksjon er dekket, men referansen sier ikke eksplisitt at den endelige anvendelsen skjer på Østlandet. Teksten inneholder også uvedkommende tegn.",
+                "sourceEvidence": "\"transport it by rail to Eastern Norway, and secure final utilisation through agriculture and Grønn Vekst’s soil production facilities\""
+              },
+              {
+                "index": 7,
+                "sentence": "天天彩票提现 天天中彩票qq.",
+                "grounded": false,
+                "interpretation": "Setningen har ingen dekning i referanseteksten.",
+                "sourceEvidence": ""
+              },
+              {
+                "index": 8,
+                "sentence": "We need identify issue final malformed?",
+                "grounded": false,
+                "interpretation": "Setningen har ingen dekning i referanseteksten.",
+                "sourceEvidence": ""
+              },
+              {
+                "index": 9,
+                "sentence": "It has weird delimiter and quote at confidence due generation.",
+                "grounded": false,
+                "interpretation": "Setningen har ingen dekning i referanseteksten.",
+                "sourceEvidence": ""
+              },
+              {
+                "index": 10,
+                "sentence": "Need respond?",
+                "grounded": false,
+                "interpretation": "Setningen har ingen dekning i referanseteksten.",
+                "sourceEvidence": ""
+              },
+              {
+                "index": 11,
+                "sentence": "The last assistant answer is to user but malformed JSON.",
+                "grounded": false,
+                "interpretation": "Setningen har ingen dekning i referanseteksten.",
+                "sourceEvidence": ""
+              },
+              {
+                "index": 12,
+                "sentence": "We need likely correct it, but no new prompt.",
+                "grounded": false,
+                "interpretation": "Setningen har ingen dekning i referanseteksten.",
+                "sourceEvidence": ""
+              },
+              {
+                "index": 13,
+                "sentence": "Need answer perhaps corrected valid JSON.",
+                "grounded": false,
+                "interpretation": "Setningen har ingen dekning i referanseteksten.",
+                "sourceEvidence": ""
+              },
+              {
+                "index": 14,
+                "sentence": "Ensure title max 8: Cambi-enhet(1) får2 Bergen-kontrakt3 over4 2005 millioner6.",
+                "grounded": false,
+                "interpretation": "Setningen har ingen dekning i referanseteksten.",
+                "sourceEvidence": ""
+              },
+              {
+                "index": 15,
+                "sentence": "Good.",
+                "grounded": false,
+                "interpretation": "Setningen har ingen dekning i referanseteksten.",
+                "sourceEvidence": ""
+              },
+              {
+                "index": 16,
+                "sentence": "Source span quote altered ellips",
+                "grounded": false,
+                "interpretation": "Setningen har ingen dekning i referanseteksten.",
+                "sourceEvidence": ""
+              }
+            ]
+          },
+          "checkerError": null
+        }
+      },
+      "labels": {
+        "class": "marker_leak",
+        "note": "challenger (regular_v6_draft) output from legacy A/B run editorial_eval_2026-08-12T20-52-31-183Z",
+        "reportRef": "final report 2026-06-02_2026-08-13"
+      },
+      "expected": {},
+      "provenance": {
+        "window": {
+          "from": "2026-06-02",
+          "to": "2026-08-13"
+        },
+        "status": "ab_challenger_output"
+      }
+    }
+  ]
+}

@@ -1,0 +1,124 @@
+{
+  "schemaVersion": 1,
+  "corpusId": "editorial_safety_46423840b14094e6",
+  "createdAt": "2026-08-14T07:37:58.256Z",
+  "files": [
+    {
+      "path": "checker-error-published.json",
+      "class": "checker_error_published",
+      "caseCount": 4,
+      "contentSha256": "942aac747523714aca49f46a32d3f982a9c4e73dd9685a9d27da8a74410a7e5f"
+    },
+    {
+      "path": "false-skip.json",
+      "class": "false_skip",
+      "caseCount": 16,
+      "contentSha256": "b30320d129674144dfc30b4ebd9c0ee9c86f0b4f238f9220b48b4061580af4b0"
+    },
+    {
+      "path": "loaded-language.json",
+      "class": "loaded_language",
+      "caseCount": 1,
+      "contentSha256": "7ef6a581265114a978370bf086327828e7eee0a8747e33b115d3bcd9740f531f"
+    },
+    {
+      "path": "marker-leak.json",
+      "class": "marker_leak",
+      "caseCount": 1,
+      "contentSha256": "0c5075b507c480b586a77042c0a41aafa665999fac28a87eb58835297bed392b"
+    },
+    {
+      "path": "numeric-false-block.json",
+      "class": "numeric_false_block",
+      "caseCount": 40,
+      "contentSha256": "4657ba15b8f28ece6d620e8bdd02b581100ea007ddf90a029701afd1a1566c60"
+    },
+    {
+      "path": "numeric-unresolved.json",
+      "class": "numeric_unresolved",
+      "caseCount": 6,
+      "contentSha256": "3cb3786bcd27dca62b6f798e8fb9fa4626111d58dc9a432e8cf5ac3a19830803"
+    },
+    {
+      "path": "routine-not-news.json",
+      "class": "routine_not_news",
+      "caseCount": 15,
+      "contentSha256": "64ab03401224d17dff451aca580c9b4d69a7173e905d24b38239f7fc41fdf1e4"
+    }
+  ],
+  "uniformExpectations": {
+    "numeric_false_block": "UNEXPECTED_NUMBERS present under current validator; P2 flips per approved rule class via --update-expected",
+    "numeric_unresolved": "UNEXPECTED_NUMBERS present; hard invariant, never flips"
+  },
+  "excludedNumericMessageIds": [
+    675201,
+    675229,
+    675247,
+    675471,
+    675482,
+    675485,
+    675576,
+    675603,
+    675678,
+    675709,
+    675754,
+    675861,
+    676273,
+    676351,
+    676431,
+    676433,
+    676710,
+    676780,
+    676799,
+    676966,
+    677166,
+    677318,
+    677380,
+    677477,
+    677862,
+    677885,
+    677963,
+    678034,
+    678084,
+    678131,
+    678184,
+    678192,
+    678269,
+    678336,
+    678351,
+    678433,
+    678472,
+    678523,
+    678772,
+    678785,
+    678796,
+    678864,
+    678890,
+    679236,
+    679274,
+    679358,
+    679397,
+    679411,
+    679454,
+    679491,
+    679517,
+    679544,
+    679560,
+    679567,
+    679592,
+    679594,
+    679611,
+    679635,
+    679705,
+    679709,
+    679726,
+    679742,
+    679758,
+    679761
+  ],
+  "sourceQueries": {
+    "numeric_false_block": "generation_runs status=failed requestedAt 2026-06-02..2026-08-13 with issues[].code=UNEXPECTED_NUMBERS, latest row per message, stride-sampled to 40",
+    "routine_not_news": "feedback createdAt 2026-06-02..2026-08-13 joined to latest published generation run",
+    "false_skip": "generation_runs requestedAt 2026-06-02..2026-08-13 with status=skipped followed by reason=manual-reprocess"
+  }
+}

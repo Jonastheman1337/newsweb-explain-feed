@@ -1,0 +1,3235 @@
+{
+  "schemaVersion": 1,
+  "class": "numeric_unresolved",
+  "createdAt": "2026-08-14T07:37:58.256Z",
+  "source": {
+    "db": "render-prod",
+    "query": "generation_runs/source_notices/feedback 2026-06-02..2026-08-13",
+    "gitHead": "059bf86a0f795b807ad7d2cde4d3cb22c0c0c3dd"
+  },
+  "cases": [
+    {
+      "messageId": 676354,
+      "generationRunId": "cmqhkohig0ad8ou1r4bwhwayv",
+      "promptVersion": "v5.9.1",
+      "sourcePayload": {
+        "messageId": 676354,
+        "title": "Panoro Energy - Completion of Acquisition",
+        "issuerName": "Panoro Energy ASA",
+        "issuerSign": "PEN",
+        "publishedAt": "2026-06-17T04:30:09.495Z",
+        "categories": [
+          "INNSIDEINFORMASJON"
+        ],
+        "markets": [
+          "XOSL"
+        ],
+        "bodyText": "Oslo, 17 June 2026 - Panoro Energy ASA (\"Panoro\" or the \"Company\") is pleased to\nannounce the completion of the acquisition by Panoro of the Kosmos Energy\n(\"Kosmos\") subsidiary that holds through a wholly-owned entity, a 40.375 per\ncent non-operated interest in Block G offshore Equatorial Guinea (the\n\"Acquisition\"). This follows the receipt of customary competition clearance by\nthe Central African Economic and Monetary Community (CEMAC).\n\nBlock G contains the producing Ceiba field and Okume Complex in which Panoro has\nheld a 14.25 per cent interest since early 2021. As a result of the Acquisition\nPanoro's interest in Block G has now increased to 54.625 per cent. The\nconsideration paid at completion is USD 127 million after customary interim\nadjustments.\n\nPanoro's next crude oil lifting at Block G, and first post-completion of the\nAcquisition, is for approximately 546,000 barrels and scheduled for next month,\nbeginning of July.\n\nJulien Balkany, Executive Chairman of Panoro, commented:\n\n\"We are delighted to complete this well timed, transformational and strongly\naccretive transaction for Panoro, materially increasing our participation in a\ncore producing asset. Having been a partner in Block G since 2021, we know the\nasset well and have a high degree of confidence in its quality, cash generation\npotential and remaining upside. With our interest now increasing to 54.625 per\ncent, this acquisition strengthens our production and reserves base and will\nenhance the frequency and size of our crude liftings, driving meaningful long\n-term cash flow expansion to enhance shareholder returns. This opportune\nacquisition, announced a couple of days before the start of the conflict in the\nMiddle East, is consistent with Panoro's strategy to expand its presence in\nEquatorial Guinea, where we see a lot of organic and external investment\nopportunities to achieve our growth ambition. I would once again like to express\nour sincere gratitude to the government of Equatorial Guinea which had approved\nthe transaction prior to announcement in February, and also to CEMAC for the\nefficient and timely conclusion of its customary clearance process.\"\n\nEnquiries\n\nQazi Qadeer, Chief Financial Officer\nTel: +44 203 405 1060\nEmail: investors@panoroenergy.com\n\nAbout Panoro Energy\n\nPanoro Energy ASA is an independent exploration and production company based in\nLondon and listed on the main board of the Oslo Stock Exchange with the ticker\nPEN. Panoro holds production, exploration and development assets in Africa,\nnamely interests in Block-G, Block EG-01 and Block EG-23 offshore Equatorial\nGuinea, the Dussafu Marin, Niosi Marin and Guduma Marin Licenses offshore\nsouthern Gabon, the TPS operated assets in Tunisia and onshore Exploration Right\n376 in South Africa.\n\nVisit us at www.panoroenergy.com.\n\nFollow us on LinkedIn (https://www.linkedin.com/company/panoro-energy)\n\n\n",
+        "hasAttachments": true,
+        "sourceBodyChars": 2882,
+        "pdfSupplementText": "Panoro Energy – Completion of\nAcquisition\nOslo, 17 June 2026 – Panoro Energy ASA (“Panoro” or the “Company”) is pleased to announce the\ncompletion of the acquisition by Panoro of the Kosmos Energy (“Kosmos”) subsidiary that holds through\na wholly-owned entity, a 40.375 per cent non-operated interest in Block G offshore Equatorial Guinea\n(the “Acquisition”). This follows the receipt of customary competition clearance by the Central African\nEconomic and Monetary Community (CEMAC).\nBlock G contains the producing Ceiba field and Okume Complex in which Panoro has held a 14.25 per\ncent interest since early 2021. As a result of the Acquisition Panoro’s interest in Block G has now\nincreased to 54.625 per cent. The consideration paid at completion is USD 127 million after customary\ninterim adjustments.\nPanoro’s next crude oil lifting at Block G, and first post-completion of the Acquisition, is for approximately\n546,000 barrels and scheduled for next month, beginning of July.\nJulien Balkany, Executive Chairman of Panoro, commented:\n“We are delighted to complete this well timed, transformational and strongly accretive transaction for\nPanoro, materially increasing our participation in a core producing asset. Having been a partner in Block\nG since 2021, we know the asset well and have a high degree of confidence in its quality, cash\ngeneration potential and remaining upside. With our interest now increasing to 54.625 per cent, this\nacquisition strengthens our production and reserves base and will enhance the frequency and size of\nour crude liftings, driving meaningful long-term cash flow expansion to enhance shareholder returns.\nThis opportune acquisition, announced a couple of days before the start of the conflict in the Middle\nEast, is consistent with Panoro’s strategy to expand its presence in Equatorial Guinea, where we see a\nlot of organic and external investment opportunities to achieve our growth ambition. I would once again\nlike to express our sincere gratitude to the government of Equatorial Guinea which had approved the\ntransaction prior to announcement in February, and also to CEMAC for the efficient and timely\nconclusion of its customary clearance process.”\nEnquiries\nQazi Qadeer, Chief Financial Officer\nTel: +44 203 405 1060\nEmail: investors@panoroenergy.com\nAbout Panoro Energy\nPanoro Energy ASA is an independent exploration and production company based in London and listed\non the main board of the Oslo Stock Exchange with the ticker PEN. Panoro holds production, exploration\nand development assets in Africa, namely interests in Block-G, Block EG-01 and Block EG-23 offshore\nEquatorial Guinea, the Dussafu Marin, Niosi Marin and Guduma Marin Licenses offshore southern\nGabon, the TPS operated assets in Tunisia and onshore Exploration Right 376 in South Africa.\nVisit us at www.panoroenergy.com.\nFollow us on LinkedIn",
+        "pdfSupplementPageCount": 1,
+        "pdfSupplementAttachmentId": 328333
+      },
+      "storedOutput": {
+        "title": "Panoro fullfører oljekjøp til 127 mill. dollar",
+        "lead": "Oljeselskapet Panoro Energy har fullført kjøpet av Kosmos Energys andel i Block G utenfor Ekvatorial-Guinea, opplyser selskapet i en børsmelding. Prisen ved gjennomføring er 127 millioner dollar.",
+        "body": [
+          "Ifølge selskapet gjør kjøpet at Panoros eierandel i Block G nå er 54,625 prosent, opp fra 14,25 prosent. Block G inneholder det produserende Ceiba-feltet og Okume Complex.",
+          "Panoros neste salgslast med olje fra Block G er på rundt 546.000 fat og er planlagt i begynnelsen av juli.",
+          "Styreleder Julien Balkany sier i meldingen at oppkjøpet ifølge selskapet kan styrke produksjons- og reservebasen og øke både hyppigheten og størrelsen på oljelastene."
+        ],
+        "company_sentence": "Panoro Energy er et uavhengig lete- og produksjonsselskap med eiendeler i Afrika.",
+        "key_facts": [
+          "Fullfører kjøp av Kosmos-andel i Block G",
+          "Betaler 127 millioner dollar ved gjennomføring",
+          "Eierandelen øker fra 14,25 prosent til 54,625 prosent",
+          "Neste salgslast er planlagt til rundt 546.000 fat i juli"
+        ],
+        "negative_or_surprising": [],
+        "excluded_hype": [
+          "Styrelederens beskrivelser av transaksjonen som «well timed», «transformational» og «strongly accretive» er utelatt som selskapsvurderinger."
+        ],
+        "source_limitations": [
+          "Ekstra kildetekst er analysert som begrenset kildegrunnlag."
+        ],
+        "confidence": "high",
+        "importance": "viktig",
+        "source_spans": [
+          "primary: completion of the acquisition by Panoro of the Kosmos Energy subsidiary",
+          "primary: Panoro's interest in Block G has now increased to 54.625 per cent",
+          "primary: The consideration paid at completion is USD 127 million",
+          "primary: Block G contains the producing Ceiba field and Okume Complex",
+          "primary: next crude oil lifting at Block G ... approximately 546,000 barrels ... beginning of July",
+          "primary: Julien Balkany, Executive Chairman: With our interest now increasing to 54.625 per cent, this acquisition strengthens our production and reserves base and will enhance the frequency and size of our crude liftings"
+        ]
+      },
+      "storedValidation": {
+        "valid": false,
+        "errors": [
+          "Unexpected numbers: 54,625, 14,25",
+          "Visible article text uses a quote, source-close wording, or named-person attribution, but source_spans lacks speaker or quote wording evidence."
+        ],
+        "issues": [
+          {
+            "code": "UNEXPECTED_NUMBERS",
+            "message": "Unexpected numbers: 54,625, 14,25",
+            "severity": "blocking"
+          },
+          {
+            "code": "MISSING_QUOTE_SOURCE_SPAN",
+            "message": "Visible article text uses a quote, source-close wording, or named-person attribution, but source_spans lacks speaker or quote wording evidence.",
+            "severity": "warning"
+          }
+        ],
+        "warnings": [
+          "Visible article text uses a quote, source-close wording, or named-person attribution, but source_spans lacks speaker or quote wording evidence."
+        ],
+        "errorCode": "BLOCKING_VALIDATION_ERRORS",
+        "hiddenDraft": {
+          "body": [
+            "Kjøpet øker Panoros eierandel i Block G fra 14,25 til 54,625 prosent. Området inneholder de produserende feltene Ceiba og Okume Complex.",
+            "Panoros neste salgslast med olje fra Block G er på rundt 546.000 fat og er planlagt i begynnelsen av juli.",
+            "– Oppkjøpet styrker produksjons- og reservebasen vår og vil øke både hyppigheten og størrelsen på oljelastene, sier styreleder Julien Balkany."
+          ],
+          "lead": "Oljeselskapet Panoro Energy har fullført kjøpet av Kosmos Energys andel i Block G utenfor Ekvatorial-Guinea, opplyser selskapet i en børsmelding. Prisen ved gjennomføring er 127 millioner dollar.",
+          "title": "Panoro fullfører oljekjøp til 127 mill. dollar",
+          "company_sentence": "Panoro Energy er et olje- og gasselskap med virksomhet i Afrika."
+        },
+        "promptChars": 389671,
+        "blockingErrors": [
+          "Unexpected numbers: 54,625, 14,25"
+        ],
+        "quoteTelemetry": {
+          "draftContainsInlineGuillemets": false,
+          "draftContainsStandaloneDashQuote": false,
+          "draftContainsNamedPersonAttribution": true,
+          "draftSourceSpansMentionQuoteSpeaker": false,
+          "sourceContainsNamedQuoteLikePattern": false
+        },
+        "referenceCheck": {
+          "enabled": true,
+          "blocking": false,
+          "checkerError": null,
+          "finalCoverage": {
+            "totalSentences": 7,
+            "coveragePercent": 86,
+            "sentenceReviews": [
+              {
+                "index": 0,
+                "grounded": true,
+                "sentence": "Oljeselskapet Panoro Energy har fullført kjøpet av Kosmos Energys andel i Block G utenfor Ekvatorial-Guinea, opplyser selskapet i en børsmelding.",
+                "interpretation": "Referansen sier at Panoro har fullført oppkjøpet av Kosmos-datterselskapet som indirekte holder en 40,375 prosent ikke-operert interesse i Block G offshore Ekvatorial-Guinea. Omtale som børsmelding er kildeattribusjon.",
+                "sourceEvidence": "announce the completion of the acquisition by Panoro of the Kosmos Energy ... subsidiary that holds ... a 40.375 per cent non-operated interest in Block G offshore Equatorial Guinea"
+              },
+              {
+                "index": 1,
+                "grounded": true,
+                "sentence": "Prisen ved gjennomføring er 127 millioner dollar.",
+                "interpretation": "Beløpet er eksplisitt oppgitt som vederlaget betalt ved gjennomføring, etter vanlige mellomjusteringer.",
+                "sourceEvidence": "The consideration paid at completion is USD 127 million after customary interim adjustments."
+              },
+              {
+                "index": 2,
+                "grounded": true,
+                "sentence": "Ifølge selskapet gjør kjøpet at Panoros eierandel i Block G nå er 54,625 prosent, opp fra 14,25 prosent.",
+                "interpretation": "Referansen sier at Panoro tidligere hadde 14,25 prosent og at eierandelen som følge av oppkjøpet nå har økt til 54,625 prosent.",
+                "sourceEvidence": "Panoro has held a 14.25 per cent interest since early 2021. As a result of the Acquisition Panoro's interest in Block G has now increased to 54.625 per cent."
+              },
+              {
+                "index": 3,
+                "grounded": true,
+                "sentence": "Block G inneholder det produserende Ceiba-feltet og Okume Complex.",
+                "interpretation": "Dette står eksplisitt i referansen.",
+                "sourceEvidence": "Block G contains the producing Ceiba field and Okume Complex"
+              },
+              {
+                "index": 4,
+                "grounded": true,
+                "sentence": "Panoros neste salgslast med olje fra Block G er på rundt 546.000 fat og er planlagt i begynnelsen av juli.",
+                "interpretation": "Referansen oppgir Panoros neste crude oil lifting fra Block G til omtrent 546.000 fat og planlagt i begynnelsen av juli.",
+                "sourceEvidence": "Panoro's next crude oil lifting at Block G ... is for approximately 546,000 barrels and scheduled for next month, beginning of July."
+              },
+              {
+                "index": 5,
+                "grounded": false,
+                "sentence": "Styreleder Julien Balkany sier i meldingen at oppkjøpet ifølge selskapet kan styrke produksjons- og reservebasen og øke både hyppigheten og størrelsen på oljelastene.",
+                "interpretation": "Referansen dekker at Balkany sier oppkjøpet styrker produksjons- og reservebasen og vil øke hyppighet og størrelse på oljelastene, men utkastet endrer styrkegraden til «kan».",
+                "sourceEvidence": "Julien Balkany, Executive Chairman of Panoro, commented: ... this acquisition strengthens our production and reserves base and will enhance the frequency and size of our crude liftings"
+              },
+              {
+                "index": 6,
+                "grounded": true,
+                "sentence": "Panoro Energy er et uavhengig lete- og produksjonsselskap med eiendeler i Afrika.",
+                "interpretation": "Referansen beskriver Panoro som et uavhengig lete- og produksjonsselskap og sier at det har produksjons-, lete- og utviklingseiendeler i Afrika.",
+                "sourceEvidence": "Panoro Energy ASA is an independent exploration and production company ... Panoro holds production, exploration and development assets in Africa"
+              }
+            ],
+            "groundedSentences": 6,
+            "unsupportedSentences": [
+              {
+                "index": 5,
+                "sentence": "Styreleder Julien Balkany sier i meldingen at oppkjøpet ifølge selskapet kan styrke produksjons- og reservebasen og øke både hyppigheten og størrelsen på oljelastene.",
+                "interpretation": "Referansen dekker at Balkany sier oppkjøpet styrker produksjons- og reservebasen og vil øke hyppighet og størrelse på oljelastene, men utkastet endrer styrkegraden til «kan».",
+                "sourceEvidence": "Julien Balkany, Executive Chairman of Panoro, commented: ... this acquisition strengthens our production and reserves base and will enhance the frequency and size of our crude liftings"
+              }
+            ],
+            "visibleArticleSentenceCount": 6
+          },
+          "repairHistory": [
+            {
+              "blocking": false,
+              "checkNumber": 1,
+              "blockingReason": null,
+              "coveragePercent": 86,
+              "correctionAttempt": 0,
+              "unsupportedSentences": [
+                {
+                  "index": 6,
+                  "sentence": "Panoro Energy er et olje- og gasselskap med virksomhet i Afrika.",
+                  "interpretation": "Ikke eksplisitt dekket: Referansen sier at Panoro er et uavhengig lete- og produksjonsselskap med eiendeler i Afrika, men omtaler ikke eksplisitt selskapet som et olje- og gasselskap."
+                }
+              ],
+              "unsupportedSentenceCount": 1,
+              "highRiskUnsupportedSentenceCount": 0
+            },
+            {
+              "blocking": false,
+              "checkNumber": 2,
+              "blockingReason": null,
+              "coveragePercent": 100,
+              "correctionAttempt": 1,
+              "unsupportedSentences": [],
+              "unsupportedSentenceCount": 0,
+              "highRiskUnsupportedSentenceCount": 0
+            },
+            {
+              "blocking": true,
+              "checkNumber": 1,
+              "blockingReason": "Reference check found unsupported high-risk factual claims.",
+              "coveragePercent": 86,
+              "correctionAttempt": 1,
+              "unsupportedSentences": [
+                {
+                  "index": 5,
+                  "sentence": "– Oppkjøpet styrker produksjons- og reservebasen vår og vil kunne øke både hyppigheten og størrelsen på oljelastene, sier styreleder Julien Balkany i meldingen.",
+                  "interpretation": "Delvis dekket og korrekt attribuert, men formuleringen «vil kunne øke» endrer forbehold/styrkegrad fra kildens «will enhance». Som sitat/gjengivelse er dette ikke uendret dekket."
+                }
+              ],
+              "unsupportedSentenceCount": 1,
+              "highRiskUnsupportedSentenceCount": 1
+            },
+            {
+              "blocking": false,
+              "checkNumber": 2,
+              "blockingReason": null,
+              "coveragePercent": 100,
+              "correctionAttempt": 2,
+              "unsupportedSentences": [],
+              "unsupportedSentenceCount": 0,
+              "highRiskUnsupportedSentenceCount": 0
+            },
+            {
+              "blocking": false,
+              "checkNumber": 1,
+              "blockingReason": null,
+              "coveragePercent": 86,
+              "correctionAttempt": 2,
+              "unsupportedSentences": [
+                {
+                  "index": 3,
+                  "sentence": "Området inneholder de produserende feltene Ceiba og Okume Complex.",
+                  "interpretation": "Ikke fullt dekket: Referansen omtaler Ceiba som felt og Okume som Complex, ikke eksplisitt som to produserende felt."
+                }
+              ],
+              "unsupportedSentenceCount": 1,
+              "highRiskUnsupportedSentenceCount": 0
+            },
+            {
+              "blocking": false,
+              "checkNumber": 2,
+              "blockingReason": null,
+              "coveragePercent": 86,
+              "correctionAttempt": 3,
+              "unsupportedSentences": [
+                {
+                  "index": 5,
+                  "sentence": "Styreleder Julien Balkany sier i meldingen at oppkjøpet ifølge selskapet kan styrke produksjons- og reservebasen og øke både hyppigheten og størrelsen på oljelastene.",
+                  "interpretation": "Referansen dekker at Balkany sier oppkjøpet styrker produksjons- og reservebasen og vil øke hyppighet og størrelse på oljelastene, men utkastet endrer styrkegraden til «kan»."
+                }
+              ],
+              "unsupportedSentenceCount": 1,
+              "highRiskUnsupportedSentenceCount": 0
+            }
+          ],
+          "blockingReason": null,
+          "totalSentences": 7,
+          "initialCoverage": {
+            "totalSentences": 7,
+            "coveragePercent": 86,
+            "sentenceReviews": [
+              {
+                "index": 0,
+                "grounded": true,
+                "sentence": "Oljeselskapet Panoro Energy har fullført kjøpet av Kosmos Energys andel i Block G utenfor Ekvatorial-Guinea, opplyser selskapet i en børsmelding.",
+                "interpretation": "Dekket: Referansen sier at Panoro har fullført oppkjøpet av Kosmos-selskapet som holder en 40,375 prosent andel i Block G offshore Ekvatorial-Guinea. Omtale som børsmelding er kildeattribusjon.",
+                "sourceEvidence": "announce the completion of the acquisition by Panoro of the Kosmos Energy subsidiary that holds ... a 40.375 per cent non-operated interest in Block G offshore Equatorial Guinea"
+              },
+              {
+                "index": 1,
+                "grounded": true,
+                "sentence": "Prisen ved gjennomføring er 127 millioner dollar.",
+                "interpretation": "Dekket: Referansen oppgir vederlaget ved gjennomføring til USD 127 millioner, etter vanlige interimjusteringer.",
+                "sourceEvidence": "The consideration paid at completion is USD 127 million after customary interim adjustments."
+              },
+              {
+                "index": 2,
+                "grounded": true,
+                "sentence": "Kjøpet øker Panoros eierandel i Block G fra 14,25 til 54,625 prosent.",
+                "interpretation": "Dekket: Referansen sier at Panoro hadde 14,25 prosent og at andelen etter oppkjøpet har økt til 54,625 prosent.",
+                "sourceEvidence": "Panoro has held a 14.25 per cent interest since early 2021. As a result of the Acquisition Panoro's interest in Block G has now increased to 54.625 per cent."
+              },
+              {
+                "index": 3,
+                "grounded": true,
+                "sentence": "Området inneholder de produserende feltene Ceiba og Okume Complex.",
+                "interpretation": "Dekket: Referansen sier at Block G inneholder det produserende Ceiba-feltet og Okume Complex.",
+                "sourceEvidence": "Block G contains the producing Ceiba field and Okume Complex"
+              },
+              {
+                "index": 4,
+                "grounded": true,
+                "sentence": "Panoros neste salgslast med olje fra Block G er på rundt 546.000 fat og er planlagt i begynnelsen av juli.",
+                "interpretation": "Dekket: Referansen oppgir neste råoljeløfting fra Block G til cirka 546.000 fat, planlagt i begynnelsen av juli.",
+                "sourceEvidence": "Panoro's next crude oil lifting at Block G ... is for approximately 546,000 barrels and scheduled for next month, beginning of July."
+              },
+              {
+                "index": 5,
+                "grounded": true,
+                "sentence": "– Oppkjøpet styrker produksjons- og reservebasen vår og vil øke både hyppigheten og størrelsen på oljelastene, sier styreleder Julien Balkany.",
+                "interpretation": "Dekket: Dette er en naturlig norsk gjengivelse av sitatet fra Julien Balkany, Executive Chairman.",
+                "sourceEvidence": "Julien Balkany, Executive Chairman of Panoro, commented: ... this acquisition strengthens our production and reserves base and will enhance the frequency and size of our crude liftings"
+              },
+              {
+                "index": 6,
+                "grounded": false,
+                "sentence": "Panoro Energy er et olje- og gasselskap med virksomhet i Afrika.",
+                "interpretation": "Ikke eksplisitt dekket: Referansen sier at Panoro er et uavhengig lete- og produksjonsselskap med eiendeler i Afrika, men omtaler ikke eksplisitt selskapet som et olje- og gasselskap.",
+                "sourceEvidence": ""
+              }
+            ],
+            "groundedSentences": 6,
+            "unsupportedSentences": [
+              {
+                "index": 6,
+                "sentence": "Panoro Energy er et olje- og gasselskap med virksomhet i Afrika.",
+                "interpretation": "Ikke eksplisitt dekket: Referansen sier at Panoro er et uavhengig lete- og produksjonsselskap med eiendeler i Afrika, men omtaler ikke eksplisitt selskapet som et olje- og gasselskap.",
+                "sourceEvidence": ""
+              }
+            ],
+            "visibleArticleSentenceCount": 6
+          },
+          "sentenceReviews": [
+            {
+              "index": 0,
+              "grounded": true,
+              "sentence": "Oljeselskapet Panoro Energy har fullført kjøpet av Kosmos Energys andel i Block G utenfor Ekvatorial-Guinea, opplyser selskapet i en børsmelding.",
+              "interpretation": "Referansen sier at Panoro har fullført oppkjøpet av Kosmos-datterselskapet som indirekte holder en 40,375 prosent ikke-operert interesse i Block G offshore Ekvatorial-Guinea. Omtale som børsmelding er kildeattribusjon.",
+              "sourceEvidence": "announce the completion of the acquisition by Panoro of the Kosmos Energy ... subsidiary that holds ... a 40.375 per cent non-operated interest in Block G offshore Equatorial Guinea"
+            },
+            {
+              "index": 1,
+              "grounded": true,
+              "sentence": "Prisen ved gjennomføring er 127 millioner dollar.",
+              "interpretation": "Beløpet er eksplisitt oppgitt som vederlaget betalt ved gjennomføring, etter vanlige mellomjusteringer.",
+              "sourceEvidence": "The consideration paid at completion is USD 127 million after customary interim adjustments."
+            },
+            {
+              "index": 2,
+              "grounded": true,
+              "sentence": "Ifølge selskapet gjør kjøpet at Panoros eierandel i Block G nå er 54,625 prosent, opp fra 14,25 prosent.",
+              "interpretation": "Referansen sier at Panoro tidligere hadde 14,25 prosent og at eierandelen som følge av oppkjøpet nå har økt til 54,625 prosent.",
+              "sourceEvidence": "Panoro has held a 14.25 per cent interest since early 2021. As a result of the Acquisition Panoro's interest in Block G has now increased to 54.625 per cent."
+            },
+            {
+              "index": 3,
+              "grounded": true,
+              "sentence": "Block G inneholder det produserende Ceiba-feltet og Okume Complex.",
+              "interpretation": "Dette står eksplisitt i referansen.",
+              "sourceEvidence": "Block G contains the producing Ceiba field and Okume Complex"
+            },
+            {
+              "index": 4,
+              "grounded": true,
+              "sentence": "Panoros neste salgslast med olje fra Block G er på rundt 546.000 fat og er planlagt i begynnelsen av juli.",
+              "interpretation": "Referansen oppgir Panoros neste crude oil lifting fra Block G til omtrent 546.000 fat og planlagt i begynnelsen av juli.",
+              "sourceEvidence": "Panoro's next crude oil lifting at Block G ... is for approximately 546,000 barrels and scheduled for next month, beginning of July."
+            },
+            {
+              "index": 5,
+              "grounded": false,
+              "sentence": "Styreleder Julien Balkany sier i meldingen at oppkjøpet ifølge selskapet kan styrke produksjons- og reservebasen og øke både hyppigheten og størrelsen på oljelastene.",
+              "interpretation": "Referansen dekker at Balkany sier oppkjøpet styrker produksjons- og reservebasen og vil øke hyppighet og størrelse på oljelastene, men utkastet endrer styrkegraden til «kan».",
+              "sourceEvidence": "Julien Balkany, Executive Chairman of Panoro, commented: ... this acquisition strengthens our production and reserves base and will enhance the frequency and size of our crude liftings"
+            },
+            {
+              "index": 6,
+              "grounded": true,
+              "sentence": "Panoro Energy er et uavhengig lete- og produksjonsselskap med eiendeler i Afrika.",
+              "interpretation": "Referansen beskriver Panoro som et uavhengig lete- og produksjonsselskap og sier at det har produksjons-, lete- og utviklingseiendeler i Afrika.",
+              "sourceEvidence": "Panoro Energy ASA is an independent exploration and production company ... Panoro holds production, exploration and development assets in Africa"
+            }
+          ],
+          "correctionApplied": true,
+          "correctionAttempts": 3,
+          "importanceAdjusted": false,
+          "attributionRiskCount": 0,
+          "finalCoveragePercent": 86,
+          "unsupportedSentences": [
+            {
+              "index": 5,
+              "sentence": "Styreleder Julien Balkany sier i meldingen at oppkjøpet ifølge selskapet kan styrke produksjons- og reservebasen og øke både hyppigheten og størrelsen på oljelastene.",
+              "interpretation": "Referansen dekker at Balkany sier oppkjøpet styrker produksjons- og reservebasen og vil øke hyppighet og størrelse på oljelastene, men utkastet endrer styrkegraden til «kan».",
+              "sourceEvidence": "Julien Balkany, Executive Chairman of Panoro, commented: ... this acquisition strengthens our production and reserves base and will enhance the frequency and size of our crude liftings"
+            }
+          ],
+          "importanceAdjustReason": null,
+          "initialCoveragePercent": 86,
+          "unsupportedSentenceCount": 1,
+          "attributionCorrectionApplied": true,
+          "highRiskUnsupportedSentenceCount": 0
+        },
+        "editorialReview": null,
+        "sourceBodyChars": 2882,
+        "validationRepair": {
+          "error": null,
+          "applied": true,
+          "issueCodes": [
+            "UNEXPECTED_NUMBERS"
+          ],
+          "finalWarnings": [
+            "Unexpected numbers: 54,625, 14,25"
+          ],
+          "initialWarnings": [
+            "Unexpected numbers: 54,625"
+          ]
+        },
+        "styleSanitization": {
+          "changed": false,
+          "removedAsaSuffix": 0,
+          "expandedMarketCodes": 0,
+          "replacedPercentSigns": 0,
+          "removedRegisteredMarks": 0,
+          "normalizedBillionPhrases": 0,
+          "replacedFiscalYearAbbrev": 0,
+          "normalizedAccountingAcronyms": 0,
+          "normalizedExactBillionAmounts": 0
+        },
+        "revisionInstructionCompliance": null
+      },
+      "labels": {
+        "class": "numeric_unresolved",
+        "reportRef": "final report 2026-06-02_2026-08-13"
+      },
+      "expected": {
+        "validation": {
+          "issueCodes": [
+            "MISSING_QUOTE_SOURCE_SPAN",
+            "UNEXPECTED_NUMBERS"
+          ],
+          "hasUnexpectedNumbers": true,
+          "blocking": false
+        }
+      },
+      "provenance": {
+        "window": {
+          "from": "2026-06-02",
+          "to": "2026-08-13"
+        },
+        "status": "failed"
+      }
+    },
+    {
+      "messageId": 676662,
+      "generationRunId": "cmqkzg69603tfqk1poo8vny9n",
+      "promptVersion": "v5.9.1",
+      "sourcePayload": {
+        "messageId": 676662,
+        "title": "Ayfie International AS contemplates share issue",
+        "issuerName": "Ayfie International AS",
+        "issuerSign": "AIX",
+        "publishedAt": "2026-06-19T13:46:53.254Z",
+        "categories": [
+          "INNSIDEINFORMASJON"
+        ],
+        "markets": [
+          "MERK"
+        ],
+        "bodyText": "NOT FOR DISTRIBUTION OR RELEASE, IN WHOLE OR IN PART, DIRECTLY OR INDIRECTLY, IN OR INTO THE UNITED STATES OF AMERICA, AUSTRALIA, CANADA, HONG KONG OR JAPAN, OR ANY OTHER JURISDICTION IN WHICH THE DISTRIBUTION OR RELEASE WOULD BE UNLAWFUL.\n\n(Oslo, 19 June 2026) Ayfie International AS (\"Ayfie\" or the \"Company\") announces that it is contemplating proposing to an extraordinary general meeting of the Company that the Company approves the issue of new shares at a subscription price of NOK 3 per share in a private placement, to raise gross proceeds of NOK 7-10 million, with warrants to subscribe for further shares at the subscription price. The Company has to date received initial commitments from leading existing shareholders for NOK 5 million of the potential share issue.\n\nThe net proceeds from the contemplated private placement will be used to cover identified short-term funding needs, strengthen the Company's balance sheet and for general corporate purposes.\n\nIf proposed to and approved by the extraordinary general meeting, the private placement would represent a deviation from the shareholders' preferential rights to subscribe for shares. The Company is of the view that a private placement as contemplated would be in compliance with applicable equal treatment principles.\n\nThe Company has continued to reduce its operating costs and now runs on a materially leaner annualised cost base than a year ago. Together with the contemplated capital raise, this lower cost base is intended to strengthen the Company's financial position and extend its financial runway.\n\nFollowing this reduction in operating costs, the Company is focused on commercialising secure enterprise AI products where customers can choose where the solution runs, including a fully sovereign Norwegian option on the Telenor AI Factory, where customer data is processed and kept within Norway and under the customer's control.\n\nShareholders who wish to discuss participation in a potential share issue may contact herman.sjoberg@ayfie.com\n\nAbout Ayfie:\n\nAyfie is a European \"Made in Norway\" software provider specialising in secure enterprise AI, enterprise search, retrieval augmented generation (RAG), and generative AI. With over 15 years of experience, Ayfie delivers a flexible AI layer that connects applications and systems, with an indexing engine that understands documents, preserves permissions, and provides source transparency behind every answer. Ayfie's platform consists of reusable connectors, a powerful AI index, and deployment models designed to fit customer requirements for security, data control and compliance.\n\nThis information is subject to a duty of disclosure pursuant to the Company's continuing obligations as a company listed on Euronext Growth Oslo, including section 5-12 of the Norwegian Securities Trading Act.\n\nThis information was issued as inside information pursuant to the EU Market Abuse Regulation and was published by Herman Sjøberg, CEO of the Company, on 19 June 2026.\n\nFor further information, please contact:\n\nHerman Sjøberg, CEO\nTel: +47 92 66 22 33\nE-mail: herman.sjoberg@ayfie.com",
+        "hasAttachments": false,
+        "sourceBodyChars": 3116
+      },
+      "storedOutput": {
+        "title": "Ayfie vurderer å hente penger",
+        "lead": "AI-programvareselskapet Ayfie vurderer å hente 7–10 millioner kroner i en rettet emisjon, opplyser selskapet i en børsmelding.",
+        "body": [
+          "Selskapet vurderer å utstede nye aksjer til 3 kroner stykket. En rettet emisjon betyr at nye aksjer selges til utvalgte investorer, og setter aksjonærenes vanlige fortrinnsrett til side.",
+          "Ayfie har fått foreløpige tilsagn på 5 millioner kroner fra større eksisterende aksjonærer.",
+          "Ifølge børsmeldingen kan emisjonen også komme med warrants, som gir rett til å tegne flere aksjer til samme pris. Pengene skal ifølge selskapet dekke kortsiktige finansieringsbehov, styrke balansen og brukes til generelle selskapsformål.",
+          "Selskapet skriver også at det har kuttet driftskostnader og nå har en vesentlig lavere årlig kostnadsbase enn for ett år siden."
+        ],
+        "company_sentence": "Ayfie er en programvareleverandør innen kunstig intelligens for bedrifter.",
+        "key_facts": [
+          "Vurderer rettet emisjon på 7–10 millioner kroner",
+          "Tegningskurs på 3 kroner per aksje",
+          "Foreløpige tilsagn på 5 millioner kroner fra større eksisterende aksjonærer",
+          "Warrants kan gi rett til å tegne flere aksjer til samme pris"
+        ],
+        "negative_or_surprising": [
+          "Pengene skal blant annet dekke kortsiktige finansieringsbehov",
+          "Emisjonen vil sette aksjonærenes vanlige fortrinnsrett til side hvis den blir godkjent"
+        ],
+        "excluded_hype": [
+          "Omtale av Ayfie som europeisk «Made in Norway»-leverandør og detaljer om plattformen er kuttet som selskapsbeskrivelse."
+        ],
+        "source_limitations": [],
+        "confidence": "high",
+        "importance": "medium",
+        "source_spans": [
+          "primary: contemplating proposing ... issue of new shares at a subscription price of NOK 3 per share in a private placement, to raise gross proceeds of NOK 7-10 million",
+          "primary: received initial commitments from leading existing shareholders for NOK 5 million",
+          "primary: with warrants to subscribe for further shares at the subscription price",
+          "primary: net proceeds ... used to cover identified short-term funding needs, strengthen the Company's balance sheet and for general corporate purposes",
+          "primary: continued to reduce its operating costs and now runs on a materially leaner annualised cost base than a year ago"
+        ]
+      },
+      "storedValidation": {
+        "valid": false,
+        "errors": [
+          "Unexpected numbers: 10",
+          "Reference check found unsupported high-risk factual claims. High-risk unsupported sentences: 1."
+        ],
+        "issues": [
+          {
+            "code": "UNEXPECTED_NUMBERS",
+            "message": "Unexpected numbers: 10",
+            "severity": "blocking"
+          },
+          {
+            "code": "REFERENCE_CHECK_UNSUPPORTED_FACTS",
+            "message": "Reference check found unsupported high-risk factual claims. High-risk unsupported sentences: 1.",
+            "severity": "blocking"
+          }
+        ],
+        "warnings": [],
+        "errorCode": "BLOCKING_VALIDATION_ERRORS",
+        "hiddenDraft": {
+          "body": [
+            "Pengene skal hentes ved å selge nye aksjer til 3 kroner stykket i en rettet emisjon. Det betyr at utvalgte investorer får kjøpe aksjer, mens aksjonærenes vanlige fortrinnsrett settes til side.",
+            "Ayfie har fått foreløpige tilsagn på 5 millioner kroner fra større eksisterende aksjonærer.",
+            "Investorene skal også få warrants, som gir rett til å kjøpe flere aksjer senere til samme pris. Selskapet sier pengene skal dekke kortsiktige finansieringsbehov, styrke balansen og brukes til generelle selskapsformål.",
+            "Ayfie skriver også at det har kuttet driftskostnader og nå har en klart lavere årlig kostnadsbase enn for ett år siden."
+          ],
+          "lead": "AI-programvareselskapet Ayfie vil be aksjonærene om å godkjenne en kapitalinnhenting på 7–10 millioner kroner, opplyser selskapet i en børsmelding.",
+          "title": "Ayfie vurderer å hente 7–10 millioner",
+          "company_sentence": "Ayfie er et norsk programvareselskap som leverer løsninger for kunstig intelligens til bedrifter."
+        },
+        "promptChars": 337910,
+        "blockingErrors": [
+          "Unexpected numbers: 10",
+          "Reference check found unsupported high-risk factual claims. High-risk unsupported sentences: 1."
+        ],
+        "quoteTelemetry": {
+          "draftContainsInlineGuillemets": false,
+          "draftContainsStandaloneDashQuote": false,
+          "draftContainsNamedPersonAttribution": false,
+          "draftSourceSpansMentionQuoteSpeaker": false,
+          "sourceContainsNamedQuoteLikePattern": false
+        },
+        "referenceCheck": {
+          "enabled": true,
+          "blocking": true,
+          "checkerError": null,
+          "finalCoverage": {
+            "totalSentences": 8,
+            "coveragePercent": 88,
+            "sentenceReviews": [
+              {
+                "index": 0,
+                "grounded": true,
+                "sentence": "AI-programvareselskapet Ayfie vurderer å hente 7–10 millioner kroner i en rettet emisjon, opplyser selskapet i en børsmelding.",
+                "interpretation": "Dekket: Referansen beskriver Ayfie som programvareleverandør innen AI og sier selskapet vurderer en privat plassering for å hente NOK 7–10 millioner. «Børsmelding» er kildeattribusjon.",
+                "sourceEvidence": "Ayfie is a European \"Made in Norway\" software provider specialising in secure enterprise AI...; ...contemplating... new shares... in a private placement, to raise gross proceeds of NOK 7-10 million"
+              },
+              {
+                "index": 1,
+                "grounded": true,
+                "sentence": "Selskapet vurderer å utstede nye aksjer til 3 kroner stykket.",
+                "interpretation": "Dekket: Referansen sier at selskapet vurderer/proponerer utstedelse av nye aksjer til tegningskurs NOK 3 per aksje.",
+                "sourceEvidence": "...contemplating proposing... the issue of new shares at a subscription price of NOK 3 per share..."
+              },
+              {
+                "index": 2,
+                "grounded": false,
+                "sentence": "En rettet emisjon betyr at nye aksjer selges til utvalgte investorer, og setter aksjonærenes vanlige fortrinnsrett til side.",
+                "interpretation": "Delvis, men ikke fullt dekket: Referansen sier at emisjonen vil innebære avvik fra aksjonærenes fortrinnsrett, men forklarer ikke at nye aksjer selges til utvalgte investorer.",
+                "sourceEvidence": "...the private placement would represent a deviation from the shareholders' preferential rights to subscribe for shares."
+              },
+              {
+                "index": 3,
+                "grounded": true,
+                "sentence": "Ayfie har fått foreløpige tilsagn på 5 millioner kroner fra større eksisterende aksjonærer.",
+                "interpretation": "Dekket: Referansen sier selskapet har mottatt initial commitments fra leading existing shareholders på NOK 5 millioner.",
+                "sourceEvidence": "The Company has to date received initial commitments from leading existing shareholders for NOK 5 million..."
+              },
+              {
+                "index": 4,
+                "grounded": true,
+                "sentence": "Ifølge børsmeldingen kan emisjonen også komme med warrants, som gir rett til å tegne flere aksjer til samme pris.",
+                "interpretation": "Dekket: Referansen sier den mulige emisjonen inkluderer warrants til å tegne ytterligere aksjer til tegningskursen. «Børsmeldingen» er kildeattribusjon.",
+                "sourceEvidence": "...with warrants to subscribe for further shares at the subscription price."
+              },
+              {
+                "index": 5,
+                "grounded": true,
+                "sentence": "Pengene skal ifølge selskapet dekke kortsiktige finansieringsbehov, styrke balansen og brukes til generelle selskapsformål.",
+                "interpretation": "Dekket: Referansen oppgir samme bruk av nettoprovenyet.",
+                "sourceEvidence": "The net proceeds... will be used to cover identified short-term funding needs, strengthen the Company's balance sheet and for general corporate purposes."
+              },
+              {
+                "index": 6,
+                "grounded": true,
+                "sentence": "Selskapet skriver også at det har kuttet driftskostnader og nå har en vesentlig lavere årlig kostnadsbase enn for ett år siden.",
+                "interpretation": "Dekket: Referansen sier selskapet har fortsatt å redusere driftskostnader og nå har en materially leaner annualised cost base enn for ett år siden.",
+                "sourceEvidence": "The Company has continued to reduce its operating costs and now runs on a materially leaner annualised cost base than a year ago."
+              },
+              {
+                "index": 7,
+                "grounded": true,
+                "sentence": "Ayfie er en programvareleverandør innen kunstig intelligens for bedrifter.",
+                "interpretation": "Dekket: Referansen beskriver Ayfie som programvareleverandør som spesialiserer seg på secure enterprise AI.",
+                "sourceEvidence": "Ayfie is a European \"Made in Norway\" software provider specialising in secure enterprise AI..."
+              }
+            ],
+            "groundedSentences": 7,
+            "unsupportedSentences": [
+              {
+                "index": 2,
+                "sentence": "En rettet emisjon betyr at nye aksjer selges til utvalgte investorer, og setter aksjonærenes vanlige fortrinnsrett til side.",
+                "interpretation": "Delvis, men ikke fullt dekket: Referansen sier at emisjonen vil innebære avvik fra aksjonærenes fortrinnsrett, men forklarer ikke at nye aksjer selges til utvalgte investorer.",
+                "sourceEvidence": "...the private placement would represent a deviation from the shareholders' preferential rights to subscribe for shares."
+              }
+            ],
+            "visibleArticleSentenceCount": 7
+          },
+          "repairHistory": [
+            {
+              "blocking": true,
+              "checkNumber": 1,
+              "blockingReason": "Reference check found unsupported high-risk factual claims.",
+              "coveragePercent": 75,
+              "correctionAttempt": 0,
+              "unsupportedSentences": [
+                {
+                  "index": 0,
+                  "sentence": "AI-programvareselskapet Ayfie vil be aksjonærene om å godkjenne en kapitalinnhenting på 7–10 millioner kroner, opplyser selskapet i en børsmelding.",
+                  "interpretation": "Referansen sier at selskapet vurderer å foreslå dette for en ekstraordinær generalforsamling, ikke at det definitivt vil be aksjonærene om godkjenning."
+                },
+                {
+                  "index": 2,
+                  "sentence": "Det betyr at utvalgte investorer får kjøpe aksjer, mens aksjonærenes vanlige fortrinnsrett settes til side.",
+                  "interpretation": "At fortrinnsretten fravikes er dekket, men referansen sier ikke eksplisitt at «utvalgte investorer» får kjøpe aksjer."
+                }
+              ],
+              "unsupportedSentenceCount": 2,
+              "highRiskUnsupportedSentenceCount": 1
+            },
+            {
+              "blocking": false,
+              "checkNumber": 2,
+              "blockingReason": null,
+              "coveragePercent": 100,
+              "correctionAttempt": 1,
+              "unsupportedSentences": [],
+              "unsupportedSentenceCount": 0,
+              "highRiskUnsupportedSentenceCount": 0
+            },
+            {
+              "blocking": true,
+              "checkNumber": 1,
+              "blockingReason": "Reference check found unsupported high-risk factual claims.",
+              "coveragePercent": 75,
+              "correctionAttempt": 1,
+              "unsupportedSentences": [
+                {
+                  "index": 1,
+                  "sentence": "Pengene skal hentes ved å selge nye aksjer til 3 kroner stykket til utvalgte investorer.",
+                  "interpretation": "Delvis dekket at nye aksjer skal utstedes til NOK 3 per aksje, men referansen sier ikke eksplisitt «utvalgte investorer»."
+                },
+                {
+                  "index": 4,
+                  "sentence": "Investorene skal ifølge selskapet også få warrants, som kan gi rett til å kjøpe flere aksjer senere til samme pris.",
+                  "interpretation": "Referansen dekker warrants til å tegne ytterligere aksjer til tegningskursen, men sier ikke eksplisitt at «investorene skal få» warrants eller tidspunktet «senere»."
+                }
+              ],
+              "unsupportedSentenceCount": 2,
+              "highRiskUnsupportedSentenceCount": 2
+            },
+            {
+              "blocking": true,
+              "checkNumber": 2,
+              "blockingReason": "Reference check found unsupported high-risk factual claims.",
+              "coveragePercent": 88,
+              "correctionAttempt": 2,
+              "unsupportedSentences": [
+                {
+                  "index": 1,
+                  "sentence": "De nye aksjene skal utstedes til 3 kroner stykket i en rettet emisjon.",
+                  "interpretation": "Ikke fullt dekket: Tegningskursen og rettet emisjon er dekket, men setningen sier definitivt at aksjene skal utstedes, mens referansen omtaler dette som noe selskapet vurderer å foreslå og som krever godkjenning."
+                }
+              ],
+              "unsupportedSentenceCount": 1,
+              "highRiskUnsupportedSentenceCount": 1
+            },
+            {
+              "blocking": false,
+              "checkNumber": 3,
+              "blockingReason": null,
+              "coveragePercent": 100,
+              "correctionAttempt": 3,
+              "unsupportedSentences": [],
+              "unsupportedSentenceCount": 0,
+              "highRiskUnsupportedSentenceCount": 0
+            },
+            {
+              "blocking": true,
+              "checkNumber": 1,
+              "blockingReason": "Reference check found unsupported high-risk factual claims.",
+              "coveragePercent": 88,
+              "correctionAttempt": 3,
+              "unsupportedSentences": [
+                {
+                  "index": 2,
+                  "sentence": "En rettet emisjon betyr at nye aksjer selges til utvalgte investorer, og setter aksjonærenes vanlige fortrinnsrett til side.",
+                  "interpretation": "Delvis, men ikke fullt dekket: Referansen sier at emisjonen vil innebære avvik fra aksjonærenes fortrinnsrett, men forklarer ikke at nye aksjer selges til utvalgte investorer."
+                }
+              ],
+              "unsupportedSentenceCount": 1,
+              "highRiskUnsupportedSentenceCount": 1
+            }
+          ],
+          "blockingReason": "Reference check found unsupported high-risk factual claims.",
+          "totalSentences": 8,
+          "initialCoverage": {
+            "totalSentences": 8,
+            "coveragePercent": 75,
+            "sentenceReviews": [
+              {
+                "index": 0,
+                "grounded": false,
+                "sentence": "AI-programvareselskapet Ayfie vil be aksjonærene om å godkjenne en kapitalinnhenting på 7–10 millioner kroner, opplyser selskapet i en børsmelding.",
+                "interpretation": "Referansen sier at selskapet vurderer å foreslå dette for en ekstraordinær generalforsamling, ikke at det definitivt vil be aksjonærene om godkjenning.",
+                "sourceEvidence": "announces that it is contemplating proposing to an extraordinary general meeting ... to raise gross proceeds of NOK 7-10 million"
+              },
+              {
+                "index": 1,
+                "grounded": true,
+                "sentence": "Pengene skal hentes ved å selge nye aksjer til 3 kroner stykket i en rettet emisjon.",
+                "interpretation": "Dette er direkte dekket av omtalen av utstedelse av nye aksjer til NOK 3 per aksje i en private placement.",
+                "sourceEvidence": "the issue of new shares at a subscription price of NOK 3 per share in a private placement"
+              },
+              {
+                "index": 2,
+                "grounded": false,
+                "sentence": "Det betyr at utvalgte investorer får kjøpe aksjer, mens aksjonærenes vanlige fortrinnsrett settes til side.",
+                "interpretation": "At fortrinnsretten fravikes er dekket, men referansen sier ikke eksplisitt at «utvalgte investorer» får kjøpe aksjer.",
+                "sourceEvidence": "the private placement would represent a deviation from the shareholders' preferential rights to subscribe for shares"
+              },
+              {
+                "index": 3,
+                "grounded": true,
+                "sentence": "Ayfie har fått foreløpige tilsagn på 5 millioner kroner fra større eksisterende aksjonærer.",
+                "interpretation": "Referansen opplyser om initial commitments på NOK 5 million fra leading existing shareholders.",
+                "sourceEvidence": "received initial commitments from leading existing shareholders for NOK 5 million"
+              },
+              {
+                "index": 4,
+                "grounded": true,
+                "sentence": "Investorene skal også få warrants, som gir rett til å kjøpe flere aksjer senere til samme pris.",
+                "interpretation": "Referansen sier at emisjonen inkluderer warrants til å tegne flere aksjer til tegningskursen.",
+                "sourceEvidence": "with warrants to subscribe for further shares at the subscription price"
+              },
+              {
+                "index": 5,
+                "grounded": true,
+                "sentence": "Selskapet sier pengene skal dekke kortsiktige finansieringsbehov, styrke balansen og brukes til generelle selskapsformål.",
+                "interpretation": "Dette gjengir formålet med nettoprovenyet i referansen.",
+                "sourceEvidence": "used to cover identified short-term funding needs, strengthen the Company's balance sheet and for general corporate purposes"
+              },
+              {
+                "index": 6,
+                "grounded": true,
+                "sentence": "Ayfie skriver også at det har kuttet driftskostnader og nå har en klart lavere årlig kostnadsbase enn for ett år siden.",
+                "interpretation": "Dette er dekket av at selskapet har redusert driftskostnader og har en materially leaner annualised cost base enn for ett år siden.",
+                "sourceEvidence": "continued to reduce its operating costs and now runs on a materially leaner annualised cost base than a year ago"
+              },
+              {
+                "index": 7,
+                "grounded": true,
+                "sentence": "Ayfie er et norsk programvareselskap som leverer løsninger for kunstig intelligens til bedrifter.",
+                "interpretation": "Referansen beskriver Ayfie som en Made in Norway programvareleverandør innen enterprise AI.",
+                "sourceEvidence": "Ayfie is a European \"Made in Norway\" software provider specialising in secure enterprise AI"
+              }
+            ],
+            "groundedSentences": 6,
+            "unsupportedSentences": [
+              {
+                "index": 0,
+                "sentence": "AI-programvareselskapet Ayfie vil be aksjonærene om å godkjenne en kapitalinnhenting på 7–10 millioner kroner, opplyser selskapet i en børsmelding.",
+                "interpretation": "Referansen sier at selskapet vurderer å foreslå dette for en ekstraordinær generalforsamling, ikke at det definitivt vil be aksjonærene om godkjenning.",
+                "sourceEvidence": "announces that it is contemplating proposing to an extraordinary general meeting ... to raise gross proceeds of NOK 7-10 million"
+              },
+              {
+                "index": 2,
+                "sentence": "Det betyr at utvalgte investorer får kjøpe aksjer, mens aksjonærenes vanlige fortrinnsrett settes til side.",
+                "interpretation": "At fortrinnsretten fravikes er dekket, men referansen sier ikke eksplisitt at «utvalgte investorer» får kjøpe aksjer.",
+                "sourceEvidence": "the private placement would represent a deviation from the shareholders' preferential rights to subscribe for shares"
+              }
+            ],
+            "visibleArticleSentenceCount": 7
+          },
+          "sentenceReviews": [
+            {
+              "index": 0,
+              "grounded": true,
+              "sentence": "AI-programvareselskapet Ayfie vurderer å hente 7–10 millioner kroner i en rettet emisjon, opplyser selskapet i en børsmelding.",
+              "interpretation": "Dekket: Referansen beskriver Ayfie som programvareleverandør innen AI og sier selskapet vurderer en privat plassering for å hente NOK 7–10 millioner. «Børsmelding» er kildeattribusjon.",
+              "sourceEvidence": "Ayfie is a European \"Made in Norway\" software provider specialising in secure enterprise AI...; ...contemplating... new shares... in a private placement, to raise gross proceeds of NOK 7-10 million"
+            },
+            {
+              "index": 1,
+              "grounded": true,
+              "sentence": "Selskapet vurderer å utstede nye aksjer til 3 kroner stykket.",
+              "interpretation": "Dekket: Referansen sier at selskapet vurderer/proponerer utstedelse av nye aksjer til tegningskurs NOK 3 per aksje.",
+              "sourceEvidence": "...contemplating proposing... the issue of new shares at a subscription price of NOK 3 per share..."
+            },
+            {
+              "index": 2,
+              "grounded": false,
+              "sentence": "En rettet emisjon betyr at nye aksjer selges til utvalgte investorer, og setter aksjonærenes vanlige fortrinnsrett til side.",
+              "interpretation": "Delvis, men ikke fullt dekket: Referansen sier at emisjonen vil innebære avvik fra aksjonærenes fortrinnsrett, men forklarer ikke at nye aksjer selges til utvalgte investorer.",
+              "sourceEvidence": "...the private placement would represent a deviation from the shareholders' preferential rights to subscribe for shares."
+            },
+            {
+              "index": 3,
+              "grounded": true,
+              "sentence": "Ayfie har fått foreløpige tilsagn på 5 millioner kroner fra større eksisterende aksjonærer.",
+              "interpretation": "Dekket: Referansen sier selskapet har mottatt initial commitments fra leading existing shareholders på NOK 5 millioner.",
+              "sourceEvidence": "The Company has to date received initial commitments from leading existing shareholders for NOK 5 million..."
+            },
+            {
+              "index": 4,
+              "grounded": true,
+              "sentence": "Ifølge børsmeldingen kan emisjonen også komme med warrants, som gir rett til å tegne flere aksjer til samme pris.",
+              "interpretation": "Dekket: Referansen sier den mulige emisjonen inkluderer warrants til å tegne ytterligere aksjer til tegningskursen. «Børsmeldingen» er kildeattribusjon.",
+              "sourceEvidence": "...with warrants to subscribe for further shares at the subscription price."
+            },
+            {
+              "index": 5,
+              "grounded": true,
+              "sentence": "Pengene skal ifølge selskapet dekke kortsiktige finansieringsbehov, styrke balansen og brukes til generelle selskapsformål.",
+              "interpretation": "Dekket: Referansen oppgir samme bruk av nettoprovenyet.",
+              "sourceEvidence": "The net proceeds... will be used to cover identified short-term funding needs, strengthen the Company's balance sheet and for general corporate purposes."
+            },
+            {
+              "index": 6,
+              "grounded": true,
+              "sentence": "Selskapet skriver også at det har kuttet driftskostnader og nå har en vesentlig lavere årlig kostnadsbase enn for ett år siden.",
+              "interpretation": "Dekket: Referansen sier selskapet har fortsatt å redusere driftskostnader og nå har en materially leaner annualised cost base enn for ett år siden.",
+              "sourceEvidence": "The Company has continued to reduce its operating costs and now runs on a materially leaner annualised cost base than a year ago."
+            },
+            {
+              "index": 7,
+              "grounded": true,
+              "sentence": "Ayfie er en programvareleverandør innen kunstig intelligens for bedrifter.",
+              "interpretation": "Dekket: Referansen beskriver Ayfie som programvareleverandør som spesialiserer seg på secure enterprise AI.",
+              "sourceEvidence": "Ayfie is a European \"Made in Norway\" software provider specialising in secure enterprise AI..."
+            }
+          ],
+          "correctionApplied": true,
+          "correctionAttempts": 3,
+          "importanceAdjusted": false,
+          "attributionRiskCount": 0,
+          "finalCoveragePercent": 88,
+          "unsupportedSentences": [
+            {
+              "index": 2,
+              "sentence": "En rettet emisjon betyr at nye aksjer selges til utvalgte investorer, og setter aksjonærenes vanlige fortrinnsrett til side.",
+              "interpretation": "Delvis, men ikke fullt dekket: Referansen sier at emisjonen vil innebære avvik fra aksjonærenes fortrinnsrett, men forklarer ikke at nye aksjer selges til utvalgte investorer.",
+              "sourceEvidence": "...the private placement would represent a deviation from the shareholders' preferential rights to subscribe for shares."
+            }
+          ],
+          "importanceAdjustReason": null,
+          "initialCoveragePercent": 75,
+          "unsupportedSentenceCount": 1,
+          "attributionCorrectionApplied": true,
+          "highRiskUnsupportedSentenceCount": 1
+        },
+        "editorialReview": null,
+        "sourceBodyChars": 3116,
+        "validationRepair": {
+          "error": null,
+          "applied": true,
+          "issueCodes": [
+            "UNEXPECTED_NUMBERS"
+          ],
+          "finalWarnings": [
+            "Unexpected numbers: 10"
+          ],
+          "initialWarnings": [
+            "Unexpected numbers: 10"
+          ]
+        },
+        "styleSanitization": {
+          "changed": false,
+          "removedAsaSuffix": 0,
+          "expandedMarketCodes": 0,
+          "replacedPercentSigns": 0,
+          "removedRegisteredMarks": 0,
+          "normalizedBillionPhrases": 0,
+          "replacedFiscalYearAbbrev": 0,
+          "normalizedAccountingAcronyms": 0,
+          "normalizedExactBillionAmounts": 0
+        },
+        "revisionInstructionCompliance": null
+      },
+      "labels": {
+        "class": "numeric_unresolved",
+        "reportRef": "final report 2026-06-02_2026-08-13"
+      },
+      "expected": {
+        "validation": {
+          "issueCodes": [
+            "UNEXPECTED_NUMBERS"
+          ],
+          "hasUnexpectedNumbers": true,
+          "blocking": false
+        }
+      },
+      "provenance": {
+        "window": {
+          "from": "2026-06-02",
+          "to": "2026-08-13"
+        },
+        "status": "failed"
+      }
+    },
+    {
+      "messageId": 678266,
+      "generationRunId": "cmrn1ikgo0k7ipx16hbsxpyi5",
+      "promptVersion": "v5.9.1",
+      "sourcePayload": {
+        "messageId": 678266,
+        "title": "Strategic momentum in challenging quarter",
+        "issuerName": "Telenor ASA",
+        "issuerSign": "TEL",
+        "publishedAt": "2026-07-16T05:00:00.000Z",
+        "categories": [
+          "HALVÅRSRAPPORT"
+        ],
+        "markets": [
+          "XOSL"
+        ],
+        "bodyText": "Telenor made important strategic progress in the second quarter, strengthening its Nordic position, expanding its broadband footprint and securing important contracts within defence and mission-critical communications. The financial performance was affected by particularly tough year-on-year comparables, the timing of commercial initiatives, robustification and transformation costs, and a continued challenging macroeconomic environment in Bangladesh.\n\n“2026 is a transition year for Telenor on several fronts as we deliver on our strategy. While the quarter was affected by several short-term factors, we are executing initiatives that will improve efficiency, strengthen customer value and increase returns over time,” says CEO Benedicte Schilbred Fasmer.\n\nSecond quarter highlights:\n\n•\tService revenues of NOK 14.679 billion.\n•\tAdjusted EBITDA of NOK 7.987 billion\n•\tFree cash flow before M&A of NOK 1.815 billion.\n•\tTotal free cash flow of NOK 2.0 billion.\n•\t\nService revenues declined by 0.7 per cent, while EBITDA declined by 4.8 per cent, both organically. Free cash flow before M&A was NOK 1.8 billion. The results reflect particularly tough year-on-year comparables, timing of commercial initiatives, phasing and step-up of robustification and transformation costs, softer market conditions in Norway, modest improvements in Finland, and challenging macro conditions in Bangladesh. Telenor also made a provision in Norway for the dispute on VAT for TV news channels, negatively affecting service revenues and adjusted EBITDA by NOK 135 million and NOK 162 million, respectively.\n\nA transition year to deliver on strategy\n\nTelenor is currently supporting dual IT cost structures and high implementation costs related to the IT transformation, which are expected to start rolling off towards year-end and through 2027. These efforts are expected to bring substantial improvements in customer experience and efficiencies over time. From August, Telenor’s new organisational structure will take effect, supporting a more focused portfolio and a leaner operating model. Over time, the changes are expected to create a Telenor with greater flexibility, higher efficiency, improved customer value and increased return on capital.\n\nNordic markets remain challenging, with signs of improvement \n\nIn the Norwegian mobile market, there has been a gradual increase in competition for mobile subscribers, with more promotional activity in recent quarters. Compared with a particularly strong second quarter last year, B2C growth slowed this quarter. At the same time, Telenor grew well in B2B and saw encouraging developments in the Norwegian market last month. In Finland, market conditions remained competitive, while Sweden, Denmark and Amp delivered good financial progress during the quarter.\n\nSecurity and defence remain a strategic focus\n\nToday, Telenor-owned defence communications specialist KNL announces a new EUR 6.5 million contract with the Finnish Defence Forces. Earlier in the quarter, KNL was also appointed to the United Kingdom’s Tactical Communication Systems Framework, while Telenor Norway secured a framework agreement with the Norwegian Armed Forces and the Norwegian National Security Authority.\n\nDuring the quarter Telenor also announced the establishment of Telenor Sovereign Cloud, a new company designed to provide nationally controlled cloud infrastructure for organisations with stringent requirements for security, resilience and regulatory compliance.\n\n“In a more uncertain environment, secure and resilient communications remain a key strategic focus area for Telenor. We are seeing increasing demand for trusted connectivity and mission-critical communication services across both public and private sectors,” says Schilbred Fasmer.\n\nBuilding a stronger and more focused Telenor\n\nTelenor also made important progress in strengthening its portfolio and Nordic position during the quarter. The partnership with Verdane with 50/50 ownership in Telenor Connexion unlocks significant value while supporting the next phase of growth in IoT.\n\nIn broadband, the approval of the GlobalConnect consumer transaction and the acquisition of Enivest strengthen Telenor’s position in Norway, while the acquisition of Bahnhof expands scale and breadth in the Swedish broadband market. The three broadband transactions are expected to generate sizeable cash flow synergies from 2030.\n\nTelenor remains in a very strong financial position and is well under way with the first year of its three-year share buyback programme, which will reduce share count over time and support growth in earnings and dividends per share.\n\n“Our focus is firmly on execution – improving commercial momentum, delivering transformation benefits and translating this year’s strategic actions and M&A into stronger cash flow and returns over time. Our long-term ambitions remain unchanged, and we remain confident in our strategic direction,” says Schilbred Fasmer.\n\nFinancial outlook for 2026:\n\nThe outlook for the 2026 is moderated on the back of market conditions in addition a few technical factors.\n•\tFlat to low-single-digit organic growth in Nordic service revenues (changed from low-single-digit).\n•\tFlat to low-single-digit organic growth in adjusted EBITDA in the Nordics (changed from low-to-mid-single-single-digit).\n•\tAround 14% capex to sales, excluding leases, for the Nordic business.\n•\tFlat to slightly negative organic growth in adjusted EBITDA for the Group (changed from flat-to-low-single-digit).\n•\tFree cash flow before M&A excluding dividends from associated companies and incremental spectrum of around NOK 10 billion (changed from NOK 10-11 billion).\n\nItems related to prior years’ periods, including the mentioned TV VAT charge for 2020-2022, remain excluded from the outlook.\n\nFor further information, please contact:\nFrank Maaø, SVP Capital Markets and Investor Relations, mobile +47 916 74 045\nThomas Midteide, SVP Communications, mobile +47 962 32 017\n\nThis information is subject to the disclosure requirements pursuant to section 5-12 of the Securities Trading Act.",
+        "hasAttachments": true,
+        "sourceBodyChars": 6089
+      },
+      "storedOutput": {
+        "title": "Telenor senker utsiktene etter resultatfall",
+        "lead": "Telenor modererer utsiktene for 2026 på grunn av markedsforhold og noen tekniske faktorer, viser kvartalsrapporten. Selskapet peker på tøffere nordiske markeder, omstillingskostnader og krevende forhold i Bangladesh.",
+        "body": [
+          "• Totalinntektene falt til 18,135 milliarder kroner, fra 19,1 milliarder i samme kvartal i fjor",
+          "• Driftsresultatet falt til 3,771 milliarder kroner, fra 5,23 milliarder",
+          "• Resultat før skatt falt til 4,044 milliarder kroner, fra 4,888 milliarder",
+          "Justert ebitda falt til 7,987 milliarder kroner, fra 8,781 milliarder. Telenor tok også en avsetning i Norge knyttet til en tv-momsstrid, som svekket serviceinntektene med 135 millioner kroner og justert ebitda med 162 millioner.",
+          "Telenor venter nå flat til svakt negativ organisk vekst i justert ebitda for konsernet i 2026. Fri kontantstrøm før oppkjøp, ekskludert utbytter fra tilknyttede selskaper og ekstra betalinger for frekvenser, ventes rundt 10 milliarder kroner.",
+          "– 2026 er et overgangsår for Telenor på flere fronter, sier konsernsjef Benedicte Schilbred Fasmer."
+        ],
+        "company_sentence": "Telenor leverer kommunikasjonstjenester.",
+        "key_facts": [
+          "Totalinntekter: 18.135 mill. kroner, ned fra 19.100 mill.",
+          "Driftsresultat: 3.771 mill. kroner, ned fra 5.230 mill.",
+          "Resultat før skatt: 4.044 mill. kroner, ned fra 4.888 mill.",
+          "Senker ebitda- og kontantstrømutsikter for 2026"
+        ],
+        "negative_or_surprising": [
+          "Telenor modererer utsiktene for 2026",
+          "Driftsresultatet falt fra 5,23 til 3,771 milliarder kroner"
+        ],
+        "excluded_hype": [
+          "«Our focus is firmly on execution ...», generisk strategikommentar utover hovedpoengene"
+        ],
+        "source_limitations": [
+          "Kun et utdrag av rapporten er analysert"
+        ],
+        "confidence": "high",
+        "importance": "viktig",
+        "source_spans": [
+          "primary: The outlook for the 2026 is moderated on the back of market conditions in addition a few technical factors.",
+          "primary: Total revenues 18,135 19,100",
+          "primary: Operating profit (loss) 3,771 5,230",
+          "primary: Profit (loss) before taxes 4,044 4,888",
+          "primary: “2026 is a transition year for Telenor on several fronts”, says CEO Benedicte Schilbred Fasmer."
+        ]
+      },
+      "storedValidation": {
+        "valid": false,
+        "errors": [
+          "Unexpected numbers: 19,1, 5,23",
+          "Visible article text exceeds 1000 chars.",
+          "Visible article text uses ebitda without the full result-measure context."
+        ],
+        "issues": [
+          {
+            "code": "UNEXPECTED_NUMBERS",
+            "message": "Unexpected numbers: 19,1, 5,23",
+            "severity": "blocking"
+          },
+          {
+            "code": "VISIBLE_ARTICLE_TOO_LONG",
+            "message": "Visible article text exceeds 1000 chars.",
+            "severity": "warning"
+          },
+          {
+            "code": "UNEXPLAINED_EBITDA",
+            "message": "Visible article text uses ebitda without the full result-measure context.",
+            "severity": "warning"
+          }
+        ],
+        "warnings": [
+          "Visible article text exceeds 1000 chars.",
+          "Visible article text uses ebitda without the full result-measure context."
+        ],
+        "errorCode": "BLOCKING_VALIDATION_ERRORS",
+        "hiddenDraft": {
+          "body": [
+            "• Totalinntektene falt til 18,14 milliarder kroner, fra 19,10 milliarder i samme kvartal i fjor",
+            "• Driftsresultatet falt til 3,77 milliarder kroner, fra 5,23 milliarder",
+            "• Resultat før skatt falt til 4,04 milliarder kroner, fra 4,89 milliarder",
+            "Justert ebitda falt organisk 4,8 prosent til 7,99 milliarder kroner. Telenor tok også en avsetning i Norge knyttet til en tv-momsstrid, som svekket serviceinntektene med 135 millioner kroner og justert ebitda med 162 millioner.",
+            "Telenor venter nå flat til svakt negativ organisk vekst i justert ebitda for konsernet i 2026. Tidligere ventet selskapet flat til lav ensifret vekst. Fri kontantstrøm før oppkjøp og salg ventes rundt 10 milliarder kroner, ned fra tidligere 10–11 milliarder.",
+            "– 2026 er et overgangsår for Telenor på flere fronter, sier konsernsjef Benedicte Schilbred Fasmer."
+          ],
+          "lead": "Telekomkonsernet Telenor senker utsiktene for 2026 etter et svakere andre kvartal, viser kvartalsrapporten. Selskapet peker på tøffere nordiske markeder, kostnader til omstilling og krevende forhold i Bangladesh.",
+          "title": "Telenor senker utsiktene etter resultatfall",
+          "company_sentence": "Telenor er et telekomkonsern med virksomhet i Norden og Asia."
+        },
+        "promptChars": 311515,
+        "blockingErrors": [
+          "Unexpected numbers: 19,1, 5,23"
+        ],
+        "quoteTelemetry": {
+          "draftContainsInlineGuillemets": false,
+          "draftContainsStandaloneDashQuote": true,
+          "draftContainsNamedPersonAttribution": true,
+          "draftSourceSpansMentionQuoteSpeaker": true,
+          "sourceContainsNamedQuoteLikePattern": true
+        },
+        "referenceCheck": {
+          "enabled": true,
+          "blocking": false,
+          "checkerError": null,
+          "finalCoverage": {
+            "totalSentences": 11,
+            "coveragePercent": 91,
+            "sentenceReviews": [
+              {
+                "index": 0,
+                "grounded": true,
+                "sentence": "Telenor modererer utsiktene for 2026 på grunn av markedsforhold og noen tekniske faktorer, viser kvartalsrapporten.",
+                "interpretation": "Direkte dekket av formuleringen om modererte 2026-utsikter på grunn av markedsforhold og tekniske faktorer.",
+                "sourceEvidence": "The outlook for the 2026 is moderated on the back of market conditions in addition a few technical factors."
+              },
+              {
+                "index": 1,
+                "grounded": true,
+                "sentence": "Selskapet peker på tøffere nordiske markeder, omstillingskostnader og krevende forhold i Bangladesh.",
+                "interpretation": "Dekket av referansens omtale av utfordrende nordiske markeder, transformasjonskostnader og krevende makroforhold i Bangladesh.",
+                "sourceEvidence": "Nordic markets remain challenging ... robustification and transformation costs ... challenging macro conditions in Bangladesh."
+              },
+              {
+                "index": 2,
+                "grounded": true,
+                "sentence": "• Totalinntektene falt til 18,135 milliarder kroner, fra 19,1 milliarder i samme kvartal i fjor",
+                "interpretation": "Tallene er eksplisitt oppgitt for Q2 2026 og Q2 2025, og nedgang følger av tallene.",
+                "sourceEvidence": "Total revenues 18,135 19,100"
+              },
+              {
+                "index": 3,
+                "grounded": true,
+                "sentence": "• Driftsresultatet falt til 3,771 milliarder kroner, fra 5,23 milliarder",
+                "interpretation": "Tallene for operating profit er eksplisitt oppgitt, og viser fall.",
+                "sourceEvidence": "Operating profit (loss) 3,771 5,230"
+              },
+              {
+                "index": 4,
+                "grounded": true,
+                "sentence": "• Resultat før skatt falt til 4,044 milliarder kroner, fra 4,888 milliarder",
+                "interpretation": "Tallene for resultat før skatt er eksplisitt oppgitt, og viser fall.",
+                "sourceEvidence": "Profit (loss) before taxes 4,044 4,888"
+              },
+              {
+                "index": 5,
+                "grounded": true,
+                "sentence": "Justert ebitda falt til 7,987 milliarder kroner, fra 8,781 milliarder.",
+                "interpretation": "Justert EBITDA for Q2 2026 og Q2 2025 er eksplisitt oppgitt, og viser fall.",
+                "sourceEvidence": "Adjusted EBITDA 7,987 8,781"
+              },
+              {
+                "index": 6,
+                "grounded": true,
+                "sentence": "Telenor tok også en avsetning i Norge knyttet til en tv-momsstrid, som svekket serviceinntektene med 135 millioner kroner og justert ebitda med 162 millioner.",
+                "interpretation": "Direkte dekket av omtalen av avsetningen og effekten på serviceinntekter og justert EBITDA.",
+                "sourceEvidence": "Telenor also made a provision in Norway for the dispute on VAT for TV news channels, negatively affecting service revenues and adjusted EBITDA by NOK 135 million and NOK 162 million, respectively."
+              },
+              {
+                "index": 7,
+                "grounded": true,
+                "sentence": "Telenor venter nå flat til svakt negativ organisk vekst i justert ebitda for konsernet i 2026.",
+                "interpretation": "Direkte dekket av oppdatert 2026-utsikt for konsernets justerte EBITDA.",
+                "sourceEvidence": "Flat to slightly negative organic growth in adjusted EBITDA for the Group (changed from flat-to-low-single-digit)."
+              },
+              {
+                "index": 8,
+                "grounded": true,
+                "sentence": "Fri kontantstrøm før oppkjøp, ekskludert utbytter fra tilknyttede selskaper og ekstra betalinger for frekvenser, ventes rundt 10 milliarder kroner.",
+                "interpretation": "Direkte dekket av 2026-utsikten for fri kontantstrøm før M&A, med de samme ekskluderingene.",
+                "sourceEvidence": "Free cash flow before M&A excluding dividends from associated companies and incremental spectrum of around NOK 10 billion"
+              },
+              {
+                "index": 9,
+                "grounded": true,
+                "sentence": "– 2026 er et overgangsår for Telenor på flere fronter, sier konsernsjef Benedicte Schilbred Fasmer.",
+                "interpretation": "Direkte dekket av sitatet fra konsernsjefen.",
+                "sourceEvidence": "“2026 is a transition year for Telenor on several fronts as we deliver on our strategy...,” says CEO Benedicte Schilbred Fasmer."
+              },
+              {
+                "index": 10,
+                "grounded": false,
+                "sentence": "Telenor leverer kommunikasjonstjenester.",
+                "interpretation": "Referansen omtaler kommunikasjon som strategisk fokus og kontrakter innen kommunikasjon, men sier ikke eksplisitt som en generell selskapsbeskrivelse at Telenor leverer kommunikasjonstjenester.",
+                "sourceEvidence": ""
+              }
+            ],
+            "groundedSentences": 10,
+            "unsupportedSentences": [
+              {
+                "index": 10,
+                "sentence": "Telenor leverer kommunikasjonstjenester.",
+                "interpretation": "Referansen omtaler kommunikasjon som strategisk fokus og kontrakter innen kommunikasjon, men sier ikke eksplisitt som en generell selskapsbeskrivelse at Telenor leverer kommunikasjonstjenester.",
+                "sourceEvidence": ""
+              }
+            ],
+            "visibleArticleSentenceCount": 10
+          },
+          "repairHistory": [
+            {
+              "blocking": true,
+              "checkNumber": 1,
+              "blockingReason": "Reference check found unsupported high-risk factual claims.",
+              "coveragePercent": 83,
+              "correctionAttempt": 0,
+              "unsupportedSentences": [
+                {
+                  "index": 9,
+                  "sentence": "Fri kontantstrøm før oppkjøp og salg ventes rundt 10 milliarder kroner, ned fra tidligere 10–11 milliarder.",
+                  "interpretation": "Ikke fullt dekket: referansen gjelder en mer avgrenset kontantstrøm-metrikk, ekskludert utbytter fra tilknyttede selskaper og inkrementelt spektrum, som utkastet utelater."
+                },
+                {
+                  "index": 11,
+                  "sentence": "Telenor er et telekomkonsern med virksomhet i Norden og Asia.",
+                  "interpretation": "Ikke eksplisitt dekket som samlet karakteristikk i referansen; Norden og Asia nevnes i tallmateriale, men ikke at Telenor er et telekomkonsern med virksomhet i disse regionene."
+                }
+              ],
+              "unsupportedSentenceCount": 2,
+              "highRiskUnsupportedSentenceCount": 1
+            },
+            {
+              "blocking": false,
+              "checkNumber": 2,
+              "blockingReason": null,
+              "coveragePercent": 100,
+              "correctionAttempt": 1,
+              "unsupportedSentences": [],
+              "unsupportedSentenceCount": 0,
+              "highRiskUnsupportedSentenceCount": 0
+            },
+            {
+              "blocking": true,
+              "checkNumber": 1,
+              "blockingReason": "Reference check found unsupported high-risk factual claims.",
+              "coveragePercent": 82,
+              "correctionAttempt": 1,
+              "unsupportedSentences": [
+                {
+                  "index": 0,
+                  "sentence": "Telekomkonsernet Telenor senker utsiktene for 2026 etter et svakere andre kvartal, viser kvartalsrapporten.",
+                  "interpretation": "Referansen dekker at utsiktene for 2026 er moderert/nedjustert, men begrunner det med markedsforhold og tekniske faktorer, ikke eksplisitt «etter et svakere andre kvartal»."
+                },
+                {
+                  "index": 10,
+                  "sentence": "Telenor er et telekomkonsern med virksomhet i Norden og Asia.",
+                  "interpretation": "Referansen omtaler Norden og Asia i segment-/markedsomtale, men sier ikke eksplisitt at Telenor er et telekomkonsern med virksomhet i Norden og Asia."
+                }
+              ],
+              "unsupportedSentenceCount": 2,
+              "highRiskUnsupportedSentenceCount": 1
+            },
+            {
+              "blocking": false,
+              "checkNumber": 2,
+              "blockingReason": null,
+              "coveragePercent": 91,
+              "correctionAttempt": 2,
+              "unsupportedSentences": [
+                {
+                  "index": 10,
+                  "sentence": "Telenor leverer kommunikasjonstjenester.",
+                  "interpretation": "Referansen omtaler kommunikasjon som strategisk fokus og kontrakter innen kommunikasjon, men sier ikke eksplisitt som en generell selskapsbeskrivelse at Telenor leverer kommunikasjonstjenester."
+                }
+              ],
+              "unsupportedSentenceCount": 1,
+              "highRiskUnsupportedSentenceCount": 0
+            }
+          ],
+          "blockingReason": null,
+          "totalSentences": 11,
+          "initialCoverage": {
+            "totalSentences": 12,
+            "coveragePercent": 83,
+            "sentenceReviews": [
+              {
+                "index": 0,
+                "grounded": true,
+                "sentence": "Telekomkonsernet Telenor senker utsiktene for 2026 etter et svakere andre kvartal, viser kvartalsrapporten.",
+                "interpretation": "Dekket: referansen sier at utsiktene for 2026 er moderert, og at kvartalet var påvirket av flere negative forhold med organisk fall i serviceinntekter og EBITDA.",
+                "sourceEvidence": "“The outlook for the 2026 is moderated…” / “Service revenues declined by 0.7 per cent, while EBITDA declined by 4.8 per cent”"
+              },
+              {
+                "index": 1,
+                "grounded": true,
+                "sentence": "Selskapet peker på tøffere nordiske markeder, kostnader til omstilling og krevende forhold i Bangladesh.",
+                "interpretation": "Dekket: referansen omtaler utfordrende nordiske markeder, transformasjonskostnader og krevende makroforhold i Bangladesh.",
+                "sourceEvidence": "“Nordic markets remain challenging” / “robustification and transformation costs” / “challenging macro conditions in Bangladesh”"
+              },
+              {
+                "index": 2,
+                "grounded": true,
+                "sentence": "• Totalinntektene falt til 18,14 milliarder kroner, fra 19,10 milliarder i samme kvartal i fjor",
+                "interpretation": "Dekket av finanstabellen; beløpene er avrundet fra NOK millioner.",
+                "sourceEvidence": "“Total revenues 18,135 19,100”"
+              },
+              {
+                "index": 3,
+                "grounded": true,
+                "sentence": "• Driftsresultatet falt til 3,77 milliarder kroner, fra 5,23 milliarder",
+                "interpretation": "Dekket av finanstabellen; operating profit tilsvarer driftsresultat.",
+                "sourceEvidence": "“Operating profit (loss) 3,771 5,230”"
+              },
+              {
+                "index": 4,
+                "grounded": true,
+                "sentence": "• Resultat før skatt falt til 4,04 milliarder kroner, fra 4,89 milliarder",
+                "interpretation": "Dekket av finanstabellen.",
+                "sourceEvidence": "“Profit (loss) before taxes 4,044 4,888”"
+              },
+              {
+                "index": 5,
+                "grounded": true,
+                "sentence": "Justert ebitda falt organisk 4,8 prosent til 7,99 milliarder kroner.",
+                "interpretation": "Dekket: referansen oppgir justert EBITDA på 7.987 mrd. og organisk fall på 4,8 prosent.",
+                "sourceEvidence": "“Adjusted EBITDA of NOK 7.987 billion” / “EBITDA declined by 4.8 per cent, both organically”"
+              },
+              {
+                "index": 6,
+                "grounded": true,
+                "sentence": "Telenor tok også en avsetning i Norge knyttet til en tv-momsstrid, som svekket serviceinntektene med 135 millioner kroner og justert ebitda med 162 millioner.",
+                "interpretation": "Dekket direkte av referansen.",
+                "sourceEvidence": "“made a provision in Norway for the dispute on VAT for TV news channels, negatively affecting service revenues and adjusted EBITDA by NOK 135 million and NOK 162 million”"
+              },
+              {
+                "index": 7,
+                "grounded": true,
+                "sentence": "Telenor venter nå flat til svakt negativ organisk vekst i justert ebitda for konsernet i 2026.",
+                "interpretation": "Dekket av oppdatert outlook.",
+                "sourceEvidence": "“Flat to slightly negative organic growth in adjusted EBITDA for the Group”"
+              },
+              {
+                "index": 8,
+                "grounded": true,
+                "sentence": "Tidligere ventet selskapet flat til lav ensifret vekst.",
+                "interpretation": "Dekket av endringsangivelsen i outlook.",
+                "sourceEvidence": "“changed from flat-to-low-single-digit”"
+              },
+              {
+                "index": 9,
+                "grounded": false,
+                "sentence": "Fri kontantstrøm før oppkjøp og salg ventes rundt 10 milliarder kroner, ned fra tidligere 10–11 milliarder.",
+                "interpretation": "Ikke fullt dekket: referansen gjelder en mer avgrenset kontantstrøm-metrikk, ekskludert utbytter fra tilknyttede selskaper og inkrementelt spektrum, som utkastet utelater.",
+                "sourceEvidence": "“Free cash flow before M&A excluding dividends from associated companies and incremental spectrum of around NOK 10 billion (changed from NOK 10-11 billion)”"
+              },
+              {
+                "index": 10,
+                "grounded": true,
+                "sentence": "– 2026 er et overgangsår for Telenor på flere fronter, sier konsernsjef Benedicte Schilbred Fasmer.",
+                "interpretation": "Dekket som direkte gjengivelse av konsernsjefens sitat.",
+                "sourceEvidence": "“2026 is a transition year for Telenor on several fronts…” says CEO Benedicte Schilbred Fasmer"
+              },
+              {
+                "index": 11,
+                "grounded": false,
+                "sentence": "Telenor er et telekomkonsern med virksomhet i Norden og Asia.",
+                "interpretation": "Ikke eksplisitt dekket som samlet karakteristikk i referansen; Norden og Asia nevnes i tallmateriale, men ikke at Telenor er et telekomkonsern med virksomhet i disse regionene.",
+                "sourceEvidence": ""
+              }
+            ],
+            "groundedSentences": 10,
+            "unsupportedSentences": [
+              {
+                "index": 9,
+                "sentence": "Fri kontantstrøm før oppkjøp og salg ventes rundt 10 milliarder kroner, ned fra tidligere 10–11 milliarder.",
+                "interpretation": "Ikke fullt dekket: referansen gjelder en mer avgrenset kontantstrøm-metrikk, ekskludert utbytter fra tilknyttede selskaper og inkrementelt spektrum, som utkastet utelater.",
+                "sourceEvidence": "“Free cash flow before M&A excluding dividends from associated companies and incremental spectrum of around NOK 10 billion (changed from NOK 10-11 billion)”"
+              },
+              {
+                "index": 11,
+                "sentence": "Telenor er et telekomkonsern med virksomhet i Norden og Asia.",
+                "interpretation": "Ikke eksplisitt dekket som samlet karakteristikk i referansen; Norden og Asia nevnes i tallmateriale, men ikke at Telenor er et telekomkonsern med virksomhet i disse regionene.",
+                "sourceEvidence": ""
+              }
+            ],
+            "visibleArticleSentenceCount": 11
+          },
+          "sentenceReviews": [
+            {
+              "index": 0,
+              "grounded": true,
+              "sentence": "Telenor modererer utsiktene for 2026 på grunn av markedsforhold og noen tekniske faktorer, viser kvartalsrapporten.",
+              "interpretation": "Direkte dekket av formuleringen om modererte 2026-utsikter på grunn av markedsforhold og tekniske faktorer.",
+              "sourceEvidence": "The outlook for the 2026 is moderated on the back of market conditions in addition a few technical factors."
+            },
+            {
+              "index": 1,
+              "grounded": true,
+              "sentence": "Selskapet peker på tøffere nordiske markeder, omstillingskostnader og krevende forhold i Bangladesh.",
+              "interpretation": "Dekket av referansens omtale av utfordrende nordiske markeder, transformasjonskostnader og krevende makroforhold i Bangladesh.",
+              "sourceEvidence": "Nordic markets remain challenging ... robustification and transformation costs ... challenging macro conditions in Bangladesh."
+            },
+            {
+              "index": 2,
+              "grounded": true,
+              "sentence": "• Totalinntektene falt til 18,135 milliarder kroner, fra 19,1 milliarder i samme kvartal i fjor",
+              "interpretation": "Tallene er eksplisitt oppgitt for Q2 2026 og Q2 2025, og nedgang følger av tallene.",
+              "sourceEvidence": "Total revenues 18,135 19,100"
+            },
+            {
+              "index": 3,
+              "grounded": true,
+              "sentence": "• Driftsresultatet falt til 3,771 milliarder kroner, fra 5,23 milliarder",
+              "interpretation": "Tallene for operating profit er eksplisitt oppgitt, og viser fall.",
+              "sourceEvidence": "Operating profit (loss) 3,771 5,230"
+            },
+            {
+              "index": 4,
+              "grounded": true,
+              "sentence": "• Resultat før skatt falt til 4,044 milliarder kroner, fra 4,888 milliarder",
+              "interpretation": "Tallene for resultat før skatt er eksplisitt oppgitt, og viser fall.",
+              "sourceEvidence": "Profit (loss) before taxes 4,044 4,888"
+            },
+            {
+              "index": 5,
+              "grounded": true,
+              "sentence": "Justert ebitda falt til 7,987 milliarder kroner, fra 8,781 milliarder.",
+              "interpretation": "Justert EBITDA for Q2 2026 og Q2 2025 er eksplisitt oppgitt, og viser fall.",
+              "sourceEvidence": "Adjusted EBITDA 7,987 8,781"
+            },
+            {
+              "index": 6,
+              "grounded": true,
+              "sentence": "Telenor tok også en avsetning i Norge knyttet til en tv-momsstrid, som svekket serviceinntektene med 135 millioner kroner og justert ebitda med 162 millioner.",
+              "interpretation": "Direkte dekket av omtalen av avsetningen og effekten på serviceinntekter og justert EBITDA.",
+              "sourceEvidence": "Telenor also made a provision in Norway for the dispute on VAT for TV news channels, negatively affecting service revenues and adjusted EBITDA by NOK 135 million and NOK 162 million, respectively."
+            },
+            {
+              "index": 7,
+              "grounded": true,
+              "sentence": "Telenor venter nå flat til svakt negativ organisk vekst i justert ebitda for konsernet i 2026.",
+              "interpretation": "Direkte dekket av oppdatert 2026-utsikt for konsernets justerte EBITDA.",
+              "sourceEvidence": "Flat to slightly negative organic growth in adjusted EBITDA for the Group (changed from flat-to-low-single-digit)."
+            },
+            {
+              "index": 8,
+              "grounded": true,
+              "sentence": "Fri kontantstrøm før oppkjøp, ekskludert utbytter fra tilknyttede selskaper og ekstra betalinger for frekvenser, ventes rundt 10 milliarder kroner.",
+              "interpretation": "Direkte dekket av 2026-utsikten for fri kontantstrøm før M&A, med de samme ekskluderingene.",
+              "sourceEvidence": "Free cash flow before M&A excluding dividends from associated companies and incremental spectrum of around NOK 10 billion"
+            },
+            {
+              "index": 9,
+              "grounded": true,
+              "sentence": "– 2026 er et overgangsår for Telenor på flere fronter, sier konsernsjef Benedicte Schilbred Fasmer.",
+              "interpretation": "Direkte dekket av sitatet fra konsernsjefen.",
+              "sourceEvidence": "“2026 is a transition year for Telenor on several fronts as we deliver on our strategy...,” says CEO Benedicte Schilbred Fasmer."
+            },
+            {
+              "index": 10,
+              "grounded": false,
+              "sentence": "Telenor leverer kommunikasjonstjenester.",
+              "interpretation": "Referansen omtaler kommunikasjon som strategisk fokus og kontrakter innen kommunikasjon, men sier ikke eksplisitt som en generell selskapsbeskrivelse at Telenor leverer kommunikasjonstjenester.",
+              "sourceEvidence": ""
+            }
+          ],
+          "correctionApplied": true,
+          "correctionAttempts": 2,
+          "importanceAdjusted": false,
+          "attributionRiskCount": 0,
+          "finalCoveragePercent": 91,
+          "unsupportedSentences": [
+            {
+              "index": 10,
+              "sentence": "Telenor leverer kommunikasjonstjenester.",
+              "interpretation": "Referansen omtaler kommunikasjon som strategisk fokus og kontrakter innen kommunikasjon, men sier ikke eksplisitt som en generell selskapsbeskrivelse at Telenor leverer kommunikasjonstjenester.",
+              "sourceEvidence": ""
+            }
+          ],
+          "importanceAdjustReason": null,
+          "initialCoveragePercent": 83,
+          "unsupportedSentenceCount": 1,
+          "attributionCorrectionApplied": false,
+          "highRiskUnsupportedSentenceCount": 0
+        },
+        "editorialReview": null,
+        "sourceBodyChars": 6089,
+        "reportExtraction": {
+          "pageCount": 41,
+          "diagnostics": {
+            "fallbackUsed": true,
+            "requestedTopicTerms": [],
+            "totalExtractedChars": 22781,
+            "incomeStatementFound": false,
+            "requestedPageNumbers": []
+          },
+          "attachmentId": 329761,
+          "contextChars": 4138,
+          "selectedPages": [
+            {
+              "score": 6,
+              "reasons": [
+                "ceo_or_management"
+              ],
+              "textChars": 90,
+              "pageNumber": 1
+            },
+            {
+              "score": 8,
+              "reasons": [
+                "outlook_or_events"
+              ],
+              "textChars": 179,
+              "pageNumber": 5
+            },
+            {
+              "score": 18,
+              "reasons": [
+                "financial_fallback"
+              ],
+              "textChars": 497,
+              "pageNumber": 13
+            },
+            {
+              "score": 16,
+              "reasons": [
+                "financial_fallback"
+              ],
+              "textChars": 397,
+              "pageNumber": 15
+            },
+            {
+              "score": 21,
+              "reasons": [
+                "financial_fallback"
+              ],
+              "textChars": 1081,
+              "pageNumber": 24
+            },
+            {
+              "score": 5,
+              "reasons": [
+                "outlook_or_events"
+              ],
+              "textChars": 1268,
+              "pageNumber": 28
+            }
+          ],
+          "attachmentName": "Presentation Q2 2026.pdf",
+          "extractedChars": 22781,
+          "metricCandidates": [
+            {
+              "label": "Service revenues, mn",
+              "metric": "revenue",
+              "values": [
+                "14,679 15,493",
+                "-0.7"
+              ],
+              "rowText": "Service revenues, mn 14,679 15,493 -0.7%",
+              "pageNumber": 13
+            },
+            {
+              "label": "Total revenues",
+              "metric": "revenue",
+              "values": [
+                "18,135"
+              ],
+              "rowText": "Total revenues 18,135",
+              "pageNumber": 24
+            },
+            {
+              "label": "Operating profit (loss)",
+              "metric": "operating_result",
+              "values": [
+                "3,771 5,230"
+              ],
+              "rowText": "Operating profit (loss) 3,771 5,230",
+              "pageNumber": 24
+            }
+          ],
+          "validationSourceChars": 10229
+        },
+        "validationRepair": {
+          "error": null,
+          "applied": true,
+          "issueCodes": [
+            "UNEXPECTED_NUMBERS"
+          ],
+          "finalWarnings": [
+            "Unexpected numbers: 19,1, 5,23"
+          ],
+          "initialWarnings": [
+            "Unexpected numbers: 18,14, 19,10, 3,77, 5,23, 4,04, 4,89, 4,8, 11"
+          ]
+        },
+        "styleSanitization": {
+          "changed": true,
+          "removedAsaSuffix": 0,
+          "expandedMarketCodes": 0,
+          "replacedPercentSigns": 0,
+          "removedRegisteredMarks": 0,
+          "normalizedBillionPhrases": 10,
+          "replacedFiscalYearAbbrev": 0,
+          "normalizedAccountingAcronyms": 0,
+          "normalizedExactBillionAmounts": 0
+        },
+        "revisionInstructionCompliance": null
+      },
+      "labels": {
+        "class": "numeric_unresolved",
+        "reportRef": "final report 2026-06-02_2026-08-13"
+      },
+      "expected": {
+        "validation": {
+          "issueCodes": [
+            "UNEXPECTED_NUMBERS",
+            "UNEXPLAINED_EBITDA",
+            "VISIBLE_ARTICLE_TOO_LONG"
+          ],
+          "hasUnexpectedNumbers": true,
+          "blocking": false
+        }
+      },
+      "provenance": {
+        "window": {
+          "from": "2026-06-02",
+          "to": "2026-08-13"
+        },
+        "status": "failed"
+      }
+    },
+    {
+      "messageId": 679469,
+      "generationRunId": "cmspq7me90qacot1j3097ov8g",
+      "promptVersion": "v5.9.1",
+      "sourcePayload": {
+        "messageId": 679469,
+        "title": "Delårsrapport Landkreditt Bank Q2 2026",
+        "issuerName": "Landkreditt Bank AS",
+        "issuerSign": "LAKRB",
+        "publishedAt": "2026-08-12T06:46:31.964Z",
+        "categories": [
+          "HALVÅRSRAPPORT"
+        ],
+        "markets": [
+          "XOSL",
+          "XOAM"
+        ],
+        "bodyText": "Beretning for 2. kvartal 2026\n\n• Resultat etter skatt per første halvår på 112 millioner kroner og utlånsvekst på 20,4 prosent mot samme periode i fjor\n• Bankkonsernet har god likviditet og en kapitaldekning på 24,3 prosent\n• Geopolitisk usikkerhet og markedsuro påvirker investeringsresultatet i likviditetsporteføljen, men ingen tegn til vesentlige tap i utlånsporteføljene\n",
+        "hasAttachments": true,
+        "sourceBodyChars": 376
+      },
+      "storedOutput": {
+        "title": "Landkreditt-resultatet faller tross utlånsvekst",
+        "lead": "Landkreditt Bank får lavere resultat i andre kvartal, selv om utlånene vokser 20,4 prosent på årsbasis, ifølge kvartalsrapporten.",
+        "body": [
+          "• Resultatet etter skatt er 112 millioner kroner i første halvår, ifølge børsmeldingen.",
+          "• Netto renteinntekter faller til 139,3 millioner kroner i andre kvartal, fra 165,9 millioner året før.",
+          "• Ifølge selskapet øker rentekostnadene til 471,4 millioner kroner i kvartalet, fra 343,6 millioner kroner året før. Dette kan ses i kvartalstallene.",
+          "• Banken opplyser at det ikke er tegn til vesentlige tap i utlånsporteføljen."
+        ],
+        "company_sentence": "Landkreditt Bank er et bankkonsern.",
+        "key_facts": [
+          "Utlånsvekst på 20,4 prosent på årsbasis",
+          "Resultat etter skatt på 112 millioner kroner i første halvår",
+          "Netto renteinntekter falt til 139,3 millioner kroner i andre kvartal",
+          "Rentekostnader økte til 471,4 millioner kroner"
+        ],
+        "negative_or_surprising": [
+          "Netto renteinntekter faller til tross for utlånsvekst på 20,4 prosent."
+        ],
+        "excluded_hype": [],
+        "source_limitations": [
+          "Kun et utdrag av rapporten er analysert"
+        ],
+        "confidence": "high",
+        "importance": "medium",
+        "source_spans": [
+          "primary: Resultat etter skatt per første halvår på 112 millioner kroner og utlånsvekst på 20,4 prosent",
+          "primary: Netto renteinntekter 139 324 165 906",
+          "primary: Sum rentekostnader og lignende kostnader 471 391 343 597",
+          "primary: Ved avleggelsen av regnskapet per andre kvartal 2026 er det ingen tegn til vesentlige tap i porteføljene."
+        ]
+      },
+      "storedValidation": {
+        "valid": false,
+        "errors": [
+          "Unexpected numbers: 139,3, 165,9, 471,4, 343,6, 139 324 165 906, 471 391 343 597"
+        ],
+        "issues": [
+          {
+            "code": "UNEXPECTED_NUMBERS",
+            "message": "Unexpected numbers: 139,3, 165,9, 471,4, 343,6, 139 324 165 906, 471 391 343 597",
+            "severity": "blocking"
+          }
+        ],
+        "warnings": [],
+        "errorCode": "BLOCKING_VALIDATION_ERRORS",
+        "hiddenDraft": {
+          "body": [
+            "• Netto renteinntekter faller til 139,3 millioner kroner, fra 165,9 millioner i samme kvartal i fjor.",
+            "• Rentekostnadene øker til 471,4 millioner kroner, fra 343,6 millioner.",
+            "• Resultatet etter skatt ender på 67,5 millioner kroner, ned fra 95,8 millioner.",
+            "For første halvår faller resultatet før skatt til 145,3 millioner kroner, fra 212,1 millioner. Banken opplyser samtidig at det ikke er tegn til vesentlige tap i utlånsporteføljen."
+          ],
+          "lead": "Landkreditt Bank får et lavere resultat i andre kvartal, selv om utlånene vokser 20,4 prosent på årsbasis. Kvartalsrapporten viser at resultatet før skatt faller til 85,2 millioner kroner, fra 126,3 millioner året før.",
+          "title": "Landkreditt-resultatet faller tross utlånsvekst",
+          "company_sentence": "Landkreditt Bank er en bank med lån til privatkunder og landbruket."
+        },
+        "promptChars": 594689,
+        "blockingErrors": [
+          "Unexpected numbers: 139,3, 165,9, 471,4, 343,6, 139 324 165 906, 471 391 343 597"
+        ],
+        "quoteTelemetry": {
+          "draftContainsInlineGuillemets": false,
+          "draftContainsStandaloneDashQuote": false,
+          "draftContainsNamedPersonAttribution": false,
+          "draftSourceSpansMentionQuoteSpeaker": false,
+          "sourceContainsNamedQuoteLikePattern": false
+        },
+        "referenceCheck": {
+          "enabled": true,
+          "blocking": false,
+          "checkerError": null,
+          "finalCoverage": {
+            "totalSentences": 7,
+            "coveragePercent": 86,
+            "sentenceReviews": [
+              {
+                "index": 0,
+                "grounded": true,
+                "sentence": "Landkreditt Bank får lavere resultat i andre kvartal, selv om utlånene vokser 20,4 prosent på årsbasis, ifølge kvartalsrapporten.",
+                "interpretation": "Konsernets resultat etter skatt i andre kvartal er lavere enn året før, og utlånsveksten på årsbasis oppgis til 20,4 prosent.",
+                "sourceEvidence": "«Resultat ... andre kvartal 2026 utgjør 67 524» mot «95 777»; «Utlånsveksten på årsbasis i bankkonsernet utgjør 20,4 prosent.»"
+              },
+              {
+                "index": 1,
+                "grounded": true,
+                "sentence": "• Resultatet etter skatt er 112 millioner kroner i første halvår, ifølge børsmeldingen.",
+                "interpretation": "Resultat etter skatt for første halvår er oppgitt til 111,729 millioner kroner, som avrundes til 112 millioner.",
+                "sourceEvidence": "«Resultat etter skatt per første halvår på 112 millioner kroner»"
+              },
+              {
+                "index": 2,
+                "grounded": true,
+                "sentence": "• Netto renteinntekter faller til 139,3 millioner kroner i andre kvartal, fra 165,9 millioner året før.",
+                "interpretation": "Tallene for konsernet viser netto renteinntekter på 139,324 millioner i andre kvartal 2026, mot 165,906 millioner i samme kvartal 2025.",
+                "sourceEvidence": "«Netto renteinntekter 139 324 165 906»"
+              },
+              {
+                "index": 3,
+                "grounded": true,
+                "sentence": "• Ifølge selskapet øker rentekostnadene til 471,4 millioner kroner i kvartalet, fra 343,6 millioner kroner året før.",
+                "interpretation": "Konsernets sum rentekostnader er oppgitt til 471,391 millioner i andre kvartal 2026, mot 343,597 millioner året før.",
+                "sourceEvidence": "«Sum rentekostnader og lignende kostnader 471 391 343 597»"
+              },
+              {
+                "index": 4,
+                "grounded": false,
+                "sentence": "Dette kan ses i kvartalstallene.",
+                "interpretation": "Setningen er en generell vurdering uten et konkret forhold som eksplisitt kan kontrolleres mot referansen.",
+                "sourceEvidence": ""
+              },
+              {
+                "index": 5,
+                "grounded": true,
+                "sentence": "• Banken opplyser at det ikke er tegn til vesentlige tap i utlånsporteføljen.",
+                "interpretation": "Dette opplyses uttrykkelig i referansen.",
+                "sourceEvidence": "«ingen tegn til vesentlige tap i utlånsporteføljene»"
+              },
+              {
+                "index": 6,
+                "grounded": true,
+                "sentence": "Landkreditt Bank er et bankkonsern.",
+                "interpretation": "Referansen omtaler virksomheten uttrykkelig som bankkonsernet og Landkreditt Bank konsern.",
+                "sourceEvidence": "«Utlånsveksten på årsbasis i bankkonsernet»"
+              }
+            ],
+            "groundedSentences": 6,
+            "unsupportedSentences": [
+              {
+                "index": 4,
+                "sentence": "Dette kan ses i kvartalstallene.",
+                "interpretation": "Setningen er en generell vurdering uten et konkret forhold som eksplisitt kan kontrolleres mot referansen.",
+                "sourceEvidence": ""
+              }
+            ],
+            "visibleArticleSentenceCount": 6
+          },
+          "repairHistory": [
+            {
+              "blocking": true,
+              "checkNumber": 1,
+              "blockingReason": "Reference check found unsupported high-risk factual claims.",
+              "coveragePercent": 88,
+              "correctionAttempt": 0,
+              "unsupportedSentences": [
+                {
+                  "index": 7,
+                  "sentence": "Landkreditt Bank er en bank med lån til privatkunder og landbruket.",
+                  "interpretation": "Referansen omtaler lån med pant i boligeiendom og næringslån som i det vesentlige er lån til landbruket, men sier ikke eksplisitt at boliglånene er lån til privatkunder."
+                }
+              ],
+              "unsupportedSentenceCount": 1,
+              "highRiskUnsupportedSentenceCount": 1
+            },
+            {
+              "blocking": false,
+              "checkNumber": 2,
+              "blockingReason": null,
+              "coveragePercent": 88,
+              "correctionAttempt": 1,
+              "unsupportedSentences": [
+                {
+                  "index": 7,
+                  "sentence": "Landkreditt Bank er en bank.",
+                  "interpretation": "Referansen omtaler Landkreditt Bank, men har ingen eksplisitt setning som fastslår at den er en bank."
+                }
+              ],
+              "unsupportedSentenceCount": 1,
+              "highRiskUnsupportedSentenceCount": 0
+            },
+            {
+              "blocking": true,
+              "checkNumber": 1,
+              "blockingReason": "Reference check found unsupported high-risk factual claims.",
+              "coveragePercent": 75,
+              "correctionAttempt": 1,
+              "unsupportedSentences": [
+                {
+                  "index": 3,
+                  "sentence": "• Rentekostnadene, som ifølge selskapet kan ha bidratt til resultatfallet, øker til 471,4 millioner kroner, fra 343,6 millioner.",
+                  "interpretation": "Rentekostnadstallene er oppgitt, men referansen sier ikke at selskapet mener økningen kan ha bidratt til resultatfallet."
+                },
+                {
+                  "index": 7,
+                  "sentence": "Landkreditt Bank er en bank.",
+                  "interpretation": "Referansen omtaler Landkreditt Bank, men inneholder ikke en eksplisitt påstand om at den er en bank."
+                }
+              ],
+              "unsupportedSentenceCount": 2,
+              "highRiskUnsupportedSentenceCount": 1
+            },
+            {
+              "blocking": false,
+              "checkNumber": 2,
+              "blockingReason": null,
+              "coveragePercent": 100,
+              "correctionAttempt": 2,
+              "unsupportedSentences": [],
+              "unsupportedSentenceCount": 0,
+              "highRiskUnsupportedSentenceCount": 0
+            },
+            {
+              "blocking": false,
+              "checkNumber": 1,
+              "blockingReason": null,
+              "coveragePercent": 86,
+              "correctionAttempt": 2,
+              "unsupportedSentences": [
+                {
+                  "index": 6,
+                  "sentence": "Landkreditt Bank er en bank med utlån til landbruk og privatkunder.",
+                  "interpretation": "Teksten beskriver hovedsakelig boligsikrede lån og næringslån, hvor sistnevnte i det vesentlige er til landbruket, men sier ikke eksplisitt at banken har utlån til privatkunder."
+                }
+              ],
+              "unsupportedSentenceCount": 1,
+              "highRiskUnsupportedSentenceCount": 0
+            },
+            {
+              "blocking": false,
+              "checkNumber": 2,
+              "blockingReason": null,
+              "coveragePercent": 86,
+              "correctionAttempt": 3,
+              "unsupportedSentences": [
+                {
+                  "index": 4,
+                  "sentence": "Dette kan ses i kvartalstallene.",
+                  "interpretation": "Setningen er en generell vurdering uten et konkret forhold som eksplisitt kan kontrolleres mot referansen."
+                }
+              ],
+              "unsupportedSentenceCount": 1,
+              "highRiskUnsupportedSentenceCount": 0
+            }
+          ],
+          "blockingReason": null,
+          "totalSentences": 7,
+          "initialCoverage": {
+            "totalSentences": 8,
+            "coveragePercent": 88,
+            "sentenceReviews": [
+              {
+                "index": 0,
+                "grounded": true,
+                "sentence": "Landkreditt Bank får et lavere resultat i andre kvartal, selv om utlånene vokser 20,4 prosent på årsbasis.",
+                "interpretation": "Resultatet i andre kvartal er lavere enn året før, og utlånsveksten på årsbasis er oppgitt til 20,4 prosent.",
+                "sourceEvidence": "«Utlånsveksten på årsbasis i bankkonsernet utgjør 20,4 prosent»; «Periodens resultat 67 524 95 777»"
+              },
+              {
+                "index": 1,
+                "grounded": true,
+                "sentence": "Kvartalsrapporten viser at resultatet før skatt faller til 85,2 millioner kroner, fra 126,3 millioner året før.",
+                "interpretation": "Konsernets resultat før skatt i andre kvartal er oppgitt til 85,198 millioner kroner, mot 126,256 millioner året før.",
+                "sourceEvidence": "«Resultat før skatt 85 198 126 256»"
+              },
+              {
+                "index": 2,
+                "grounded": true,
+                "sentence": "• Netto renteinntekter faller til 139,3 millioner kroner, fra 165,9 millioner i samme kvartal i fjor.",
+                "interpretation": "Netto renteinntekter for andre kvartal er oppgitt med disse avrundede tallene.",
+                "sourceEvidence": "«Netto renteinntekter 139 324 165 906»"
+              },
+              {
+                "index": 3,
+                "grounded": true,
+                "sentence": "• Rentekostnadene øker til 471,4 millioner kroner, fra 343,6 millioner.",
+                "interpretation": "Sum rentekostnader og lignende kostnader for andre kvartal er oppgitt med disse avrundede tallene.",
+                "sourceEvidence": "«Sum rentekostnader og lignende kostnader 471 391 343 597»"
+              },
+              {
+                "index": 4,
+                "grounded": true,
+                "sentence": "• Resultatet etter skatt ender på 67,5 millioner kroner, ned fra 95,8 millioner.",
+                "interpretation": "Periodens resultat i andre kvartal er oppgitt med disse avrundede tallene.",
+                "sourceEvidence": "«Periodens resultat 67 524 95 777»"
+              },
+              {
+                "index": 5,
+                "grounded": true,
+                "sentence": "For første halvår faller resultatet før skatt til 145,3 millioner kroner, fra 212,1 millioner.",
+                "interpretation": "Konsernets resultat før skatt for første halvår er oppgitt med disse avrundede tallene.",
+                "sourceEvidence": "«Resultat før skatt 145 279 212 096»"
+              },
+              {
+                "index": 6,
+                "grounded": true,
+                "sentence": "Banken opplyser samtidig at det ikke er tegn til vesentlige tap i utlånsporteføljen.",
+                "interpretation": "Dette er uttrykkelig opplyst i referansen.",
+                "sourceEvidence": "«Ved avleggelsen av regnskapet per andre kvartal 2026 er det ingen tegn til vesentlige tap i porteføljene.»"
+              },
+              {
+                "index": 7,
+                "grounded": false,
+                "sentence": "Landkreditt Bank er en bank med lån til privatkunder og landbruket.",
+                "interpretation": "Referansen omtaler lån med pant i boligeiendom og næringslån som i det vesentlige er lån til landbruket, men sier ikke eksplisitt at boliglånene er lån til privatkunder.",
+                "sourceEvidence": ""
+              }
+            ],
+            "groundedSentences": 7,
+            "unsupportedSentences": [
+              {
+                "index": 7,
+                "sentence": "Landkreditt Bank er en bank med lån til privatkunder og landbruket.",
+                "interpretation": "Referansen omtaler lån med pant i boligeiendom og næringslån som i det vesentlige er lån til landbruket, men sier ikke eksplisitt at boliglånene er lån til privatkunder.",
+                "sourceEvidence": ""
+              }
+            ],
+            "visibleArticleSentenceCount": 7
+          },
+          "sentenceReviews": [
+            {
+              "index": 0,
+              "grounded": true,
+              "sentence": "Landkreditt Bank får lavere resultat i andre kvartal, selv om utlånene vokser 20,4 prosent på årsbasis, ifølge kvartalsrapporten.",
+              "interpretation": "Konsernets resultat etter skatt i andre kvartal er lavere enn året før, og utlånsveksten på årsbasis oppgis til 20,4 prosent.",
+              "sourceEvidence": "«Resultat ... andre kvartal 2026 utgjør 67 524» mot «95 777»; «Utlånsveksten på årsbasis i bankkonsernet utgjør 20,4 prosent.»"
+            },
+            {
+              "index": 1,
+              "grounded": true,
+              "sentence": "• Resultatet etter skatt er 112 millioner kroner i første halvår, ifølge børsmeldingen.",
+              "interpretation": "Resultat etter skatt for første halvår er oppgitt til 111,729 millioner kroner, som avrundes til 112 millioner.",
+              "sourceEvidence": "«Resultat etter skatt per første halvår på 112 millioner kroner»"
+            },
+            {
+              "index": 2,
+              "grounded": true,
+              "sentence": "• Netto renteinntekter faller til 139,3 millioner kroner i andre kvartal, fra 165,9 millioner året før.",
+              "interpretation": "Tallene for konsernet viser netto renteinntekter på 139,324 millioner i andre kvartal 2026, mot 165,906 millioner i samme kvartal 2025.",
+              "sourceEvidence": "«Netto renteinntekter 139 324 165 906»"
+            },
+            {
+              "index": 3,
+              "grounded": true,
+              "sentence": "• Ifølge selskapet øker rentekostnadene til 471,4 millioner kroner i kvartalet, fra 343,6 millioner kroner året før.",
+              "interpretation": "Konsernets sum rentekostnader er oppgitt til 471,391 millioner i andre kvartal 2026, mot 343,597 millioner året før.",
+              "sourceEvidence": "«Sum rentekostnader og lignende kostnader 471 391 343 597»"
+            },
+            {
+              "index": 4,
+              "grounded": false,
+              "sentence": "Dette kan ses i kvartalstallene.",
+              "interpretation": "Setningen er en generell vurdering uten et konkret forhold som eksplisitt kan kontrolleres mot referansen.",
+              "sourceEvidence": ""
+            },
+            {
+              "index": 5,
+              "grounded": true,
+              "sentence": "• Banken opplyser at det ikke er tegn til vesentlige tap i utlånsporteføljen.",
+              "interpretation": "Dette opplyses uttrykkelig i referansen.",
+              "sourceEvidence": "«ingen tegn til vesentlige tap i utlånsporteføljene»"
+            },
+            {
+              "index": 6,
+              "grounded": true,
+              "sentence": "Landkreditt Bank er et bankkonsern.",
+              "interpretation": "Referansen omtaler virksomheten uttrykkelig som bankkonsernet og Landkreditt Bank konsern.",
+              "sourceEvidence": "«Utlånsveksten på årsbasis i bankkonsernet»"
+            }
+          ],
+          "correctionApplied": true,
+          "correctionAttempts": 3,
+          "importanceAdjusted": false,
+          "attributionRiskCount": 1,
+          "finalCoveragePercent": 86,
+          "unsupportedSentences": [
+            {
+              "index": 4,
+              "sentence": "Dette kan ses i kvartalstallene.",
+              "interpretation": "Setningen er en generell vurdering uten et konkret forhold som eksplisitt kan kontrolleres mot referansen.",
+              "sourceEvidence": ""
+            }
+          ],
+          "importanceAdjustReason": null,
+          "initialCoveragePercent": 88,
+          "unsupportedSentenceCount": 1,
+          "attributionCorrectionApplied": true,
+          "highRiskUnsupportedSentenceCount": 0
+        },
+        "editorialReview": null,
+        "sourceBodyChars": 376,
+        "reportExtraction": {
+          "pageCount": 26,
+          "diagnostics": {
+            "fallbackUsed": false,
+            "requestedTopicTerms": [],
+            "totalExtractedChars": 62938,
+            "incomeStatementFound": true,
+            "requestedPageNumbers": []
+          },
+          "attachmentId": 330803,
+          "contextChars": 15008,
+          "selectedPages": [
+            {
+              "score": 5,
+              "reasons": [
+                "outlook_or_events"
+              ],
+              "textChars": 4473,
+              "pageNumber": 4
+            },
+            {
+              "score": 5,
+              "reasons": [
+                "outlook_or_events"
+              ],
+              "textChars": 3262,
+              "pageNumber": 5
+            },
+            {
+              "score": 34,
+              "reasons": [
+                "income_statement"
+              ],
+              "textChars": 3246,
+              "pageNumber": 7
+            },
+            {
+              "score": 22,
+              "reasons": [
+                "income_statement"
+              ],
+              "textChars": 1598,
+              "pageNumber": 8
+            },
+            {
+              "score": 44,
+              "reasons": [
+                "income_statement"
+              ],
+              "textChars": 3070,
+              "pageNumber": 9
+            }
+          ],
+          "attachmentName": "Landkreditt Bank Rapport Q2 2026.pdf",
+          "extractedChars": 62938,
+          "metricCandidates": [
+            {
+              "label": "Sum renteinntekter og lignende inntekter",
+              "metric": "revenue",
+              "values": [
+                "610 715 509 503 1 200 373 1 082 249 2 238 705"
+              ],
+              "rowText": "Sum renteinntekter og lignende inntekter 610 715 509 503 1 200 373 1 082 249 2 238 705",
+              "pageNumber": 7
+            },
+            {
+              "label": "Provisjonsinntekter og inntekter fra banktjenester",
+              "metric": "revenue",
+              "values": [
+                "7 949 17 268 18 541 33 977 40 983"
+              ],
+              "rowText": "Provisjonsinntekter og inntekter fra banktjenester 7 949 17 268 18 541 33 977 40 983",
+              "pageNumber": 7
+            },
+            {
+              "label": "Resultat før skatt",
+              "metric": "earnings_before_tax",
+              "values": [
+                "85 198 126 256 145 279 212 096 357 118"
+              ],
+              "rowText": "Resultat før skatt 85 198 126 256 145 279 212 096 357 118",
+              "pageNumber": 7
+            },
+            {
+              "label": "Resultat før skatt",
+              "metric": "earnings_before_tax",
+              "values": [
+                "81 563 114 591 132 006 218 378 318 186"
+              ],
+              "rowText": "Resultat før skatt 81 563 114 591 132 006 218 378 318 186",
+              "pageNumber": 9
+            }
+          ],
+          "validationSourceChars": 15386
+        },
+        "validationRepair": {
+          "error": null,
+          "applied": true,
+          "issueCodes": [
+            "UNEXPECTED_NUMBERS"
+          ],
+          "finalWarnings": [
+            "Unexpected numbers: 139,3, 165,9, 471,4, 343,6, 139 324 165 906, 471 391 343 597"
+          ],
+          "initialWarnings": [
+            "Unexpected numbers: 85,2, 126,3, 139,3, 165,9, 471,4, 145,3, 85 198 126 256, 139 324 165 906, 471 391 343 597, 95 777, 145 279 212 096"
+          ]
+        },
+        "styleSanitization": {
+          "changed": false,
+          "removedAsaSuffix": 0,
+          "expandedMarketCodes": 0,
+          "replacedPercentSigns": 0,
+          "removedRegisteredMarks": 0,
+          "normalizedBillionPhrases": 0,
+          "replacedFiscalYearAbbrev": 0,
+          "normalizedAccountingAcronyms": 0,
+          "normalizedExactBillionAmounts": 0
+        },
+        "revisionInstructionCompliance": null
+      },
+      "labels": {
+        "class": "numeric_unresolved",
+        "reportRef": "final report 2026-06-02_2026-08-13"
+      },
+      "expected": {
+        "validation": {
+          "issueCodes": [
+            "UNEXPECTED_NUMBERS"
+          ],
+          "hasUnexpectedNumbers": true,
+          "blocking": false
+        }
+      },
+      "provenance": {
+        "window": {
+          "from": "2026-06-02",
+          "to": "2026-08-13"
+        },
+        "status": "failed"
+      }
+    },
+    {
+      "messageId": 679552,
+      "generationRunId": "cmsr1ujj704oark17asml8o7v",
+      "promptVersion": "v5.9.1",
+      "sourcePayload": {
+        "messageId": 679552,
+        "title": "Axactor ASA announces second quarter and first half year financial results",
+        "issuerName": "Axactor ASA",
+        "issuerSign": "ACR",
+        "publishedAt": "2026-08-13T05:00:00.000Z",
+        "categories": [
+          "HALVÅRSRAPPORT"
+        ],
+        "markets": [
+          "XOSL"
+        ],
+        "bodyText": "(Oslo, 13 August 2026) Axactor ASA announces second quarter and first half year financial results.\n\nAxactor has during the second quarter completed all milestones of its transformational project announced in April: \n- Successfully completed EUR ~215 million equity issue\n- Established co-investment partnership with Fortress\n- Completed seed portfolio sale, raising EUR 100 million in proceeds\n- Bond placement of EUR 100 million at significantly improved margins compared to prior bond issues\n\n“We are happy to announce that our transformational project is on schedule. All milestones have been delivered in due time, and we acquired the first portfolios in the new co-investment structure in July. The pricing for our latest bond placement indicates that our new deleveraging strategy is paying off”, says CEO Johnny Tsolis.\n\nThe pre-announced book value assessment has been finalized in the quarter with revised assumptions for the future collection estimates implemented, supported by improved and more data driven model. The review resulted in negative revaluations of EUR 320 million, which is ~10% lower than Fortress’ pricing assumption in relation to the private placement. Axactor expects future collection to be in line with collection curves and hence no further revaluation will be needed.\n\n\nKey figures Q2 2026 (Q2 2025 in brackets)*\n- Gross revenue of EUR 78m (EUR 81m) \n- Total revenue of EUR -258m (EUR 64m) \n- EBITDA of EUR -290m (EUR 33m) \n- Cash EBITDA of EUR 46m (EUR 50m) \n- Net profit after tax of EUR -315m (EUR 7m)\n- NPL investments of EUR 19m (EUR 27m)\n\nKey figures H1 2026 (H1 2025 in brackets)*\n- Gross revenue of EUR 153m (EUR 158m) \n- Total revenue of EUR -205m (EUR 129m)\n- EBITDA of EUR -268m (EUR 65m) \n- Cash EBITDA of EUR 91m (EUR 97m) \n- Net profit after tax of EUR -313m (EUR 17m)\n- NPL investments of EUR 55m (EUR 32m)\n\n\n“With the equity raise completed and the co-investment vehicle established, we expect significantly lower cost of funding and increased investment capacity, supporting substantial shareholder distribution capacity going forward”, adds CEO Johnny Tsolis.\n\n\nPresentation\n10:00 am CEST, 13 August 2026: The results will be presented in a global investor webcast with a live Q&A session. A recording of the webcast will be made available after the live stream is concluded on axactor.com. \n\nWebcast participation will be possible via the following. Please note that you need to register before you will be provided with streaming access or phone number, access code and pin.\n\nWebcast:\n- https://events.q4inc.com/attendee/713190319\nPhone: \n- https://events.q4inc.com/analyst/713190319?pwd=6XC4rsok\n\n\nFor additional information, please contact: \nJohnny Tsolis, CEO \nTel: +47 913 35 461 \nE-mail: johnny.tsolis@axactor.com \n\nNina Mortensen, CFO\nMobile: +47 975 24 236\nE-mail: nina.mortensen@axactor.com\n\n\nTo learn more about Axactor, visit www.axactor.com \n\n\n*EBITDA and other alternative performance measures (APMs) are defined and reconciled to the IFRS financial statements as a part of the APM section of the financial report. \n\n\nThis information is considered to be inside information pursuant to the EU Market Abuse Regulation and is subject to the disclosure requirements pursuant to Section 5-12 the Norwegian Securities Trading Act. This stock exchange announcement was published by Eilif Drageseth, Deputy CFO at Axactor ASA, on 13 August 2026 at 07:00 CEST.",
+        "hasAttachments": true,
+        "sourceBodyChars": 3419
+      },
+      "storedOutput": {
+        "title": "Axactor skriver ned verdier med 320 millioner euro",
+        "lead": "Axactor går fra overskudd til tap i andre kvartal, ifølge kvartalsrapporten. Selskapet opplyser også om negative verdiendringer på 320 millioner euro.",
+        "body": [
+          "• Omsetningen, driftsresultatet og resultatet før skatt snur fra pluss til minus sammenlignet med samme kvartal i fjor.",
+          "Axactor har samtidig hentet rundt 215 millioner euro i egenkapital, solgt en startportefølje for 100 millioner euro og utstedt obligasjoner for 100 millioner euro.",
+          "– Alle milepælene i endringsprosjektet er levert, og vi kjøpte de første porteføljene i den nye medinvesteringsstrukturen i juli, sier konsernsjef Johnny Tsolis."
+        ],
+        "company_sentence": "Axactor kjøper og følger opp misligholdte lån.",
+        "key_facts": [
+          "Negative verdiendringer på 320 millioner euro",
+          "Resultatet snur fra overskudd til tap i andre kvartal",
+          "Hentet rundt 215 millioner euro i egenkapital",
+          "Solgte en startportefølje for 100 millioner euro"
+        ],
+        "negative_or_surprising": [
+          "Resultatet før skatt snudde til minus 312,5 millioner euro, fra pluss 8,9 millioner euro året før."
+        ],
+        "excluded_hype": [],
+        "source_limitations": [
+          "Kun et utdrag av rapporten er analysert"
+        ],
+        "confidence": "high",
+        "importance": "viktig",
+        "source_spans": [
+          "primary: Profit/(loss) before tax -312,453 8,892",
+          "primary: The review resulted in negative revaluations of EUR 320 million",
+          "primary: Successfully completed EUR ~215 million equity issue",
+          "primary: Completed seed portfolio sale, raising EUR 100 million in proceeds",
+          "primary: CEO Johnny Tsolis: “All milestones have been delivered in due time, and we acquired the first portfolios in the new co-investment structure in July.”"
+        ]
+      },
+      "storedValidation": {
+        "valid": false,
+        "errors": [
+          "Unexpected numbers: 312,5",
+          "Reference check found unsupported high-risk factual claims. High-risk unsupported sentences: 1."
+        ],
+        "issues": [
+          {
+            "code": "UNEXPECTED_NUMBERS",
+            "message": "Unexpected numbers: 312,5",
+            "severity": "blocking"
+          },
+          {
+            "code": "REFERENCE_CHECK_UNSUPPORTED_FACTS",
+            "message": "Reference check found unsupported high-risk factual claims. High-risk unsupported sentences: 1.",
+            "severity": "blocking"
+          }
+        ],
+        "warnings": [],
+        "errorCode": "BLOCKING_VALIDATION_ERRORS",
+        "hiddenDraft": {
+          "body": [
+            "• Omsetningen snur til minus 258 millioner euro, fra 64 millioner euro i samme kvartal i fjor.",
+            "• Driftsresultatet (ebit) snur til minus 292 millioner euro, fra pluss 31 millioner euro.",
+            "• Resultatet før skatt snur til minus 312 millioner euro, fra pluss 8,9 millioner euro.",
+            "Axactor har samtidig hentet rundt 215 millioner euro i egenkapital, solgt en låneportefølje for 100 millioner euro og utstedt obligasjoner for 100 millioner euro. Antall aksjer økte til 806 millioner ved utgangen av juni, fra 302 millioner ved årsslutt.",
+            "– Alle milepælene i endringsprosjektet er levert, og vi kjøpte de første porteføljene i den nye medinvesteringsstrukturen i juli, sier konsernsjef Johnny Tsolis."
+          ],
+          "lead": "Inkassoselskapet Axactor går fra overskudd til et tap før skatt på 312 millioner euro i andre kvartal. Årsaken er en nedskrivning på 320 millioner euro av verdien på kjøpte misligholdte lån, opplyser selskapet.",
+          "title": "Axactor skriver ned verdier med 320 millioner euro",
+          "company_sentence": "Axactor er et inkassoselskap som kjøper og krever inn misligholdte lån."
+        },
+        "promptChars": 443147,
+        "blockingErrors": [
+          "Unexpected numbers: 312,5",
+          "Reference check found unsupported high-risk factual claims. High-risk unsupported sentences: 1."
+        ],
+        "quoteTelemetry": {
+          "draftContainsInlineGuillemets": false,
+          "draftContainsStandaloneDashQuote": true,
+          "draftContainsNamedPersonAttribution": true,
+          "draftSourceSpansMentionQuoteSpeaker": true,
+          "sourceContainsNamedQuoteLikePattern": true
+        },
+        "referenceCheck": {
+          "enabled": true,
+          "blocking": true,
+          "checkerError": null,
+          "finalCoverage": {
+            "totalSentences": 6,
+            "coveragePercent": 83,
+            "sentenceReviews": [
+              {
+                "index": 0,
+                "grounded": true,
+                "sentence": "Axactor går fra overskudd til tap i andre kvartal, ifølge kvartalsrapporten.",
+                "interpretation": "Nettoresultatet etter skatt var positivt i Q2 2025 og negativt i Q2 2026.",
+                "sourceEvidence": "Net profit after tax of EUR -315m (EUR 7m)"
+              },
+              {
+                "index": 1,
+                "grounded": true,
+                "sentence": "Selskapet opplyser også om negative verdiendringer på 320 millioner euro.",
+                "interpretation": "Selskapet opplyser eksplisitt at gjennomgangen ga negative revalueringer på 320 millioner euro.",
+                "sourceEvidence": "The review resulted in negative revaluations of EUR 320 million"
+              },
+              {
+                "index": 2,
+                "grounded": true,
+                "sentence": "• Omsetningen, driftsresultatet og resultatet før skatt snur fra pluss til minus sammenlignet med samme kvartal i fjor.",
+                "interpretation": "Alle de tre postene er positive i Q2 2025 og negative i Q2 2026.",
+                "sourceEvidence": "Total revenue -258,011 / 63,786; Operating profit /(loss) -292,332 / 30,551; Profit/(loss) before tax -312,453 / 8,892"
+              },
+              {
+                "index": 3,
+                "grounded": true,
+                "sentence": "Axactor har samtidig hentet rundt 215 millioner euro i egenkapital, solgt en startportefølje for 100 millioner euro og utstedt obligasjoner for 100 millioner euro.",
+                "interpretation": "Alle beløpene og transaksjonene er eksplisitt oppgitt.",
+                "sourceEvidence": "Successfully completed EUR ~215 million equity issue; Completed seed portfolio sale, raising EUR 100 million in proceeds; Bond placement of EUR 100 million"
+              },
+              {
+                "index": 4,
+                "grounded": true,
+                "sentence": "– Alle milepælene i endringsprosjektet er levert, og vi kjøpte de første porteføljene i den nye medinvesteringsstrukturen i juli, sier konsernsjef Johnny Tsolis.",
+                "interpretation": "Dette er en naturlig norsk gjengivelse av CEO-sitatet, med uendret innhold og avsender.",
+                "sourceEvidence": "All milestones have been delivered in due time, and we acquired the first portfolios in the new co-investment structure in July. (...) says CEO Johnny Tsolis."
+              },
+              {
+                "index": 5,
+                "grounded": false,
+                "sentence": "Axactor kjøper og følger opp misligholdte lån.",
+                "interpretation": "Teksten omtaler porteføljeinvesteringer og servicing, men dekker ikke eksplisitt denne generelle beskrivelsen av selskapets virksomhet.",
+                "sourceEvidence": ""
+              }
+            ],
+            "groundedSentences": 5,
+            "unsupportedSentences": [
+              {
+                "index": 5,
+                "sentence": "Axactor kjøper og følger opp misligholdte lån.",
+                "interpretation": "Teksten omtaler porteføljeinvesteringer og servicing, men dekker ikke eksplisitt denne generelle beskrivelsen av selskapets virksomhet.",
+                "sourceEvidence": ""
+              }
+            ],
+            "visibleArticleSentenceCount": 5
+          },
+          "repairHistory": [
+            {
+              "blocking": true,
+              "checkNumber": 1,
+              "blockingReason": "Reference check found unsupported high-risk factual claims.",
+              "coveragePercent": 67,
+              "correctionAttempt": 0,
+              "unsupportedSentences": [
+                {
+                  "index": 0,
+                  "sentence": "Inkassoselskapet Axactor går fra overskudd til et tap før skatt på 312 millioner euro i andre kvartal.",
+                  "interpretation": "Tallene for resultat før skatt er dekket, men referansen omtaler ikke eksplisitt Axactor som et inkassoselskap."
+                },
+                {
+                  "index": 1,
+                  "sentence": "Årsaken er en nedskrivning på 320 millioner euro av verdien på kjøpte misligholdte lån, opplyser selskapet.",
+                  "interpretation": "Referansen oppgir negative revalueringer på 320 millioner euro, men sier ikke eksplisitt at dette er årsaken til resultatet før skatt."
+                },
+                {
+                  "index": 8,
+                  "sentence": "Axactor er et inkassoselskap som kjøper og krever inn misligholdte lån.",
+                  "interpretation": "Referansen beskriver kjøpte låneporteføljer og 3PC, men fastslår ikke eksplisitt denne virksomhetsbeskrivelsen av Axactor."
+                }
+              ],
+              "unsupportedSentenceCount": 3,
+              "highRiskUnsupportedSentenceCount": 3
+            },
+            {
+              "blocking": true,
+              "checkNumber": 2,
+              "blockingReason": "Reference check found unsupported high-risk factual claims.",
+              "coveragePercent": 89,
+              "correctionAttempt": 1,
+              "unsupportedSentences": [
+                {
+                  "index": 5,
+                  "sentence": "Axactor har samtidig hentet rundt 215 millioner euro i egenkapital, solgt en låneportefølje for 100 millioner euro og utstedt obligasjoner for 100 millioner euro.",
+                  "interpretation": "Egenkapitalinnhentingen og obligasjonsutstedelsen er dekket, men referansen sier bare «seed portfolio sale» med 100 millioner euro i proveny, ikke eksplisitt at det var en låneportefølje solgt for 100 millioner euro."
+                }
+              ],
+              "unsupportedSentenceCount": 1,
+              "highRiskUnsupportedSentenceCount": 1
+            },
+            {
+              "blocking": false,
+              "checkNumber": 3,
+              "blockingReason": null,
+              "coveragePercent": 100,
+              "correctionAttempt": 2,
+              "unsupportedSentences": [],
+              "unsupportedSentenceCount": 0,
+              "highRiskUnsupportedSentenceCount": 0
+            },
+            {
+              "blocking": true,
+              "checkNumber": 1,
+              "blockingReason": "Reference check found unsupported high-risk factual claims.",
+              "coveragePercent": 80,
+              "correctionAttempt": 2,
+              "unsupportedSentences": [
+                {
+                  "index": 0,
+                  "sentence": "Axactor går fra overskudd til tap i andre kvartal etter negative verdiendringer på 320 millioner euro i kjøpte låneporteføljer, ifølge kvartalsrapporten.",
+                  "interpretation": "Kvartalstallene viser overgang fra overskudd til tap, og kilden oppgir negative revalueringer på EUR 320 millioner. Den sier imidlertid ikke eksplisitt at tapet kom som følge av disse verdiendringene i kjøpte låneporteføljer."
+                }
+              ],
+              "unsupportedSentenceCount": 1,
+              "highRiskUnsupportedSentenceCount": 1
+            },
+            {
+              "blocking": true,
+              "checkNumber": 2,
+              "blockingReason": "Reference check found unsupported high-risk factual claims.",
+              "coveragePercent": 83,
+              "correctionAttempt": 3,
+              "unsupportedSentences": [
+                {
+                  "index": 5,
+                  "sentence": "Axactor kjøper og følger opp misligholdte lån.",
+                  "interpretation": "Teksten omtaler porteføljeinvesteringer og servicing, men dekker ikke eksplisitt denne generelle beskrivelsen av selskapets virksomhet."
+                }
+              ],
+              "unsupportedSentenceCount": 1,
+              "highRiskUnsupportedSentenceCount": 1
+            }
+          ],
+          "blockingReason": "Reference check found unsupported high-risk factual claims.",
+          "totalSentences": 6,
+          "initialCoverage": {
+            "totalSentences": 9,
+            "coveragePercent": 67,
+            "sentenceReviews": [
+              {
+                "index": 0,
+                "grounded": false,
+                "sentence": "Inkassoselskapet Axactor går fra overskudd til et tap før skatt på 312 millioner euro i andre kvartal.",
+                "interpretation": "Tallene for resultat før skatt er dekket, men referansen omtaler ikke eksplisitt Axactor som et inkassoselskap.",
+                "sourceEvidence": "Profit/(loss) before tax -312,453 ... 8,892"
+              },
+              {
+                "index": 1,
+                "grounded": false,
+                "sentence": "Årsaken er en nedskrivning på 320 millioner euro av verdien på kjøpte misligholdte lån, opplyser selskapet.",
+                "interpretation": "Referansen oppgir negative revalueringer på 320 millioner euro, men sier ikke eksplisitt at dette er årsaken til resultatet før skatt.",
+                "sourceEvidence": "The review resulted in negative revaluations of EUR 320 million"
+              },
+              {
+                "index": 2,
+                "grounded": true,
+                "sentence": "• Omsetningen snur til minus 258 millioner euro, fra 64 millioner euro i samme kvartal i fjor.",
+                "interpretation": "Totalinntektene i andre kvartal 2026 og 2025 fremgår eksplisitt.",
+                "sourceEvidence": "Total revenue ... -258,011 63,786"
+              },
+              {
+                "index": 3,
+                "grounded": true,
+                "sentence": "• Driftsresultatet (ebit) snur til minus 292 millioner euro, fra pluss 31 millioner euro.",
+                "interpretation": "Driftsresultatet for begge kvartalene fremgår eksplisitt.",
+                "sourceEvidence": "Operating profit /(loss) -292,332 30,551"
+              },
+              {
+                "index": 4,
+                "grounded": true,
+                "sentence": "• Resultatet før skatt snur til minus 312 millioner euro, fra pluss 8,9 millioner euro.",
+                "interpretation": "Resultat før skatt for begge kvartalene fremgår eksplisitt.",
+                "sourceEvidence": "Profit/(loss) before tax -312,453 8,892"
+              },
+              {
+                "index": 5,
+                "grounded": true,
+                "sentence": "Axactor har samtidig hentet rundt 215 millioner euro i egenkapital, solgt en låneportefølje for 100 millioner euro og utstedt obligasjoner for 100 millioner euro.",
+                "interpretation": "Egenkapitalemisjonen, salget av seed-porteføljen og obligasjonsplasseringen med de oppgitte beløpene er eksplisitt oppgitt.",
+                "sourceEvidence": "Successfully completed EUR ~215 million equity issue ... seed portfolio sale, raising EUR 100 million in proceeds ... Bond placement of EUR 100 million"
+              },
+              {
+                "index": 6,
+                "grounded": true,
+                "sentence": "Antall aksjer økte til 806 millioner ved utgangen av juni, fra 302 millioner ved årsslutt.",
+                "interpretation": "Antall aksjer per 30. juni 2026 og 31. desember 2025 er eksplisitt oppgitt; tallene er avrundet i setningen.",
+                "sourceEvidence": "On 31 Dec 2025 302,145,464 ... On 30 Jun 2026 805,674,302"
+              },
+              {
+                "index": 7,
+                "grounded": true,
+                "sentence": "– Alle milepælene i endringsprosjektet er levert, og vi kjøpte de første porteføljene i den nye medinvesteringsstrukturen i juli, sier konsernsjef Johnny Tsolis.",
+                "interpretation": "Dette er en naturlig norsk gjengivelse av CEO-sitatet i referansen.",
+                "sourceEvidence": "All milestones have been delivered in due time, and we acquired the first portfolios in the new co-investment structure in July. ... says CEO Johnny Tsolis."
+              },
+              {
+                "index": 8,
+                "grounded": false,
+                "sentence": "Axactor er et inkassoselskap som kjøper og krever inn misligholdte lån.",
+                "interpretation": "Referansen beskriver kjøpte låneporteføljer og 3PC, men fastslår ikke eksplisitt denne virksomhetsbeskrivelsen av Axactor.",
+                "sourceEvidence": ""
+              }
+            ],
+            "groundedSentences": 6,
+            "unsupportedSentences": [
+              {
+                "index": 0,
+                "sentence": "Inkassoselskapet Axactor går fra overskudd til et tap før skatt på 312 millioner euro i andre kvartal.",
+                "interpretation": "Tallene for resultat før skatt er dekket, men referansen omtaler ikke eksplisitt Axactor som et inkassoselskap.",
+                "sourceEvidence": "Profit/(loss) before tax -312,453 ... 8,892"
+              },
+              {
+                "index": 1,
+                "sentence": "Årsaken er en nedskrivning på 320 millioner euro av verdien på kjøpte misligholdte lån, opplyser selskapet.",
+                "interpretation": "Referansen oppgir negative revalueringer på 320 millioner euro, men sier ikke eksplisitt at dette er årsaken til resultatet før skatt.",
+                "sourceEvidence": "The review resulted in negative revaluations of EUR 320 million"
+              },
+              {
+                "index": 8,
+                "sentence": "Axactor er et inkassoselskap som kjøper og krever inn misligholdte lån.",
+                "interpretation": "Referansen beskriver kjøpte låneporteføljer og 3PC, men fastslår ikke eksplisitt denne virksomhetsbeskrivelsen av Axactor.",
+                "sourceEvidence": ""
+              }
+            ],
+            "visibleArticleSentenceCount": 8
+          },
+          "sentenceReviews": [
+            {
+              "index": 0,
+              "grounded": true,
+              "sentence": "Axactor går fra overskudd til tap i andre kvartal, ifølge kvartalsrapporten.",
+              "interpretation": "Nettoresultatet etter skatt var positivt i Q2 2025 og negativt i Q2 2026.",
+              "sourceEvidence": "Net profit after tax of EUR -315m (EUR 7m)"
+            },
+            {
+              "index": 1,
+              "grounded": true,
+              "sentence": "Selskapet opplyser også om negative verdiendringer på 320 millioner euro.",
+              "interpretation": "Selskapet opplyser eksplisitt at gjennomgangen ga negative revalueringer på 320 millioner euro.",
+              "sourceEvidence": "The review resulted in negative revaluations of EUR 320 million"
+            },
+            {
+              "index": 2,
+              "grounded": true,
+              "sentence": "• Omsetningen, driftsresultatet og resultatet før skatt snur fra pluss til minus sammenlignet med samme kvartal i fjor.",
+              "interpretation": "Alle de tre postene er positive i Q2 2025 og negative i Q2 2026.",
+              "sourceEvidence": "Total revenue -258,011 / 63,786; Operating profit /(loss) -292,332 / 30,551; Profit/(loss) before tax -312,453 / 8,892"
+            },
+            {
+              "index": 3,
+              "grounded": true,
+              "sentence": "Axactor har samtidig hentet rundt 215 millioner euro i egenkapital, solgt en startportefølje for 100 millioner euro og utstedt obligasjoner for 100 millioner euro.",
+              "interpretation": "Alle beløpene og transaksjonene er eksplisitt oppgitt.",
+              "sourceEvidence": "Successfully completed EUR ~215 million equity issue; Completed seed portfolio sale, raising EUR 100 million in proceeds; Bond placement of EUR 100 million"
+            },
+            {
+              "index": 4,
+              "grounded": true,
+              "sentence": "– Alle milepælene i endringsprosjektet er levert, og vi kjøpte de første porteføljene i den nye medinvesteringsstrukturen i juli, sier konsernsjef Johnny Tsolis.",
+              "interpretation": "Dette er en naturlig norsk gjengivelse av CEO-sitatet, med uendret innhold og avsender.",
+              "sourceEvidence": "All milestones have been delivered in due time, and we acquired the first portfolios in the new co-investment structure in July. (...) says CEO Johnny Tsolis."
+            },
+            {
+              "index": 5,
+              "grounded": false,
+              "sentence": "Axactor kjøper og følger opp misligholdte lån.",
+              "interpretation": "Teksten omtaler porteføljeinvesteringer og servicing, men dekker ikke eksplisitt denne generelle beskrivelsen av selskapets virksomhet.",
+              "sourceEvidence": ""
+            }
+          ],
+          "correctionApplied": true,
+          "correctionAttempts": 3,
+          "importanceAdjusted": false,
+          "attributionRiskCount": 0,
+          "finalCoveragePercent": 83,
+          "unsupportedSentences": [
+            {
+              "index": 5,
+              "sentence": "Axactor kjøper og følger opp misligholdte lån.",
+              "interpretation": "Teksten omtaler porteføljeinvesteringer og servicing, men dekker ikke eksplisitt denne generelle beskrivelsen av selskapets virksomhet.",
+              "sourceEvidence": ""
+            }
+          ],
+          "importanceAdjustReason": null,
+          "initialCoveragePercent": 67,
+          "unsupportedSentenceCount": 1,
+          "attributionCorrectionApplied": false,
+          "highRiskUnsupportedSentenceCount": 1
+        },
+        "editorialReview": null,
+        "sourceBodyChars": 3419,
+        "reportExtraction": {
+          "pageCount": 42,
+          "diagnostics": {
+            "fallbackUsed": false,
+            "requestedTopicTerms": [],
+            "totalExtractedChars": 97953,
+            "incomeStatementFound": true,
+            "requestedPageNumbers": []
+          },
+          "attachmentId": 330870,
+          "contextChars": 12289,
+          "selectedPages": [
+            {
+              "score": 8,
+              "reasons": [
+                "outlook_or_events"
+              ],
+              "textChars": 2939,
+              "pageNumber": 13
+            },
+            {
+              "score": 9,
+              "reasons": [
+                "outlook_or_events"
+              ],
+              "textChars": 1254,
+              "pageNumber": 14
+            },
+            {
+              "score": 84,
+              "reasons": [
+                "income_statement"
+              ],
+              "textChars": 1065,
+              "pageNumber": 15
+            },
+            {
+              "score": 60,
+              "reasons": [
+                "income_statement"
+              ],
+              "textChars": 2060,
+              "pageNumber": 16
+            },
+            {
+              "score": 9,
+              "reasons": [
+                "outlook_or_events"
+              ],
+              "textChars": 2234,
+              "pageNumber": 36
+            },
+            {
+              "score": 45,
+              "reasons": [
+                "income_statement"
+              ],
+              "textChars": 1803,
+              "pageNumber": 41
+            }
+          ],
+          "attachmentName": "Quarterly Report - Q2 - 2026.pdf",
+          "extractedChars": 97953,
+          "metricCandidates": [
+            {
+              "label": "Note",
+              "metric": "revenue",
+              "values": [
+                "5"
+              ],
+              "rowText": "Note 5 Revenue",
+              "pageNumber": 15
+            },
+            {
+              "label": "Interest revenue from purchased loan portfolios",
+              "metric": "revenue",
+              "values": [
+                "5, 6 51,159 49,809 101,230 99,554 199,301"
+              ],
+              "rowText": "Interest revenue from purchased loan portfolios 5, 6 51,159 49,809 101,230 99,554 199,301",
+              "pageNumber": 16
+            },
+            {
+              "label": "Operating profit /(loss)",
+              "metric": "operating_result",
+              "values": [
+                "-292,332 30,551",
+                "-272,306 60,851 125,248"
+              ],
+              "rowText": "Operating profit /(loss) -292,332 30,551 -272,306 60,851 125,248",
+              "pageNumber": 16
+            },
+            {
+              "label": "Profit/(loss) before tax",
+              "metric": "earnings_before_tax",
+              "values": [
+                "-312,453 8,892",
+                "-310,624 22,345 47,408"
+              ],
+              "rowText": "Profit/(loss) before tax -312,453 8,892 -310,624 22,345 47,408",
+              "pageNumber": 16
+            }
+          ],
+          "validationSourceChars": 15710
+        },
+        "validationRepair": {
+          "error": null,
+          "applied": true,
+          "issueCodes": [
+            "UNEXPECTED_NUMBERS"
+          ],
+          "finalWarnings": [
+            "Unexpected numbers: 312,5"
+          ],
+          "initialWarnings": [
+            "Unexpected numbers: 312, 258, 292, 806, 302"
+          ]
+        },
+        "styleSanitization": {
+          "changed": false,
+          "removedAsaSuffix": 0,
+          "expandedMarketCodes": 0,
+          "replacedPercentSigns": 0,
+          "removedRegisteredMarks": 0,
+          "normalizedBillionPhrases": 0,
+          "replacedFiscalYearAbbrev": 0,
+          "normalizedAccountingAcronyms": 0,
+          "normalizedExactBillionAmounts": 0
+        },
+        "revisionInstructionCompliance": null
+      },
+      "labels": {
+        "class": "numeric_unresolved",
+        "reportRef": "final report 2026-06-02_2026-08-13"
+      },
+      "expected": {
+        "validation": {
+          "issueCodes": [
+            "UNEXPECTED_NUMBERS"
+          ],
+          "hasUnexpectedNumbers": true,
+          "blocking": false
+        }
+      },
+      "provenance": {
+        "window": {
+          "from": "2026-06-02",
+          "to": "2026-08-13"
+        },
+        "status": "failed"
+      }
+    },
+    {
+      "messageId": 679626,
+      "generationRunId": "cmsrdfafc0853rk17nbm7dmdc",
+      "promptVersion": "v5.9.1",
+      "sourcePayload": {
+        "messageId": 679626,
+        "title": "2. kvartalsrapport for JBF",
+        "issuerName": "JBF Sparebank",
+        "issuerSign": "JESB",
+        "publishedAt": "2026-08-13T10:24:09.639Z",
+        "categories": [
+          "HALVÅRSRAPPORT"
+        ],
+        "markets": [
+          "XOAM"
+        ],
+        "bodyText": "Solide resultater for JBF i første halvår\n\nJBF Bank og Forsikring Holding AS leverer et resultat før skatt på 386,8 millioner kroner i første halvår 2026. Konsernet fortsetter å vokse i kjernevirksomheten, med 18 prosent økning i premieinntekter fra samme periode i fjor og 7,6 prosent utlånsvekst (inkl. Eika Boligkreditt) de siste 12 månedene. Egenkapitalavkastningen i konsernet var 12,9 prosent (annualisert) i første halvår.\n\nTotale driftsinntekter i konsernet var 1 208,4 millioner kroner i første halvår, og resultat etter skatt ble 314,7 millioner kroner. Bokført egenkapital var 5,1 milliarder kroner. \n\n– Vi er svært fornøyde med resultatene for første halvår 2026. Både bank- og forsikringsvirksomheten leverer solide tall og god vekst. JBF er kundeeid, og overskuddet går tilbake til kundene gjennom konkurransedyktige priser og gode vilkår, sier konsernsjef Helge Dalen i JBF.\n\nSterkt forsikringsresultat\nJBF Forsikring leverte et resultat før skatt på 285,5 millioner kroner i første halvår. Netto premieinntekter var 889 millioner kroner, en økning på 18 prosent fra samme periode i fjor. Combined ratio endte på 82,0 prosent, mot 83,9 prosent i samme periode i 2025.\n\n– Første halvår var preget av god skadeutvikling, positiv salgsutvikling, prisregulerende tiltak og fortsatt vekst i kundeporteføljen. En avviklingsgevinst på 39,9 millioner kroner bidro også positivt til resultatet, sier administrerende direktør Kathrine G. Aamoth i JBF Forsikring.  \n\nGod utlånsvekst i banken\nJBF Sparebank leverte et resultat før skatt på 107,4 millioner kroner i første halvår. Totale utlån, inkludert porteføljen i Eika Boligkreditt, var 21 milliarder kroner, tilsvarende en utlånsvekst på 7,6 prosent de siste 12 månedene. Innskudd utgjorde 10,6 milliarder kroner, med en vekst på 5,9 prosent siste 12 måneder. \n\n– Banken leverer et godt halvårsresultat og solid kredittvekst samtidig som vi har gjennomført en krevende omorganisering og rigget banken for fremtiden. Vi er nå godt posisjonert for videre vekst og utvikling, sier administrerende banksjef Aud Ø. Oland i JBF Sparebank.\n\nNøkkeltall første halvår 2026\n•\tResultat før skatt konsern: 386,8 mill. kroner \n•\tResultat etter skatt konsern: 314,7 mill. kroner \n•\tTotale driftsinntekter konsern: 1 208,4 mill. kroner \n•\tBokført egenkapital konsern: 5 120,5 mill. kroner \n•\tVekst i forretningskapital konsern inkl. lån i Eika Boligkreditt (12 mnd.): 7,05 % \n•\tNetto premieinntekter forsikring: 889,0 mill. kroner (opp 18 %) \n•\tResultat før skatt forsikring: 285,5 mill. kroner \n•\tCombined ratio forsikring: 82,0 % (83,9 %) \n•\tResultat før skatt bank: 107,4 mill. kroner \n•\tUtlånsvekst bank inkl. Eika Boligkreditt (12 mnd.): 7,62 % \n•\tInnskuddsvekst bank (12 mnd.): 5,9 % \n\nOm JBF Bank og Forsikring Holding AS\nJBF Bank og Forsikring Holding AS er morselskap i JBF-konsernet og eier JBF Forsikring AS og JBF Sparebank AS. Konsernet er kundeeid gjennom stiftelser og er en totalleverandør av bank- og forsikringstjenester til privatmarkedet. JBF ble opprinnelig etablert av og for ansatte i jernbanen, og denne tilknytningen preger fortsatt konsernets kjerne og kundegrunnlag. JBF har hovedkontor i Oslo og kontor i Trondheim. Overskuddet i konsernet går tilbake til kundene i form av konkurransedyktige produkter, gode vilkår og høy kvalitet i tjenestene.\n\nKontaktpersoner\nFor ytterligere informasjon vennligst kontakt:\n•\tKonsernsjef Helge Dalen i JBF, tlf. 918 58 275\n•\tDirektør strategi og kommunikasjon Ole Gjuv Pedersen, tlf. 402 16 447\n\n",
+        "hasAttachments": true,
+        "sourceBodyChars": 3503
+      },
+      "storedOutput": {
+        "title": "JBF løfter resultatet før skatt",
+        "lead": "JBF, som tilbyr bank- og forsikringstjenester, fikk et resultat før skatt på 386,8 millioner kroner i første halvår, ifølge kvartalsrapporten.",
+        "body": [
+          "• Driftsinntekter på 1.208,4 millioner kroner i første halvår",
+          "• Resultat etter skatt på 314,7 millioner kroner",
+          "• Netto premieinntekter i forsikring økte 18 prosent til 889 millioner kroner",
+          "Forsikringsvirksomheten bidro med 285,5 millioner kroner i resultat før skatt. En avviklingsgevinst på 39,9 millioner kroner bidro positivt, ifølge selskapet.",
+          "– Første halvår var preget av god skadeutvikling, positiv salgsutvikling, prisregulerende tiltak og fortsatt vekst i kundeporteføljen, sier administrerende direktør Kathrine G. Aamoth i JBF Forsikring."
+        ],
+        "company_sentence": "JBF er et kundeeid konsern med bank- og forsikringstjenester til privatmarkedet.",
+        "key_facts": [
+          "Resultat før skatt: 386,8 millioner kroner",
+          "Driftsinntekter: 1.208,4 millioner kroner",
+          "Resultat etter skatt: 314,7 millioner kroner",
+          "Netto premieinntekter: 889 millioner kroner, opp 18 prosent"
+        ],
+        "negative_or_surprising": [],
+        "excluded_hype": [],
+        "source_limitations": [
+          "Kun et utdrag av rapporten er analysert"
+        ],
+        "confidence": "high",
+        "importance": "uviktig",
+        "source_spans": [
+          "primary: Resultat før skatt 386 766",
+          "primary: Sum driftsinntekter 1 208 366",
+          "primary: Periodens resultat 314 663",
+          "primary: Netto premieinntekter forsikring 888 996 755 591",
+          "primary: «Første halvår var preget av god skadeutvikling ...», sier administrerende direktør Kathrine G. Aamoth i JBF Forsikring."
+        ]
+      },
+      "storedValidation": {
+        "valid": false,
+        "errors": [
+          "Unexpected numbers: 386 766, 1 208 366, 888 996 755 591"
+        ],
+        "issues": [
+          {
+            "code": "UNEXPECTED_NUMBERS",
+            "message": "Unexpected numbers: 386 766, 1 208 366, 888 996 755 591",
+            "severity": "blocking"
+          }
+        ],
+        "warnings": [],
+        "errorCode": "BLOCKING_VALIDATION_ERRORS",
+        "hiddenDraft": {
+          "body": [
+            "• Driftsinntekter på 1,21 milliarder kroner, opp fra 889,1 millioner kroner i første halvår 2025",
+            "• Resultat etter skatt på 314,7 millioner kroner, opp fra 195,7 millioner kroner",
+            "• Netto premieinntekter i forsikring økte 18 prosent til 889 millioner kroner",
+            "Forsikringsvirksomheten bidro med 285,5 millioner kroner i resultat før skatt. En gevinst på 39,9 millioner kroner ved avvikling bidro positivt, opplyser selskapet.",
+            "– Første halvår var preget av god skadeutvikling, positiv salgsutvikling og fortsatt vekst i kundeporteføljen, sier forsikringsdirektør Kathrine G. Aamoth."
+          ],
+          "lead": "JBF, som tilbyr bank- og forsikringstjenester, øker resultatet før skatt til 386,8 millioner kroner i første halvår, fra 239,4 millioner året før. Kvartalsrapporten viser også høyere driftsinntekter.",
+          "title": "JBF øker resultatet før skatt med 62 prosent",
+          "company_sentence": "JBF er et kundeeid konsern med bank- og forsikringstjenester til privatmarkedet."
+        },
+        "promptChars": 374475,
+        "blockingErrors": [
+          "Unexpected numbers: 386 766, 1 208 366, 888 996 755 591"
+        ],
+        "quoteTelemetry": {
+          "draftContainsInlineGuillemets": false,
+          "draftContainsStandaloneDashQuote": true,
+          "draftContainsNamedPersonAttribution": true,
+          "draftSourceSpansMentionQuoteSpeaker": true,
+          "sourceContainsNamedQuoteLikePattern": true
+        },
+        "referenceCheck": {
+          "enabled": true,
+          "blocking": false,
+          "checkerError": null,
+          "finalCoverage": {
+            "totalSentences": 9,
+            "coveragePercent": 78,
+            "sentenceReviews": [
+              {
+                "index": 0,
+                "grounded": true,
+                "sentence": "JBF, som tilbyr bank- og forsikringstjenester, fikk et resultat før skatt på 386,8 millioner kroner i første halvår, ifølge kvartalsrapporten.",
+                "interpretation": "JBF-konsernet omtales som tilbyder av bank- og forsikringstjenester, og resultat før skatt i første halvår oppgis til 386,8 millioner kroner.",
+                "sourceEvidence": "«Resultat før skatt konsern: 386,8 mill. kroner»; «totalleverandør av bank- og forsikringstjenester til privatmarkedet»"
+              },
+              {
+                "index": 1,
+                "grounded": true,
+                "sentence": "• Driftsinntekter på 1.208,4 millioner kroner i første halvår",
+                "interpretation": "Totale driftsinntekter i første halvår er eksplisitt oppgitt.",
+                "sourceEvidence": "«Totale driftsinntekter i konsernet var 1 208,4 millioner kroner i første halvår»"
+              },
+              {
+                "index": 2,
+                "grounded": true,
+                "sentence": "• Resultat etter skatt på 314,7 millioner kroner",
+                "interpretation": "Resultat etter skatt er eksplisitt oppgitt.",
+                "sourceEvidence": "«resultat etter skatt ble 314,7 millioner kroner»"
+              },
+              {
+                "index": 3,
+                "grounded": true,
+                "sentence": "• Netto premieinntekter i forsikring økte 18 prosent til 889 millioner kroner",
+                "interpretation": "Netto premieinntekter på 889 millioner kroner og økning på 18 prosent er eksplisitt oppgitt.",
+                "sourceEvidence": "«Netto premieinntekter var 889 millioner kroner, en økning på 18 prosent»"
+              },
+              {
+                "index": 4,
+                "grounded": true,
+                "sentence": "Forsikringsvirksomheten bidro med 285,5 millioner kroner i resultat før skatt.",
+                "interpretation": "JBF Forsikrings resultat før skatt er eksplisitt oppgitt til 285,5 millioner kroner.",
+                "sourceEvidence": "«JBF Forsikring leverte et resultat før skatt på 285,5 millioner kroner»"
+              },
+              {
+                "index": 5,
+                "grounded": true,
+                "sentence": "En avviklingsgevinst på 39,9 millioner kroner bidro positivt, ifølge selskapet.",
+                "interpretation": "Selskapet opplyser at avviklingsgevinsten bidro positivt til resultatet.",
+                "sourceEvidence": "«En avviklingsgevinst på 39,9 millioner kroner bidro også positivt til resultatet»"
+              },
+              {
+                "index": 6,
+                "grounded": false,
+                "sentence": "– Første halvår var preget av god skadeutvikling, positiv salgsutvikling, prisregulerende tiltak og fortsatt vekst i kundeporteføljen, sier administrerende direktør Kathrine G.",
+                "interpretation": "Sitatet er avbrutt i navnet og gjengir derfor ikke fullt ut den eksplisitte attribusjonen i referansen.",
+                "sourceEvidence": "«– Første halvår var preget av god skadeutvikling, positiv salgsutvikling, prisregulerende tiltak og fortsatt vekst i kundeporteføljen. ... sier administrerende direktør Kathrine G. Aamoth i JBF Forsikring.»"
+              },
+              {
+                "index": 7,
+                "grounded": false,
+                "sentence": "Aamoth i JBF Forsikring.",
+                "interpretation": "Dette er kun et navnefragment og utgjør ikke en selvstendig påstand med dekning.",
+                "sourceEvidence": ""
+              },
+              {
+                "index": 8,
+                "grounded": true,
+                "sentence": "JBF er et kundeeid konsern med bank- og forsikringstjenester til privatmarkedet.",
+                "interpretation": "JBF-konsernet beskrives eksplisitt som kundeeid og som totalleverandør av slike tjenester til privatmarkedet.",
+                "sourceEvidence": "«Konsernet er kundeeid gjennom stiftelser og er en totalleverandør av bank- og forsikringstjenester til privatmarkedet.»"
+              }
+            ],
+            "groundedSentences": 7,
+            "unsupportedSentences": [
+              {
+                "index": 6,
+                "sentence": "– Første halvår var preget av god skadeutvikling, positiv salgsutvikling, prisregulerende tiltak og fortsatt vekst i kundeporteføljen, sier administrerende direktør Kathrine G.",
+                "interpretation": "Sitatet er avbrutt i navnet og gjengir derfor ikke fullt ut den eksplisitte attribusjonen i referansen.",
+                "sourceEvidence": "«– Første halvår var preget av god skadeutvikling, positiv salgsutvikling, prisregulerende tiltak og fortsatt vekst i kundeporteføljen. ... sier administrerende direktør Kathrine G. Aamoth i JBF Forsikring.»"
+              },
+              {
+                "index": 7,
+                "sentence": "Aamoth i JBF Forsikring.",
+                "interpretation": "Dette er kun et navnefragment og utgjør ikke en selvstendig påstand med dekning.",
+                "sourceEvidence": ""
+              }
+            ],
+            "visibleArticleSentenceCount": 8
+          },
+          "repairHistory": [
+            {
+              "blocking": false,
+              "checkNumber": 1,
+              "blockingReason": null,
+              "coveragePercent": 90,
+              "correctionAttempt": 0,
+              "unsupportedSentences": [
+                {
+                  "index": 7,
+                  "sentence": "– Første halvår var preget av god skadeutvikling, positiv salgsutvikling og fortsatt vekst i kundeporteføljen, sier forsikringsdirektør Kathrine G.",
+                  "interpretation": "Sitatinnholdet er delvis dekket, men kilden omtaler avsenderen som «administrerende direktør», ikke «forsikringsdirektør»."
+                }
+              ],
+              "unsupportedSentenceCount": 1,
+              "highRiskUnsupportedSentenceCount": 0
+            },
+            {
+              "blocking": false,
+              "checkNumber": 2,
+              "blockingReason": null,
+              "coveragePercent": 100,
+              "correctionAttempt": 1,
+              "unsupportedSentences": [],
+              "unsupportedSentenceCount": 0,
+              "highRiskUnsupportedSentenceCount": 0
+            },
+            {
+              "blocking": false,
+              "checkNumber": 1,
+              "blockingReason": null,
+              "coveragePercent": 100,
+              "correctionAttempt": 1,
+              "unsupportedSentences": [],
+              "unsupportedSentenceCount": 0,
+              "highRiskUnsupportedSentenceCount": 0
+            },
+            {
+              "blocking": true,
+              "checkNumber": 1,
+              "blockingReason": "Reference check coverage is below 75 percent after correction.",
+              "coveragePercent": 70,
+              "correctionAttempt": 1,
+              "unsupportedSentences": [
+                {
+                  "index": 1,
+                  "sentence": "Driftsinntektene økte også.",
+                  "interpretation": "Referansen oppgir driftsinntekter for første halvår, men sier ikke eksplisitt at de økte."
+                },
+                {
+                  "index": 7,
+                  "sentence": "– Første halvår var preget av god skadeutvikling, positiv salgsutvikling, prisregulerende tiltak og fortsatt vekst i kundeporteføljen, sier administrerende direktør Kathrine G.",
+                  "interpretation": "Sitatet er avkortet før etternavnet og avsenderens fulle identitet, og setningen avsluttes dermed ikke slik den står i referansen."
+                },
+                {
+                  "index": 8,
+                  "sentence": "Aamoth i JBF Forsikring.",
+                  "interpretation": "Dette er bare et setningsfragment og gir ikke alene den fullstendige, eksplisitt dekkede påstanden eller attribusjonen."
+                }
+              ],
+              "unsupportedSentenceCount": 3,
+              "highRiskUnsupportedSentenceCount": 0
+            },
+            {
+              "blocking": false,
+              "checkNumber": 2,
+              "blockingReason": null,
+              "coveragePercent": 78,
+              "correctionAttempt": 2,
+              "unsupportedSentences": [
+                {
+                  "index": 6,
+                  "sentence": "– Første halvår var preget av god skadeutvikling, positiv salgsutvikling, prisregulerende tiltak og fortsatt vekst i kundeporteføljen, sier administrerende direktør Kathrine G.",
+                  "interpretation": "Sitatet er avbrutt i navnet og gjengir derfor ikke fullt ut den eksplisitte attribusjonen i referansen."
+                },
+                {
+                  "index": 7,
+                  "sentence": "Aamoth i JBF Forsikring.",
+                  "interpretation": "Dette er kun et navnefragment og utgjør ikke en selvstendig påstand med dekning."
+                }
+              ],
+              "unsupportedSentenceCount": 2,
+              "highRiskUnsupportedSentenceCount": 0
+            }
+          ],
+          "blockingReason": null,
+          "totalSentences": 9,
+          "initialCoverage": {
+            "totalSentences": 10,
+            "coveragePercent": 90,
+            "sentenceReviews": [
+              {
+                "index": 0,
+                "grounded": true,
+                "sentence": "JBF, som tilbyr bank- og forsikringstjenester, øker resultatet før skatt til 386,8 millioner kroner i første halvår, fra 239,4 millioner året før.",
+                "interpretation": "Virksomhetstype og begge resultatfør-skatt-tallene for første halvår er oppgitt.",
+                "sourceEvidence": "«Resultat før skatt ... 386,8 millioner»; «239 375»; «totalleverandør av bank- og forsikringstjenester»"
+              },
+              {
+                "index": 1,
+                "grounded": true,
+                "sentence": "Kvartalsrapporten viser også høyere driftsinntekter.",
+                "interpretation": "Driftsinntektene er høyere enn i samme periode året før.",
+                "sourceEvidence": "«Sum driftsinntekter 1 208 366 ... 889 136»"
+              },
+              {
+                "index": 2,
+                "grounded": true,
+                "sentence": "• Driftsinntekter på 1,21 milliarder kroner, opp fra 889,1 millioner kroner i første halvår 2025",
+                "interpretation": "Tallene er avrundede gjengivelser av driftsinntektene for første halvår 2026 og 2025.",
+                "sourceEvidence": "«Totale driftsinntekter ... 1 208,4 millioner kroner»; «889 136»"
+              },
+              {
+                "index": 3,
+                "grounded": true,
+                "sentence": "• Resultat etter skatt på 314,7 millioner kroner, opp fra 195,7 millioner kroner",
+                "interpretation": "Begge tallene for resultat etter skatt er oppgitt i konsernregnskapet.",
+                "sourceEvidence": "«Periodens resultat 314 663 ... 195 674»"
+              },
+              {
+                "index": 4,
+                "grounded": true,
+                "sentence": "• Netto premieinntekter i forsikring økte 18 prosent til 889 millioner kroner",
+                "interpretation": "Premieinntektene, nivået og veksten er eksplisitt oppgitt.",
+                "sourceEvidence": "«Netto premieinntekter var 889 millioner kroner, en økning på 18 prosent»"
+              },
+              {
+                "index": 5,
+                "grounded": true,
+                "sentence": "Forsikringsvirksomheten bidro med 285,5 millioner kroner i resultat før skatt.",
+                "interpretation": "JBF Forsikrings resultat før skatt er oppgitt til dette beløpet.",
+                "sourceEvidence": "«JBF Forsikring leverte et resultat før skatt på 285,5 millioner kroner»"
+              },
+              {
+                "index": 6,
+                "grounded": true,
+                "sentence": "En gevinst på 39,9 millioner kroner ved avvikling bidro positivt, opplyser selskapet.",
+                "interpretation": "Selskapet opplyser at avviklingsgevinsten bidro positivt til resultatet.",
+                "sourceEvidence": "«En avviklingsgevinst på 39,9 millioner kroner bidro også positivt til resultatet»"
+              },
+              {
+                "index": 7,
+                "grounded": false,
+                "sentence": "– Første halvår var preget av god skadeutvikling, positiv salgsutvikling og fortsatt vekst i kundeporteføljen, sier forsikringsdirektør Kathrine G.",
+                "interpretation": "Sitatinnholdet er delvis dekket, men kilden omtaler avsenderen som «administrerende direktør», ikke «forsikringsdirektør».",
+                "sourceEvidence": "«sier administrerende direktør Kathrine G. Aamoth i JBF Forsikring»"
+              },
+              {
+                "index": 8,
+                "grounded": true,
+                "sentence": "Aamoth.",
+                "interpretation": "Navnefragmentet inngår i navnet på den siterte direktøren i referansen.",
+                "sourceEvidence": "«Kathrine G. Aamoth»"
+              },
+              {
+                "index": 9,
+                "grounded": true,
+                "sentence": "JBF er et kundeeid konsern med bank- og forsikringstjenester til privatmarkedet.",
+                "interpretation": "Dette er eksplisitt beskrevet i omtalen av selskapet.",
+                "sourceEvidence": "«Konsernet er kundeeid ... en totalleverandør av bank- og forsikringstjenester til privatmarkedet»"
+              }
+            ],
+            "groundedSentences": 9,
+            "unsupportedSentences": [
+              {
+                "index": 7,
+                "sentence": "– Første halvår var preget av god skadeutvikling, positiv salgsutvikling og fortsatt vekst i kundeporteføljen, sier forsikringsdirektør Kathrine G.",
+                "interpretation": "Sitatinnholdet er delvis dekket, men kilden omtaler avsenderen som «administrerende direktør», ikke «forsikringsdirektør».",
+                "sourceEvidence": "«sier administrerende direktør Kathrine G. Aamoth i JBF Forsikring»"
+              }
+            ],
+            "visibleArticleSentenceCount": 9
+          },
+          "sentenceReviews": [
+            {
+              "index": 0,
+              "grounded": true,
+              "sentence": "JBF, som tilbyr bank- og forsikringstjenester, fikk et resultat før skatt på 386,8 millioner kroner i første halvår, ifølge kvartalsrapporten.",
+              "interpretation": "JBF-konsernet omtales som tilbyder av bank- og forsikringstjenester, og resultat før skatt i første halvår oppgis til 386,8 millioner kroner.",
+              "sourceEvidence": "«Resultat før skatt konsern: 386,8 mill. kroner»; «totalleverandør av bank- og forsikringstjenester til privatmarkedet»"
+            },
+            {
+              "index": 1,
+              "grounded": true,
+              "sentence": "• Driftsinntekter på 1.208,4 millioner kroner i første halvår",
+              "interpretation": "Totale driftsinntekter i første halvår er eksplisitt oppgitt.",
+              "sourceEvidence": "«Totale driftsinntekter i konsernet var 1 208,4 millioner kroner i første halvår»"
+            },
+            {
+              "index": 2,
+              "grounded": true,
+              "sentence": "• Resultat etter skatt på 314,7 millioner kroner",
+              "interpretation": "Resultat etter skatt er eksplisitt oppgitt.",
+              "sourceEvidence": "«resultat etter skatt ble 314,7 millioner kroner»"
+            },
+            {
+              "index": 3,
+              "grounded": true,
+              "sentence": "• Netto premieinntekter i forsikring økte 18 prosent til 889 millioner kroner",
+              "interpretation": "Netto premieinntekter på 889 millioner kroner og økning på 18 prosent er eksplisitt oppgitt.",
+              "sourceEvidence": "«Netto premieinntekter var 889 millioner kroner, en økning på 18 prosent»"
+            },
+            {
+              "index": 4,
+              "grounded": true,
+              "sentence": "Forsikringsvirksomheten bidro med 285,5 millioner kroner i resultat før skatt.",
+              "interpretation": "JBF Forsikrings resultat før skatt er eksplisitt oppgitt til 285,5 millioner kroner.",
+              "sourceEvidence": "«JBF Forsikring leverte et resultat før skatt på 285,5 millioner kroner»"
+            },
+            {
+              "index": 5,
+              "grounded": true,
+              "sentence": "En avviklingsgevinst på 39,9 millioner kroner bidro positivt, ifølge selskapet.",
+              "interpretation": "Selskapet opplyser at avviklingsgevinsten bidro positivt til resultatet.",
+              "sourceEvidence": "«En avviklingsgevinst på 39,9 millioner kroner bidro også positivt til resultatet»"
+            },
+            {
+              "index": 6,
+              "grounded": false,
+              "sentence": "– Første halvår var preget av god skadeutvikling, positiv salgsutvikling, prisregulerende tiltak og fortsatt vekst i kundeporteføljen, sier administrerende direktør Kathrine G.",
+              "interpretation": "Sitatet er avbrutt i navnet og gjengir derfor ikke fullt ut den eksplisitte attribusjonen i referansen.",
+              "sourceEvidence": "«– Første halvår var preget av god skadeutvikling, positiv salgsutvikling, prisregulerende tiltak og fortsatt vekst i kundeporteføljen. ... sier administrerende direktør Kathrine G. Aamoth i JBF Forsikring.»"
+            },
+            {
+              "index": 7,
+              "grounded": false,
+              "sentence": "Aamoth i JBF Forsikring.",
+              "interpretation": "Dette er kun et navnefragment og utgjør ikke en selvstendig påstand med dekning.",
+              "sourceEvidence": ""
+            },
+            {
+              "index": 8,
+              "grounded": true,
+              "sentence": "JBF er et kundeeid konsern med bank- og forsikringstjenester til privatmarkedet.",
+              "interpretation": "JBF-konsernet beskrives eksplisitt som kundeeid og som totalleverandør av slike tjenester til privatmarkedet.",
+              "sourceEvidence": "«Konsernet er kundeeid gjennom stiftelser og er en totalleverandør av bank- og forsikringstjenester til privatmarkedet.»"
+            }
+          ],
+          "correctionApplied": true,
+          "correctionAttempts": 2,
+          "importanceAdjusted": true,
+          "attributionRiskCount": 0,
+          "finalCoveragePercent": 78,
+          "unsupportedSentences": [
+            {
+              "index": 6,
+              "sentence": "– Første halvår var preget av god skadeutvikling, positiv salgsutvikling, prisregulerende tiltak og fortsatt vekst i kundeporteføljen, sier administrerende direktør Kathrine G.",
+              "interpretation": "Sitatet er avbrutt i navnet og gjengir derfor ikke fullt ut den eksplisitte attribusjonen i referansen.",
+              "sourceEvidence": "«– Første halvår var preget av god skadeutvikling, positiv salgsutvikling, prisregulerende tiltak og fortsatt vekst i kundeporteføljen. ... sier administrerende direktør Kathrine G. Aamoth i JBF Forsikring.»"
+            },
+            {
+              "index": 7,
+              "sentence": "Aamoth i JBF Forsikring.",
+              "interpretation": "Dette er kun et navnefragment og utgjør ikke en selvstendig påstand med dekning.",
+              "sourceEvidence": ""
+            }
+          ],
+          "importanceAdjustReason": "downgraded_medium_routine_notice",
+          "initialCoveragePercent": 90,
+          "unsupportedSentenceCount": 2,
+          "attributionCorrectionApplied": true,
+          "highRiskUnsupportedSentenceCount": 0
+        },
+        "editorialReview": null,
+        "sourceBodyChars": 3503,
+        "reportExtraction": {
+          "pageCount": 28,
+          "diagnostics": {
+            "fallbackUsed": false,
+            "requestedTopicTerms": [],
+            "totalExtractedChars": 40449,
+            "incomeStatementFound": true,
+            "requestedPageNumbers": []
+          },
+          "attachmentId": 330961,
+          "contextChars": 5483,
+          "selectedPages": [
+            {
+              "score": 6,
+              "reasons": [
+                "ceo_or_management"
+              ],
+              "textChars": 373,
+              "pageNumber": 14
+            },
+            {
+              "score": 44,
+              "reasons": [
+                "income_statement"
+              ],
+              "textChars": 2124,
+              "pageNumber": 15
+            },
+            {
+              "score": 34,
+              "reasons": [
+                "income_statement"
+              ],
+              "textChars": 501,
+              "pageNumber": 16
+            },
+            {
+              "score": 18,
+              "reasons": [
+                "income_statement"
+              ],
+              "textChars": 1482,
+              "pageNumber": 18
+            }
+          ],
+          "attachmentName": "JBF Bank og Forsikring Holding Kvartalsrapport 2 kvartal 2026 Final.pdf",
+          "extractedChars": 40449,
+          "metricCandidates": [
+            {
+              "label": "Provisjonsinntekter og inntekter ved banktjenester",
+              "metric": "revenue",
+              "values": [
+                "19 572",
+                "42 903",
+                "34 299"
+              ],
+              "rowText": "Provisjonsinntekter og inntekter ved banktjenester 19 572 - 42 903 - 34 299",
+              "pageNumber": 15
+            },
+            {
+              "label": "Inntekter av aksjer, andeler og andre egenkapitalinstrumenter",
+              "metric": "revenue",
+              "values": [
+                "109 149 105 715 143 441 115 062 284 660"
+              ],
+              "rowText": "Inntekter av aksjer, andeler og andre egenkapitalinstrumenter 109 149 105 715 143 441 115 062 284 660",
+              "pageNumber": 15
+            },
+            {
+              "label": "Resultat før skatt",
+              "metric": "earnings_before_tax",
+              "values": [
+                "299 096 186 010 386 766 239 375 562 322"
+              ],
+              "rowText": "Resultat før skatt 299 096 186 010 386 766 239 375 562 322",
+              "pageNumber": 15
+            },
+            {
+              "label": "Resultat før skatt",
+              "metric": "earnings_before_tax",
+              "values": [
+                "-6 146",
+                "-9 975 338 450"
+              ],
+              "rowText": "Resultat før skatt -6 146 -9 975 338 450",
+              "pageNumber": 16
+            }
+          ],
+          "validationSourceChars": 8988
+        },
+        "validationRepair": {
+          "error": null,
+          "applied": true,
+          "issueCodes": [
+            "UNEXPECTED_NUMBERS"
+          ],
+          "finalWarnings": [
+            "Unexpected numbers: 386 766, 1 208 366, 888 996 755 591"
+          ],
+          "initialWarnings": [
+            "Unexpected numbers: 62, 239,4, 889,1, 195,7, 386 766, 239 375, 1 208 366, 889 136, 195 674, 888 996, 755 591"
+          ]
+        },
+        "styleSanitization": {
+          "changed": false,
+          "removedAsaSuffix": 0,
+          "expandedMarketCodes": 0,
+          "replacedPercentSigns": 0,
+          "removedRegisteredMarks": 0,
+          "normalizedBillionPhrases": 0,
+          "replacedFiscalYearAbbrev": 0,
+          "normalizedAccountingAcronyms": 0,
+          "normalizedExactBillionAmounts": 0
+        },
+        "revisionInstructionCompliance": null
+      },
+      "labels": {
+        "class": "numeric_unresolved",
+        "reportRef": "final report 2026-06-02_2026-08-13"
+      },
+      "expected": {
+        "validation": {
+          "issueCodes": [
+            "UNEXPECTED_NUMBERS"
+          ],
+          "hasUnexpectedNumbers": true,
+          "blocking": false
+        }
+      },
+      "provenance": {
+        "window": {
+          "from": "2026-06-02",
+          "to": "2026-08-13"
+        },
+        "status": "failed"
+      }
+    }
+  ]
+}

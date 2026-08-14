@@ -1,0 +1,1328 @@
+{
+  "schemaVersion": 1,
+  "class": "checker_error_published",
+  "createdAt": "2026-08-14T07:37:58.256Z",
+  "source": {
+    "db": "render-prod",
+    "query": "generation_runs/source_notices/feedback 2026-06-02..2026-08-13",
+    "gitHead": "059bf86a0f795b807ad7d2cde4d3cb22c0c0c3dd"
+  },
+  "cases": [
+    {
+      "messageId": 675348,
+      "generationRunId": "cmpz3nwd7000nnx1pgc9tpsst",
+      "promptVersion": "v5.7.1",
+      "sourcePayload": {
+        "messageId": 675348,
+        "title": "Norwegian Air Shuttle ASA (NAS) - Traffic Figures for May 2026",
+        "issuerName": "Norwegian Air Shuttle ASA",
+        "issuerSign": "NAS",
+        "publishedAt": "2026-06-04T06:00:00.000Z",
+        "categories": [
+          "INNSIDEINFORMASJON"
+        ],
+        "markets": [
+          "XOSL"
+        ],
+        "bodyText": "In May, the Norwegian Group had a total of 2.62 million passengers. Of these, Norwegian recorded 2.25 million passengers, while Widerøe had 364,000. Norwegian's operational performance remained strong, recording a regularity of 99.7 percent and a punctuality that increased to 89.8 percent.\n \n\"I am pleased that we have delivered another month of strong operational performance for the passengers who travelled with Norwegian and Widerøe in May. High regularity and on-time performance are important to all our customers. These results show that our focus on reliability is paying off as we enter the busy summer travel season,\" said Geir Karlsen, CEO of Norwegian.\n\nNorwegian's capacity (ASK) was 3,741 million seat kilometres in May, an increase of 5 percent compared with May 2025. Actual passenger traffic (RPK) was 3,050 million seat kilometres, an increase of 3 percent from the same period last year. In May, Norwegian operated an average of 93 aircraft. The load factor was impacted by the increased production this month and ended at 81.5 percent, down 2 percentage points from last year. Regularity, the share of scheduled flights that took place, was 99.7 percent, while punctuality, the share of flights departing within 15 minutes of scheduled time, was 89,8 percent, an increase of 1.3 percentage points from last year. Both regularity and punctuality ranked amongst the top airlines in Europe for the month of May.\n\n\"While we are adding considerable capacity in the coming months, especially during the month of June, we continue to see overall good demand across our network. Many of our most popular routes are selling quickly, and we continue to offer strong capacity and compelling value across many markets. This ensures that our customers can find both a wide range of choices and competitive fares,\" said Geir Karlsen.\n\nThe Widerøe capacity (ASK) was 197 million seat kilometres, a 2 percent increase from last year. Actual passenger traffic (RPK) was 137 million seat kilometres, an increase of 4 percent from May 2025. The load factor was 69,7 percent, up 1.2 percentage points from last year. Regularity, the share of scheduled flights that took place, was 98.6 percent. Punctuality, the share of flights departing within 15 minutes of scheduled time, was 95.7 percent, an increase of 2.7 percentage points from last year.\n\nNeither Norwegian nor Widerøe has cancelled a single flight due to the increase in fuel prices. Both airlines remain committed to delivering a reliable and predictable service, ensuring customers can travel with confidence during the peak summer holiday season.\n\n\"We are satisfied with our punctuality and regularity performance in May. Delivering a reliable and competitive product is important to our customers, and we remain focused on efficient operations and maintaining an attractive offering across our network,” said Tore Jenssen, CEO of Widerøe.\n\nSee detailed traffic figures in the attached PDF.\n\n\nFor further information, please contact: \nJesper M. Hatletveit, Investor Relations at Norwegian, Tel: +47 906 64 401\n\n\nFornebu, 4 June 2026\nNorwegian Air Shuttle ASA\n\n\nThis information is considered to be inside information pursuant to the EU Market Abuse Regulation and is subject to the disclosure requirements pursuant to Section 5-12 the Norwegian Securities Trading Act. This stock exchange announcement was published by Jesper M. Hatletveit, VP Investor Relations at Norwegian Air Shuttle ASA, on 4 June 2026 at 08:00 CEST.",
+        "hasAttachments": true,
+        "sourceBodyChars": 3486,
+        "pdfSupplementText": "81.1%\nNorwegian Air Shuttle\nTRAFFIC FIGURES MAY 2026\nIn May, Norwegian’s capacity was 5% higher than May last\nyear and 14% higher compared to the previous month. The\nload factor was 81.5%, down 2.0 p.p. from the same period\nlast year. On average, Norwegian operated 93 aircraft\nduring May.\nCompared to the same period last year:\nTotal capacity (ASK)\nincreased 5%\nTotal passenger traffic (RPK)\nincreased 3%\n72 grams per RPK, 0.1% lower CO\n2\nNorwegian Air Shuttle ASA\ninvestor.relations@norwegian.com ● www.norwegian.com\nTRAFFIC DEVELOPMENT\nMay May-26 May-25 Change\nASK (million) 3,741 3,560 5%\nRPK (million) 3,050 2,973 3%\nLoad factor 8 1. 5% 83.5% - 2. 0 p.p.\nPassengers 2,252,657 2,176,537 3%\nTraffic 12 - month rolling May-26 May-25 Change\nASK (million) 37,449 37,687 - 0.5%\nRPK (million) 32,439 31,997 1%\nLoad factor 86. 5% 84. 9% 1.6 p.p.\nPassengers 23,368, 051 22, 8 80, 923 2%\nPASSENGER REVENUES (ESTIMATE)\nMay May-26 May-25 Change\nRegularity 99.7% 99.7% 0.0 p.p.\nPunctuality 89. 8% 88.5% 1.3 p.p.\nCO\n2 \nper RPK 72.4 g 72. 5 g -0.1%\nOPERATING PERFORMANCE\nRPK:\n3, 050 m\nASK:\n3, 741 m\nMay May-26 May-25 Change\nYield – total 0.89 0. 84 5%\nUnit revenue – total 0.72 0.70 3%\nLoad factor this month\ndecreased 2.0 p.p.\nTotal number of passengers was\n2,252,657, an increase of 3%\nLoad Factor\n99.7%\n89.8%\nScheduled flights\nthat operated this\nmonth\nFlights that\ndeparted on time\nthis month\nAvg. flying distance 1,283\nkm, 1% decrease from last\nyear\nOPERATING PERFORMANCE\nFUEL HEDGE POSITIONS\nNorwegian has hedged jet fuel for the\nfollowing share of exp. consumption and\nprice as per month-end:\nVolume\n(%)\nPrice\n(USD/mt)\nQ2 2026 46% 716\nQ3 2026 53% 762\nQ4 2026 54% 759\n2027 22% 660\n81.5%\n\n68.6%\nWiderøe’s Flyveselskap\nTRAFFIC FIGURES MAY 2026\nIn May, Widerøe’s capacity was 2% higher from May last\nyear and 13% higher compared to the previous month. The\nload factor was 69.7%, up 1.2 p.p. from the same period\nlast year.\nCompared to the same period last year:\nTotal capacity (ASK)\nIncreased 2%\nTotal passenger traffic (RPK)\nincreased 4%\n32 kg per seat, 0.1% lower CO\n2\nWiderøe AS\nkommunikasjonsavdeling@wideroe.no ● www.wideroe.no\nTRAFFIC DEVELOPMENT\nMay May-26 May-25 Change\nASK (million) 197 193 2%\nRPK (million) 137 132 4%\nLoad factor 69. 7% 68.6% 1. 2 p.p.\nPassengers 3 64, 406 3 49, 362 4%\nTraffic 12 - month rolling May-26 May-25 Change\nASK (million) 2,141 2,113 1%\nRPK (million) 1,568 1,552 1%\nLoad factor 73.2% 73. 5% -0.2 p.p.\nPassengers 4,1 66, 734 3,9 64, 480 5%\nPASSENGER REVENUES (ESTIMATE)\nMay May-26 May-25 Change\nRegularity 9 8. 6% 9 7. 8% 0.8 p.p.\nPunctuality 9 5. 7% 92. 9% 2. 7 p.p.\nCO\n2 \nper seat 32 k g 32 k g -0.1%\nOPERATING PERFORMANCE\nRPK:\n1 37 m\nASK:\n1 97 m\nMay May-26 May-25 Change\nYield – total 4. 46 4.43 1%\nUnit revenue – total 3.11 3.04 2%\nLoad factor this month\nincreased 1.2 p.p.\nTotal number of passengers was\n364,406, an increase of 4%\nLoad Factor\n98.6%\n95.7%\nScheduled flights\nthat operated this\nmonth\nFlights that\ndeparted on time\nthis month\nOPERATING PERFORMANCE\nFUEL HEDGE POSITIONS\nWiderøe has hedged jet fuel for the\nfollowing share of exp. consumption\nand price as per month-end:\nAvg. flying distance 281\nkm, unchanged from last\nyear\nVolume\n(%)\nPrice\n(NOK/mt)\nQ2 2026 60% 7,284\nQ3 2026 59% 7,561\nQ4 2026 62% 7,842\n2027 4 5% 7, 843\n2028/2029 1 7% 7, 333\n69.7%\n\nASK\nCO 2 per RPK\nAvailable seat kilometres. Number of available passenger seats multiplied by flight distance\nAmount of CO 2 emissions divided by RPK\nCO2 per seat \nAmount of CO 2 emissions divided by available seats\nPunctuality\nRegularity\nShare of flights departing on schedule\nShare of scheduled flights taking place\nRPK \nRevenue passenger kilometres. Number of sold seats multiplied by flight distance\nYield – total revenue \nPassenger ticket revenue and flight related ancillary revenue divided by RPK. A measure of average passenger revenue per kilometre.\nIncludes compensation for PSO routes for Widerøe Flyveselskap\nUnit revenue – total \nPassenger ticket revenue and flight related ancillary revenue divided by ASK. A measure of average passenger revenue per available seat kilometre.\nIncludes compensation for PSO routes for Widerøe Flyveselskap\nITEM DESCRIPTION\nLoad Factor \nRPK divided by ASK. A measure of utilisation of available seats",
+        "pdfSupplementPageCount": 3,
+        "pdfSupplementAttachmentId": 327522
+      },
+      "storedOutput": {
+        "title": "Norwegian-konsernet fraktet 2,62 millioner passasjerer",
+        "lead": "Norwegian-konsernet, som består av Norwegian og Widerøe, hadde 2,62 millioner passasjerer i mai. Det opplyser selskapet i en børsmelding.",
+        "body": [
+          "Norwegian alene hadde 2.252.657 passasjerer, opp 3 prosent fra mai i fjor. Kapasiteten økte 5 prosent, mens fyllingsgraden falt til 81,5 prosent.",
+          "Widerøe hadde 364.406 passasjerer, opp 4 prosent. Fyllingsgraden steg til 69,7 prosent.",
+          "Selskapet skriver at verken Norwegian eller Widerøe kansellerte flyginger på grunn av økte drivstoffpriser."
+        ],
+        "company_sentence": "Norwegian-konsernet består av flyselskapene Norwegian og Widerøe.",
+        "key_facts": [
+          "2,62 millioner passasjerer i konsernet i mai",
+          "Norwegian hadde 2.252.657 passasjerer, opp 3 prosent",
+          "Widerøe hadde 364.406 passasjerer, opp 4 prosent",
+          "Norwegians fyllingsgrad falt til 81,5 prosent"
+        ],
+        "negative_or_surprising": [
+          "Norwegians fyllingsgrad falt til 81,5 prosent."
+        ],
+        "excluded_hype": [
+          "Sjefssitater om «sterk» drift og «god etterspørsel» er utelatt."
+        ],
+        "source_limitations": [],
+        "confidence": "high",
+        "importance": "medium",
+        "source_spans": [
+          "total of 2.62 million passengers",
+          "Norwegian recorded 2.25 million passengers, while Widerøe had 364,000",
+          "Passengers 2,252,657 ... Change 3%",
+          "Passengers 364,406 ... Change 4%",
+          "load factor was 81.5%",
+          "Neither Norwegian nor Widerøe has cancelled a single flight due to the increase in fuel prices"
+        ]
+      },
+      "storedValidation": {
+        "valid": false,
+        "errors": [
+          "Attachment exists but source_limitations is empty."
+        ],
+        "issues": [
+          {
+            "code": "MISSING_ATTACHMENT_LIMITATION",
+            "message": "Attachment exists but source_limitations is empty.",
+            "severity": "warning"
+          }
+        ],
+        "warnings": [
+          "Attachment exists but source_limitations is empty."
+        ],
+        "errorCode": "NON_BLOCKING_VALIDATION_WARNINGS",
+        "hiddenDraft": {
+          "body": [
+            "Norwegian alene hadde 2.252.657 passasjerer, opp 3 prosent fra mai i fjor. Kapasiteten økte 5 prosent, mens fyllingsgraden falt 2,0 prosentpoeng til 81,5 prosent.",
+            "Widerøe hadde 364.406 passasjerer, opp 4 prosent. Fyllingsgraden steg til 69,7 prosent.",
+            "Selskapet skriver at verken Norwegian eller Widerøe kansellerte flyginger på grunn av økte drivstoffpriser."
+          ],
+          "lead": "Norwegian-konsernet, som består av Norwegian og Widerøe, hadde 2,62 millioner passasjerer i mai. Det opplyser selskapet i en børsmelding.",
+          "title": "Norwegian-konsernet fraktet 2,62 millioner",
+          "company_sentence": "Norwegian-konsernet består av flyselskapene Norwegian og Widerøe."
+        },
+        "promptChars": 127038,
+        "blockingErrors": [],
+        "referenceCheck": {
+          "enabled": true,
+          "blocking": false,
+          "checkerError": "OpenAI returned no output_text for rewrite_output after 2 attempts | model=gpt-5.5 reasoning=xhigh timeoutMs=240000 maxOutputTokens=4096 promptChars=40128 | emptyResponses=attempt1=id=resp_058172aac7dc214e016a211a3a7fb481998a1749dc1eed1a08 status=incomplete incomplete={\"reason\":\"max_output_tokens\"} ; attempt2=id=resp_0a5de8d5045f45c3016a211aa1f83c819ab5e3be1f6ef6d595 status=incomplete incomplete={\"reason\":\"max_output_tokens\"}",
+          "finalCoverage": {
+            "totalSentences": 8,
+            "coveragePercent": 75,
+            "sentenceReviews": [
+              {
+                "index": 0,
+                "grounded": false,
+                "sentence": "Norwegian-konsernet, som består av Norwegian og Widerøe, hadde 2,62 millioner passasjerer i mai.",
+                "interpretation": "Passasjertallet er dekket, men referansen sier ikke eksplisitt at Norwegian-konsernet består av Norwegian og Widerøe.",
+                "sourceEvidence": "In May, the Norwegian Group had a total of 2.62 million passengers. Of these, Norwegian recorded 2.25 million passengers, while Widerøe had 364,000."
+              },
+              {
+                "index": 1,
+                "grounded": true,
+                "sentence": "Det opplyser selskapet i en børsmelding.",
+                "interpretation": "Referansen er eksplisitt omtalt som en børsmelding publisert av Norwegian Air Shuttle ASA.",
+                "sourceEvidence": "This stock exchange announcement was published by Jesper M. Hatletveit, VP Investor Relations at Norwegian Air Shuttle ASA"
+              },
+              {
+                "index": 2,
+                "grounded": true,
+                "sentence": "Norwegian alene hadde 2.252.657 passasjerer, opp 3 prosent fra mai i fjor.",
+                "interpretation": "Tallene for Norwegian-passasjerer og prosentvis økning er eksplisitt oppgitt.",
+                "sourceEvidence": "Passengers 2,252,657 2,176,537 3%"
+              },
+              {
+                "index": 3,
+                "grounded": true,
+                "sentence": "Kapasiteten økte 5 prosent, mens fyllingsgraden falt til 81,5 prosent.",
+                "interpretation": "For Norwegian er både kapasitetsøkningen og fyllingsgraden eksplisitt oppgitt.",
+                "sourceEvidence": "Norwegian's capacity (ASK) was 3,741 million seat kilometres in May, an increase of 5 percent ... The load factor ... ended at 81.5 percent"
+              },
+              {
+                "index": 4,
+                "grounded": true,
+                "sentence": "Widerøe hadde 364.406 passasjerer, opp 4 prosent.",
+                "interpretation": "Tallene for Widerøe-passasjerer og økningen er eksplisitt oppgitt.",
+                "sourceEvidence": "Passengers 364,406 349,362 4%"
+              },
+              {
+                "index": 5,
+                "grounded": true,
+                "sentence": "Fyllingsgraden steg til 69,7 prosent.",
+                "interpretation": "For Widerøe er fyllingsgraden og at den økte eksplisitt oppgitt.",
+                "sourceEvidence": "The load factor was 69,7 percent, up 1.2 percentage points from last year."
+              },
+              {
+                "index": 6,
+                "grounded": true,
+                "sentence": "Selskapet skriver at verken Norwegian eller Widerøe kansellerte flyginger på grunn av økte drivstoffpriser.",
+                "interpretation": "Dette er direkte dekket i referansen.",
+                "sourceEvidence": "Neither Norwegian nor Widerøe has cancelled a single flight due to the increase in fuel prices."
+              },
+              {
+                "index": 7,
+                "grounded": false,
+                "sentence": "Norwegian-konsernet består av flyselskapene Norwegian og Widerøe.",
+                "interpretation": "Referansen omtaler Norwegian Group og de to flyselskapene, men sier ikke eksplisitt at konsernet består av disse.",
+                "sourceEvidence": "Of these, Norwegian recorded 2.25 million passengers, while Widerøe had 364,000."
+              }
+            ],
+            "groundedSentences": 6,
+            "unsupportedSentences": [
+              {
+                "index": 0,
+                "sentence": "Norwegian-konsernet, som består av Norwegian og Widerøe, hadde 2,62 millioner passasjerer i mai.",
+                "interpretation": "Passasjertallet er dekket, men referansen sier ikke eksplisitt at Norwegian-konsernet består av Norwegian og Widerøe.",
+                "sourceEvidence": "In May, the Norwegian Group had a total of 2.62 million passengers. Of these, Norwegian recorded 2.25 million passengers, while Widerøe had 364,000."
+              },
+              {
+                "index": 7,
+                "sentence": "Norwegian-konsernet består av flyselskapene Norwegian og Widerøe.",
+                "interpretation": "Referansen omtaler Norwegian Group og de to flyselskapene, men sier ikke eksplisitt at konsernet består av disse.",
+                "sourceEvidence": "Of these, Norwegian recorded 2.25 million passengers, while Widerøe had 364,000."
+              }
+            ],
+            "visibleArticleSentenceCount": 7
+          },
+          "repairHistory": [
+            {
+              "blocking": true,
+              "checkNumber": 1,
+              "blockingReason": "Reference check found unsupported high-risk factual claims.",
+              "coveragePercent": 75,
+              "correctionAttempt": 0,
+              "unsupportedSentences": [
+                {
+                  "index": 0,
+                  "sentence": "Norwegian-konsernet, som består av Norwegian og Widerøe, hadde 2,62 millioner passasjerer i mai.",
+                  "interpretation": "Passasjertallet er dekket, men referansen sier ikke eksplisitt at Norwegian-konsernet består av Norwegian og Widerøe."
+                },
+                {
+                  "index": 7,
+                  "sentence": "Norwegian-konsernet består av flyselskapene Norwegian og Widerøe.",
+                  "interpretation": "Referansen omtaler Norwegian Group og de to flyselskapene, men sier ikke eksplisitt at konsernet består av disse."
+                }
+              ],
+              "unsupportedSentenceCount": 2,
+              "highRiskUnsupportedSentenceCount": 1
+            }
+          ],
+          "blockingReason": null,
+          "totalSentences": 8,
+          "initialCoverage": null,
+          "sentenceReviews": [
+            {
+              "index": 0,
+              "grounded": false,
+              "sentence": "Norwegian-konsernet, som består av Norwegian og Widerøe, hadde 2,62 millioner passasjerer i mai.",
+              "interpretation": "Passasjertallet er dekket, men referansen sier ikke eksplisitt at Norwegian-konsernet består av Norwegian og Widerøe.",
+              "sourceEvidence": "In May, the Norwegian Group had a total of 2.62 million passengers. Of these, Norwegian recorded 2.25 million passengers, while Widerøe had 364,000."
+            },
+            {
+              "index": 1,
+              "grounded": true,
+              "sentence": "Det opplyser selskapet i en børsmelding.",
+              "interpretation": "Referansen er eksplisitt omtalt som en børsmelding publisert av Norwegian Air Shuttle ASA.",
+              "sourceEvidence": "This stock exchange announcement was published by Jesper M. Hatletveit, VP Investor Relations at Norwegian Air Shuttle ASA"
+            },
+            {
+              "index": 2,
+              "grounded": true,
+              "sentence": "Norwegian alene hadde 2.252.657 passasjerer, opp 3 prosent fra mai i fjor.",
+              "interpretation": "Tallene for Norwegian-passasjerer og prosentvis økning er eksplisitt oppgitt.",
+              "sourceEvidence": "Passengers 2,252,657 2,176,537 3%"
+            },
+            {
+              "index": 3,
+              "grounded": true,
+              "sentence": "Kapasiteten økte 5 prosent, mens fyllingsgraden falt til 81,5 prosent.",
+              "interpretation": "For Norwegian er både kapasitetsøkningen og fyllingsgraden eksplisitt oppgitt.",
+              "sourceEvidence": "Norwegian's capacity (ASK) was 3,741 million seat kilometres in May, an increase of 5 percent ... The load factor ... ended at 81.5 percent"
+            },
+            {
+              "index": 4,
+              "grounded": true,
+              "sentence": "Widerøe hadde 364.406 passasjerer, opp 4 prosent.",
+              "interpretation": "Tallene for Widerøe-passasjerer og økningen er eksplisitt oppgitt.",
+              "sourceEvidence": "Passengers 364,406 349,362 4%"
+            },
+            {
+              "index": 5,
+              "grounded": true,
+              "sentence": "Fyllingsgraden steg til 69,7 prosent.",
+              "interpretation": "For Widerøe er fyllingsgraden og at den økte eksplisitt oppgitt.",
+              "sourceEvidence": "The load factor was 69,7 percent, up 1.2 percentage points from last year."
+            },
+            {
+              "index": 6,
+              "grounded": true,
+              "sentence": "Selskapet skriver at verken Norwegian eller Widerøe kansellerte flyginger på grunn av økte drivstoffpriser.",
+              "interpretation": "Dette er direkte dekket i referansen.",
+              "sourceEvidence": "Neither Norwegian nor Widerøe has cancelled a single flight due to the increase in fuel prices."
+            },
+            {
+              "index": 7,
+              "grounded": false,
+              "sentence": "Norwegian-konsernet består av flyselskapene Norwegian og Widerøe.",
+              "interpretation": "Referansen omtaler Norwegian Group og de to flyselskapene, men sier ikke eksplisitt at konsernet består av disse.",
+              "sourceEvidence": "Of these, Norwegian recorded 2.25 million passengers, while Widerøe had 364,000."
+            }
+          ],
+          "correctionApplied": false,
+          "correctionAttempts": 0,
+          "importanceAdjusted": false,
+          "attributionRiskCount": 0,
+          "finalCoveragePercent": 75,
+          "unsupportedSentences": [
+            {
+              "index": 0,
+              "sentence": "Norwegian-konsernet, som består av Norwegian og Widerøe, hadde 2,62 millioner passasjerer i mai.",
+              "interpretation": "Passasjertallet er dekket, men referansen sier ikke eksplisitt at Norwegian-konsernet består av Norwegian og Widerøe.",
+              "sourceEvidence": "In May, the Norwegian Group had a total of 2.62 million passengers. Of these, Norwegian recorded 2.25 million passengers, while Widerøe had 364,000."
+            },
+            {
+              "index": 7,
+              "sentence": "Norwegian-konsernet består av flyselskapene Norwegian og Widerøe.",
+              "interpretation": "Referansen omtaler Norwegian Group og de to flyselskapene, men sier ikke eksplisitt at konsernet består av disse.",
+              "sourceEvidence": "Of these, Norwegian recorded 2.25 million passengers, while Widerøe had 364,000."
+            }
+          ],
+          "importanceAdjustReason": null,
+          "initialCoveragePercent": null,
+          "unsupportedSentenceCount": 2,
+          "attributionCorrectionApplied": false,
+          "highRiskUnsupportedSentenceCount": 0
+        },
+        "editorialReview": null,
+        "sourceBodyChars": 3486,
+        "validationRepair": {
+          "error": null,
+          "applied": true,
+          "issueCodes": [
+            "UNEXPECTED_NUMBERS"
+          ],
+          "finalWarnings": [],
+          "initialWarnings": [
+            "Unexpected numbers: 2,0"
+          ]
+        },
+        "styleSanitization": {
+          "changed": false,
+          "removedAsaSuffix": 0,
+          "expandedMarketCodes": 0,
+          "replacedPercentSigns": 0,
+          "removedRegisteredMarks": 0,
+          "normalizedBillionPhrases": 0,
+          "replacedFiscalYearAbbrev": 0,
+          "normalizedAccountingAcronyms": 0,
+          "normalizedExactBillionAmounts": 0
+        },
+        "revisionInstructionCompliance": null
+      },
+      "labels": {
+        "class": "checker_error_published",
+        "reportRef": "final report 2026-06-02_2026-08-13"
+      },
+      "expected": {},
+      "provenance": {
+        "window": {
+          "from": "2026-06-02",
+          "to": "2026-08-13"
+        },
+        "status": "published"
+      }
+    },
+    {
+      "messageId": 677082,
+      "generationRunId": "cmquiuomd053dsg1q27gk3e9b",
+      "promptVersion": "v5.9.1",
+      "sourcePayload": {
+        "messageId": 677082,
+        "title": "Styrene i Trøndelag Sparebank og Ørland Sparebank har signert en plan for sammenslåing",
+        "issuerName": "Trøndelag Sparebank",
+        "issuerSign": "TRSB",
+        "publishedAt": "2026-06-26T06:00:00.000Z",
+        "categories": [
+          "INNSIDEINFORMASJON"
+        ],
+        "markets": [
+          "XOSL",
+          "XOAM"
+        ],
+        "bodyText": "Det vises til børsmeldinger publisert av Trøndelag Sparebank og Ørland Sparebank (\"Bankene\") 27. februar 2026 om at Bankene har inngått en intensjonsavtale om sammenslåing.\n\nStyrene i Trøndelag Sparebank og Ørland Sparebank har i dag vedtatt en plan for sammenslåing av Bankene (fusjonsplan) basert på denne intensjonsavtalen. Fusjonsplanen vil bli registrert og offentliggjort i Foretaksregisteret.\n\nTrøndelag Sparebank skal være juridisk og regnskapsrettslig overtakende bank. Sammenslåing og videreføring av sparebankvirksomheten skjer ved at eiendeler, rettigheter og forpliktelser overføres fra Ørland Sparebank til det som i dag er Trøndelag Sparebank. Den sammenslåtte banken videreføres under navnet Trøndelag Sparebank. \n\nBasert på regnskapstall per 31. mars 2026, vil den sammenslåtte banken få:\n• Forvaltningskapital på ca. NOK 15,1 milliarder og forretningskapital på ca. NOK 18 milliarder\n• Egenkapital ekskl. hybridkapital/fondsobligasjon på ca. NOK 1,8 milliarder\n• En samlet ren kjernekapitaldekning på 18,7 prosent\n\nBytteforhold og vederlag\n\nBokført egenkapital (justert for hybridkapital, utbytte i forbindelse med årsoppgjøret for 2025, samt minoritetsinteresser) per første kvartal 2026 er NOK 1 048 millioner i Trøndelag Sparebank og NOK 715 millioner i Ørland Sparebank, samlet NOK 1 762 millioner. Justert for mer- og mindreverdier, er verdijustert egenkapital NOK 1 020 millioner i Trøndelag Sparebank og NOK 702 millioner i Ørland Sparebank, samlet NOK 1 722 millioner. Samlet verdijustert egenkapital på NOK 1 722 millioner representerer en pris/bok på 0,98x sammenlignet med bokført egenkapital (justert for hybridkapital, utbytte i forbindelse med årsoppgjøret for 2025, samt minoritetsinteresser) per første kvartal 2026. \n\nSett hen til mer- og mindreverdier i Partenes balanser, samt normalisert resultat (analyse av historisk resultat justert for engangseffekter), er Partene enige om et bytteforhold på 60 % til Trøndelag Sparebank og 40 % til Ørland Sparebank.\n\nVederlaget for overtakelse av virksomhet fra Ørland Sparebank skal ytes i form av egenkapitalbevis i den sammenslåtte banken til eksisterende eiere i Ørland Sparebank og til en sparebankstiftelse som opprettes av Ørland Sparebank i forbindelse med gjennomføring av Sammenslåingen.\n\nTrøndelag Sparebank og Ørland Sparebank har forut for Sammenslåingen en kapitalstruktur bestående av grunnfondskapital og eierandelskapital. Eierbrøken per første kvartal 2026 beregnet til 51,03 % for Trøndelag Sparebank og 6,16 % for Ørland Sparebank. \n\nSparebankstiftelsen som skal opprettes av Ørland Sparebank vil få vederlag for deler av grunnfondskapitalen i Ørland Sparebank i form av egenkapitalbevis. Hensyntatt dette og vederlaget til dagens eiere i Ørland Sparebank, er Partene enige om at den sammenslåtte banken skal ha en eierbrøk på ca. 46 % basert på tall per første kvartal 2026. Eierbrøken kan som følge av Partenes utdeling av utbytte og gaver frem mot gjennomføring av Sammenslåingen endres. Eierbrøken skal på Gjennomføringsdato beregnes som den gjennomsnittlige eierbrøken i de to Partene, konvertering av deler av grunnfondskapitalen i Ørland Sparebank og det avtalte bytteforholdet. \nEgenkapitalbevis som utstedes som vederlag til dagens eiere i Ørland Sparebank og sparebankstiftelsen som etableres i Ørland, utstedes til kurs NOK 110,2229, som tilsvarer volumvektet børskurs siste måned på egenkapitalbevisene utstedt av Trøndelag Sparebank på tidspunkt for vedtak av fusjonsplanen.\n\nHensyntatt bytteforholdet og justeringer for mer- og mindreverdier i bankene skal det utstedes 383 986 egenkapitalbevis til nåværende eiere i Ørland Sparebank, samt 2 048 962 egenkapitalbevis til sparebankstiftelsen som opprettes av Ørland Sparebank. Fra før har Trøndelag Sparebank utstedt 4 781 705 egenkapitalbevis, inkludert en egenbeholdning på 6 855 egenkapitalbevis per første kvartal 2026. Trøndelag Sparebank har fra tidligere to sparebankstiftelser blant egenkapitalbeviseierne; Sparebankstiftelsen Hemne Sparebank og Sparebankstiftelsen Åfjord Sparebank. Trøndelag Sparebankstiftelse, Ørland vil på etableringstidspunktet få en gave på 4 MNOK fra Ørland Sparebank.\n\nEtter Sammenslåingen vil det være totalt 7 214 653 utstedte egenkapitalbevis inkludert egenbeholdningen. Dette gir følgende fordeling av eierandelskapitalen i den sammenslåtte banken:\n\nEgenkapitalbeviseiere\t\t\t\tAntall EKB \tI %\nNåværende egenkapitalbeviseiere Trøndelag \nex. Sparebankstiftelsene og egenbeholdning      2 777 865      36 %\nSparebankstiftelsen Hemne Sparebank             1 236 507      17 %\nSparebankstiftelsen Åfjord Sparebank              760 478      11 %\nNåværende egenkapitalbeviseiere Ørland            383 986       5 %\nTrøndelag Sparebankstiftelse, Ørland            2 048 962      28 %\nSum egenkapitalbevis. ex egenbeholdning         7 207 798     100 %\n\nEgenbeholdning Trøndelag Sparebank                  6 855       0 %\nSum egenkapitalbevis. inkl egenbeholdning       7 214 653     100 %\n\nSamarbeid/alliansetilknytning\n\nBankene har gjennomført en bred og grundig vurdering for valg av samarbeid/alliansetilknytning for den sammenslåtte banken. Basert på den gjennomførte vurderingen er Bankene enige om at den sammenslåtte banken skal være tilknyttet Eika alliansen.\n\nTidsplan og forutsetninger for gjennomføring\n\nEn eventuell sammenslåing er blant annet betinget av at fusjonsplanen godkjennes av Bankenes respektive generalforsamlinger som det er lagt opp skal gjennomføres den 13. august 2026. Sammenslåingen er også betinget av nødvendige godkjennelser fra myndigheter. Etter gjeldende tidsplan planlegges det gjennomføring av sammenslåingen den 1. april 2027.\n\nBankene har engasjert Norne Securities AS som felles finansiell rådgiver i forbindelse med sammenslåingen, mens Advokatfirmaet Selmer AS er engasjert som felles juridisk rådgiver. \n\nKontaktpersoner: \n\nTrøndelag Sparebank\nAdministrerende banksjef Tor Espnes, tlf. 992 90 007 og e-post te@trondelagsparebank.no\n\nStyreleder Arnar Utseth, tlf. 971 64 863 og e-post arnar.utseth@fosenyard.com \n\n\n \nInformasjonen i denne børsmeldingen utgjorde innsideinformasjon og er informasjonspliktig i henhold til markedsmisbruksforordningen (MAR). Børsmeldingen offentliggjøres på vegne av Trøndelag Sparebank av Gaute Krogfjord, CFO, på det tidspunktet angitt i børsmeldingen. \n\nBørsmeldingen offentliggjøres i henhold til kravene i verdipapirhandelloven § 5-12.\n",
+        "hasAttachments": false,
+        "sourceBodyChars": 6404
+      },
+      "storedOutput": {
+        "title": "Trøndelag Sparebank nærmer seg Ørland-sammenslåing",
+        "lead": "Trøndelag Sparebank og Ørland Sparebank har fått på plass planen for sammenslåing, opplyser Trøndelag Sparebank i en børsmelding. Trøndelag Sparebank blir overtakende bank, og den nye banken skal videreføres under samme navn.",
+        "body": [
+          "Basert på tall per 31. mars vil den sammenslåtte banken få forvaltningskapital på rundt 15,1 milliarder kroner og ren kjernekapitaldekning på 18,7 prosent.",
+          "Partene er enige om et bytteforhold på 60 prosent til Trøndelag Sparebank og 40 prosent til Ørland Sparebank. Ørland-eiere og en ny sparebankstiftelse får egenkapitalbevis, sparebankenes aksjelignende eierpapirer, som vederlag.",
+          "Sammenslåingen må godkjennes av generalforsamlingene 13. august og av myndighetene. Planlagt gjennomføring er 1. april 2027, og banken skal være tilknyttet Eika-alliansen."
+        ],
+        "company_sentence": "Trøndelag Sparebank er en sparebank med utstedte egenkapitalbevis.",
+        "key_facts": [
+          "Styrene har vedtatt fusjonsplan",
+          "Bytteforholdet er 60 prosent til Trøndelag Sparebank og 40 prosent til Ørland Sparebank",
+          "Planlagt gjennomføring er 1. april 2027"
+        ],
+        "negative_or_surprising": [
+          "Eierfordelingen endres gjennom nye egenkapitalbevis til Ørland-eiere og ny sparebankstiftelse"
+        ],
+        "excluded_hype": [],
+        "source_limitations": [],
+        "confidence": "high",
+        "importance": "viktig",
+        "source_spans": [
+          "primary: Styrene i Trøndelag Sparebank og Ørland Sparebank har i dag vedtatt en plan for sammenslåing",
+          "primary: den sammenslåtte banken få: Forvaltningskapital på ca. NOK 15,1 milliarder",
+          "primary: Partene er enige om et bytteforhold på 60 % til Trøndelag Sparebank og 40 % til Ørland Sparebank",
+          "primary: planlegges det gjennomføring av sammenslåingen den 1. april 2027"
+        ]
+      },
+      "storedValidation": {
+        "valid": true,
+        "errors": [],
+        "issues": [],
+        "warnings": [],
+        "errorCode": null,
+        "hiddenDraft": {
+          "body": [
+            "Basert på tall per 31. mars vil den sammenslåtte banken få forvaltningskapital på rundt 15,1 milliarder kroner og ren kjernekapitaldekning på 18,7 prosent.",
+            "Partene er enige om et bytteforhold på 60 prosent til Trøndelag Sparebank og 40 prosent til Ørland Sparebank. Ørland-eiere og en ny sparebankstiftelse får egenkapitalbevis, sparebankenes aksjelignende eierpapirer, som vederlag.",
+            "Sammenslåingen må godkjennes av generalforsamlingene 13. august og av myndighetene. Planlagt gjennomføring er 1. april 2027, og banken skal være tilknyttet Eika-alliansen."
+          ],
+          "lead": "Trøndelag Sparebank og Ørland Sparebank har fått på plass planen for sammenslåing, opplyser Trøndelag Sparebank i en børsmelding. Trøndelag Sparebank blir overtakende bank, og den nye banken skal videreføres under samme navn.",
+          "title": "Trøndelag Sparebank nærmer seg Ørland-sammenslåing",
+          "company_sentence": "Trøndelag Sparebank er en sparebank med utstedte egenkapitalbevis."
+        },
+        "promptChars": 100044,
+        "blockingErrors": [],
+        "quoteTelemetry": {
+          "draftContainsInlineGuillemets": false,
+          "draftContainsStandaloneDashQuote": false,
+          "draftContainsNamedPersonAttribution": false,
+          "draftSourceSpansMentionQuoteSpeaker": false,
+          "sourceContainsNamedQuoteLikePattern": false
+        },
+        "referenceCheck": {
+          "enabled": true,
+          "blocking": false,
+          "checkerError": "OpenAI request failed for rewrite_output: Request was aborted. | model=gpt-5.5 reasoning=medium timeoutMs=240000 maxOutputTokens=16384 promptChars=47746",
+          "finalCoverage": {
+            "totalSentences": 8,
+            "coveragePercent": 88,
+            "sentenceReviews": [
+              {
+                "index": 0,
+                "grounded": true,
+                "sentence": "Trøndelag Sparebank og Ørland Sparebank har fått på plass planen for sammenslåing, opplyser Trøndelag Sparebank i en børsmelding.",
+                "interpretation": "Dekket: referansen sier at styrene har vedtatt en fusjonsplan, og at børsmeldingen offentliggjøres på vegne av Trøndelag Sparebank.",
+                "sourceEvidence": "Styrene i Trøndelag Sparebank og Ørland Sparebank har i dag vedtatt en plan for sammenslåing av Bankene (fusjonsplan) ... Børsmeldingen offentliggjøres på vegne av Trøndelag Sparebank"
+              },
+              {
+                "index": 1,
+                "grounded": true,
+                "sentence": "Trøndelag Sparebank blir overtakende bank, og den nye banken skal videreføres under samme navn.",
+                "interpretation": "Dekket direkte av referansen.",
+                "sourceEvidence": "Trøndelag Sparebank skal være juridisk og regnskapsrettslig overtakende bank. ... Den sammenslåtte banken videreføres under navnet Trøndelag Sparebank."
+              },
+              {
+                "index": 2,
+                "grounded": true,
+                "sentence": "Basert på tall per 31. mars vil den sammenslåtte banken få forvaltningskapital på rundt 15,1 milliarder kroner og ren kjernekapitaldekning på 18,7 prosent.",
+                "interpretation": "Dekket: 31. mars tilsvarer tall per første kvartal/31. mars 2026, med oppgitte tall for forvaltningskapital og ren kjernekapitaldekning.",
+                "sourceEvidence": "Basert på regnskapstall per 31. mars 2026, vil den sammenslåtte banken få: • Forvaltningskapital på ca. NOK 15,1 milliarder ... • En samlet ren kjernekapitaldekning på 18,7 prosent"
+              },
+              {
+                "index": 3,
+                "grounded": true,
+                "sentence": "Partene er enige om et bytteforhold på 60 prosent til Trøndelag Sparebank og 40 prosent til Ørland Sparebank.",
+                "interpretation": "Dekket direkte av referansen.",
+                "sourceEvidence": "Partene enige om et bytteforhold på 60 % til Trøndelag Sparebank og 40 % til Ørland Sparebank."
+              },
+              {
+                "index": 4,
+                "grounded": false,
+                "sentence": "Ørland-eiere og en ny sparebankstiftelse får egenkapitalbevis, sparebankenes aksjelignende eierpapirer, som vederlag.",
+                "interpretation": "Delvis dekket at Ørland-eiere og en ny stiftelse får egenkapitalbevis som vederlag, men forklaringen «sparebankenes aksjelignende eierpapirer» står ikke i referansen.",
+                "sourceEvidence": "Vederlaget ... skal ytes i form av egenkapitalbevis ... til eksisterende eiere i Ørland Sparebank og til en sparebankstiftelse som opprettes av Ørland Sparebank"
+              },
+              {
+                "index": 5,
+                "grounded": true,
+                "sentence": "Sammenslåingen må godkjennes av generalforsamlingene 13. august og av myndighetene.",
+                "interpretation": "Dekket: referansen oppgir at sammenslåingen er betinget av godkjenning fra generalforsamlingene planlagt 13. august 2026 og nødvendige myndighetsgodkjennelser.",
+                "sourceEvidence": "betinget av at fusjonsplanen godkjennes av Bankenes respektive generalforsamlinger ... den 13. august 2026. Sammenslåingen er også betinget av nødvendige godkjennelser fra myndigheter."
+              },
+              {
+                "index": 6,
+                "grounded": true,
+                "sentence": "Planlagt gjennomføring er 1. april 2027, og banken skal være tilknyttet Eika-alliansen.",
+                "interpretation": "Dekket direkte av referansen.",
+                "sourceEvidence": "den sammenslåtte banken skal være tilknyttet Eika alliansen. ... planlegges det gjennomføring av sammenslåingen den 1. april 2027."
+              },
+              {
+                "index": 7,
+                "grounded": true,
+                "sentence": "Trøndelag Sparebank er en sparebank med utstedte egenkapitalbevis.",
+                "interpretation": "Dekket: referansen omtaler Trøndelag Sparebank som sparebank og oppgir at banken har utstedt egenkapitalbevis.",
+                "sourceEvidence": "Fra før har Trøndelag Sparebank utstedt 4 781 705 egenkapitalbevis ... Trøndelag Sparebank har fra tidligere to sparebankstiftelser blant egenkapitalbeviseierne"
+              }
+            ],
+            "groundedSentences": 7,
+            "unsupportedSentences": [
+              {
+                "index": 4,
+                "sentence": "Ørland-eiere og en ny sparebankstiftelse får egenkapitalbevis, sparebankenes aksjelignende eierpapirer, som vederlag.",
+                "interpretation": "Delvis dekket at Ørland-eiere og en ny stiftelse får egenkapitalbevis som vederlag, men forklaringen «sparebankenes aksjelignende eierpapirer» står ikke i referansen.",
+                "sourceEvidence": "Vederlaget ... skal ytes i form av egenkapitalbevis ... til eksisterende eiere i Ørland Sparebank og til en sparebankstiftelse som opprettes av Ørland Sparebank"
+              }
+            ],
+            "visibleArticleSentenceCount": 7
+          },
+          "repairHistory": [
+            {
+              "blocking": false,
+              "checkNumber": 1,
+              "blockingReason": null,
+              "coveragePercent": 88,
+              "correctionAttempt": 0,
+              "unsupportedSentences": [
+                {
+                  "index": 4,
+                  "sentence": "Ørland-eiere og en ny sparebankstiftelse får egenkapitalbevis, sparebankenes aksjelignende eierpapirer, som vederlag.",
+                  "interpretation": "Delvis dekket at Ørland-eiere og en ny stiftelse får egenkapitalbevis som vederlag, men forklaringen «sparebankenes aksjelignende eierpapirer» står ikke i referansen."
+                }
+              ],
+              "unsupportedSentenceCount": 1,
+              "highRiskUnsupportedSentenceCount": 0
+            }
+          ],
+          "blockingReason": null,
+          "totalSentences": 8,
+          "initialCoverage": {
+            "totalSentences": 8,
+            "coveragePercent": 88,
+            "sentenceReviews": [
+              {
+                "index": 0,
+                "grounded": true,
+                "sentence": "Trøndelag Sparebank og Ørland Sparebank har fått på plass planen for sammenslåing, opplyser Trøndelag Sparebank i en børsmelding.",
+                "interpretation": "Dekket: referansen sier at styrene har vedtatt en fusjonsplan, og at børsmeldingen offentliggjøres på vegne av Trøndelag Sparebank.",
+                "sourceEvidence": "Styrene i Trøndelag Sparebank og Ørland Sparebank har i dag vedtatt en plan for sammenslåing av Bankene (fusjonsplan) ... Børsmeldingen offentliggjøres på vegne av Trøndelag Sparebank"
+              },
+              {
+                "index": 1,
+                "grounded": true,
+                "sentence": "Trøndelag Sparebank blir overtakende bank, og den nye banken skal videreføres under samme navn.",
+                "interpretation": "Dekket direkte av referansen.",
+                "sourceEvidence": "Trøndelag Sparebank skal være juridisk og regnskapsrettslig overtakende bank. ... Den sammenslåtte banken videreføres under navnet Trøndelag Sparebank."
+              },
+              {
+                "index": 2,
+                "grounded": true,
+                "sentence": "Basert på tall per 31. mars vil den sammenslåtte banken få forvaltningskapital på rundt 15,1 milliarder kroner og ren kjernekapitaldekning på 18,7 prosent.",
+                "interpretation": "Dekket: 31. mars tilsvarer tall per første kvartal/31. mars 2026, med oppgitte tall for forvaltningskapital og ren kjernekapitaldekning.",
+                "sourceEvidence": "Basert på regnskapstall per 31. mars 2026, vil den sammenslåtte banken få: • Forvaltningskapital på ca. NOK 15,1 milliarder ... • En samlet ren kjernekapitaldekning på 18,7 prosent"
+              },
+              {
+                "index": 3,
+                "grounded": true,
+                "sentence": "Partene er enige om et bytteforhold på 60 prosent til Trøndelag Sparebank og 40 prosent til Ørland Sparebank.",
+                "interpretation": "Dekket direkte av referansen.",
+                "sourceEvidence": "Partene enige om et bytteforhold på 60 % til Trøndelag Sparebank og 40 % til Ørland Sparebank."
+              },
+              {
+                "index": 4,
+                "grounded": false,
+                "sentence": "Ørland-eiere og en ny sparebankstiftelse får egenkapitalbevis, sparebankenes aksjelignende eierpapirer, som vederlag.",
+                "interpretation": "Delvis dekket at Ørland-eiere og en ny stiftelse får egenkapitalbevis som vederlag, men forklaringen «sparebankenes aksjelignende eierpapirer» står ikke i referansen.",
+                "sourceEvidence": "Vederlaget ... skal ytes i form av egenkapitalbevis ... til eksisterende eiere i Ørland Sparebank og til en sparebankstiftelse som opprettes av Ørland Sparebank"
+              },
+              {
+                "index": 5,
+                "grounded": true,
+                "sentence": "Sammenslåingen må godkjennes av generalforsamlingene 13. august og av myndighetene.",
+                "interpretation": "Dekket: referansen oppgir at sammenslåingen er betinget av godkjenning fra generalforsamlingene planlagt 13. august 2026 og nødvendige myndighetsgodkjennelser.",
+                "sourceEvidence": "betinget av at fusjonsplanen godkjennes av Bankenes respektive generalforsamlinger ... den 13. august 2026. Sammenslåingen er også betinget av nødvendige godkjennelser fra myndigheter."
+              },
+              {
+                "index": 6,
+                "grounded": true,
+                "sentence": "Planlagt gjennomføring er 1. april 2027, og banken skal være tilknyttet Eika-alliansen.",
+                "interpretation": "Dekket direkte av referansen.",
+                "sourceEvidence": "den sammenslåtte banken skal være tilknyttet Eika alliansen. ... planlegges det gjennomføring av sammenslåingen den 1. april 2027."
+              },
+              {
+                "index": 7,
+                "grounded": true,
+                "sentence": "Trøndelag Sparebank er en sparebank med utstedte egenkapitalbevis.",
+                "interpretation": "Dekket: referansen omtaler Trøndelag Sparebank som sparebank og oppgir at banken har utstedt egenkapitalbevis.",
+                "sourceEvidence": "Fra før har Trøndelag Sparebank utstedt 4 781 705 egenkapitalbevis ... Trøndelag Sparebank har fra tidligere to sparebankstiftelser blant egenkapitalbeviseierne"
+              }
+            ],
+            "groundedSentences": 7,
+            "unsupportedSentences": [
+              {
+                "index": 4,
+                "sentence": "Ørland-eiere og en ny sparebankstiftelse får egenkapitalbevis, sparebankenes aksjelignende eierpapirer, som vederlag.",
+                "interpretation": "Delvis dekket at Ørland-eiere og en ny stiftelse får egenkapitalbevis som vederlag, men forklaringen «sparebankenes aksjelignende eierpapirer» står ikke i referansen.",
+                "sourceEvidence": "Vederlaget ... skal ytes i form av egenkapitalbevis ... til eksisterende eiere i Ørland Sparebank og til en sparebankstiftelse som opprettes av Ørland Sparebank"
+              }
+            ],
+            "visibleArticleSentenceCount": 7
+          },
+          "sentenceReviews": [
+            {
+              "index": 0,
+              "grounded": true,
+              "sentence": "Trøndelag Sparebank og Ørland Sparebank har fått på plass planen for sammenslåing, opplyser Trøndelag Sparebank i en børsmelding.",
+              "interpretation": "Dekket: referansen sier at styrene har vedtatt en fusjonsplan, og at børsmeldingen offentliggjøres på vegne av Trøndelag Sparebank.",
+              "sourceEvidence": "Styrene i Trøndelag Sparebank og Ørland Sparebank har i dag vedtatt en plan for sammenslåing av Bankene (fusjonsplan) ... Børsmeldingen offentliggjøres på vegne av Trøndelag Sparebank"
+            },
+            {
+              "index": 1,
+              "grounded": true,
+              "sentence": "Trøndelag Sparebank blir overtakende bank, og den nye banken skal videreføres under samme navn.",
+              "interpretation": "Dekket direkte av referansen.",
+              "sourceEvidence": "Trøndelag Sparebank skal være juridisk og regnskapsrettslig overtakende bank. ... Den sammenslåtte banken videreføres under navnet Trøndelag Sparebank."
+            },
+            {
+              "index": 2,
+              "grounded": true,
+              "sentence": "Basert på tall per 31. mars vil den sammenslåtte banken få forvaltningskapital på rundt 15,1 milliarder kroner og ren kjernekapitaldekning på 18,7 prosent.",
+              "interpretation": "Dekket: 31. mars tilsvarer tall per første kvartal/31. mars 2026, med oppgitte tall for forvaltningskapital og ren kjernekapitaldekning.",
+              "sourceEvidence": "Basert på regnskapstall per 31. mars 2026, vil den sammenslåtte banken få: • Forvaltningskapital på ca. NOK 15,1 milliarder ... • En samlet ren kjernekapitaldekning på 18,7 prosent"
+            },
+            {
+              "index": 3,
+              "grounded": true,
+              "sentence": "Partene er enige om et bytteforhold på 60 prosent til Trøndelag Sparebank og 40 prosent til Ørland Sparebank.",
+              "interpretation": "Dekket direkte av referansen.",
+              "sourceEvidence": "Partene enige om et bytteforhold på 60 % til Trøndelag Sparebank og 40 % til Ørland Sparebank."
+            },
+            {
+              "index": 4,
+              "grounded": false,
+              "sentence": "Ørland-eiere og en ny sparebankstiftelse får egenkapitalbevis, sparebankenes aksjelignende eierpapirer, som vederlag.",
+              "interpretation": "Delvis dekket at Ørland-eiere og en ny stiftelse får egenkapitalbevis som vederlag, men forklaringen «sparebankenes aksjelignende eierpapirer» står ikke i referansen.",
+              "sourceEvidence": "Vederlaget ... skal ytes i form av egenkapitalbevis ... til eksisterende eiere i Ørland Sparebank og til en sparebankstiftelse som opprettes av Ørland Sparebank"
+            },
+            {
+              "index": 5,
+              "grounded": true,
+              "sentence": "Sammenslåingen må godkjennes av generalforsamlingene 13. august og av myndighetene.",
+              "interpretation": "Dekket: referansen oppgir at sammenslåingen er betinget av godkjenning fra generalforsamlingene planlagt 13. august 2026 og nødvendige myndighetsgodkjennelser.",
+              "sourceEvidence": "betinget av at fusjonsplanen godkjennes av Bankenes respektive generalforsamlinger ... den 13. august 2026. Sammenslåingen er også betinget av nødvendige godkjennelser fra myndigheter."
+            },
+            {
+              "index": 6,
+              "grounded": true,
+              "sentence": "Planlagt gjennomføring er 1. april 2027, og banken skal være tilknyttet Eika-alliansen.",
+              "interpretation": "Dekket direkte av referansen.",
+              "sourceEvidence": "den sammenslåtte banken skal være tilknyttet Eika alliansen. ... planlegges det gjennomføring av sammenslåingen den 1. april 2027."
+            },
+            {
+              "index": 7,
+              "grounded": true,
+              "sentence": "Trøndelag Sparebank er en sparebank med utstedte egenkapitalbevis.",
+              "interpretation": "Dekket: referansen omtaler Trøndelag Sparebank som sparebank og oppgir at banken har utstedt egenkapitalbevis.",
+              "sourceEvidence": "Fra før har Trøndelag Sparebank utstedt 4 781 705 egenkapitalbevis ... Trøndelag Sparebank har fra tidligere to sparebankstiftelser blant egenkapitalbeviseierne"
+            }
+          ],
+          "correctionApplied": false,
+          "correctionAttempts": 0,
+          "importanceAdjusted": false,
+          "attributionRiskCount": 0,
+          "finalCoveragePercent": 88,
+          "unsupportedSentences": [
+            {
+              "index": 4,
+              "sentence": "Ørland-eiere og en ny sparebankstiftelse får egenkapitalbevis, sparebankenes aksjelignende eierpapirer, som vederlag.",
+              "interpretation": "Delvis dekket at Ørland-eiere og en ny stiftelse får egenkapitalbevis som vederlag, men forklaringen «sparebankenes aksjelignende eierpapirer» står ikke i referansen.",
+              "sourceEvidence": "Vederlaget ... skal ytes i form av egenkapitalbevis ... til eksisterende eiere i Ørland Sparebank og til en sparebankstiftelse som opprettes av Ørland Sparebank"
+            }
+          ],
+          "importanceAdjustReason": null,
+          "initialCoveragePercent": 88,
+          "unsupportedSentenceCount": 1,
+          "attributionCorrectionApplied": false,
+          "highRiskUnsupportedSentenceCount": 0
+        },
+        "editorialReview": null,
+        "sourceBodyChars": 6404,
+        "validationRepair": {
+          "error": null,
+          "applied": false,
+          "issueCodes": [],
+          "finalWarnings": [],
+          "initialWarnings": []
+        },
+        "styleSanitization": {
+          "changed": false,
+          "removedAsaSuffix": 0,
+          "expandedMarketCodes": 0,
+          "replacedPercentSigns": 0,
+          "removedRegisteredMarks": 0,
+          "normalizedBillionPhrases": 0,
+          "replacedFiscalYearAbbrev": 0,
+          "normalizedAccountingAcronyms": 0,
+          "normalizedExactBillionAmounts": 0
+        },
+        "revisionInstructionCompliance": null
+      },
+      "labels": {
+        "class": "checker_error_published",
+        "reportRef": "final report 2026-06-02_2026-08-13"
+      },
+      "expected": {},
+      "provenance": {
+        "window": {
+          "from": "2026-06-02",
+          "to": "2026-08-13"
+        },
+        "status": "published"
+      }
+    },
+    {
+      "messageId": 677571,
+      "generationRunId": "cmr3jb2ba0tzvpx1r03jhcvfv",
+      "promptVersion": "v5.9.1",
+      "sourcePayload": {
+        "messageId": 677571,
+        "title": "Aqualis ASA: Acquisition of SynergenOG completed",
+        "issuerName": "Aqualis ASA",
+        "issuerSign": "AQUA",
+        "publishedAt": "2026-07-02T13:22:37.044Z",
+        "categories": [
+          "IKKE-INFORMASJONSPLIKTIGE PRESSEMELDINGER"
+        ],
+        "markets": [
+          "XOSL"
+        ],
+        "bodyText": "Aqualis has successfully completed the acquisition of 100 percent of the shares of Southeast Asia-based consultancy SynergenOG, adding specialist capability in process safety and technical risk management and enhancing the group’s technical offering to the energy industries.\n\nPlease refer to the stock exchange announcement dated 13th May 2026 for further details about SynergenOG and the transaction.\n\nSynergenOG will be integrated with the group’s design and engineering consultancy, Longitude. This will strengthen Longitude’s engineering offering across all business lines, creating a technical centre of excellence in process safety and risk management focused on driving safety, cost efficiencies and performance from concept design through to operations and late life.\n\n(ENDS)\n\nFor further information, please contact:\nInvestors and financial media:\nStuart Jackson, Chief Financial Officer, Aqualis ASA\nEmail: stuart.jackson@aqualis-group.com\n\nOther media enquiries:\nEndre Johansen, Corporate Communications AS\nTelephone: +47 41 61 06 05\nEmail: endre.johansen@corpcom.no\n\nAbout Aqualis \nAqualis (OSE: Aqualis ASA – ticker code “AQUA”) is a leading independent global consultancy delivering energy, marine, engineering and digital solutions to drive safety and sustainability in renewables, maritime and oil and gas sectors. The group has offices in 44 countries worldwide and operates under four main brands: ABL, OWC, Longitude and AGR.\n",
+        "hasAttachments": false,
+        "sourceBodyChars": 1446
+      },
+      "storedOutput": {
+        "title": "Aqualis fullfører SynergenOG-kjøp",
+        "lead": "Aqualis, et konsulentselskap for energi og maritim sektor, har fullført kjøpet av alle aksjene i SynergenOG i Sørøst-Asia, opplyser selskapet.",
+        "body": [
+          "SynergenOG har spesialistkompetanse innen prosessikkerhet og teknisk risikostyring for energibransjen. Selskapet skal inn i Aqualis-enheten Longitude, som jobber med design- og ingeniørrådgivning.",
+          "Aqualis skriver at kjøpet skal styrke Longitude på tvers av forretningsområdene."
+        ],
+        "company_sentence": "Aqualis leverer rådgivning innen energi, maritim sektor, ingeniørtjenester og digitale løsninger.",
+        "key_facts": [
+          "Aqualis har fullført kjøpet av 100 prosent av aksjene i SynergenOG",
+          "SynergenOG skal integreres i Longitude"
+        ],
+        "negative_or_surprising": [],
+        "excluded_hype": [
+          "«Successfully completed» og formuleringer om «technical centre of excellence» er utelatt som selskapsformuleringer uten nytt konkret innhold."
+        ],
+        "source_limitations": [
+          "Meldingen viser til en tidligere børsmelding for flere detaljer om SynergenOG og transaksjonen."
+        ],
+        "confidence": "high",
+        "importance": "medium",
+        "source_spans": [
+          "primary: completed the acquisition of 100 percent of the shares of Southeast Asia-based consultancy SynergenOG",
+          "primary: adding specialist capability in process safety and technical risk management",
+          "primary: SynergenOG will be integrated with the group’s design and engineering consultancy, Longitude",
+          "primary: This will strengthen Longitude’s engineering offering across all business lines"
+        ]
+      },
+      "storedValidation": {
+        "valid": true,
+        "errors": [],
+        "issues": [],
+        "warnings": [],
+        "errorCode": null,
+        "hiddenDraft": {
+          "body": [
+            "SynergenOG gir råd om sikkerhet og teknisk risiko i energiprosjekter. Selskapet skal inn i Aqualis-enheten Longitude, som jobber med design- og ingeniørrådgivning.",
+            "Aqualis skriver at kjøpet skal styrke Longitude på tvers av forretningsområdene."
+          ],
+          "lead": "Aqualis, et konsulentselskap for energi og maritim sektor, har fullført kjøpet av alle aksjene i SynergenOG i Sørøst-Asia, opplyser selskapet.",
+          "title": "Aqualis fullfører SynergenOG-kjøp",
+          "company_sentence": "Aqualis leverer rådgivning innen energi, maritim sektor, ingeniørtjenester og digitale løsninger."
+        },
+        "promptChars": 84203,
+        "blockingErrors": [],
+        "quoteTelemetry": {
+          "draftContainsInlineGuillemets": false,
+          "draftContainsStandaloneDashQuote": false,
+          "draftContainsNamedPersonAttribution": false,
+          "draftSourceSpansMentionQuoteSpeaker": false,
+          "sourceContainsNamedQuoteLikePattern": false
+        },
+        "referenceCheck": {
+          "enabled": true,
+          "blocking": false,
+          "checkerError": "Expected ',' or '}' after property value in JSON at position 2310 (line 1 column 2311)",
+          "finalCoverage": {
+            "totalSentences": 5,
+            "coveragePercent": 80,
+            "sentenceReviews": [
+              {
+                "index": 0,
+                "grounded": true,
+                "sentence": "Aqualis, et konsulentselskap for energi og maritim sektor, har fullført kjøpet av alle aksjene i SynergenOG i Sørøst-Asia, opplyser selskapet.",
+                "interpretation": "Dekket av referansen: Aqualis beskrives som konsulentselskap, og det står at selskapet har fullført kjøp av 100 prosent av aksjene i Sørøst-Asia-baserte SynergenOG.",
+                "sourceEvidence": "Aqualis has successfully completed the acquisition of 100 percent of the shares of Southeast Asia-based consultancy SynergenOG"
+              },
+              {
+                "index": 1,
+                "grounded": false,
+                "sentence": "SynergenOG gir råd om sikkerhet og teknisk risiko i energiprosjekter.",
+                "interpretation": "Referansen omtaler SynergenOG som et konsulentselskap med kapasitet innen process safety og technical risk management for energibransjen, men sier ikke eksplisitt at dette gjelder energiprosjekter.",
+                "sourceEvidence": "adding specialist capability in process safety and technical risk management and enhancing the group’s technical offering to the energy industries"
+              },
+              {
+                "index": 2,
+                "grounded": true,
+                "sentence": "Selskapet skal inn i Aqualis-enheten Longitude, som jobber med design- og ingeniørrådgivning.",
+                "interpretation": "Dekket: SynergenOG skal integreres med konsernets design- og ingeniørrådgivning Longitude.",
+                "sourceEvidence": "SynergenOG will be integrated with the group’s design and engineering consultancy, Longitude."
+              },
+              {
+                "index": 3,
+                "grounded": true,
+                "sentence": "Aqualis skriver at kjøpet skal styrke Longitude på tvers av forretningsområdene.",
+                "interpretation": "Dekket som gjengivelse av at dette skal styrke Longitudes ingeniørtilbud på tvers av alle forretningslinjer.",
+                "sourceEvidence": "This will strengthen Longitude’s engineering offering across all business lines"
+              },
+              {
+                "index": 4,
+                "grounded": true,
+                "sentence": "Aqualis leverer rådgivning innen energi, maritim sektor, ingeniørtjenester og digitale løsninger.",
+                "interpretation": "Dekket av selskapsbeskrivelsen i referansen.",
+                "sourceEvidence": "Aqualis ... is a leading independent global consultancy delivering energy, marine, engineering and digital solutions"
+              }
+            ],
+            "groundedSentences": 4,
+            "unsupportedSentences": [
+              {
+                "index": 1,
+                "sentence": "SynergenOG gir råd om sikkerhet og teknisk risiko i energiprosjekter.",
+                "interpretation": "Referansen omtaler SynergenOG som et konsulentselskap med kapasitet innen process safety og technical risk management for energibransjen, men sier ikke eksplisitt at dette gjelder energiprosjekter.",
+                "sourceEvidence": "adding specialist capability in process safety and technical risk management and enhancing the group’s technical offering to the energy industries"
+              }
+            ],
+            "visibleArticleSentenceCount": 4
+          },
+          "repairHistory": [
+            {
+              "blocking": false,
+              "checkNumber": 1,
+              "blockingReason": null,
+              "coveragePercent": 80,
+              "correctionAttempt": 0,
+              "unsupportedSentences": [
+                {
+                  "index": 1,
+                  "sentence": "SynergenOG gir råd om sikkerhet og teknisk risiko i energiprosjekter.",
+                  "interpretation": "Referansen omtaler SynergenOG som et konsulentselskap med kapasitet innen process safety og technical risk management for energibransjen, men sier ikke eksplisitt at dette gjelder energiprosjekter."
+                }
+              ],
+              "unsupportedSentenceCount": 1,
+              "highRiskUnsupportedSentenceCount": 0
+            }
+          ],
+          "blockingReason": null,
+          "totalSentences": 5,
+          "initialCoverage": {
+            "totalSentences": 5,
+            "coveragePercent": 80,
+            "sentenceReviews": [
+              {
+                "index": 0,
+                "grounded": true,
+                "sentence": "Aqualis, et konsulentselskap for energi og maritim sektor, har fullført kjøpet av alle aksjene i SynergenOG i Sørøst-Asia, opplyser selskapet.",
+                "interpretation": "Dekket av referansen: Aqualis beskrives som konsulentselskap, og det står at selskapet har fullført kjøp av 100 prosent av aksjene i Sørøst-Asia-baserte SynergenOG.",
+                "sourceEvidence": "Aqualis has successfully completed the acquisition of 100 percent of the shares of Southeast Asia-based consultancy SynergenOG"
+              },
+              {
+                "index": 1,
+                "grounded": false,
+                "sentence": "SynergenOG gir råd om sikkerhet og teknisk risiko i energiprosjekter.",
+                "interpretation": "Referansen omtaler SynergenOG som et konsulentselskap med kapasitet innen process safety og technical risk management for energibransjen, men sier ikke eksplisitt at dette gjelder energiprosjekter.",
+                "sourceEvidence": "adding specialist capability in process safety and technical risk management and enhancing the group’s technical offering to the energy industries"
+              },
+              {
+                "index": 2,
+                "grounded": true,
+                "sentence": "Selskapet skal inn i Aqualis-enheten Longitude, som jobber med design- og ingeniørrådgivning.",
+                "interpretation": "Dekket: SynergenOG skal integreres med konsernets design- og ingeniørrådgivning Longitude.",
+                "sourceEvidence": "SynergenOG will be integrated with the group’s design and engineering consultancy, Longitude."
+              },
+              {
+                "index": 3,
+                "grounded": true,
+                "sentence": "Aqualis skriver at kjøpet skal styrke Longitude på tvers av forretningsområdene.",
+                "interpretation": "Dekket som gjengivelse av at dette skal styrke Longitudes ingeniørtilbud på tvers av alle forretningslinjer.",
+                "sourceEvidence": "This will strengthen Longitude’s engineering offering across all business lines"
+              },
+              {
+                "index": 4,
+                "grounded": true,
+                "sentence": "Aqualis leverer rådgivning innen energi, maritim sektor, ingeniørtjenester og digitale løsninger.",
+                "interpretation": "Dekket av selskapsbeskrivelsen i referansen.",
+                "sourceEvidence": "Aqualis ... is a leading independent global consultancy delivering energy, marine, engineering and digital solutions"
+              }
+            ],
+            "groundedSentences": 4,
+            "unsupportedSentences": [
+              {
+                "index": 1,
+                "sentence": "SynergenOG gir råd om sikkerhet og teknisk risiko i energiprosjekter.",
+                "interpretation": "Referansen omtaler SynergenOG som et konsulentselskap med kapasitet innen process safety og technical risk management for energibransjen, men sier ikke eksplisitt at dette gjelder energiprosjekter.",
+                "sourceEvidence": "adding specialist capability in process safety and technical risk management and enhancing the group’s technical offering to the energy industries"
+              }
+            ],
+            "visibleArticleSentenceCount": 4
+          },
+          "sentenceReviews": [
+            {
+              "index": 0,
+              "grounded": true,
+              "sentence": "Aqualis, et konsulentselskap for energi og maritim sektor, har fullført kjøpet av alle aksjene i SynergenOG i Sørøst-Asia, opplyser selskapet.",
+              "interpretation": "Dekket av referansen: Aqualis beskrives som konsulentselskap, og det står at selskapet har fullført kjøp av 100 prosent av aksjene i Sørøst-Asia-baserte SynergenOG.",
+              "sourceEvidence": "Aqualis has successfully completed the acquisition of 100 percent of the shares of Southeast Asia-based consultancy SynergenOG"
+            },
+            {
+              "index": 1,
+              "grounded": false,
+              "sentence": "SynergenOG gir råd om sikkerhet og teknisk risiko i energiprosjekter.",
+              "interpretation": "Referansen omtaler SynergenOG som et konsulentselskap med kapasitet innen process safety og technical risk management for energibransjen, men sier ikke eksplisitt at dette gjelder energiprosjekter.",
+              "sourceEvidence": "adding specialist capability in process safety and technical risk management and enhancing the group’s technical offering to the energy industries"
+            },
+            {
+              "index": 2,
+              "grounded": true,
+              "sentence": "Selskapet skal inn i Aqualis-enheten Longitude, som jobber med design- og ingeniørrådgivning.",
+              "interpretation": "Dekket: SynergenOG skal integreres med konsernets design- og ingeniørrådgivning Longitude.",
+              "sourceEvidence": "SynergenOG will be integrated with the group’s design and engineering consultancy, Longitude."
+            },
+            {
+              "index": 3,
+              "grounded": true,
+              "sentence": "Aqualis skriver at kjøpet skal styrke Longitude på tvers av forretningsområdene.",
+              "interpretation": "Dekket som gjengivelse av at dette skal styrke Longitudes ingeniørtilbud på tvers av alle forretningslinjer.",
+              "sourceEvidence": "This will strengthen Longitude’s engineering offering across all business lines"
+            },
+            {
+              "index": 4,
+              "grounded": true,
+              "sentence": "Aqualis leverer rådgivning innen energi, maritim sektor, ingeniørtjenester og digitale løsninger.",
+              "interpretation": "Dekket av selskapsbeskrivelsen i referansen.",
+              "sourceEvidence": "Aqualis ... is a leading independent global consultancy delivering energy, marine, engineering and digital solutions"
+            }
+          ],
+          "correctionApplied": true,
+          "correctionAttempts": 1,
+          "importanceAdjusted": false,
+          "attributionRiskCount": 0,
+          "finalCoveragePercent": 80,
+          "unsupportedSentences": [
+            {
+              "index": 1,
+              "sentence": "SynergenOG gir råd om sikkerhet og teknisk risiko i energiprosjekter.",
+              "interpretation": "Referansen omtaler SynergenOG som et konsulentselskap med kapasitet innen process safety og technical risk management for energibransjen, men sier ikke eksplisitt at dette gjelder energiprosjekter.",
+              "sourceEvidence": "adding specialist capability in process safety and technical risk management and enhancing the group’s technical offering to the energy industries"
+            }
+          ],
+          "importanceAdjustReason": null,
+          "initialCoveragePercent": 80,
+          "unsupportedSentenceCount": 1,
+          "attributionCorrectionApplied": false,
+          "highRiskUnsupportedSentenceCount": 0
+        },
+        "editorialReview": null,
+        "sourceBodyChars": 1446,
+        "validationRepair": {
+          "error": null,
+          "applied": false,
+          "issueCodes": [],
+          "finalWarnings": [],
+          "initialWarnings": []
+        },
+        "styleSanitization": {
+          "changed": false,
+          "removedAsaSuffix": 0,
+          "expandedMarketCodes": 0,
+          "replacedPercentSigns": 0,
+          "removedRegisteredMarks": 0,
+          "normalizedBillionPhrases": 0,
+          "replacedFiscalYearAbbrev": 0,
+          "normalizedAccountingAcronyms": 0,
+          "normalizedExactBillionAmounts": 0
+        },
+        "revisionInstructionCompliance": null
+      },
+      "labels": {
+        "class": "checker_error_published",
+        "reportRef": "final report 2026-06-02_2026-08-13"
+      },
+      "expected": {},
+      "provenance": {
+        "window": {
+          "from": "2026-06-02",
+          "to": "2026-08-13"
+        },
+        "status": "published"
+      }
+    },
+    {
+      "messageId": 679311,
+      "generationRunId": "cmsn0l2k400hnsb1st3dk9zf6",
+      "promptVersion": "v5.9.1",
+      "sourcePayload": {
+        "messageId": 679311,
+        "title": "HX Hold Co Ltd – Additional Information in Connection with Summons for Written Resolution",
+        "issuerName": "HX Hold Co Ltd.",
+        "issuerSign": "HXHC",
+        "publishedAt": "2026-08-10T09:13:39.945Z",
+        "categories": [
+          "IKKE-INFORMASJONSPLIKTIGE PRESSEMELDINGER"
+        ],
+        "markets": [
+          "XOSL"
+        ],
+        "bodyText": "London, 10 August 2026 – Reference is made to the summons for a written resolution dated 29 July 2026 (the “Summons”) issued to bondholders of HX Hold Co Ltd (the “Company”) in respect of its 7.00% senior secured EUR 257,575,758 bonds 2025/2030 (ISIN NO0010874548).\n\nIn order to assist holders in making a decision in respect of the Summons, the Company has provided additional information to certain bondholders in connection with the operational performance of the business. In order to ensure parity of information among all holders, that information is set out below.\n\nTrading Outlook and Upward Trend\n\nAs described in the Summons, the Company’s group experienced a period of liquidity pressure following operational disruption associated with its transition from Hurtigruten’s legacy booking system to an independent booking system on a compressed timetable. This transition resulted in a delayed launch of the 2027/28 season by approximately 3 months and a manual migration of over 9,000 bookings lasting approximately 4½ months.\n\nThe Company considers that it has now substantially overcome the operational headwinds experienced in 2025 and early 2026 and that meaningful progress is being made towards profitability. Key trading statistics are summarised below.\n\n2026 Performance:\n\n• The Company is currently 99% booked against its downgraded 2026 forecast revenue, with pre-sold revenue tracking c. 23% up vs. prior year comparative and approaching c. EUR 50 million year-on-year growth. The Company notes that substantially all 2026 revenue was booked during the period of operational disruption associated with the split and transformation programme.\n\n2027 Outlook and Path to EBITDA Breakeven:\n\n• The Company estimates that c. 8% pre-sold revenue growth in 2027 (relative to 2026 forecast) is required to achieve EBITDA breakeven. While 2027 bookings initially lagged 2026 comparables due to the delayed season launch and system migration, the trajectory has improved materially following completion of the migration:\n\n  o 31 October 2025: 2027 bookings down 25% vs. 2026 (reflecting delayed 27/28 season launch);\n  o 31 December 2025: 2027 bookings down 5% vs. 2026;\n  o 31 March 2026: 2027 bookings down 3% vs. 2026 (migration disruption ongoing);\n  o 31 May 2026: 2027 bookings up 3% vs. 2026 (post-transformation acceleration); and\n  o 31 July 2026: 2027 bookings up 6% vs. 2026.\n\n• Based on the above trajectory, the Company considers the 8% growth target required for EBITDA breakeven in 2027 to be achievable.\n\n2028 and Beyond:\n\n• The Company’s business has high operating leverage: assuming 8% revenue growth in 2027 to reach breakeven, the Company estimates that c. 25% revenue growth in 2028 relative to 2027 would be required to achieve EUR 50 million EBITDA. The Company estimates it would require c. EUR 25 million EBITDA in 2028 to become cash flow positive after capex and interest payments under the SSSNs (as defined in the Term Sheet).\n\n• Early indicators for 2028 are positive: as at 31 July 2026, the Company has booked EUR 23 million of revenue for Q1 2028, compared with EUR 9 million booked at the equivalent point last year for Q1 2027, representing an increase of 157%.\n\n• With the 28/29 season set to launch in September 2026, approximately 3 months ahead of the equivalent delayed 27/28 season launch and anticipates further support from product enhancements (including new 7-night Alaska and Greenland itineraries), digital and marketing initiatives, and sales conversion improvements the Company is further looking to strengthen its 2028 bookings momentum.\n\nFurther details of the Proposed Funding Transaction (as defined in the Summons) can be found in the Term Sheet annexed to the Summons.\n\nThe implementation of the Proposed Funding Transaction remains subject to the approvals of the requisite majorities of the Company’s creditors under its existing debt instruments and the satisfaction or waiver of certain conditions precedent as specified in the Term Sheet.\n\nENDS",
+        "hasAttachments": false,
+        "sourceBodyChars": 4014
+      },
+      "storedOutput": {
+        "title": "HX-bookinger tar seg opp",
+        "lead": "HX Hold Co sier bookingene for 2027 nå ligger seks prosent over 2026-nivået, etter at nytt bookingsystem tidligere forsinket salget. Opplysningene kommer i en børsmelding til obligasjonseiere før de skal ta stilling til en finansieringsplan.",
+        "body": [
+          "Selskapet anslår at forhåndssalget må øke rundt åtte prosent i 2027 for at driftsresultatet før renter, skatt, av- og nedskrivninger skal gå i null.",
+          "For 2026 er selskapet 99 prosent booket mot en nedjustert inntektsprognose. Forhåndssolgte inntekter ligger rundt 23 prosent over samme periode i fjor.",
+          "HX opplyser også at første kvartal 2028 har 23 millioner euro i bookede inntekter, mot ni millioner euro på samme tidspunkt i fjor for første kvartal 2027.",
+          "Finansieringsplanen krever fortsatt godkjenning fra nødvendige flertall av selskapets kreditorer."
+        ],
+        "company_sentence": "HX Hold Co har et senior sikret obligasjonslån på 257.575.758 euro med forfall i 2030.",
+        "key_facts": [
+          "2027-bookinger er opp seks prosent mot 2026 per 31. juli 2026",
+          "Selskapet trenger rundt åtte prosent forhåndssalgsvekst i 2027 for å gå i null på ebitda",
+          "2026 er 99 prosent booket mot nedjustert inntektsprognose",
+          "Finansieringsplanen krever fortsatt kreditorgodkjenning"
+        ],
+        "negative_or_surprising": [
+          "Tidligere overgang til nytt bookingsystem forsinket salget og ga likviditetspress"
+        ],
+        "excluded_hype": [],
+        "source_limitations": [],
+        "confidence": "high",
+        "importance": "medium",
+        "source_spans": [
+          "primary: 2027 bookings up 6% vs. 2026",
+          "primary: c. 8% pre-sold revenue growth in 2027 ... required to achieve EBITDA breakeven",
+          "primary: currently 99% booked against its downgraded 2026 forecast revenue",
+          "primary: pre-sold revenue tracking c. 23% up vs. prior year comparative",
+          "primary: booked EUR 23 million of revenue for Q1 2028, compared with EUR 9 million",
+          "primary: remains subject to the approvals of the requisite majorities of the Company’s creditors",
+          "primary: 7.00% senior secured EUR 257,575,758 bonds 2025/2030"
+        ]
+      },
+      "storedValidation": {
+        "valid": true,
+        "errors": [],
+        "issues": [],
+        "warnings": [],
+        "errorCode": null,
+        "hiddenDraft": {
+          "body": [
+            "Selskapet anslår at forhåndssalget må øke rundt åtte prosent i 2027 for at driftsresultatet før renter, skatt, av- og nedskrivninger skal gå i null.",
+            "For 2026 er selskapet 99 prosent booket mot en nedjustert inntektsprognose. Forhåndssolgte inntekter ligger rundt 23 prosent over samme periode i fjor.",
+            "HX opplyser også at første kvartal 2028 har 23 millioner euro i bookede inntekter, mot ni millioner euro på samme tidspunkt i fjor for første kvartal 2027.",
+            "Finansieringsplanen krever fortsatt godkjenning fra nødvendige flertall av selskapets kreditorer."
+          ],
+          "lead": "HX Hold Co sier bookingene for 2027 nå ligger seks prosent over 2026-nivået, etter at nytt bookingsystem tidligere forsinket salget. Opplysningene kommer i en børsmelding til obligasjonseiere før de skal ta stilling til en finansieringsplan.",
+          "title": "HX-bookinger tar seg opp",
+          "company_sentence": "HX Hold Co har obligasjoner notert på Oslo Børs."
+        },
+        "promptChars": 99196,
+        "blockingErrors": [],
+        "quoteTelemetry": {
+          "draftContainsInlineGuillemets": false,
+          "draftContainsStandaloneDashQuote": false,
+          "draftContainsNamedPersonAttribution": false,
+          "draftSourceSpansMentionQuoteSpeaker": false,
+          "sourceContainsNamedQuoteLikePattern": false
+        },
+        "referenceCheck": {
+          "enabled": true,
+          "blocking": false,
+          "checkerError": "OpenAI request failed for reference_check_result: Request was aborted. | model=gpt-5.5 reasoning=medium serviceTier=default timeoutMs=240000 maxOutputTokens=16384 promptChars=6462",
+          "finalCoverage": {
+            "totalSentences": 8,
+            "coveragePercent": 88,
+            "sentenceReviews": [
+              {
+                "index": 0,
+                "grounded": true,
+                "sentence": "HX Hold Co sier bookingene for 2027 nå ligger seks prosent over 2026-nivået, etter at nytt bookingsystem tidligere forsinket salget.",
+                "interpretation": "Dekket: Referansen oppgir at 2027-bookinger per 31. juli 2026 er opp 6 % mot 2026, og at tidligere forsinkelse skyldtes systemmigrering og forsinket sesonglansering.",
+                "sourceEvidence": "“31 July 2026: 2027 bookings up 6% vs. 2026”; “delayed season launch and system migration”"
+              },
+              {
+                "index": 1,
+                "grounded": true,
+                "sentence": "Opplysningene kommer i en børsmelding til obligasjonseiere før de skal ta stilling til en finansieringsplan.",
+                "interpretation": "Dekket: Referansen sier informasjonen gis til obligasjonseiere for å hjelpe dem å ta beslutning om innkallingen, og omtaler den foreslåtte finansieringstransaksjonen. Børsmelding regnes som kildeattribusjon.",
+                "sourceEvidence": "“In order to assist holders in making a decision in respect of the Summons”; “Further details of the Proposed Funding Transaction”"
+              },
+              {
+                "index": 2,
+                "grounded": true,
+                "sentence": "Selskapet anslår at forhåndssalget må øke rundt åtte prosent i 2027 for at driftsresultatet før renter, skatt, av- og nedskrivninger skal gå i null.",
+                "interpretation": "Dekket: Referansen sier eksplisitt at selskapet anslår ca. 8 % vekst i forhåndssolgte inntekter i 2027 for å nå EBITDA break-even.",
+                "sourceEvidence": "“The Company estimates that c. 8% pre-sold revenue growth in 2027 ... is required to achieve EBITDA breakeven.”"
+              },
+              {
+                "index": 3,
+                "grounded": true,
+                "sentence": "For 2026 er selskapet 99 prosent booket mot en nedjustert inntektsprognose.",
+                "interpretation": "Dekket direkte av referansen.",
+                "sourceEvidence": "“The Company is currently 99% booked against its downgraded 2026 forecast revenue”"
+              },
+              {
+                "index": 4,
+                "grounded": true,
+                "sentence": "Forhåndssolgte inntekter ligger rundt 23 prosent over samme periode i fjor.",
+                "interpretation": "Dekket direkte av referansen.",
+                "sourceEvidence": "“pre-sold revenue tracking c. 23% up vs. prior year comparative”"
+              },
+              {
+                "index": 5,
+                "grounded": true,
+                "sentence": "HX opplyser også at første kvartal 2028 har 23 millioner euro i bookede inntekter, mot ni millioner euro på samme tidspunkt i fjor for første kvartal 2027.",
+                "interpretation": "Dekket direkte av referansen.",
+                "sourceEvidence": "“as at 31 July 2026, the Company has booked EUR 23 million of revenue for Q1 2028, compared with EUR 9 million booked at the equivalent point last year for Q1 2027”"
+              },
+              {
+                "index": 6,
+                "grounded": true,
+                "sentence": "Finansieringsplanen krever fortsatt godkjenning fra nødvendige flertall av selskapets kreditorer.",
+                "interpretation": "Dekket: Referansen sier at gjennomføringen av den foreslåtte finansieringstransaksjonen er betinget av godkjenning fra nødvendige flertall av kreditorer.",
+                "sourceEvidence": "“The implementation of the Proposed Funding Transaction remains subject to the approvals of the requisite majorities of the Company’s creditors”"
+              },
+              {
+                "index": 7,
+                "grounded": false,
+                "sentence": "HX Hold Co har obligasjoner notert på Oslo Børs.",
+                "interpretation": "Ikke dekket: Referansen oppgir obligasjoner og ISIN, men sier ikke at obligasjonene er notert på Oslo Børs.",
+                "sourceEvidence": ""
+              }
+            ],
+            "groundedSentences": 7,
+            "unsupportedSentences": [
+              {
+                "index": 7,
+                "sentence": "HX Hold Co har obligasjoner notert på Oslo Børs.",
+                "interpretation": "Ikke dekket: Referansen oppgir obligasjoner og ISIN, men sier ikke at obligasjonene er notert på Oslo Børs.",
+                "sourceEvidence": ""
+              }
+            ],
+            "visibleArticleSentenceCount": 7
+          },
+          "repairHistory": [
+            {
+              "blocking": false,
+              "checkNumber": 1,
+              "blockingReason": null,
+              "coveragePercent": 88,
+              "correctionAttempt": 0,
+              "unsupportedSentences": [
+                {
+                  "index": 7,
+                  "sentence": "HX Hold Co har obligasjoner notert på Oslo Børs.",
+                  "interpretation": "Ikke dekket: Referansen oppgir obligasjoner og ISIN, men sier ikke at obligasjonene er notert på Oslo Børs."
+                }
+              ],
+              "unsupportedSentenceCount": 1,
+              "highRiskUnsupportedSentenceCount": 0
+            }
+          ],
+          "blockingReason": null,
+          "totalSentences": 8,
+          "initialCoverage": {
+            "totalSentences": 8,
+            "coveragePercent": 88,
+            "sentenceReviews": [
+              {
+                "index": 0,
+                "grounded": true,
+                "sentence": "HX Hold Co sier bookingene for 2027 nå ligger seks prosent over 2026-nivået, etter at nytt bookingsystem tidligere forsinket salget.",
+                "interpretation": "Dekket: Referansen oppgir at 2027-bookinger per 31. juli 2026 er opp 6 % mot 2026, og at tidligere forsinkelse skyldtes systemmigrering og forsinket sesonglansering.",
+                "sourceEvidence": "“31 July 2026: 2027 bookings up 6% vs. 2026”; “delayed season launch and system migration”"
+              },
+              {
+                "index": 1,
+                "grounded": true,
+                "sentence": "Opplysningene kommer i en børsmelding til obligasjonseiere før de skal ta stilling til en finansieringsplan.",
+                "interpretation": "Dekket: Referansen sier informasjonen gis til obligasjonseiere for å hjelpe dem å ta beslutning om innkallingen, og omtaler den foreslåtte finansieringstransaksjonen. Børsmelding regnes som kildeattribusjon.",
+                "sourceEvidence": "“In order to assist holders in making a decision in respect of the Summons”; “Further details of the Proposed Funding Transaction”"
+              },
+              {
+                "index": 2,
+                "grounded": true,
+                "sentence": "Selskapet anslår at forhåndssalget må øke rundt åtte prosent i 2027 for at driftsresultatet før renter, skatt, av- og nedskrivninger skal gå i null.",
+                "interpretation": "Dekket: Referansen sier eksplisitt at selskapet anslår ca. 8 % vekst i forhåndssolgte inntekter i 2027 for å nå EBITDA break-even.",
+                "sourceEvidence": "“The Company estimates that c. 8% pre-sold revenue growth in 2027 ... is required to achieve EBITDA breakeven.”"
+              },
+              {
+                "index": 3,
+                "grounded": true,
+                "sentence": "For 2026 er selskapet 99 prosent booket mot en nedjustert inntektsprognose.",
+                "interpretation": "Dekket direkte av referansen.",
+                "sourceEvidence": "“The Company is currently 99% booked against its downgraded 2026 forecast revenue”"
+              },
+              {
+                "index": 4,
+                "grounded": true,
+                "sentence": "Forhåndssolgte inntekter ligger rundt 23 prosent over samme periode i fjor.",
+                "interpretation": "Dekket direkte av referansen.",
+                "sourceEvidence": "“pre-sold revenue tracking c. 23% up vs. prior year comparative”"
+              },
+              {
+                "index": 5,
+                "grounded": true,
+                "sentence": "HX opplyser også at første kvartal 2028 har 23 millioner euro i bookede inntekter, mot ni millioner euro på samme tidspunkt i fjor for første kvartal 2027.",
+                "interpretation": "Dekket direkte av referansen.",
+                "sourceEvidence": "“as at 31 July 2026, the Company has booked EUR 23 million of revenue for Q1 2028, compared with EUR 9 million booked at the equivalent point last year for Q1 2027”"
+              },
+              {
+                "index": 6,
+                "grounded": true,
+                "sentence": "Finansieringsplanen krever fortsatt godkjenning fra nødvendige flertall av selskapets kreditorer.",
+                "interpretation": "Dekket: Referansen sier at gjennomføringen av den foreslåtte finansieringstransaksjonen er betinget av godkjenning fra nødvendige flertall av kreditorer.",
+                "sourceEvidence": "“The implementation of the Proposed Funding Transaction remains subject to the approvals of the requisite majorities of the Company’s creditors”"
+              },
+              {
+                "index": 7,
+                "grounded": false,
+                "sentence": "HX Hold Co har obligasjoner notert på Oslo Børs.",
+                "interpretation": "Ikke dekket: Referansen oppgir obligasjoner og ISIN, men sier ikke at obligasjonene er notert på Oslo Børs.",
+                "sourceEvidence": ""
+              }
+            ],
+            "groundedSentences": 7,
+            "unsupportedSentences": [
+              {
+                "index": 7,
+                "sentence": "HX Hold Co har obligasjoner notert på Oslo Børs.",
+                "interpretation": "Ikke dekket: Referansen oppgir obligasjoner og ISIN, men sier ikke at obligasjonene er notert på Oslo Børs.",
+                "sourceEvidence": ""
+              }
+            ],
+            "visibleArticleSentenceCount": 7
+          },
+          "sentenceReviews": [
+            {
+              "index": 0,
+              "grounded": true,
+              "sentence": "HX Hold Co sier bookingene for 2027 nå ligger seks prosent over 2026-nivået, etter at nytt bookingsystem tidligere forsinket salget.",
+              "interpretation": "Dekket: Referansen oppgir at 2027-bookinger per 31. juli 2026 er opp 6 % mot 2026, og at tidligere forsinkelse skyldtes systemmigrering og forsinket sesonglansering.",
+              "sourceEvidence": "“31 July 2026: 2027 bookings up 6% vs. 2026”; “delayed season launch and system migration”"
+            },
+            {
+              "index": 1,
+              "grounded": true,
+              "sentence": "Opplysningene kommer i en børsmelding til obligasjonseiere før de skal ta stilling til en finansieringsplan.",
+              "interpretation": "Dekket: Referansen sier informasjonen gis til obligasjonseiere for å hjelpe dem å ta beslutning om innkallingen, og omtaler den foreslåtte finansieringstransaksjonen. Børsmelding regnes som kildeattribusjon.",
+              "sourceEvidence": "“In order to assist holders in making a decision in respect of the Summons”; “Further details of the Proposed Funding Transaction”"
+            },
+            {
+              "index": 2,
+              "grounded": true,
+              "sentence": "Selskapet anslår at forhåndssalget må øke rundt åtte prosent i 2027 for at driftsresultatet før renter, skatt, av- og nedskrivninger skal gå i null.",
+              "interpretation": "Dekket: Referansen sier eksplisitt at selskapet anslår ca. 8 % vekst i forhåndssolgte inntekter i 2027 for å nå EBITDA break-even.",
+              "sourceEvidence": "“The Company estimates that c. 8% pre-sold revenue growth in 2027 ... is required to achieve EBITDA breakeven.”"
+            },
+            {
+              "index": 3,
+              "grounded": true,
+              "sentence": "For 2026 er selskapet 99 prosent booket mot en nedjustert inntektsprognose.",
+              "interpretation": "Dekket direkte av referansen.",
+              "sourceEvidence": "“The Company is currently 99% booked against its downgraded 2026 forecast revenue”"
+            },
+            {
+              "index": 4,
+              "grounded": true,
+              "sentence": "Forhåndssolgte inntekter ligger rundt 23 prosent over samme periode i fjor.",
+              "interpretation": "Dekket direkte av referansen.",
+              "sourceEvidence": "“pre-sold revenue tracking c. 23% up vs. prior year comparative”"
+            },
+            {
+              "index": 5,
+              "grounded": true,
+              "sentence": "HX opplyser også at første kvartal 2028 har 23 millioner euro i bookede inntekter, mot ni millioner euro på samme tidspunkt i fjor for første kvartal 2027.",
+              "interpretation": "Dekket direkte av referansen.",
+              "sourceEvidence": "“as at 31 July 2026, the Company has booked EUR 23 million of revenue for Q1 2028, compared with EUR 9 million booked at the equivalent point last year for Q1 2027”"
+            },
+            {
+              "index": 6,
+              "grounded": true,
+              "sentence": "Finansieringsplanen krever fortsatt godkjenning fra nødvendige flertall av selskapets kreditorer.",
+              "interpretation": "Dekket: Referansen sier at gjennomføringen av den foreslåtte finansieringstransaksjonen er betinget av godkjenning fra nødvendige flertall av kreditorer.",
+              "sourceEvidence": "“The implementation of the Proposed Funding Transaction remains subject to the approvals of the requisite majorities of the Company’s creditors”"
+            },
+            {
+              "index": 7,
+              "grounded": false,
+              "sentence": "HX Hold Co har obligasjoner notert på Oslo Børs.",
+              "interpretation": "Ikke dekket: Referansen oppgir obligasjoner og ISIN, men sier ikke at obligasjonene er notert på Oslo Børs.",
+              "sourceEvidence": ""
+            }
+          ],
+          "correctionApplied": true,
+          "correctionAttempts": 1,
+          "importanceAdjusted": false,
+          "attributionRiskCount": 0,
+          "finalCoveragePercent": 88,
+          "unsupportedSentences": [
+            {
+              "index": 7,
+              "sentence": "HX Hold Co har obligasjoner notert på Oslo Børs.",
+              "interpretation": "Ikke dekket: Referansen oppgir obligasjoner og ISIN, men sier ikke at obligasjonene er notert på Oslo Børs.",
+              "sourceEvidence": ""
+            }
+          ],
+          "importanceAdjustReason": null,
+          "initialCoveragePercent": 88,
+          "unsupportedSentenceCount": 1,
+          "attributionCorrectionApplied": false,
+          "highRiskUnsupportedSentenceCount": 0
+        },
+        "editorialReview": null,
+        "sourceBodyChars": 4014,
+        "validationRepair": {
+          "error": null,
+          "applied": false,
+          "issueCodes": [],
+          "finalWarnings": [],
+          "initialWarnings": []
+        },
+        "styleSanitization": {
+          "changed": false,
+          "removedAsaSuffix": 0,
+          "expandedMarketCodes": 0,
+          "replacedPercentSigns": 0,
+          "removedRegisteredMarks": 0,
+          "normalizedBillionPhrases": 0,
+          "replacedFiscalYearAbbrev": 0,
+          "normalizedAccountingAcronyms": 0,
+          "normalizedExactBillionAmounts": 0
+        },
+        "revisionInstructionCompliance": null
+      },
+      "labels": {
+        "class": "checker_error_published",
+        "reportRef": "final report 2026-06-02_2026-08-13"
+      },
+      "expected": {},
+      "provenance": {
+        "window": {
+          "from": "2026-06-02",
+          "to": "2026-08-13"
+        },
+        "status": "published"
+      }
+    }
+  ]
+}

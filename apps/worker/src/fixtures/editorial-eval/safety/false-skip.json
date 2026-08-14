@@ -1,0 +1,814 @@
+{
+  "schemaVersion": 1,
+  "class": "false_skip",
+  "createdAt": "2026-08-14T07:37:58.256Z",
+  "source": {
+    "db": "render-prod",
+    "query": "generation_runs/source_notices/feedback 2026-06-02..2026-08-13",
+    "gitHead": "059bf86a0f795b807ad7d2cde4d3cb22c0c0c3dd"
+  },
+  "cases": [
+    {
+      "messageId": 675220,
+      "generationRunId": "cmpwtq9t301pomy1qhzbkx1oe",
+      "promptVersion": "v5.7.0",
+      "sourcePayload": {
+        "messageId": 675220,
+        "title": "Norse Atlantic ASA: IndiGo ACMI operations - redelivery of one aircraft",
+        "issuerName": "Norse Atlantic ASA",
+        "issuerSign": "NORSE",
+        "publishedAt": "2026-06-02T16:00:16.784Z",
+        "categories": [
+          "ANNEN INFORMASJONSPLIKTIG REGULATORISK INFORMASJON"
+        ],
+        "markets": [
+          "XOAX"
+        ],
+        "bodyText": "Arendal, Norway, 2 June 2026 -- Norse Atlantic ASA (\"Norse Atlantic\" or the\n\"Company\") was notified by Interglobe Aviation Limited (\"IndiGo\") of the\nredelivery of one out of six aircraft operated on ACMI charter due to the\nclosure of a UK route.  The aircraft will be redelivered to Norse Atlantic 31\nAugust 2026. IndiGo will continue to operate all its remaining aircraft leased\nfrom Norse Atlantic as planned.\n\nFollowing redelivery, the aircraft will be deployed by Norse Atlantic in its\nupcoming winter program for direct flights between Europe and Thailand.\n\n\"With the additional aircraft, we look forward to deploying extra capacity on\nour successful and profitable Thailand routes. We also continue to strengthen\nour strong partnership with IndiGo and have jointly initiated a strategic\ncollaboration project to assess new and deeper cooperation\", says Eivind Roald,\nCEO of Norse Atlantic.\n\nAbhijit Dasgupta, Senior Vice President - Network Planning & Revenue Management,\nIndiGo, says, \"We inducted these leased wide-body aircraft to fast-track our\nconnectivity to high potential long-haul destinations such as Manchester and\nwitnessed very encouraging demand response. It is, therefore, unfortunate that\nlonger flying times due to airspace constraints combined with dramatically\nescalating costs compelled us to take the decision to discontinue India -\nManchester services. The response and support for these services have reinforced\nour belief in the opportunity for IndiGo's long-haul ambitions, and we are\nconvinced that this discontinuation is temporary. We look forward to serving\nthis route again at the earliest viable opportunity and are exploring innovative\nsolutions to continuing our collaboration with Norse Atlantic Airways.\"\n\nNorse Atlantic commenced ACMI operations for IndiGo in March 2025, with a total\nof six Boeing 787-9 aircraft progressively deployed through early 2026.\n\nContacts\n\nInvestors: CFO, Anders Hall Jomaas, anders.jomaas@flynorse.com\nMedia: Bård Nordhagen, CCCO, baard.nordhagen@flynorse.com\n\nAbout Norse Atlantic ASA\n\nNorse Atlantic Airways is an airline committed to offering affordable fares on\ndirect, long-haul flights to popular destinations, along with specialized\ncharter and ACMI services for tailored travel needs and extensive cargo\noperations. Norse Atlantic operates a modern fleet of 12 fuel-efficient Boeing\n787 Dreamliners, serving a network of destinations across North America, Europe,\nAfrica and Asia.\n\nThis information is considered to be inside information pursuant to the EU\nMarket Abuse Regulation (MAR) and is subject to the disclosure requirements\npursuant to MAR article 17 and section 5-12 of the Norwegian Securities Trading\nAct. This stock exchange announcement was published by Bård Nordhagen on the\ntime and date provided.\n\n\n",
+        "hasAttachments": false,
+        "sourceBodyChars": 2795
+      },
+      "storedOutput": null,
+      "storedValidation": {
+        "valid": true,
+        "errors": [],
+        "errorCode": null,
+        "promptChars": 3024,
+        "triageResult": {
+          "reason": "Dette er primært en operasjonell/administrativ melding om at ett fly i en leasing-/ACMI-avtale skal redeliveres, uten opplysninger om vesentlig ny kontrakt, finansiering eller resultatpåvirkning. Innholdet er rutinemessig og ikke klart nyhetsverdig i seg selv.",
+          "newsworthy": false
+        },
+        "sourceBodyChars": 2795
+      },
+      "labels": {
+        "class": "false_skip",
+        "reportRef": "final report 2026-06-02_2026-08-13"
+      },
+      "expected": {
+        "triage": {
+          "deterministicSkipKind": null
+        }
+      },
+      "provenance": {
+        "window": {
+          "from": "2026-06-02",
+          "to": "2026-08-13"
+        },
+        "status": "skipped"
+      }
+    },
+    {
+      "messageId": 675252,
+      "generationRunId": "cmpxoacif0774pr1rrjgmgn7j",
+      "promptVersion": "v5.7.1",
+      "sourcePayload": {
+        "messageId": 675252,
+        "title": "Secondary placement of existing shares in SED Energy Holdings Plc successfully completed and major shareholding notification",
+        "issuerName": "SED Energy Holdings Plc",
+        "issuerSign": "ENH",
+        "publishedAt": "2026-06-03T06:15:42.831Z",
+        "categories": [
+          "FLAGGING"
+        ],
+        "markets": [
+          "XOSL"
+        ],
+        "bodyText": "NOT FOR RELEASE, PUBLICATION OR DISTRIBUTION, IN WHOLE OR IN PART, DIRECTLY OR INDIRECTLY, IN OR INTO THE UNITED STATES, AUSTRALIA, CANADA, HONG KONG, JAPAN OR ANY JURISDICTION IN WHICH SUCH RELEASE, PUBLICATION OR DISTRIBUTION WOULD BE UNLAWFUL. \n\nTHIS ANNOUNCEMENT IS NOT AN OFFER OF SECURITIES AND THE SECURITIES REFERRED TO HEREIN MAY NOT BE OFFERED OR SOLD IN THE UNITED STATES ABSENT REGISTRATION EXCEPT PURSUANT TO AN EXEMPTION FROM, OR IN A TRANSACTION NOT SUBJECT TO, THE REGISTRATION REQUIREMENTS OF THE U.S. SECURITIES ACT; ANY PUBLIC OFFERING OF SUCH SECURITIES TO BE MADE IN THE UNITED STATES WILL BE MADE BY MEANS OF A PROSPECTUS THAT MAY BE OBTAINED FROM THE COMPANY, WHICH WOULD CONTAIN DETAILED INFORMATION ABOUT THE COMPANY AND MANAGEMENT, AS WELL AS FINANCIAL STATEMENTS. THERE WILL BE NO PUBLIC OFFERING OF THE SECURITIES IN THE UNITED STATES. \n\nOslo, 3 June 2026 \n\nReference is made to the stock exchange notice published on 2 June 2026 regarding a potential secondary placement of existing ordinary shares (Class A-shares) (the “Shares”) in SED Energy Holdings Plc (“Energy Holdings” or the “Company”) by HV VI Invest Uraz Limited (“HitecVision”, the “Seller”).\n\nThe Seller has successfully sold 130 million Shares in the Company (the “Sale Shares\"), representing approximately 21.0% of the Shares and votes outstanding in the Company and approximately 17.9% of the total issued and outstanding share capital, at NOK 8.00 per Sale Share for a total transaction size of NOK 1,040 million (the “Offering”). \n\nThe Offering attracted strong investor demand, and on this basis, the Offering was upsized from approximately 100 million Shares to 130 million Shares, providing a full exit for HitecVision in the Company.\n\nFollowing completion of the Offering, HitecVision will no longer hold any Shares or voting rights in the Company. The Offering is unconditional as of the time of allocation, and the Sale Shares will be tradeable upon allocation as from 3 June 2026. Settlement will take place on a delivery versus payment basis on 5 June 2026.\n\nHitecVision is represented on the board of the directors of the Company by Alf C. Thorkildsen.\n\nThe PDMR notification will be published separately in due course. \n\nABG Sundal Collier ASA, SB1 Markets AS and Skandinaviska Enskilda Banken AB (publ) (the “Managers”) acted as Joint Global Coordinators and Joint Bookrunners in connection with the Offering. Advokatfirmaet BAHR AS acted as legal counsel to HitecVision in connection with the Offering.\n\nThe Offering has not been registered under the U.S. Securities Act of 1933, as amended (the “U.S. Securities Act”) and will be made pursuant to applicable exemptions from the obligation to publish a prospectus in Norway as well as exemptions from the U.S. Securities Act and the securities laws of other applicable jurisdictions.\n\nThis information is subject to disclosure requirements pursuant to Section 4-2 of the Norwegian Securities Trading Act.\n\nImportant Notices \n\nThis announcement is not and does not form a part of a prospectus or any offer to sell, or a solicitation of an offer to purchase, any securities of the Company. \n\nThe distribution of this announcement and other information may be restricted by law in the United States of America or in certain jurisdictions. Copies of this announcement are not being made and may not be distributed or sent into any jurisdiction in which such distribution would be unlawful or would require registration or other measures. Accordingly, this announcement is not for public release, publication or distribution, directly or indirectly, in or into the United States (including its territories and possessions, any state of the United States and the District of Columbia), except to “qualified institutional buyers” as defined in Rule 144A under the U.S. Securities Act of 1933, as amended (the “U.S. Securities Act”). Persons into whose possession this announcement or such other information should come are required to inform themselves about and to observe any such restrictions. \n\nThe securities referred to in this announcement have not been and will not be registered under the U.S. Securities Act, and accordingly may not be offered or sold in the United States absent registration or an applicable exemption from the registration requirements of the U.S. Securities Act and in accordance with applicable U.S. state securities laws. The Company does not intend to register any part of the Offering or its securities in the United States or to conduct a public offering of securities in the United States. \n\nIn any EEA Member State, this communication is only addressed to and is only directed at qualified investors in that Member State within the meaning of the Prospectus Regulation, i.e., only to investors who can receive the offer without an approved prospectus in such EEA Member State. The expression “Prospectus Regulation” means Regulation (EU) 2017/1129, as amended, together with any applicable implementing measures in any Member State. \n\nThis communication is only being distributed to and is only directed at persons in the United Kingdom who are \"qualified investors\" as defined in paragraph 15 of Schedule 1 to the Public Offers and Admission to Trading Regulations 2024, and who are (i) persons having professional experience in matters relating to investments who fall within the definition of  \"investment professionals\" in Article 19(5) of the Financial Services and Markets Act 2000 (Financial Promotion) Order 2005, as amended (the \"Order\") or (ii) high net worth entities  falling within Article 49(2)(a) to (d) of the Order; or (iii) are  other persons to whom it may otherwise  lawfully be communicated  (all such persons together being referred to as \"relevant persons\"). This communication must not be acted on or relied on by persons who are not relevant persons. Any investment or investment activity to which this communication relates is available only for relevant persons and will be engaged in only with relevant persons. Persons distributing this communication must satisfy themselves that it is lawful to do so.\n\nMatters discussed in this announcement may constitute forward-looking statements. Forward-looking statements are statements that are not historical facts and may be identified by words such as “believe”, “expect”, “anticipate”, “strategy”, “intends”, “estimate”, “will”, “may”, “continue”, “should” and similar expressions. The forward-looking statements in this release are based upon various assumptions, many of which are based, in turn, upon further assumptions. Although the Seller believes that these assumptions were reasonable when made, these assumptions are inherently subject to significant known and unknown risks, uncertainties, contingencies and other important factors which are difficult or impossible to predict and are beyond their control. By their nature, forward-looking statements are subject to numerous factors, risks and uncertainties that could cause actual outcomes and results to be materially different from those projected. Readers are cautioned not to place undue reliance on these forward-looking statements. \n\nExcept for any ongoing obligation to disclose material information as required by the applicable law, the Seller does not have any intention or obligation to publicly update or revise any forward-looking statements after distribution of this announcement, whether to reflect any future events or circumstances or otherwise. \n\nNone of the Seller, the Managers or any of their respective subsidiary undertakings, affiliates or any of their respective directors, officers, employees, advisers, agents or any other person accepts any responsibility whatsoever for, or makes any representation or warranty, express or implied, as to the truth, accuracy, completeness or fairness of the information or opinions in this announcement (or whether any information has been omitted from the announcement) or any other information relating to the Company, the Seller, or associated companies, whether written, oral or in a visual or electronic form, and howsoever transmitted or made available or for any loss howsoever arising from any use of this announcement or its contents or otherwise arising in connection therewith. \n\nEach of the Managers is acting for the Seller only in connection with the Offering and no one else, and will not be responsible to anyone other than the Seller for providing the protections offered to clients nor for providing advice in relation to the Offering, the contents of this announcement or any transaction, arrangement or other matter referred to in this announcement. \n\nIn connection with the Offering, the Managers and their respective affiliates may take up a portion of the Shares offered in the Offering as a principal position and in that capacity may retain, purchase, sell, offer to sell for their own accounts such Shares and other securities of the Company or related investments in connection with the Offering or otherwise. In addition, the Managers and their respective affiliates may enter into financing arrangements (including swaps or contracts for differences) with investors in connection with which the Managers and their respective affiliates may from time to time acquire, hold or dispose of Shares of the Company. Certain of the Managers or their affiliates may be lenders and/or agents under lending facilities with the Seller and may receive a portion of the net proceeds of the Offering to repay amounts outstanding under such facilities. The Managers do not intend to disclose the extent of any such investment or transactions, other than in accordance with any legal or regulatory obligations to do so. \n\nThis announcement is for information purposes only and is not to be relied upon in substitution for the exercise of independent judgment. It is not intended as investment advice and under no circumstances is it to be used or considered as an offer to sell, or a solicitation of an offer to buy any securities or a recommendation to buy or sell any securities in the Company. The price and value of securities and any income from them can go down as well as up and you could lose your entire investment. Past performance is not a guide to future performance. Information in this announcement cannot be relied upon as a guide to future performance. None of the Managers nor any of their respective affiliates accepts any liability arising from the use of this announcement.\n",
+        "hasAttachments": false,
+        "sourceBodyChars": 10494
+      },
+      "storedOutput": null,
+      "storedValidation": {
+        "valid": true,
+        "errors": [],
+        "errorCode": null,
+        "promptChars": 3035,
+        "triageResult": {
+          "reason": "Dette er i hovedsak en flaggemelding knyttet til en sekundærplassering av eksisterende aksjer, uten konkrete nye drifts-, resultat- eller strateginyheter i tilgjengelig tekst. Meldingen viser også bare til transaksjonen/vedlegg, som ikke er gjengitt fullt ut.",
+          "newsworthy": false
+        },
+        "sourceBodyChars": 10494
+      },
+      "labels": {
+        "class": "false_skip",
+        "reportRef": "final report 2026-06-02_2026-08-13"
+      },
+      "expected": {
+        "triage": {
+          "deterministicSkipKind": null
+        }
+      },
+      "provenance": {
+        "window": {
+          "from": "2026-06-02",
+          "to": "2026-08-13"
+        },
+        "status": "skipped"
+      }
+    },
+    {
+      "messageId": 675253,
+      "generationRunId": "cmpxoz7cc07e0pr1r1kf6endm",
+      "promptVersion": "v5.7.1",
+      "sourcePayload": {
+        "messageId": 675253,
+        "title": "Per Axel Koch varsler planlagt fratreden som konsernsjef i Polaris Media",
+        "issuerName": "Polaris Media ASA",
+        "issuerSign": "POL",
+        "publishedAt": "2026-06-03T06:35:04.129Z",
+        "categories": [
+          "INNSIDEINFORMASJON"
+        ],
+        "markets": [
+          "XOSL"
+        ],
+        "bodyText": "Konsernsjef Per Axel Koch har i dag meddelt styret i Polaris Media ASA at han\nønsker å fratre stillingen som konsernsjef i løpet av de neste 12 månedene.\n\n- Jeg blir 66 år i 2027 og kan se tilbake på mer enn 30 år som toppleder i\nAdresseavisen-konsernet og Polaris Media. Tiden er inne for å overlate\nansvaret til en annen, men jeg er hundre prosent innstilt på å arbeide for\nfullt til en ny konsernsjef er på plass.\n\nStyret vil nå iverksette prosessen med å rekruttere ny konsernsjef.\n\n- Per Axel Koch er den lengstsittende toppsjefen i et stort norsk\nmediekonsern. Han har vært avgjørende for konsernets suksess. Han har hatt\nrett til å gå av med pensjon siden 2021. Jeg er glad for at han har stått på i\nalle disse årene, og at han fortsatt vil stå på frem til ny konsernsjef er på\nplass, sier styreleder Stig Eide Sivertsen.\n\nFor ytterligere informasjon, vennligst kontakt:\n \nPer Axel Koch\nKonsernsjef\n+47 481 20 000\n \nStig Eide Sivertsen\nStyreleder\n+47 909 55 767\n\nDenne meldingen inneholder innsideinformasjon i henhold til EUs\nmarkedsmisbruksforordning (MAR) artikkel 7 og offentliggjøres i henhold til\nMAR artikkel 17 og verdipapirhandelloven § 5-12. Meldingen er offentliggjort\nav Robert Berg, økonomidirektør i Polaris Media ASA, den 2026-06-03 kl. 08:35\nCEST.",
+        "hasAttachments": false,
+        "sourceBodyChars": 1270
+      },
+      "storedOutput": null,
+      "storedValidation": {
+        "valid": true,
+        "errors": [],
+        "errorCode": null,
+        "promptChars": 0,
+        "triageResult": {
+          "kind": "document-only",
+          "reason": "Tilgjengelig tekst sier bare at et dokument/presentasjon er publisert, uten konkrete tall, hendelser eller konsekvenser.",
+          "newsworthy": false
+        },
+        "sourceBodyChars": 1270
+      },
+      "labels": {
+        "class": "false_skip",
+        "reportRef": "final report 2026-06-02_2026-08-13"
+      },
+      "expected": {
+        "triage": {
+          "deterministicSkipKind": "document-only"
+        }
+      },
+      "provenance": {
+        "window": {
+          "from": "2026-06-02",
+          "to": "2026-08-13"
+        },
+        "status": "skipped"
+      }
+    },
+    {
+      "messageId": 675492,
+      "generationRunId": "cmq0jb7c907u9tf1o35hxqfu2",
+      "promptVersion": "v5.7.1",
+      "sourcePayload": {
+        "messageId": 675492,
+        "title": "The Goldman Sachs Group, Inc. Disclosure in HIMALAYA SHIPPING LTD",
+        "issuerName": "Himalaya Shipping Ltd",
+        "issuerSign": "HSHP",
+        "publishedAt": "2026-06-05T06:19:40.973Z",
+        "categories": [
+          "FLAGGING"
+        ],
+        "markets": [
+          "XOSL"
+        ],
+        "bodyText": "Please see attachment on www.newsweb.no",
+        "hasAttachments": true,
+        "sourceBodyChars": 39,
+        "pdfSupplementText": "1\nStandard form for notification of major holdings\nNOTIFICATION OF MAJOR HOLDINGS (to be sent to the relevant issuer and to the competent authority)\n1. Identity of the issuer or the underlying issuer of existing shares to which voting rights are at-\ntached: HIMALAYA SHIPPING LTD\nLEI: 984500D86FFE5EYE7988\n2. Reason for the notification (please tick the appropriate box or boxes):\n[ ] An acquisition or disposal of voting rights\n[X] An acquisition or disposal of financial instruments\n[ ] An event changing the breakdown of voting rights\n[X] Other (please specify)\niii\n: Voluntary group notification with triggered threshold on subsidiary level\n3. Details of person subject to the notification obligation :\nName: The Goldman Sachs Group, Inc. City and country of registered office (if applicable): Corporation\nTrust Centre, 1209 Orange Street, Wilmington DE 19801, USA\n4. Full name of shareholder(s) (if different from 3.)\nv\n: Goldman Sachs International\n5. Date on which the threshold was crossed or reached: 03/06/2026\n6. Total positions of person(s) subject to the notification obligation:\n% of voting rights at-\ntached to shares (total\nof 7.A)\n% of voting rights\nthrough financial in-\nstruments\n(total of 7.B.1 + 7.B.2)\nTotal of both in %\n(7.A + 7.B)\nTotal number of\nvoting rights of is-\nsuer\nvii\nResulting situation\non the date on\nwhich threshold\nwas crossed or\nreached\n0.24% 7.82% 8.07% \n47,145,000\nPosition of previ-\nous notification (if\napplicable)\n1.99% 6.21% 8.20%\nDate:22 October 2015\nESMA/2015/1597\n\n2\n7. Notified details of the resulting situation on the date on which the threshold was crossed or\nreached:\nA: Voting rights attached to shares\nClass/type of\nshares\nISIN code (if possible)\nNumber of voting rights % of voting rights\nDirect\n(Art 9 of Directive\n2004/109/EC)\nIndirect\n(Art 10 of Directive\n2004/109/EC)\nDirect\n(Art 9 of Directive\n2004/109/EC)\nIndirect\n(Art 10 of Directive\n2004/109/EC)\nBMG4660A1036 114,609 0.24%\nSUBTOTAL A \n114,609 0.24%\nB 1: Financial Instruments according to Art. 13(1)(a) of Directive 2004/109/EC\nType of financial instru-\nment\nExpiration\ndate\nExercise/\nConversion Period\nNumber of voting\nrights that may be ac-\nquired if the instrument\nis exercised/ con-\nverted.\n% of voting rights\nSecurities Lending Open 3,625,654 7.69%\nSUBTOTAL B.1 3,625,654 7.69%\nB 2: Financial Instruments with similar economic effect according to Art. 13(1)(b) of Directive\n2004/109/EC\nType of financial\ninstrument\nExpiration\ndate\nExercise/\nConversion Pe-\nriod\nPhysical or cash\nsettlement\nNumber of\nvoting rights \n% of voting rights\nSwap 10/03/2036 Cash 63,033 0.13%\nSUBTOTAL B.2 63,033 0.13%\n\n3\n8. Information in relation to the person subject to the notification obligation (please tick the appli-\ncable box):\n[ ] Person subject to the notification obligation is not controlled by any natural person or legal en-\ntity and does not control any other undertaking(s) holding directly or indirectly an interest in the\n(underlying) issuer\n[X] Full chain of controlled undertakings through which the voting rights and/or the financial instru-\nments are effectively held starting with the ultimate controlling natural person or legal entity:\nName\n% of voting rights\nif it equals or is\nhigher than the\nnotifiable thresh-\nold\n% of voting rights\nthrough financial\ninstruments if it\nequals or is\nhigher than the\nnotifiable thresh-\nold\nTotal of both if\nit equals or is\nhigher than the\nnotifiable\nthreshold\nThe Goldman Sachs Group, Inc.\nGoldman Sachs (UK) L.L.C.\nGoldman Sachs Group UK Limited\nGoldman Sachs International 6.25%\nThe Goldman Sachs Group, Inc.\nGoldman Sachs & Co. LLC\nThe Goldman Sachs Group, Inc.\nGoldman Sachs Bank USA\nGoldman Sachs Bank Europe SE\nThe Goldman Sachs Group, Inc.\nGSAM Holdings LLC\nGoldman Sachs Asset Management, L.P.\n9. In case of proxy voting: [ name of the proxy holder ] will cease to hold [% and number ] voting\nrights as of [ date ]\n\n4\n10. Additional information:\nPlease note, the total amount of voting rights has been rounded to 2 decimal places and therefore there is\na possibility of a rounding difference.\nGeneral email contact:\ngs-rrc-emea-position-enquiries@gs.com\nDone at London on 04/06/2026.",
+        "pdfSupplementPageCount": 4,
+        "pdfSupplementAttachmentId": 327653
+      },
+      "storedOutput": null,
+      "storedValidation": {
+        "valid": true,
+        "errors": [],
+        "errorCode": null,
+        "promptChars": 1814,
+        "triageResult": {
+          "reason": "Dette er en flaggemelding uten gjengitt innhold; teksten henviser bare til vedlegg på Newsweb. Uten oppgitte detaljer om eierandel, part eller motiv er den ikke nyhetsverdig nok for automatisk omskriving.",
+          "newsworthy": false
+        },
+        "sourceBodyChars": 39
+      },
+      "labels": {
+        "class": "false_skip",
+        "reportRef": "final report 2026-06-02_2026-08-13"
+      },
+      "expected": {
+        "triage": {
+          "deterministicSkipKind": null
+        }
+      },
+      "provenance": {
+        "window": {
+          "from": "2026-06-02",
+          "to": "2026-08-13"
+        },
+        "status": "skipped"
+      }
+    },
+    {
+      "messageId": 675511,
+      "generationRunId": "cmq0ur17j029iqb1o1nryuqhb",
+      "promptVersion": "v5.7.1",
+      "sourcePayload": {
+        "messageId": 675511,
+        "title": "Flaggemelding Norbit ASA",
+        "issuerName": "NORBIT ASA",
+        "issuerSign": "NORBT",
+        "publishedAt": "2026-06-05T11:39:56.422Z",
+        "categories": [
+          "FLAGGING"
+        ],
+        "markets": [
+          "XOSL"
+        ],
+        "bodyText": "Handelsbanken Fonder AB has on 2026-06-04 bought 29 131 shares in Norbit ASA (NO0010856511) and has consequently passed the 5% disclosure threshold.\n\nPlease find further details below.\n\nNumber of shares\t\n\tShares\t                                       Votes\n\t                #\t  %\t       #\t   %\n2026-06-03\t3 171 927\t4,96\t3 171 927\t4,96\n2026-06-04\t3 201 058\t5,01\t3 201 058\t5,01\n",
+        "hasAttachments": false,
+        "sourceBodyChars": 376
+      },
+      "storedOutput": null,
+      "storedValidation": {
+        "valid": true,
+        "errors": [],
+        "errorCode": null,
+        "promptChars": 2111,
+        "triageResult": {
+          "reason": "Dette er en vanlig flaggemelding om passering av 5 %-grensen, uten opplysninger som tyder på særskilt nyhetsverdi utover eierandelsendringen.",
+          "newsworthy": false
+        },
+        "sourceBodyChars": 376
+      },
+      "labels": {
+        "class": "false_skip",
+        "reportRef": "final report 2026-06-02_2026-08-13"
+      },
+      "expected": {
+        "triage": {
+          "deterministicSkipKind": null
+        }
+      },
+      "provenance": {
+        "window": {
+          "from": "2026-06-02",
+          "to": "2026-08-13"
+        },
+        "status": "skipped"
+      }
+    },
+    {
+      "messageId": 675544,
+      "generationRunId": "cmq12xjf904n1qb1oh38blrph",
+      "promptVersion": "v5.7.1",
+      "sourcePayload": {
+        "messageId": 675544,
+        "title": "Huddly AS – Proposed changes to the Board",
+        "issuerName": "Huddly AS",
+        "issuerSign": "HDLY",
+        "publishedAt": "2026-06-05T15:28:59.263Z",
+        "categories": [
+          "IKKE-INFORMASJONSPLIKTIGE PRESSEMELDINGER"
+        ],
+        "markets": [
+          "MERK"
+        ],
+        "bodyText": "Oslo, 5 June 2026: Board Member Jostein Devold has informed the Board of Directors of Huddly AS of his decision to resign from the Board following his appointment as Chief Executive Officer of DEMANO Group AS. The Nomination Committee has proposed that Svenn-Tore Larsen be elected to the Board of Directors as a replacement for Jostein Devold.\n\nThe Board will convene an Extraordinary General Meeting to be held on 22 June 2026 at 10:00 (CEST). Notice of extraordinary general meeting with documentation will be published on Monday 8 June 2026.\n\nJostein Devold has served as a member of the Board of Directors of Huddly since 2017 and as Chair of the Board from 2023 to 2025. \"On behalf of the Board I would like to express our sincere appreciation for Jostein Devold’s valuable contributions and dedicated service to the Company during his tenure\", said Jon Øyvind Eriksen, Chair of the Board of Directors of Huddly AS.\n\nSvenn-Tore Larsen is a Norwegian technology executive and former Chief Executive Officer of Nordic Semiconductor ASA. He led the company for more than two decades and played a pivotal role in transforming it into a leading international provider of wireless communications technology. Prior to joining Nordic Semiconductor, Mr. Larsen served as Regional Director for the Nordic region at Xilinx, Inc. and also held positions at Philips Semiconductors. He holds a degree in Electrical Engineering from the University of Strathclyde in the United Kingdom.\n\nFor more information, please contact:\nJon Øyvind Eriksen\nChair of the Board of Directors\n+47 93 06 03 30 \nadmin@sonstad.no\n\nAbout Huddly AS \n\nDisruptive innovation is our heartbeat at Huddly. We're committed to pushing technology and challenging the status quo to empower human collaboration. Combining our industry-leading expertise in artificial intelligence, software, hardware, and UX, we craft intelligent camera systems that enable inclusive and productive teamwork. Huddly cameras are designed to provide high-quality, AI-powered video meetings on major platforms, including Microsoft Teams, Zoom, and Google Meet. With upgradable software, durable hardware, and engaging user experiences, they are the ideal choice for organizations seeking a future-proof, scalable, and sustainable solution. Founded in 2013, Huddly is headquartered in Oslo, Norway, with presence in the US and EMEA and distribution globally.\n",
+        "hasAttachments": false,
+        "sourceBodyChars": 2397
+      },
+      "storedOutput": null,
+      "storedValidation": {
+        "valid": true,
+        "errors": [],
+        "errorCode": null,
+        "promptChars": 2985,
+        "triageResult": {
+          "reason": "Dette er en rutinemessig styreendring/innkalling til ekstraordinær generalforsamling uten indikasjon på vesentlig strategi-, resultatutvikling eller andre markedsdrivende forhold.",
+          "newsworthy": false
+        },
+        "sourceBodyChars": 2397
+      },
+      "labels": {
+        "class": "false_skip",
+        "reportRef": "final report 2026-06-02_2026-08-13"
+      },
+      "expected": {
+        "triage": {
+          "deterministicSkipKind": null
+        }
+      },
+      "provenance": {
+        "window": {
+          "from": "2026-06-02",
+          "to": "2026-08-13"
+        },
+        "status": "skipped"
+      }
+    },
+    {
+      "messageId": 675564,
+      "generationRunId": "cmq4rv78e138jqb1om2ecabh4",
+      "promptVersion": "v5.7.1",
+      "sourcePayload": {
+        "messageId": 675564,
+        "title": "Saga Pure ASA: Launch of conditional offer to buy back own shares",
+        "issuerName": "Saga Pure ASA",
+        "issuerSign": "SAGA",
+        "publishedAt": "2026-06-08T05:30:16.939Z",
+        "categories": [
+          "UTSTEDERS MELDEPLIKT VED HANDEL I EGNE AKSJER"
+        ],
+        "markets": [
+          "XOSL"
+        ],
+        "bodyText": "NOT FOR RELEASE, PUBLICATION OR DISTRIBUTION, IN WHOLE OR IN PART, DIRECTLY OR\nINDIRECTLY, INTO OR WITHIN ANY JURISDICTION IN WHICH THE RELEASE, PUBLICATION OR\nDISTRIBUTION WOULD BE UNLAWFUL OR WOULD REQUIRE REGISTRATION OR OTHER MEASURES.\n\n(Oslo, Norway, 8 June 2026)\n\nSaga Pure ASA (SAGA) (the \"Company\") hereby launches a conditional offer to buy\nback up to 67,487,842 existing shares in the Company (the \"Offer\") at a price\nbetween NOK 1.45 to NOK 1.60 (the \"Price Range\"), to reduce the Company's\ncapital and consequently optimize the Company's capital structure. The Offer\nwill be structured as a reverse bookbuilding process in which all shareholders,\nsubject to the restrictions set out herein, can submit sales offers within the\nPrice Range.\n\nThe final purchase price per share will be set within the Price Range based on\nthe sales offers received at a level representing a satisfactory price and offer\nvolume (to be determined by the Company at its sole discretion). The final\npurchase price will be identical for all selling shareholders.\n\nThe bookbuilding period commences today, Monday 8 June 2026, at 09:00 (CEST) and\nis expected to close on Friday, 12 June 2026 at 15:00 (CEST) (the \"Bookbuilding\nPeriod\"). Notification of allocation and pricing is expected to be made on or\nabout 15 June 2026, and settlement is expected to take place on or about 17 June\n2026 on a normal delivery versus payment basis (DVP).\n\nThe Company reserves the right to accept sales offers received after the end of\nthe Bookbuilding Period, as well as to close or extend the Bookbuilding Period\nat any time and for any reason in its sole discretion without further notice.\n\nIn the event that the total volume offered by selling shareholders in the Offer\nexceeds 67,487,842 shares at or below the final purchase price, the allocation\nwill, to the extent possible, be made on a pro rata basis relative to the volume\noffered by each selling shareholder, with the objective of treating all\nshareholders equally based on their sales offers at or below the final purchase\nprice. The selling shareholders will be bound to sell up to the number of shares\noffered on the terms submitted if and at such time the offer is accepted by the\nCompany, irrespective of whether the Company elects to purchase a lower number\nof shares from such selling shareholder than offered for sale by the respective\nshareholder.\n\nThe Company reserves the right, at its sole discretion, to amend, terminate or\nwithdraw the Offer at any time prior to its completion. Completion of the Offer\nis subject to approval by the Company's board of directors.\n\nThe Offer will be based on the authorization granted to the board of directors\nby the Company's annual general meeting held on 26 May 2026. The Company has not\nprepared, and will not prepare, any offer document in connection with the Offer.\n\nReference is also made to the stock exchange notice 28 May 2026 regarding the\nsale of Eilert Sundtsgate 39 AS. The board of directors of the Company is not\naware of any other event having occurred following the period covered by the\nCompany's first quarter 2026 financial results that are expected to have a\nmaterial impact on the Company's profit and loss or financial position.\n\nThe Company has a total of 674,878,423 shares issued. Prior to the Offer, the\nCompany does not hold any own shares.\n\nArctic Securities AS (the \"Manager\") acts as sole bookrunner in connection with\nthe Offer. Existing shareholders in the Company wishing to sell shares in the\nOffer can contact the Manager at +47 971 83 609 in order to place a sales offer\nbefore the end of the Bookbuilding Period.\n\nFor further information, please contact:\n\nHenrik A. Christensen, Chairperson\n\n+47 909 67 683\n\nThis information is considered to be inside information pursuant to the EU\nMarket Abuse Regulation. This stock exchange notice was published by Eldar\nPaulsrud, on the date and time as set out in the release. This information is\nsubject to the disclosure requirements under the EU Market Abuse Regulation art.\n17 and Section 5-12 of the Norwegian Securities Trading Act.\n\nImportant note\n\nThe Offer contemplated herein and the distribution of this announcement and\nother information in connection with the Offer may be restricted by law in\ncertain jurisdictions, and the Offer is not made in any jurisdiction in which\nthis would be unlawful, require registration or other measures. The Company does\nnot assume any responsibility in the event there is a violation by any person of\nsuch restrictions. Persons into whose possession this announcement or such other\ninformation should come are required to inform themselves about and to observe\nany such restrictions. This announcement is not an offer document and, as such,\ndoes not constitute an offer or the solicitation of an offer to subscribe to,\nacquire, or sell, shares in the Company.\n\nThis announcement contains forward-looking statements. All statements, other\nthan statements of historical fact, included herein, including without\nlimitation, statements regarding the Offer, are forward-looking statements that\ninvolve risk and uncertainties. There can be no assurances that such statements\nwill prove to be accurate, and actual results could differ materially from those\nanticipated in such statements.\n\n\n",
+        "hasAttachments": false,
+        "sourceBodyChars": 5287
+      },
+      "storedOutput": null,
+      "storedValidation": {
+        "valid": true,
+        "errors": [],
+        "errorCode": null,
+        "promptChars": 0,
+        "sourceBodyChars": 5287,
+        "skippedCategories": [
+          "UTSTEDERS MELDEPLIKT VED HANDEL I EGNE AKSJER"
+        ]
+      },
+      "labels": {
+        "class": "false_skip",
+        "reportRef": "final report 2026-06-02_2026-08-13"
+      },
+      "expected": {
+        "triage": {
+          "deterministicSkipKind": null
+        }
+      },
+      "provenance": {
+        "window": {
+          "from": "2026-06-02",
+          "to": "2026-08-13"
+        },
+        "status": "skipped"
+      }
+    },
+    {
+      "messageId": 675675,
+      "generationRunId": "cmq668oi7023wry1qmmxrpmi1",
+      "promptVersion": "v5.7.1",
+      "sourcePayload": {
+        "messageId": 675675,
+        "title": "Kongsberg Maritime Capital Markets Day",
+        "issuerName": "Kongsberg Maritime ASA",
+        "issuerSign": "KMAR",
+        "publishedAt": "2026-06-09T05:00:29.605Z",
+        "categories": [
+          "IKKE-INFORMASJONSPLIKTIGE PRESSEMELDINGER"
+        ],
+        "markets": [
+          "XOSL"
+        ],
+        "bodyText": "Kongsberg Maritime will host its Capital Markets Day (CMD) in Oslo today. The\nCMD can be followed online at www.kongsbergmaritime.com from 09:15 to 11:30\nCEST. The presentation materials are attached.\n\nAbout Us\nKongsberg Maritime is a global leader in maritime technology.\n\nWe deliver advanced solutions to merchant, offshore, fishing, and naval\nvessels, setting new standards for safe, efficient, and sustainable operations\n- both for new builds and existing fleets. In close collaboration with\ncustomers and research environments, we develop technology that solves real\nchallenges at sea.\n\nToday, over 30,000 vessels operate with our systems on board.\n\nKongsberg Maritime has over 8,300 employees in 35 countries.",
+        "hasAttachments": true,
+        "sourceBodyChars": 715,
+        "pdfSupplementText": "Capital Markets Day\n2026\n\nDisclaimer\nThis presentation contains certain “forward - looking information and statements” within the meaning of applicable laws and regula tions. These statements include, but are not\nlimited to, statements regarding the Company’s expectations, plans, strategies, business outlook, market opportunities, finan cia l projections, and assumptions underlying any of the\nforegoing. Such forward - looking information and statements are based on the current, estimates and projections of the Company or assumptions based on information currently\navailable to the Company. Such forward - looking information and statements reflect current views with respect to future events an d are subject to risks, uncertainties and\nassumptions. The Company cannot give assurance to the correctness of such information and statements. These forward - looking info rmation and statements can generally be\nidentified by the fact that they do not relate only to historical or current facts. Forward - looking statements sometimes use ter minology such as \"targets\", \"believes\", \"expects\",\n\"aims\", \"assumes\", \"intends\", \"plans\", \"seeks\", \"will\", \"may\", \"anticipates\", \"would\", \"could\", \"continues\", \"estimate\", \"mil est one\" or other words of similar meaning and similar\nexpressions or the negatives thereof.\nBy their nature, forward - looking information and statements involve known and unknown risks, uncertainties and other important f actors that could cause the actual results,\nperformance or achievements of the Company to differ materially from any future results, performance or achievements that may be expressed or implied by the forward - looking\ninformation and statements in this presentation. Should one or more of these risks or uncertainties materialize, or should an y u nderlying assumptions prove to be incorrect, the\nCompany's actual financial condition or results of operations could differ materially from that or those described herein as ant icipated, believed, estimated or expected.\nAny forward - looking information or statements in this presentation speak only as at the date of this presentation. Except as req uired by applicable laws and regulations, the\nCompany does not intend, and expressly disclaims any obligation or undertaking, to publicly update, correct or revise any of the information included in this presentation, including\nforward - looking information and statements, whether to reflect changes in the Company's expectations with regard thereto or as a result of new information, future events,\nchanges in conditions or circumstances or otherwise on which any statement in this presentation is based.\nGiven the aforementioned uncertainties, prospective investors are cautioned not to place undue reliance on any of these forwa rd - looking statements\nHistorical figures may be subject to inaccuracies due to changes in business structure and internal transactions.\n\nThe maritime market\nin a global context\nLisa Edvardsen Haugan, President & CEO\n3\n\nWrap - up\nCEO Lisa Edvardsen Haugan\nModerated Q&A\n• Our market exposure and resilience through our business model\nResilience and market exposure\nCEO Lisa Edvardsen Haugan\n• Financial track record and ambitions\n• Capital allocation\nFinancial ambitions\nCFO Mette Toft Bjørgen\n• Our markets in a global context\n• Strategic direction and ambitions\nThe maritime market in a global context\nCEO Lisa Edvardsen Haugan\nAgenda\n01\n02\n03\n05\n06\n• Key products and solutions and how we help partners solve challenges\n• Our unique deliveries\nProducts and competitive edge\nEVP Per Håvard Siljan Hjukse / EVP Johnny Aarseth\n04\n\nLong term global trends\nA maritime industry operating in a more complex world\nGeopolitical\nlandscape\nEnergy security\nand efficiency\nMaritime security\nand resilience\n\nMore than\n80%\nof global trade\n\nNew reality creates opportunities\nNational maritime strategies\nGovernments have maritime high on the agenda\nRegional changes\nLess globalisation, more regionalisation\nTrade agreements\nRegional and bilateral frameworks grow in importance\nPh oto: Philip Davali/Ritzau Scanpix\n\nIncreased defence spending\ndrives naval investments\nDrive towards\nstandardisation\nTraditional naval\nvessels are expensive\nNaval investments\nto increase\n0\n50\n100\n150\n200\n250\n2015 2020 2025\nGLOBAL*\n$ BILLION –\nNAVAL PLATFORM\nFUNDING\nSource: S&P Global, AMI, KM Business Intelligence.\n*Excludes China, Russia and non – accessible markets.\nGlobal Platform Funding (analyst - derived market\nestimates): spending related to the design, construction,\nand major modernisation of naval vessels as physical\nplatforms, not weapons and ammunition, personnel costs\netc.\nNATO\nEXCL. USA\n0\n10\n20\n30\n40\n50\n2015 2020 2025\nUSA\n0\n20\n40\n60\n80\n100\n2015 2020 2025\n\nDecarbonisation – the\nsolutions are here\n\nMacro tailwinds drive vessel contracting\nFavourable macro conditions across all of KM's core end - markets\nOffshore energy\nDemand for energy, security and energy mix\nNaval\nGlobal defence s pending\nMerchant\nGDP growth and world trade\n\n10% CAGR\nthrough a 5 - year cycle\n>16% EBITDA\ngradually through a 5 - year cycle\n\nFinancial\nambitions\nMette Toft Bjørgen, CFO\n\nBacked by a continuously expanding order backlog\nSustained revenue growth\n0.0 %\n10.0 %\n20.0 %\n30.0 %\n40.0 %\n50.0 %\n60.0 %\n0\n5\n10\n15\n20\n25\n30\n35\n2021 2022 2023 2024 2025 LTM Q1 2026\nEBITDA %\n15\nNewbuild\nAftermarket\n15%\n10%\n*\n27\n24,035\n0\n5000\n10000\n15000\n20000\n25000\n30000\n35000\n2021 2022 2023 2024 2025 Q1 2026\n12\nNewbuild\nAftermarket \n28\n*Financials exclude the gain (BNOK 1.2) from the sale of the commercial steering gear and rudder business effective March 202 5\n\nSecuring profitable growth\nImprovement programme\n• Streamline operational\nperformance\n• Ensure a strong and resilient\ncost base\n• Strengthen execution\nTargeted organic R&D spend\n600 MNOK\nFULL - YEAR EFFECT IN 2027\n1.8 BNOK\nLTM Q1’26\n7.2%\n2021\n7.3%\n2022\n7.0%\n2023\n6.2%\n2024\n6.6%\n2025\n6.7%\nLTM Q1\n2026\nR&D of LTM - revenue (%) R&D (OPEX & CAPEX)\nEfficiency initiatives and capital discipline to further strengthen competitiveness\n\nFinancial strength and flexibility\nSolid foundation\n• Solid balance sheet with low\nleverage\n• Revolving credit f acility 3 BNOK\n• Overdraft facility 1 BNOK\nRobust working capital development\n• Disciplined working capital\nmanagement has driven a\nstructural reduction in NWC\n• Supporting stronger cash\nconversion and a more capital -\nefficient business model\nCash 3 BNOK\nZERO INTEREST - BEARING DEBT\n5.8%\nNWC of LTM - revenue (%) NWC\nRemain investment grade\n• Clear guardrails on leverage and\nliquidity\n• Maintaining a solid credit rating is a\nstrategic priority\n• Financial flexibility for capital\nallocation\nBBB+\nLONG - TERM RATING\n\nPrioritising shareholder remuneration and M&A\nDisciplined capital return, supporting a solid balance sheet and future capital requirements\nShareholder Remuneration\n• Annual dividend target of\n40 – 60% of earnings after tax\n• Special dividends and/or share\nbuybacks may complement\nordinary dividends\nPortfolio Management\n• M&A to complement and\ngrow our portfolio beyond\norganic limits\n• Portfolio optimi s ations\n\nTargeting profitable growth\nExecute positions, secure scale and competitiveness\n~10%\nThrough a 5 - year cycle\nREVENUE CAGR\n>16%\nGradual improvement\nEBITDA margin\nSensitivities\n→ FX - translation\n→ Geopolitics\n→ M&A\nStrong long - term drivers - cyclical end - markets, robust and flexible business model\nRevenue development\n(illustrative)\nIllustrative revenue development Target CAGR\n26.9\n10%\nCAGR\nShort - term\ngrowth 0 - 5%\nExecution\nand scale\nCapital\nallocation\nLTM Q1’26\n\n18\nRevenue navigated by\ninnovation, domain knowledge\nand market tailwind\nMargins anchored by solid\nproject execution and\ncost control\nPropelled by disciplined\nfinancial execution\nOur journey\nt hrough the cycle\n\nResilience\nand market\nexposure\nLisa Edvardsen Haugan, President & CEO\n\nResilience against cyclicality\nStrong degree of resilience through diversified lifecycle exposure\nDiversified exposure\nacross segments\nA broad exposure towards all shipping\nsegments gives limited exposure to\nindividual cycles\nStable repair and\nrefurbishment market\nEquipment onboard around 30 000\nvessels in operations. A solid\nfoundation for a recurring through\nlife aftermarket\n0\n6,000\n12,000\n2021 2022 2023 2024 2025\nUnique vessels serviced by KM\nSolid and growing order backlog,\nmajority towards newbuild\nOrder backlog provides revenue\nvisibility through newbuilding\norder cycles\n0\n5000\n10000\n15000\n20000\n25000\n30000\n35000\n2021 2022 2023 2024 2025 Q1\n2026\n12\nNewbuild \nAftermarket\n22%\nCAGR\n28\nBacklog [BNOK]\n\nTypical newbuild\ncontract value\nrange (MNOK)\n5 – 50 10 – 500 1 – 80 10 – 20 20 – 200 50 – 200\nMid/Long - term\ngrowth potential*\nKM market\nposition today\nDiversified across segments\nGas Carriers \nCargo \nNaval &\nGovernmental\nOffshore\nEnergy \nTugs \nPassenger\nStrong position with large scope \nStrong position with selected scope \nMedium position with large scope \nMedium position with selected scope\n* As seen from KM. Combination of expected market development, internal strategies and initiatives. Mid/Long - term = 2+ years\n\nGas Carriers\n• Win complex integrated scope\non newbuild projects\n• Accelerate lifecycle value\nthrough upgrades and retrofits\n• Strengthen digital attach and\noperational optimisation\nOur focus moving\nforward\n• Ordering activity is cyclical, but\ntechnology scope per vessel is\nrising\n• Customers prioritise efficiency,\nreliability and digital operations\nMarket dynamics\nA strong track record\n• Delivered to more than 700\nLNGCs, FSRUs and LNG -\nbunkering vessels\n• Integrated systems across\ncritical onboard functions\n• Lifecycle relevance through\nupgrades and support\nSegment snapshot\nGas Carriers Offshore Energy Cargo Tugs Passenger Naval\nMarket characteristics\nSharp focus on energy\nefficiency and digitalisation\nShare of KM’s newbuild order intake (2025)\n16%\nTypical newbuild contract value range (MNOK)\n5 - 50\nShare of KM’s aftermarket sales (2025)\n10%\n\nOffshore Energy\n• Invest in technology and\ndigitalisation to improve\nindustry efficiency, both on\nenergy and operational\n• Future energy concepts\nenabling electrified, hybrid and\ncost - efficient vessel operations\nOur focus moving\nforward\n• A new pull for alternative\nenergy\n- Offshore wind\n• Prolongs existing oil and gas\noperations\n- Old fleet\n- Multi - purpose\nEnergy security\nExposure to\noffshore energy\n• The bridge to propeller portfolio\nsupports the entire offshore\nlifecycle, from exploration to\ndecommissioning\n• Support a wide range of vessels\nsuch as CLV, AHTS, DPST, OSV,\nSOV/CSOV, WTIV and other\nspecialised vessels\nSegment snapshot\nGas Carriers Offshore Energy Cargo Tugs Passenger Naval\nPhoto: Salt Design\nMarket characteristics\nDemand for new tonnage,\nupgrades and life\nextensions\nShare of KM’s newbuild order intake (2025)\n39%\nTypical newbuild contract value range (MNOK)\n10 - 500\nShare of KM’s aftermarket sales (2025)\n47%\n\nCargo\n• Strengthen positioning with fuel\nagnostic approach toward\nenergy efficiency\n• Expand scope and addressable\nmarket through integrated,\nenergy efficient solutions\nOur focus moving\nforward\n• Products and integrated\nsystems enabling safe, cyber -\nsecure, energy - efficient and\nlower - emission operations\nacross cargo vessels\n• Enable shipowners, yards and\noperators to improve fuel\nefficiency, reduce emissions and\nmeet evolving regulatory\nrequirements across both\nnewbuilds and retrofit projects\nDeliveries\ntowards cargo\nThe cargo market\n• Covers ships transporting\ngoods across global seaborne\ntrade which accounts for the\nmajority of international trade\nflows\n• Market drivers are typically\nlinked with\n- Global GDP development\n- C ommodity demand (bulk\nand tankers)\n- Trade volumes and supply\nchains (containers)\nSegment snapshot\nMarket characteristics\nNeed for renewal and\nmodernisation of fleet\nShare of KM’s newbuild order intake (2025)\n10%\nTypical newbuild contract value range (MNOK)\n1 - 80\nShare of KM’s aftermarket sales (2025)\n14%\nGas Carriers Offshore Energy Cargo Tugs Passenger Naval\n\nTugs\n• Execute further on our already\nstrong market share on a zimuth\nthrusters for mechanical tugs\n• Leverage our strong market\nposition to capture integrated\nsolution sales for hybrid and\nelectric tugs\n• Expand position towards tugs\nwith automation, simulation,\ndeck machinery, bridge\nsolutions and energy solutions\nOur focus moving\nforward\n• Traditionally mechanical diesel\ndrive trains dominate\n• Governments, ports, and\noperators have started to\ndemand emission reductions\nwhich lead to hybrid, full\nelectric and alternative fuel\nsolutions\n• New market opening for hybrid\nand electric tugs\nEmission reductions\nThe tug market\n• Our relevant tug market\nconsists of 15,000 vessels\nglobally with 300 - 400\nnewbuilds per year\n• Demand driven by port growth\nand port calls\n• Currently strong newbuild\nactivity due to the need of\nreplacing ageing fleet and\nincrease power due to larger\nmerchant vessels\nSegment snapshot\nMarket characteristics\nSolid newbuild, fleet\nmodernisation, electric era\nemerging\nShare of KM’s newbuild order intake (2025)\n12%\nTypical newbuild contract value range (MNOK)\n10 - 20\nShare of KM’s aftermarket sales (2025)\n6%\nGas Carriers Offshore Energy Cargo Tugs Passenger Naval\n\nPassenger\n• Strengthen our position in\npod - based propulsion\n• Leverage on electrification and\nenergy efficiency trends\n• Strengthen lifecycle value\nproposition\nOur focus moving\nforward\n• Electrification and energy\nefficiency driving newbuild\nspecifications\n• Environmental regulation\ndriving fleet optimisation\n• Fuel cost volatility influencing\nprofitability and investment\ntiming\nExposure and\nsegment trends\nThe passenger market\n• Cruise market growing with\nstrong bookings and high fleet\nutilisation\n• Ro - Pax market stable but\nageing fleets and renewal needs\n• Environmental regulation\nincreasingly shaping investment\ndecisions\nSegment snapshot\nMarket characteristics\nGrowth market with strong\ncost discipline\nShare of KM’s newbuild order intake (2025)\n9%\nTypical newbuild contract value range (MNOK)\n20 - 200\nShare of KM’s aftermarket sales (2025)\n8%\nGas Carriers Offshore Energy Cargo Tugs Passenger Naval\n\nNaval\n• Uncrewed surface vessels is a\nfast - growing sub - segment\nwithin naval\n• Leverage our position as a\nfrontrunner in large USVs in the\ncommercial sector into the\nnaval domain\n• Increases operational\ncapabilities, reduces crew need\nand crew exposure at reduced\ncost\nRemote and autonomy\nincreasingly relevant\n• Traditional naval scope has\nprimarily been propulsion and\nhandling systems\n• Going forward, more\ncommercial marine capabilities\nwill be applied\n• Automation, bridge and\nmanoeuvring, electrification\nand digitalisation\nPotential for expanded\nproduct scope\nEquipped more than\n1,000 naval vessels\n• Type 26 frigates for\nthe UK, Canada and Australia\n• United States Coast Guard’s\nOffshore Patrol Cutter Heritage\nClass\n• More than 20 different naval\nvessel designs delivered\nSegment snapshot\nMarket characteristics\nEntering a defence - driven\nsupercycle\nShare of KM’s newbuild order intake (2025)\n12%\nTypi\n\n[... resten er utelatt ...]",
+        "pdfSupplementPageCount": 42,
+        "pdfSupplementAttachmentId": 327810
+      },
+      "storedOutput": null,
+      "storedValidation": {
+        "valid": true,
+        "errors": [],
+        "errorCode": null,
+        "promptChars": 2496,
+        "triageResult": {
+          "reason": "Dette er bare en invitasjon til Capital Markets Day med henvisning til vedlagte presentasjonsmaterialer, uten konkrete nye tall, hendelser eller beslutninger i selve meldingen.",
+          "newsworthy": false
+        },
+        "sourceBodyChars": 715
+      },
+      "labels": {
+        "class": "false_skip",
+        "reportRef": "final report 2026-06-02_2026-08-13"
+      },
+      "expected": {
+        "triage": {
+          "deterministicSkipKind": null
+        }
+      },
+      "provenance": {
+        "window": {
+          "from": "2026-06-02",
+          "to": "2026-08-13"
+        },
+        "status": "skipped"
+      }
+    },
+    {
+      "messageId": 675676,
+      "generationRunId": "cmq669fa1024jry1quhinkuyx",
+      "promptVersion": "v5.7.1",
+      "sourcePayload": {
+        "messageId": 675676,
+        "title": "SoftwareOne sets new 2030 financial targets as AI transformation unlocks unprecedented structural growth opportunities across enterprise software and cloud",
+        "issuerName": "SoftwareOne Holding AG",
+        "issuerSign": "SWON",
+        "publishedAt": "2026-06-09T05:01:02.069Z",
+        "categories": [
+          "IKKE-INFORMASJONSPLIKTIGE PRESSEMELDINGER"
+        ],
+        "markets": [
+          "XOSL"
+        ],
+        "bodyText": "Please see attached PDF to view the full announcement.",
+        "hasAttachments": true,
+        "sourceBodyChars": 54,
+        "pdfSupplementText": "1\nMedia Release – ad hoc announcement pursuant to Art. 53 LR\nSoftwareOne sets new 2030 financial targets as AI transformation unlocks\nunprecedented structural growth opportunities across enterprise software\nand cloud\nStans, Switzerland I 9 June 2026 – SoftwareOne Holding AG (SIX: SWON) today presents new 2030\nfinancial targets and a refined strategy at its Capital Markets Day starting at 14:00 CEST. The\nambition to achieve high-single-digit revenue CAGR, EBITDA margin above 28% and a free cash flow\nconversion above 60% builds on the successful integration of Crayon, a business model that has\ngrown stronger through every technology shift, and an even more powerful position to capture the\nstructural tailwind from AI.\nThe integration of Crayon is in its final stages and delivering ahead of expectations, creating an unmatched\nglobal platform of approximately 12,000 professionals across more than 70 countries with strengthened\nscale, capabilities and customer reach as AI reshapes enterprise software and cloud.\n“ SoftwareOne’s business model is built on a core value proposition that has been reinforced through every\nmajor technology shift, and the combination with Crayon has created a truly global platform, uniquely\npositioned to help enterprises navigate what is becoming the most complex decade in the history of\nenterprise software ”, says Melissa Mulholland, Co-CEO of SoftwareOne.\nRaphael Erb, Co-CEO of SoftwareOne, further underscores: “ Every technology wave, from on-premise to\ncloud, from SaaS proliferation to multi-cloud, and now AI, has expanded demand for what we do. Today, we\nare presenting a clear and credible path to strong, profitable growth, powered by a business model that is\ndelivering measurable outcomes for customers across the full technology lifecycle. ”\nTrusted to deliver value across the full technology lifecycle\nSoftwareOne’s role as an independent trusted advisor and its go-to-market model addresses the full\ntechnology lifecycle of customers. As AI adoption accelerates, enterprises increasingly require support to\nmanage technology cost, complexity and risk, expanding demand across SoftwareOne’s solution portfolio:\n• IT Cost Management: Advisory, IT Asset Management and FinOps services that improve visibility\nand control over software, cloud and AI spend.\n• Software & Cloud Sourcing: Access to the industry’s broadest ( 10,000+) vendors portfolio through\nsourcing, reselling and a scaled channel business serving 200,000+ SMB customers.\n• Cloud Services: End-to-end cloud delivery covering migration, modernisation, security and\nmanaged services across hybrid and multi-cloud environments.\n• Data & AI Solutions: Outcome-driven AI services that convert optimisation savings into measurable\nbusiness impact.\nAI acts as a structural accelerator across all four business motions, increasing governance requirements,\ndriving licence upgrades, accelerating cloud consumption and creating new services demand as customers\nbecome AI-ready. SoftwareOne c ombined with its proprietary IP, data from millions of software transactions,\n\n2\ncomplementary services depth and more than 25 years of domain expertise - is exceptionally well equipped,\nto capture a growing share of customer technology spend across software, cloud and AI.\n2030 financial ambitions and dividend policy\n• High-single-digit revenue CAGR, reflecting broad-based growth across Software & Cloud Direct,\nChannel and Services.\n• EBITDA margin above 28%, representing a strong 5 percentage points expansion from 2026, driven\nby AI efficiencies, a scalable business model and operating leverage.\n• Free cash flow conversion above 60% throughout the cycle, supported by earnings growth and\nstructural working capital improvements.\n• Dividend policy with a target payout of 30 – 50% of net profit.\nLIVE EVENT AND WEBCAST\nSoftwareOne's Capital Markets Day will begin at 14:00 CEST today. The event will be held in a hybrid\nformat, with investors, research analysts and media invited to attend in person (upon prior registration) at the\nCircle Convention Centre – Zurich Airport.\nTo view the live webcast, please visit SoftwareOne Capital Markets Day 2026. The presentation materials\nand agenda are available here from 13:00 CEST. The event will be held in English.\nTo participate in the Q&A session, or if you are unable to join via the webcast, you may dial in using the\nfollowing numbers below 10 - 15 minutes prior to the start of the event:\nSwitzerland / Europe: +41 (0) 58 310 50 00\nUnited Kingdom: +44 (0) 207 107 06 13\nUnited States: +1 (1) 631 570 56 13\nOther international numbers available here.\nA replay of the webcast will be available for on-demand viewing after the live event on Investor Relations |\nSoftwareOne.\nCORPORATE CALENDAR\n2026 Half-year results and 2026 Half-year Report 26 August 2026\nQ3 2026 Trading update 11 November 2026\nCONTACT\nKjell Arne Hansen, Investor Relations\nTel. +47 95 04 03 72, kjellarne.hansen@softwareone.com\n\n3\nABOUT SOFTWAREONE\nSoftwareOne is a global software and cloud solutions provider and distributor. With a presence in over 70\ncountries and a team of about 12,000 professionals, we combine global scale and local expertise to help\npartners and customers optimize costs, source and procure, accelerate growth, and navigate complex IT\nenvironments with confidence. Leveraging deep capabilities in cloud, software, and data and AI, the company\nempowers organizations to modernize, innovate, and unlock the full value of their technology investments.\nHeadquartered in Switzerland, SoftwareOne is listed on the SIX Swiss Exchange and Euronext\nOslo Børs under the ticker symbol SWON.\nSoftwareOne Holding AG, Riedenmatt 4, CH-6370 Stans\nCAUTIONARY STATEMENT REGARDING FORWARD-LOOKING INFORMATION\nThis media release may contain certain forward- looking statements relating to the group’s future business,\ndevelopment and economic performance. Such statements may be subject to a number of risks, uncertainties\nand other important factors, such as but not limited to force majeure, competitive pressures, legislative and\nregulatory developments, global, macroeconomic and political trends, the group’s ability to attract and retain\nthe employees that are necessary to generate revenues and to manage its businesses, fluctuations in currency\nexchange rates and general financial market conditions, changes in accounting standards or policies, delay or\ninability in obtaining approvals from authorities, technical developments, litigation or adverse publicity and\nnews coverage, each of which could cause actual development and results to differ materially from the\nstatements made in this media release. SoftwareOne assumes no obligation to update or alter forward-looking\nstatements whether as a result of new information, future events or otherwise.",
+        "pdfSupplementPageCount": 3,
+        "pdfSupplementAttachmentId": 327811
+      },
+      "storedOutput": null,
+      "storedValidation": {
+        "valid": true,
+        "errors": [],
+        "errorCode": null,
+        "promptChars": 1952,
+        "triageResult": {
+          "reason": "Utdraget inneholder ingen konkrete nye tall eller hendelser, bare henvisning til vedlegg/PDF. Uten innholdet i vedlegget er dette ikke nyhetsverdig nok for automatisk omskriving.",
+          "newsworthy": false
+        },
+        "sourceBodyChars": 54
+      },
+      "labels": {
+        "class": "false_skip",
+        "reportRef": "final report 2026-06-02_2026-08-13"
+      },
+      "expected": {
+        "triage": {
+          "deterministicSkipKind": null
+        }
+      },
+      "provenance": {
+        "window": {
+          "from": "2026-06-02",
+          "to": "2026-08-13"
+        },
+        "status": "skipped"
+      }
+    },
+    {
+      "messageId": 675848,
+      "generationRunId": "cmq81pewz07pjnr1rm0ph0pj1",
+      "promptVersion": "v5.8.0",
+      "sourcePayload": {
+        "messageId": 675848,
+        "title": "New name ALNG ASA registered",
+        "issuerName": "AWILCO LNG ASA",
+        "issuerSign": "ALNG",
+        "publishedAt": "2026-06-10T12:29:05.125Z",
+        "categories": [
+          "ANNEN INFORMASJONSPLIKTIG REGULATORISK INFORMASJON"
+        ],
+        "markets": [
+          "XOAX"
+        ],
+        "bodyText": "Oslo, 10 June 2026: Reference is made to the stock exchange announcement made by ALNG ASA (the \"Company\") on 3 June 2026 regarding the Company's annual general meeting for 2026 having been held the same day.\n\nAs further detailed therein, the annual general meeting inter alia resolved to amend paragraph 1 of the Company's articles of association to change the Company's name from \"Awilco LNG ASA\" to \"ALNG ASA\". The name change has today been registered with the Norwegian Register of Business Enterprises and is expected to be implemented by Euronext Oslo Børs shortly. Following the name change, the Company's shares will continue to trade under its existing ticker \"ALNG\".\n\nFor further information, please contact:\n\nInterim CEO Jens-Julius Ramdahl Nygaard, \nPhone: +47 957 21 630\n\nCFO Per Heiberg, \nPhone: +47 952 20 264\n\nAbout ALNG ASA\n\nALNG ASA is a Norwegian based LNG transportation provider, owning and operating LNG vessels intended for international trade. The Company currently owns two 2013 built 156,000 cbm TFDE membrane LNG vessels, WilForce and WilPride.\n\nThis information is subject to the disclosure requirements pursuant to section 5-12 of the Norwegian Securities Trading Act and Euronext Oslo Rule Book II – Issuer Rules.\n",
+        "hasAttachments": false,
+        "sourceBodyChars": 1244
+      },
+      "storedOutput": null,
+      "storedValidation": {
+        "valid": true,
+        "errors": [],
+        "errorCode": null,
+        "promptChars": 3115,
+        "triageResult": {
+          "reason": "Dette er en ren administrativ navneendring registrert etter vedtak i generalforsamlingen, uten nye tall, strategiske endringer eller andre nyhetsutløsende forhold.",
+          "newsworthy": false
+        },
+        "sourceBodyChars": 1244
+      },
+      "labels": {
+        "class": "false_skip",
+        "reportRef": "final report 2026-06-02_2026-08-13"
+      },
+      "expected": {
+        "triage": {
+          "deterministicSkipKind": null
+        }
+      },
+      "provenance": {
+        "window": {
+          "from": "2026-06-02",
+          "to": "2026-08-13"
+        },
+        "status": "skipped"
+      }
+    },
+    {
+      "messageId": 675858,
+      "generationRunId": "cmq83rsc008blnr1regqiz8gy",
+      "promptVersion": "v5.8.0",
+      "sourcePayload": {
+        "messageId": 675858,
+        "title": "Chief Business Development Officer to leave the Company",
+        "issuerName": "Capsol Technologies ASA",
+        "issuerSign": "CAPSL",
+        "publishedAt": "2026-06-10T13:26:53.420Z",
+        "categories": [
+          "ANNEN INFORMASJONSPLIKTIG REGULATORISK INFORMASJON"
+        ],
+        "markets": [
+          "XOSL"
+        ],
+        "bodyText": "Oslo June 10, 2026: Capsol Technologies ASA announces that Johan Jungholm, Chief\nBusiness Development Officer, has decided to step down from his position.\n\nJohan will continue in his role as Chief Business Development Officer during the\nnotice period and is expected to leave the company on 31 December 2026.\n\nThis information is subject to the disclosure requirements pursuant to Section 5\n-12 of the Norwegian Securities Trading Act.\n\nFor further information, please contact:\nJacob Zeno Clausen Krøvel\nSVP Investment and Strategy, Capsol Technologies ASA\n+47 48 40 32 25\n\nAbout Capsol Technologies\n\nCapsol Technologies ASA is a carbon capture technology provider with a goal of\naccelerating the world's transition to a net zero future. The technology\ncombines inherent heat recovery and generation in a stand-alone unit based on a\nproven and safe solvent. Capsol's technology is licensed either directly to\ncustomers or through industrial partners globally. Key segments include cement,\nbiomass, energy-from-waste and gas turbines. Capsol Technologies is listed on\nEuronext Oslo Børs (ticker: CAPSL). For more information\nvisit capsoltechnologies.com.\n\nTo receive Capsol's stock exchange and press releases via email, subscribe\nat capsoltechnologies.com/investors.\n\nThis information is subject to the disclosure requirements pursuant to section 5\n-12 of the Norwegian Securities Trading Act.\n\n\n",
+        "hasAttachments": false,
+        "sourceBodyChars": 1396
+      },
+      "storedOutput": null,
+      "storedValidation": {
+        "valid": true,
+        "errors": [],
+        "errorCode": null,
+        "promptChars": 3142,
+        "triageResult": {
+          "reason": "Meldingen gjelder en varslet avgang i ledergruppen uten opplysninger om ny toppsjef, strategisk endring eller annen vesentlig konsekvens. Fremstår som en ordinær personalmelding.",
+          "newsworthy": false
+        },
+        "sourceBodyChars": 1396
+      },
+      "labels": {
+        "class": "false_skip",
+        "reportRef": "final report 2026-06-02_2026-08-13"
+      },
+      "expected": {
+        "triage": {
+          "deterministicSkipKind": null
+        }
+      },
+      "provenance": {
+        "window": {
+          "from": "2026-06-02",
+          "to": "2026-08-13"
+        },
+        "status": "skipped"
+      }
+    },
+    {
+      "messageId": 675867,
+      "generationRunId": "cmq85nu8f08w3nr1rd68hief3",
+      "promptVersion": "v5.8.0",
+      "sourcePayload": {
+        "messageId": 675867,
+        "title": "Flagging",
+        "issuerName": "Zalaris ASA",
+        "issuerSign": "ZAL",
+        "publishedAt": "2026-06-10T14:19:46.818Z",
+        "categories": [
+          "FLAGGING"
+        ],
+        "markets": [
+          "XOSL"
+        ],
+        "bodyText": "Se vedlegg på www.newsweb.no",
+        "hasAttachments": true,
+        "sourceBodyChars": 28,
+        "pdfSupplementText": "1\nS tandard form for notification of major holdings\nNOTIFICATION OF MAJOR HOLDINGS (to be sent to the relevant issuer and to the competent authority)\ni\n1. Identity of the issuer or the underlying issuer of existing shares to which voting rights are at-\ntache d\nii\n:\nZalaris ASA, org.nr. 981 953 134\n2. Reason for the notification (please tick the appropriate box or boxes):\n[ X ] An acquisition or disposal of voting rights\n[ X ] An acquisition or disposal of financial instruments\n[ ] An event changing the breakdown of voting rights\n[ ] Other (please specify)\niii\n: Change in attribution of the nature of the holding from indirect to direct\n3. Details of person subject to the notification obligatio n\niv \n:\nName:\nAthanase Innovation AB, org.nr 559098 -\n0909\nCity and country of registered office ( if applicable):\nStockholm, Sweden\n4. Full name of shareholder(s) (if different from 3.)\nv\n:\n5. Date on which the threshold was crossed or reache d\nvi\n:\n9 June 2026\n6. Total positions of person(s) subject to the notification obligation:\n% of voting rights at-\ntached to shares (to-\ntal of 7.A)\n% of voting rights\nthrough financial instru-\nments\n(total of 7.B.1 + 7.B. 2)\nTotal of both in %\n(7.A + 7.B)\nTotal number of\nvoting rights of is-\nsue r\nvii\nResulting situation\non the date on which\nthreshold was\ncrossed or reached\n0 % 0\nPosition of previous\nnotification (if appli-\ncable)\n6,45 %\nDate: 10 June 2026\nESMA/201 5 / 1597\n\n2\n7. Notified details of the r esulting situation on the date on which the threshold was crossed or\nreache d\nviii\n:\nA: Voting rights attached to shares\nClass/type of\nshares\nISIN code (if possi-\nble)\nNumber of voting right s\nix \n% of voting rights\nDirect\n(Art 9 of Directive\n2004/109/EC)\nIndirect\n(Art 10 of Directive\n2004/109/EC)\nDirect\n(Art 9 of Directive\n2004/109/EC)\nIndirect\n(Art 10 of Directive\n2004/109/EC)\nNO0010708910 0 0\nSUBTOTAL A \n0\nB 1: Financial Instruments according to Art. 13(1)(a) of Directive 2004/109/EC\nType of financial in-\nstrument\nExpiration\ndat e\nx\nExercise/\nConversion Period\nxi\nNumber of voting rights\nthat may be acquired if\nthe instrument is exer-\ncised/ converted.\n% of voting rights\nSUBTOTAL B.1 \nN/A N/A\nB 2: Financial Instruments with similar economic effect according to Art. 13(1)(b) of Directive\n2004/109/EC\nType of financial\ninstrument\nExpiration\ndat e\nx\nExercise/\nConversion Pe-\nriod \nx\ni\nPhysical or cash\nsettlemen t\nxii\nNumber of\nvoting rights \n% of voting rights\nSUBTOTAL B.2 \nN/A N/A\n\n3\n8. Information in relation to the person subject to the notification obligation (please tick the applica-\nble box):\n[ ] Person subject to the notification obligation is not controlled by any natural person or legal en-\ntity and does not control any other undertaking(s) holding directly or indirectly an interest in the\n(underlying) issuer.\nxiii\n[ ] Full c hain of controlled undertakings through which the voting rights and/or the\nfinancial instruments are effectively held starting with the ultimate controlling natural person or le-\ngal entity\nxiv\n:\nName\nxv\n% of voting rights if it\nequals or is higher\nthan the notifiable\nthreshold\n% of voting rights\nthrough financial in-\nstruments if it equals\nor is higher than the\nnotifiable threshold\nTotal of both if it\nequals or is higher\nthan the notifiable\nthreshold\n9. In case of proxy voting: [ name of the proxy holder ] will cease to hold [% and number ] voting rights as of\n[ date ]\n10. Additional information\nxvi\n:\nFollowing the tender offer in Zalaris ASA, Athanase Innovation AB has sold their 1,427,006 shares in Zala-\nris ASA.\nAfter the transaction Athanase Innovation AB has a direct ownership of 0% of the\ncompany, equalling 0 shares.\nDone in Oslo on 10 June 2026.\n\n4\nAnnex: Notification of major holdings (only to be filed with competent authority and not with the relevant\nissuer)\nA: Identity of the person subject to the notification obligation\nFull name (including legal form f o r legal entities)\nAthanase Innovation AB\nContact address (registered office for legal entities)\nBirger Jarlsgatan 6, 4 tr 114 34 STOCKHOLM\nE - Mail\nmalin@athanaseinnovation.com\nPhone number / Fax number\n+46 70 678 85 00\nOther useful information (at least legal a contact person for legal persons)\nMalin Norrman, malin@athanaseinnovation.com, +46 70 678 85 00\nB: Identity of the notifier, if applicable\nFull name\nAdvokatfirmaet Hjort AS v/ advokat Jørn A. Uggerud\nContact address\nPostboks 471 Sentrum, 0105 Oslo\nE - Mail\njau@hjort.no\nPhone number / Fax number\n+47 975 40 185\nOther useful information (e.g. functional relationship with the person or legal entity subject to the notification obliga-\ntion)\nThe notification is on behalf of\nAdvokatfirman Lindahl KB\nBox 5898\n102 40 Stockholm\nLegal advisor to Athanase Innovation AB\nC: Additional information:\n\n5\nNotes\ni \nPlease note that national forms may vary due to specific national legislation (Article 3(1a) of Directive 2004/109/EC)\nas for instance the applicable thresholds or information regarding capital holdings.\nii \nFull name of the legal entity and further specification of the issuer or underlying issuer, provided it is reliable and\naccurate (e.g. address, LEI, domestic number identity).\niii \nOther reason for the notification could be voluntary notifications, changes of attribution of the nature of the holding\n(e.g. expiring of financial instruments) or acting in concert.\niv \nThis should be the full name of (a) the shareholder; (b) the natural person or legal entity acquiring, disposing of or\nexercising voting rights in the cases provided for in Article 10 (b) to (h) of Directive 2004/109/EC; or (c) the holder of\nfinancial ins truments referred to in Article 13(1) of Directive 2004/109/EC.\nAs the disclosure of cases of acting in concert may vary due to the specific circumstances (e.g. same or different total\npositions of the parties, entering or exiting of acting in concert by a single party) the standard form does not provide for\na specific method how to notify cases of acting in concert.\nIn relation to the transactions referred to in points (b) to (h) of Article 10 of Directive 2004/109/EC, the following list i s\nprovided as indication of the persons who should be mentioned:\n- in the circumstances foreseen in letter (b) of Article 10 of that Directive, the natural person or legal entity that\nacquires the voting rights and is entitled to exercise them under the agreement and the natural person or legal\nentity who is transferrin g temporarily for consideration the voting rights;\n- in the circumstances foreseen in letter (c) of Article 10 of that Directive, the natural person or legal entity holding\nthe collateral, provided the person or entity controls the voting rights and declares its intention of exercising them,\nand natural pe rson or legal entity lodging the collateral under these conditions;\n- in the circumstances foreseen in letter (d) of Article 10 of that Directive, the natural person or legal entity who\nhas a life interest in shares if that person or entity is entitled to exercise the voting rights attached to the shares\nand the natural pe rson or legal entity who is disposing of the voting rights when the life interest is created;\n- in the circumstances foreseen in letter (e) of Article 10 of that Directive, the controlling natural person or legal\nentity and, provided it has a notification duty at an individual level under Article 9, under letters (a) to (d) of Article\n10 of that Di rective or under a combination of any of those situations, the controlled undertaking;\n- in the circumstances foreseen in letter (f) of Article 10 of that Directive, the deposit taker of the shares, if he can\nexercise the voting rights attached to the shares deposited with him at his discretion, and the depositor of the\nshares allowing the d eposit taker to exercise the voting rights at his discretion;\n- in the circumstances foreseen in letter (g) of Article 10 of that Directive, the natural person or legal entity that\ncontrols the voting rights;\n- in the circumstances foreseen in letter (h) of Article 10 of that Directive, the proxy holder, if he can exercise the\nvoting rights at his discretion, and the shareholder who has given his proxy to the proxy holder allowing the latter\nto exercise the vot ing rights at his discretion (e.g. management companies).\nv \nApplicable in the cases provided for in Article 10 (b) to (h) of Directive 2004/109/EC. This should be the full name of\nthe shareholder who is the counterparty to the natural person or legal entity referred to in Article 10 of that Directive\nunless the pe rcentage of voting rights held by the shareholder is lower than the lowest notifiable threshold for the dis-\nclosure of voting rights holdings in accordance with national practices (e.g. identification of funds managed by manage-\nment companies).\nvi \nThe date on which threshold is crossed or reached should be the date on which the acquisition or disposal took place\nor the other reason triggered the notification obligation. For passive crossings, the date when the corporate event took\neffect.\nvii \nThe total number of voting rights shall be composed of all the shares, including depository receipts representing\nshares, to which voting rights are attached even if the exercise thereof is suspended.\n\n6\nviii \nIf the holding has fallen below the lowest applicable threshold in accordance with national law, please note that it\nmight not be necessary in accordance with national law to disclose the extent of the holding, only that the new holding\nis below that thre shold.\nix \nIn case of combined holdings of shares with voting rights attached \"direct holding\" and voting rights \"indirect holding\",\nplease split the voting rights number and percentage into the direct and indirect columns – if there is no combined\nholdings, please leave the relevant box blank.\nx \nDate of maturity/expiration of the financial instrument i.e. the date when right to acquire shares ends.\nxi \nIf the financial instrument has such a period – please specify this period – for example once every 3 months starting\nfrom [date].\nxii \nIn case of cash settled instruments the number and percentages of voting rights is to be presented on a delta - adjusted\nbasis (Article 13(1a) of Directive 2004/109/EC).\nxiii \nIf the person subject to the notification obligation is either controlled and/or does control another undertaking then the\nsecond option applies.\nxiv \nThe full chain of controlled undertakings starting with the ultimate controlling natural person or legal entity has to be\npresented also in the cases, in which only on subsidiary level a threshold is crossed or reached and the subsidiary\nundertaking discl oses the notification as only thus the markets get always the full picture of the group holdings. In case\nof multiple chains through which the voting rights and/or financial instruments are effectively held the chains have to be\npresented chain by chain leaving a row free between different chains (e.g.: A, B, C, free row, A, B, D, free row, A, E, F\netc.).\nxv \nThe names of controlled undertakings through which the voting rights and/or financial instruments are effectively held\nhave to be presented irrespectively whether the controlled undertakings cross or reach the lowest applicable threshold\nthemselves.\nxvi \nExample: Correction of a previous notification.",
+        "pdfSupplementPageCount": 6,
+        "pdfSupplementAttachmentId": 327936
+      },
+      "storedOutput": null,
+      "storedValidation": {
+        "valid": true,
+        "errors": [],
+        "errorCode": null,
+        "promptChars": 1880,
+        "triageResult": {
+          "reason": "Meldingen er bare en flaggemelding som viser til et vedlegg på Newsweb, uten oppgitte detaljer om hvem, størrelse eller årsak i teksten. Ikke nyhetsverdig nok uten å lese vedlegget.",
+          "newsworthy": false
+        },
+        "sourceBodyChars": 28
+      },
+      "labels": {
+        "class": "false_skip",
+        "reportRef": "final report 2026-06-02_2026-08-13"
+      },
+      "expected": {
+        "triage": {
+          "deterministicSkipKind": null
+        }
+      },
+      "provenance": {
+        "window": {
+          "from": "2026-06-02",
+          "to": "2026-08-13"
+        },
+        "status": "skipped"
+      }
+    },
+    {
+      "messageId": 675870,
+      "generationRunId": "cmq86dzss0039vy1vsv9ztthf",
+      "promptVersion": "v5.8.0",
+      "sourcePayload": {
+        "messageId": 675870,
+        "title": "Fjord Defence Group ASA – New share capital registered",
+        "issuerName": "Fjord Defence Group ASA",
+        "issuerSign": "DFENS",
+        "publishedAt": "2026-06-10T14:40:07.267Z",
+        "categories": [
+          "KAPITAL- OG STEMMERETTSENDRINGER"
+        ],
+        "markets": [
+          "XOSL"
+        ],
+        "bodyText": "Oslo, 10 June 2026\n\nReference is made to the stock exchange announcements made by Fjord Defence Group ASA (the \"Company\") on 20 May 2026 and 5 June 2026 regarding, inter alia, the Acquisition (as defined therein) and the board of directors' resolution to issue 6,972,823 new shares in the Company to be used as part settlement of the consideration payable by the Company to the Seller (as defined therein) in the Acquisition (the \"Consideration Shares\"). The Acquisition was successfully completed on 5 June 2026.\n\nThe share capital increase pertaining to the issuance of the Consideration Shares has today been registered with the Norwegian Register of Business Enterprises:\n\n\tShare capital (new): NOK 639,438,987.60\n\tTotal number of shares (new): 76,123,689 shares\n\tPar value of each share: NOK 8.40\n\nThe Consideration Shares will be issued in the Norwegian Central Securities Depository, Euronext Securities Oslo (VPS), on the Company's listed ISIN (NO 0013647693) and are expected to be delivered to the Seller on or about 10 June 2026.\n\nFor further details about the Acquisition, please refer to the Company's stock exchange announcements of 20 May 2026.\n\nFor further information, please contact: \nJon Asbjørn Bø, CEO \nJAB@fjorddefence.com \n+47 930 86 932 \n\nABOUT FJORD DEFENCE GROUP ASA \n\nFjord Defence Group ASA (\"DFENS\") is a Norwegian \"compounder\" listed on Euronext Oslo Børs seeking to acquire and develop fast-growing, profitable, and well-run companies in the defence industry. The company has a buy & build strategy, with focus on acquiring established, profitable businesses within the defence, security and related segments. More information on www.fjorddefencegroup.com.\n\nThis information is subject to the disclosure requirements pursuant to Section 5-12 of the Norwegian Securities Trading Act and Euronext Oslo Rulebook II – Issuer Rules.\n",
+        "hasAttachments": false,
+        "sourceBodyChars": 1862
+      },
+      "storedOutput": null,
+      "storedValidation": {
+        "valid": true,
+        "errors": [],
+        "errorCode": null,
+        "promptChars": 0,
+        "sourceBodyChars": 1862,
+        "skippedCategories": [
+          "KAPITAL- OG STEMMERETTSENDRINGER"
+        ]
+      },
+      "labels": {
+        "class": "false_skip",
+        "reportRef": "final report 2026-06-02_2026-08-13"
+      },
+      "expected": {
+        "triage": {
+          "deterministicSkipKind": null
+        }
+      },
+      "provenance": {
+        "window": {
+          "from": "2026-06-02",
+          "to": "2026-08-13"
+        },
+        "status": "skipped"
+      }
+    },
+    {
+      "messageId": 678418,
+      "generationRunId": "cmrsui8lj23hdpx16dj602soe",
+      "promptVersion": "v5.9.1",
+      "sourcePayload": {
+        "messageId": 678418,
+        "title": "Desert Control Field Trials Demonstrate Significant Yield and Water Efficiency Gains in Romaine Lettuce with Liquid Natural Clay",
+        "issuerName": "Desert Control AS",
+        "issuerSign": "DSRT",
+        "publishedAt": "2026-07-20T06:30:20.400Z",
+        "categories": [
+          "INNSIDEINFORMASJON"
+        ],
+        "markets": [
+          "MERK"
+        ],
+        "bodyText": "Sandnes, Norway, 20 July 2026 - Desert Control (OSE: DSRT), a leader in soil and\nwater conservation technology, announces field trial results demonstrating that\nLiquid Natural Clay (LNC) can significantly improve romaine lettuce yields and\nwater-use efficiency in sandy soils, offering growers a practical tool to\naddress increasing water scarcity and soil management challenges.\n\nAn initial, spring 2026 trial was conducted on a historically underperforming\nsandy loam field in the Salinas Valley, where growers often face rapid water\ndrainage, low organic matter, and limited nutrient retention. One acre treated\nwith LNC was compared to one acre of untreated romaine lettuce under identical\nirrigation practices. Results were verified by the customer, a large grower in\nthe Salinas Valley.\n\nResults showed that the LNC-treated plot produced427 boxes per acre, compared\nwith329 boxes per acrein the untreated control-a29.8% increase in yield. Average\nbox weights remained nearly identical between the two plots, indicating that the\nincrease was driven by a greater number of harvestable lettuce heads rather than\nincreased plant size.\n\nAssuming recent romaine lettuce spot pricing of $18/box, the increased number of\nboxes in the LNC-treated acre had the potential to increase sales by almost\n$1,800 per acre (98 additional boxes X $18).\n\nThe study also demonstrated a substantial improvement in water-use efficiency.\nThe LNC-treated field achieved5.7 tons per acre-foot of water, compared with4.3\ntons per acre-footin the control plot, representing a33% improvement in water\n-use efficiency.\n\nBy increasing the soil's reactive surface area, the product helps retain water\nand nutrients within the root zone, slowing water percolation through sandy\nsoils and improving crop access to essential resources. This aspect of LNC was\nespecially crucial during the first trial as crop performance was maintained\nduring a delayed harvest period after irrigation had been stopped.\n\nSubsequent to the first trial, the Desert Control and same grower conducted\nanother romaine lettuce trial to confirm the results of the first trial. In\nnearby plots of over 5 acres, the LNC-treated lettuce harvest was 34% greater\nthan the untreated plot. More detailed findings from the subsequent trial will\nbe published soon. The whitepaper from the first trial is available\nat https://desertcontrol.com/results/\n\n\"These results demonstrate the practical value of improving the soil's ability\nto hold water and nutrients where crops need them most,\" saidJames Thomas, Chief\nExecutive Officer. \"In these trials, Liquid Natural Clay demonstrates yield\nincreases of approximately 30% and higher, while meaningfully improving water\n-use efficiency, all without requiring additional water or changes to standard\nfarming practices. We were pleased to see this degree of improvement in soil\nwith 64% sand content; a type of soil which has not been the focus of our\nmarketing efforts. We were also pleased to see this response in row crops, as\nour marketing focus has been permanent crops. Both findings indicate that our\ntotal addressable market could be larger than previously expected.\"\n\nThe findings suggest that LNC can serve as a practical management tool for\ngrowers seeking to improve productivity, conserve water, and build greater\nresilience against water stress and operational challenges, particularly in\nsandy soils.\n\nFor more information, please contact:\n\nDavid Borah\n\nChief Financial Officer\n\ndavid.borah@desertcontrol.com\n\nAbout Desert Control\n\nDesert Control develops innovative solutions to enhance soil health, conserve\nwater, and promote ecosystem resilience. Our proprietary Liquid Natural Clay\n(LNC) allows sandy, fast-draining soils to retain water and nutrients, improving\nsoil health, crop yields, and ecosystem vitality while conserving water. Desert\nControl provides customized solutions to strengthen sustainability,\nprofitability, and prosperity for agriculture, forests, and green landscapes. In\ncollaboration with partners and clients, we aim to preserve natural resources,\nenhance food security, and ensure a climate-resilient future.\n\nCautionary Note\n\nThis release contains forward-looking information and statements relating to the\nbusiness, performance, and items that may be interpreted to impact the results\nof Desert Control and/or the industry and markets in which Desert Control\noperates. Forward-looking statements are statements that are not historical\nfacts and may be identified by words such as \"aims,\" \"anticipates,\" \"believes,\"\n\"estimates,\" \"expects,\" \"foresees,\" \"intends,\" \"plans,\" \"predicts,\" \"projects,\"\n\"targets,\" and similar expressions. Such forward-looking statements are based on\ncurrent expectations, estimates, and projections, reflect current views\nconcerning future events, and are subject to risks, uncertainties, and\nassumptions, and may be subject to change without notice. Forward-looking\nstatements are not guarantees of any future performance, and risks,\nuncertainties, and other important factors could cause the actual business,\nperformance, results, or the industry and markets in which Desert Control\noperates to differ materially from the statements expressed or implied in this\nrelease by such forward-looking statements. No representation is made that any\nof these forward-looking statements or forecasts will come to pass or that any\nforecasted performance, capacities, or results will be achieved, and you are\ncautioned not to place any undue reliance on any forward-looking statements.\n\n\n",
+        "hasAttachments": true,
+        "sourceBodyChars": 5533,
+        "pdfSupplementText": "Desert Control\n\nRomaine Lettuce\n\nYield Trial\n\nTABLE OF\nCONTENTS\nIntroduction\n\nSummary\n\nMaterials & Methods\n\nResults\n\nDiscussion\n\nConclusion\n\nReferences\n01\n\n02\n\n03\n\n06\n\n07\n\n09\n\n10\n\nRomaine Lettuce Yield Trial\nIntroduction\nThe Western United States faces a pressing crisis in water availability. Prolonged drought has placed\nextreme stress on California farmers, who generate half of the country’s vegetables and three-quarters of\nits fruits and nuts while consuming roughly 80% of the state’s managed water supply¹ ² ³. In critical\nagricultural hubs like the Salinas Valley, heavy reliance on local aquifers has led to the formation of the\nSustained Groundwater Management Act (SGMA), which strictly enforces the conservation of regional\nfreshwater resources⁴. Further restrictions are likely to follow, as state and federal level negotiations are\nanticipated to enforce greater cuts in withdrawals from the Colorado River Basin⁵. As growers face\ntightening state-level water allocations, steeply rising water costs, and government incentives to fallow\nland, optimizing every drop of applied water is no longer a luxury, but an operational necessity⁶ ⁷.\n\n\nCompounding these water restrictions are the inherent limitations of the soil. In the American Southwest,\nmany agricultural regions are dominated by sandy soils 8 9. These soils are characterized by high\nhydraulic conductivity and low water-holding capacity, which drives poor irrigation efficiency and,\nfrequently, suboptimal crop yields 8 10 11. While several methods are commercially available to mitigate\nthese effects, including biochar, mulching, compost, superabsorbent polymers, wetting agents or\nsurfactants, and live microbials, each comes with distinct trade-offs regarding application logistics,\nefficacy, or longevity¹².\n\n\nDesert Control’s Liquid Natural Clay (LNC) offers a fundamentally different approach. LNC is an OMRI-\nlisted organic soil amendment that uses exfoliated clay platelets in a liquid suspension to improve soil\nstructure. Because it is applied directly through the growers’ existing irrigation systems, LNC delivers\nsustained results without requiring mechanical soil disruption or changes to current farming operations.\nOnce applied, LNC increases the reactive surface area within soil macropores, slowing the percolation of\nwater and extending its residence times in the root zone. This allows the plant to uptake a significantly\nhigher proportion of applied water and nutrients.\nTo test its efficacy under field conditions, LNC was applied to a 6-row trial block at a commercial lettuce\noperation in California’s Salinas Valley. This publication evaluates the efficacy of the LNC treatment\nagainst an adjacent untreated control plot, quantifying the results of a single growing season in\nharvestable yield per acre. In doing so, the objective is to provide growers with a scientifically validated,\nhighly practical method to enhance yields and water efficiency in underperforming, sand-dominant soils.\n01 Desert Control | Romaine Lettuce Yield Trial\n\nRomaine Lettuce Yield Trial\nSummary\nLiquid Natural Clay (“LNC”) was applied to 6 rows (1 acre) of romaine lettuce located in California’s Salinas\nValley and compared against an untreated control (“UTC”) group. Results after one growing season\nshowed a nearly 30% increase in boxes per acre and a 33% increase in Water Use Efficiency. This suggests\na significant positive impact of LNC on harvestable crop yields compared to UTC, under equal irrigation\nregimes. LNC is also likely to have acted as a buffer against additional stress as the grower was forced to\ndelay harvest after terminating their irrigation program. When considered concurrently with its ease of\napplication and minimal disruption to farming operations, LNC is a viable alternative to traditional\nmethods of mitigating the negative effects of sandy, fast draining soils.\nMaterials and Methods\nSite Selection and Experimental Design\nThe field trial was conducted in the Salinas Valley of California during the spring 2026 growing season.\nThe trial focused on commercial romaine lettuce production. To ensure the trial reflected demanding\ncommercial realities, the grower selected a historically underperforming ranch block.\nThe experimental design consisted of a side-by-side field comparison:\n• Treatment Plot: One acre of commercial romaine lettuce treated with Liquid Natural Clay (LNC).\n• Control Plot: One acre of commercial romaine lettuce grown under standard historical grower\npractices, serving as the untreated control group.\nSoil Baseline Profile\nPrior to the trial, a 0-to-6-inch soil sample from the specific trial block was collected and analyzed by\nMidwest Laboratories (March 31, 2026). The analysis confirmed a light-textured sandy loam soil profile\ncharacterized by rapid drainage, low organic matter, and limited native buffering capacity.\n02 Desert Control | Romaine Lettuce Yield Trial\n\nR omaine Lettuce Y ield Trial\nTable 1: Baseline Soil Physio-Chemical Properties (0–6 inch depth)\nParameter M eas u rement Agronomic Implication\nSoil Texture Sandy Loam \nHigh permeability, prone to rapid\ndrainage.\nSand/Silt/Clay % 64%/ 20%/ 16% \nContributes to poor nutrient and water\nretention.\nOrganic Matter 0. 6% \nExtremely low; limits biological activity and\nstructure.\nSoil pH 8. 0 Moderately alkaline.\nCation Exchange\nCapacity (CEC) \n6. 7 me q / 100 g \nLow capacity to hold onto essential\nnutrients.\nNitrate-N 12 ppm Baseline nitrogen availability.\nSoluble Salts 0. 3 mmhos/cm Low salinity risk.\nF ield Capacity 15. 23% Maximum water held after excess drains.\nW ilting P oint 5. 26% \nMoisture level at which plants can no longer\nextract water.\nA vailable Moisture 9. 97% Narrow margin o f usable water f or the crop.\nLNC Treatment and Application Protocol\nThe treatment utili z ed was a proprietary f ormulation o f Li q uid Natural Clay (LNC) developed by D esert\nControl, designed to permanently or semi-permanently alter the water- and nutrient-holding behavior o f\nlight soils. The application occurred in A pril 2026 shortly after the beginning o f the vegetative growing\nseason.\n\nThe treatment was executed as a vendor-applied service by D esert Control, re q uiring no additional\noperational labor f rom the grower. LNC was delivered through the fi eld ' s existing drip tape irrigation\nin f rastructure.\n04 D esert Control | R omaine Lettuce Y ield Trial\n\nRomaine Lettuce Yield Trial\nTable 2: LNC Application Parameters\nOperational Metric Specification\nApplication Delivery Method \nSandy Loam\n64%/20%/16%\nTotal Water Volume Applied\nIrrigation Runtime 0.6%\n8.0\nEquipment Used\n6.7 meq/100 g\nUnit Output Capacity\nEstimated Daily Capacity 12 ppm\nAdditional Grower Inputs 0.3 mmhos/cm\n05 Desert Control | Romaine Lettuce Yield Trial\n\nRomaine Lettuce Yield Trial\nResults\nHarvest Yield and Physical Characteristics\n\nBoth the treated and untreated plots were harvested simultaneously on May 19, 2026. The primary\nagronomic metric evaluated was yield volume (measured in standard harvest boxes per acre) and average\ncarton weight.\n\nThe data indicates that the LNC application significantly improved the productive output of the\nhistorically weak ground. The primary driver of the yield increase was total volume (number of mature,\nharvestable heads) rather than an increase of individual carton weights, as box weights remained virtually\nidentical between the two plots.\nTable 3: Agronomic Yield Comparison\nUntreated Control\n(UTC) Acre \nLNC-Treated\nAcre \nNet\nChange \nPercentage\nChange\nHarvest Metric\nTotal Yield 329 boxes 427 boxes +98 boxes +29.8%\nAverage Box Weight 17.7 lbs 17.8 lbs +0.1 lbs +0.56%\n06 Desert Control | Romaine Lettuce Yield Trial\n\nRomaine Lettuce Yield Trial\nDiscussion\nApplication Success and Yield Impact\n\nThe application of LNC in this trial is considered highly successful. By generating a 29.8% increase in total\nharvestable yield an additional 98 boxes per acre without compromising individual carton weight or\nrequiring additional grower inputs, LNC met the primary objective of enhancing productive output on\nhistorically underperforming sandy loam soils. The data suggests that by fundamentally altering the\nsoil's hydrological and nutrient flow characteristics, the crop was able to sustain a higher population of\nmature, harvestable heads through to the end of the season.\n\n\nApplication Timing Optimization\n\nIt is notable that the LNC treatment was applied via existing drip infrastructure approximately three\nweeks after the beginning of the vegetative growing season. While the results demonstrate a clear and\nsignificant agronomic benefit, an earlier application such as pre-planting or immediately at planting may\nimprove the outcome further. Introducing LNC earlier in the crop cycle could maximize moisture and\nnutrient retention during the critical early stages of root establishment, potentially compounding the\nyield benefits observed here.\n\n\nMoisture Retention as an Agronomic \"Insurance Policy\"\n\nAn important operational variable occurred at the end of the trial: the grower delayed the harvest after\ndiscontinuing standard irrigation. This extended \"dry-down\" period likely favored the LNC-treated plot.\nBecause LNC increases the reactive surface area within soil macropores and slows water percolation, the\ntreated root zone retained plant-available moisture longer than the untreated crop. As a result, the LNC-\ntreated lettuce was better buffered against water stress and desiccation. In commercial practice, this\nextended moisture retention serves as a critical \"insurance policy,\" protecting crop quality and yield\nagainst unexpected irrigation disruptions, extreme heat events, or unforeseen harvest delays.\n\n07 Desert Control | Romaine Lettuce Yield Trial\n\nRomaine Lettuce Yield Trial\nConverting Results to Water Use Efficiency (WUE)\n\n\nWater Use Efficiency (WUE) is a useful tool in comparing yields per unit of applied water, expressed in tons\nof yield per acre foot (AF) of water. The LNC-treated and control plots each received 0.57-acre feet per acre\n(AF/ac) of irrigation, and 1.2” of rainfall over the growing season. This converts to 8.04 inches per acre or\n0.67 AF/ac of total water applied. Translating these values into tons of yield per acre foot of water results\nin the following:\nTable 4: Water Use Efficiency\nHarvest Metric \nUntreated Control\n(UTC) Acre \nLNC-Treated\nAcre \nNet C h an g e\nLNC 0. 6 7 3. 8 5.7\nUTC 0. 6 7 2. 9 4.3\nTable 4 shows a WUE of 4.3 tons of yield per acre foot of applied water for the untreated control group,\nwhile the LNC group has a calculated WUE of 5.7 tons/AF. This represents a 33% increase in yield per AF of\napplied water.\nDurability in Row Crop Systems and Future Studies\n\n\nWhile LNC has shown prolonged structural durability in permanent agriculture applications (such as tree\nnuts and vineyards), the product is unlikely to demonstrate the same permanence in seasonal row crop\noperations. The intensive, frequent mechanical tillage required between vegetable crop cycles will\ninevitably disrupt the continuous LNC soil matrix over time. As such, optimizing reapplication frequencies\nwill require additional studies to evaluate the persistence of LNC across multiple seasons.\n08 Desert Control | Romaine Lettuce Yield Trial\n\nRomaine Lettuce Yield Trial\nConclusion\nThe Spring 2026 Romaine lettuce trial in California’s Salinas Valley demonstrates that LNC is a highly\nviable solution for mitigating the compounding challenges of sandy soils and severe water scarcity in\ncommercial agriculture. LNC treatment generated a nearly 30% increase in harvestable romaine lettuce\nyield and significantly improved overall Water Use Efficiency without requiring additional grower labor or\nwater inputs. Furthermore, this enhanced water-holding capacity acted as a critical agronomic buffer\nagainst late-season water stress, preserving crop quality during a delayed dry-down harvest.\nAlthough further research is required to evaluate long-term persistence amidst the frequent mechanical\ntillage of seasonal row crop systems, LNC presents a scientifically validated, immediately practical\nmethod to transform underperforming, sand-dominant ground into highly productive acreage.\n09 Desert Control | Romaine Lettuce Yield Trial\n\nReferences\nThe Western Drought Issue. (2025, September 3). Drought.gov.\nhttps://www.drought.gov/news/western-drought-issue-2025-09-03\n\nCalifornia Department of Food and Agriculture. (2022). California Agricultural Production Statistics. Ca.gov.\nhttps://www.cdfa.ca.gov/statistics/\n\nPeterson, C., Escriva-Bou, A., Medellín-Azuara, J., & Cole, S. (n.d.). Water Use in California’s Agriculture.\nhttps://www.ppic.org/wp-content/uploads/water-use-in-californias-agriculture.pdf\n\nCalifornia Department of Water Resources. (2014). SGMA Groundwater Management. Ca.gov.\nhttps://water.ca.gov/Programs/Groundwater-Management/SGMA-Groundwater-Management\n\nColorado River Board of California. (2026, June 24). California Commits to Conservation, Collaboration in New\nColorado River Framework [Review of California Commits to Conservation, Collaboration in New Colorado\nRiver Framework]. Crb.ca.gov.\nhttps://crb.ca.gov/wp-content/uploads/2025/12/20251216-press-release-new-framework.pdf\n\nLandFlex. (n.d.). Water.ca.gov. https://water.ca.gov/landflex\n\nQuinton, A. M. (2025, November 5). California Surface Water Costs Triple During Drought. UC Davis.\nhttps://www.ucdavis.edu/climate/news/california-surface-water-costs-triple-during-drought\n\nNASA Earth Observatory. (2016, January 9). Soil Composition Across the U.S. NASA Science.\nhttps://science.nasa.gov/earth/earth-observatory/soil-composition-across-the-us-87220/\n\nSamuel, J. (2019). SoilGrids | ISRIC. Soilgrids.org. https://soilgrids.org/\n\nSoil Water Holding Characteristics | UC Agriculture and Natural Resources. (2025, February 26). UC Agriculture\nand Natural Resources.\nhttps://ucanr.edu/site/center-landscape-urban-horticulture/soil-water-holding-characteristics\n10 Desert Control | Romaine Lettuce Yield Trial\n\nwww.desertcontrol.com",
+        "pdfSupplementPageCount": 12,
+        "pdfSupplementAttachmentId": 329912
+      },
+      "storedOutput": null,
+      "storedValidation": {
+        "valid": true,
+        "errors": [],
+        "errorCode": null,
+        "promptChars": 0,
+        "triageResult": {
+          "kind": "document-only",
+          "reason": "Tilgjengelig tekst sier bare at et dokument/presentasjon er publisert, uten konkrete tall, hendelser eller konsekvenser.",
+          "newsworthy": false
+        },
+        "sourceBodyChars": 5533
+      },
+      "labels": {
+        "class": "false_skip",
+        "reportRef": "final report 2026-06-02_2026-08-13"
+      },
+      "expected": {
+        "triage": {
+          "deterministicSkipKind": "document-only"
+        }
+      },
+      "provenance": {
+        "window": {
+          "from": "2026-06-02",
+          "to": "2026-08-13"
+        },
+        "status": "skipped"
+      }
+    },
+    {
+      "messageId": 679225,
+      "generationRunId": "cmsijbe0n2n5epx17r2movozl",
+      "promptVersion": "v5.9.1",
+      "sourcePayload": {
+        "messageId": 679225,
+        "title": "Nordic Mining ASA - Update on Production Ramp-Up, Liquidity and Regulatory Status",
+        "issuerName": "Nordic Mining ASA",
+        "issuerSign": "NOM",
+        "publishedAt": "2026-08-07T05:59:07.391Z",
+        "categories": [
+          "INNSIDEINFORMASJON"
+        ],
+        "markets": [
+          "XOSL"
+        ],
+        "bodyText": "Oslo, 7 August 2026\n\nINSIDE INFORMATION pursuant to Article 17 of the Market Abuse Regulation (MAR)\n\nNordic Mining ASA (\"Nordic Mining\" or the \"Company\") today publishes the\nfollowing update regarding the production ramp up, liquidity and regulatory\nstatus. The Company is simultaneously publishing a separate stock exchange\nannouncement from Engebø Rutile and Garnet AS (Nordic Rutile, ISIN:\nNO0012734112) as issuer of the Senior Secured Bonds.\n\nProduction ramp-up: The ramp-up at Engebø Rutile and Garnet AS (\"ERG\") is behind\nthe original schedule. Following a ramp-up reset under new operational\nmanagement in early 2026 and with the support of external technical adviser\nSystemex, plant throughput is approaching design capacity. However, challenges\nwith product separation (rutile) and fines (garnet) have required a downward\nrevision of production forecasts.\n\nLiquidity: The Company and ERG have initiated discussions with a group of\nbondholders under the Senior Secured bonds and has been informed that\nBondholders representing more than two-thirds (2/3) of the Voting Bonds have\nindicated their support to a deferral of the 9 August coupon payment for the\nSenior Secured bonds and further waiver as described in the separate\nannouncement made by ERG today, the Company's current liquidity extends to 4\nSeptember 2026. A liquidity injection of USD 10-15 million is required to fund\noperations through to November 2026. The Company is working to secure this\nthrough a tap issue under ERG's existing Senior Secured Bonds, subject to\nbondholder consent and the outcome of an independent technical review being\nconducted by SRK Consulting, expected to conclude by 4 September 2026. The\nCompany will also need to cover a further liquidity shortfall in 2027 and at the\nsame time address its 2027 bond maturity to establish a viable long-term\nfinancial platform.\n\nRegulatory status: As previously communicated, the Norwegian Supreme Court has\nupheld the Court of Appeal's finding that the permits for tailings disposal in\nFørdefjorden are invalid due to insufficient reasoning. The Government will\nconduct a new assessment of the project. The ruling does not require an\nimmediate suspension of operations, and ERG continues to operate under existing\nenvironmental conditions.\n\nAn updated presentation containing detailed information regarding the Company's\noperational status, financial projections, and strategic outlook is attached to\nthis announcement and made available on the Company's website at\nnordicmining.com.\n\nContact\n\nFinn Ivar Marum, CEO Nordic Mining\nfinn.ivar.marum@nordicmining.com\n\nThis announcement has been prepared pursuant to Article 17 of MAR, cf. the\nNorwegian Securities Trading Act section 5-2. Forward-looking statements are\nsubject to uncertainty and risk, and actual results may differ materially.\n\n\n",
+        "hasAttachments": true,
+        "sourceBodyChars": 2828,
+        "pdfSupplementText": "Update on Production\nRamp-Up, Liquidity and\nRegulatory Status\n7 August 2026\n\nIMPORTANT INFORMATION\nTHIS DOCUMENT IS NOT FOR RELEASE, PUBLICATION OR DISTRIBUTION, IN WHOLE OR IN PART, DIRECTLY OR INDIRECTLY, IN OR INTO OR FROM THE UNITED STATES OF AMERICA, ITS TERRITORIES,\nDEPENDENCIES OR POSSESSIONS, INCLUDING ANY STATE OF THE UNITED STATES AND THE DISTRICT OF COLUMBIA, OR AUSTRALIA, CANADA, JAPAN OR SOUTH AFRICA OR TO ANY RESIDENT THEREOF, OR ANY\nJURISDICTION WHERE SUCH DISTRIBUTION IS UNLAWFUL. THIS DOCUMENT IS NOT AN OFFER OR AN INVITATION TO BUY OR SELL SECURITIES IN ANY JURISDICTION.\nThis presentation (the “Company Presentation”) has been prepared by Nordic Mining ASA (the “Company”). In this Company Presentation, references to the “Company”, the “Group”, “we”, “our”, “us”, or similar terms\nrefer to the Company and its consolidated subsidiaries, except where context otherwise requires.\nThis Company Presentation has been prepared for information purposes only, and does not constitute or form part of, and should not be construed as, any offer, invitation or recommendation to purchase, sell or\nsubscribe for any securities in any jurisdiction and neither the Company Presentation nor anything contained herein shall form the basis of, or be relied upon in connection with, or act as an inducement to enter into,\nany investment activity. This Company Presentation does not purport to contain all of the information that may be required to evaluate any investment in the Company or any of its securities and should not be relied\nupon to form the basis of, or be relied on in connection with, any contract or commitment or investment decision whatsoever. This Company Presentation is intended to present background information on the\nCompany, its business and the industry in which it operates and is not intended to provide complete disclosure upon which an investment decision could be made.\nThis Company Presentation is furnished by the Company, and it is expressly noted that no representation or warranty, express or implied, as to the accuracy or completeness of any information included herein is given\nby the Company. This Company Presentation and the information contained herein have not been independently verified, and the contents of this Company Presentation are not to be construed as financial, legal,\nbusiness, investment, tax or other professional advice. Each recipient should consult with its own professional advisors for any such matter and advice. Generally, any investment in the Company should be considered\nas a high-risk investment.\nInformation provided on the market environment, developments, trends and on the competitive situation is based on data and reports prepared by third parties and/or the Company based on its own information and\ninformation derived from such third-party sources. Third party industry publications, studies and surveys generally state that the data contained therein have been obtained from sources believed to be reliable, but\nthat there is no guarantee of the accuracy or completeness of such data.\nThis Company Presentation is current as of the date stated on the front page of this Company Presentation. Neither the delivery of this Company Presentation nor any further discussions of the Company with any of\nthe recipients shall, under any circumstances, create any implication that there has been no change in the affairs of the Company since such date. This Company Presentation contains several forward-looking\nstatements relating to the business, future financial performance and results of the Company and/or the industry in which it operates. In particular, this Company Presentation contains forward-looking statements such\nas with respect to the Company's potential future revenues and cash flows, the Company's equity and debt financing requirements and its ability to obtain financing in a timely manner and at favourable terms.\nForward-looking statements concern future circumstances and results and other statements that are not historical facts, sometimes identified by the words “believes”, “expects”, “predicts”, “intends”, “projects”,\n“plans”, “estimates”, “aims”, “foresees”, “anticipates”, “targets”, and similar expressions. The forward-looking statements contained in this Company Presentation, including assumptions, opinions and views of the\nCompany or cited from third party sources, are solely opinions and forecasts which are subject to risks, uncertainties and other factors that may cause actual events to differ materially from any anticipated\ndevelopment. All forward–looking statements attributable to the Company or persons acting on its behalf apply only as of the date of this Company Presentation and are expressly qualified in their entirety by the\ncautionary statements included elsewhere in this document.\nThe distribution of this Company Presentation by the Company in certain jurisdictions is restricted by law. Accordingly, this Company Presentation may not be distributed or published in any jurisdiction except under\ncircumstances that will result in compliance with any applicable laws and regulations. This Company Presentation does not constitute an offer of, or an invitation to purchase, any securities.\nIN RELATION TO THE UNITED STATES AND U.S. PERSONS, THIS COMPANY PRESENTATION IS BEING FURNISHED ONLY TO INVESTORS THAT ARE “QUALIFIED INSTITUTIONAL BUYERS” (“QIBs”), AS DEFINED IN RULE\n144A UNDER THE U.S. SECURITIES ACT OF 1933, AS AMENDED (THE “U.S. SECURITIES ACT”). THIS PRESENTATION DOES NOT CONTAIN OR CONSTITUTE AN OFFER OF, OR THE SOLICITATION OF AN OFFER TO BUY\nOR SUBSCRIBE FOR, SHARES OF THE COMPANY TO ANY PERSON IN THE UNITED STATES. THE SHARES HAVE NOT BEEN, AND WILL NOT BE, REGISTERED UNDER U.S. SECURITIES ACT OR WITH ANY SECURITIES\nREGULATORY AUTHORITY OF ANY STATE OR OTHER JURISDICTION IN THE UNITED STATES, AND MAY NOT BE OFFERED OR SOLD WITHIN THE UNITED STATES, OR TO OR FOR THE ACCOUNT OR BENEFIT OF A U.S.\nPERSON, EXCEPT PURSUANT TO AN APPLICABLE EXEMPTION FROM, OR IN A TRANSACTION NOT SUBJECT TO, THE REGISTRATION REQUIREMENTS OF THE U.S. SECURITIES ACT AND IN COMPLIANCE WITH ANY\nAPPLICABLE STATE SECURITIES LAWS.\nThis Company Presentation is subject to Norwegian law, and any dispute arising in respect of this Company Presentation is subject to the exclusive jurisdiction of Norwegian courts with Oslo District Court as first\nvenue.\n2\nDisclaimer\n\n• Liquidity and going concern risk. The Company faces an immediate liquidity shortfall. Although the Company has received relevant covenant waiver up to 4 September 2026, including an\nagreement to roll up interest until 4 September, the Company's available liquidity is expected to be insufficient beyond 4 September 2026 without additional capital measures. There is no\nassurance that the required short-term financing solution or any long-term financial restructuring will be achieved on acceptable terms, or at all. Failure to secure adequate financing in a\ntimely manner could have a material adverse effect on the Company's operations and financial condition, including the ability to continue as a going concern.\n• Short-term financing and bondholder approval risk. The proposed short-term liquidity solution is contingent upon further engagement with bondholders, and their consent for several\nelements, including (i) a tap issue of up to USD 10–15 million under the existing senior secured bond or other funding measures, and (ii) waivers or amendments of existing covenant\nthresholds. There is no assurance that such engagement will be successful or consents being obtained, or that the terms of any consent will be acceptable to the Company.\n• Regulatory and permitting risk. The Norwegian Supreme Court has upheld the court of appeal's ruling that the permits allowing the disposal of mine tailings in Førdefjorden are invalid\nunder applicable environmental law due to insufficient justification. The Government has announced that it will undertake a re-assessment of the project in accordance with the Supreme\nCourt's decision. The outcome, conditions and timeline of any such re-assessment are uncertain, and there is a risk that new or amended permits required for continued long-term operations\nwill not be obtained, will be subject to material conditions, or will be significantly delayed.\n• Production ramp-up and operational risk. The Company has experienced production ramp-up delays and output levels below initial projections. The current base case reflects a more\nconservative production profile based on early operational experience, including challenges related to product separation, product quality and ore grades below those set out in the UDFS. Full\nrun-rate production is not expected until 2031 and beyond. The ramp-up plan is subject to ongoing verification by an independent technical adviser, and there is a risk that further downward\nrevisions to production forecasts and projected cash flows may be required. There is also a risk that ramp-up measures may require adjustments to the current permit or future permits\nwhich will entail similar risk as the Regulatory and permitting risk.\n• Commodity price and market risk. The Company's revenues and financial projections are materially dependent on prevailing market prices for rutile and garnet. Such prices are subject to\nvolatility and may be adversely affected by global supply and demand dynamics, competition from alternative materials and sources, and general macroeconomic factors. There is no\nassurance that the commodity price assumptions underlying the Company's financial projections will be realised.\n• Off-take risk. The Company's financial projections are based on assumptions regarding off-take arrangements, achievable sales volumes and applicable market prices for rutile and garnet.\nThe market for garnet is relatively opaque and illiquid compared to more established commodity markets, and the financial condition of current and prospective off-takers is subject to\nuncertainty. There can be no assurance that the assumed off-take arrangements, sales volumes and prices can be realised on the terms, at the levels or within the timeframes projected, and\nany material deviation from these assumptions could have a significant adverse effect on the Company's revenues and financial condition.\n• Refinancing risk. The Company's medium- to long-term financial plan requires full refinancing of existing bond debt of approximately USD 155 million. Given the Company's current ramp-\nup stage, limited EBITDA generation and negative free cash flow expected through 2027, there is a significant risk that such refinancing cannot be achieved on acceptable terms, or within\nthe timeframe required.\n3\nKey Risk Factors\n\n-200 000\n-150 000\n-100 000\n-50 000\n0\n50 000\n100 000\n150 000\n200 000\nCash balance – before waiver Cash balance (excl. August bond coupon)\nRunway temporarily extended to 4 September ‘26\nStatus on production ramp-up\nand liquidity situation\nRamp-up behind revised schedule\n• Nordic Mining ASA (\" Nordic Mining \" or the \" Company \") is a resource\ncompany focused on critical minerals in an extensive ramp-up phase of its\nmine at Engebø (“ ERG ”) – the first greenfield mine in Norway in 40 years\n• Despite a ramp-up reset at ERG in January 2026 that brought in new\nmanagement and expert support, progress has been slower than expected\nand final product performance remains short of previously stated plans,\nwhile the Company continues to face a demanding regulatory environment\n• Production and sales are delayed, long-term projections are lowered, and\nthe Company needs elevated use of external services to address the ramp-\nup challenges\n4\nImmediate liquidity shortfall\n• Following waivers, the Company’s current liquidity reserves extend into\nSeptember 2026. Negative cash flow is projected through 2H 2026 and 2027\namounting to a total liquidity need of NOK 475 \n1 \nmillion (USD ~49 million)\nby the end of 2027, assuming the current debt is refinanced in full\n• The immediate shortfall is temporarily being addressed trough bond\ncovenant waivers and a deferred coupon payment of NOK 46.4 million, while\nthe bondholders conduct an independent technical review of ERG\n• NOK 139 million in liquidity shortfall is projected by year-end 2026 and the\nCompany is working to secure liquidity in the amount of USD 10-15 million\nto provide a runway for a long-term solution\n August cash coupon of NOK 46.4 million deferred until 4. September 2026\n Minimum liquidity and minimum equity ratio covenants temporarily waived\nthrough 4. September 2026\n Minimum liquidity covenant lowered from USD 10 million to USD 2 million\n Interest rate on bond issue increased by 250bps to 15%, where the\nincrease shall be paid-in-kind\n1) Current base case before any capital injection including negative cash balance and the\nminimum operational liquidity requirement.\n2) NOK 46.4 million coupon payment payable at 9 August 2026 deferred until 4 September 2026, the\nline does not illustrate the payment of the August coupon in September.\nWaiver period with independent\ntechnical review conducted at ERG\n2\n\nPreliminary 2026 timeline\nStabilizing the situation and\nsecuring long-term financing\nFirst: Secure liquidity to continue operations\n• A liquidity injection of USD 10-15 million would secure sufficient liquidity for\noperations until the November coupon payment, including the revised\nramp-up plans with elevated external support\n• The Company has explored alternatives with various stakeholders and is\ncurrently engaged with bondholders regarding near-term liquidity\nrequirements\n• The liquidity could be in the form of a bond tap issue, following the findings\nof the independent technical review of ERG expected to reach a conclusions\nin the end of August\n5\nPursuing a long-term term sustainable capital\nstructure\n• Upon completion of the first step of USD 10-15 million liquidity injection, the\nCompany will engage with existing stakeholders, potential new financial and\nstrategic investors and other parties with respect with the aim of securing a\nlong-term sustainable capital structure\n• In a projected steady-state, estimated in 2031, Engebø will generate free\ncash flow in the area of NOK 480 million per year \n1\nAug Sep Oct Nov\nCurrent\nrunway\nTechnical review\nTechnical validation\nreport by SRK\nCovenant waivers\nMinimum liquidity and\nequity ratio covenants\nwaived\nShort term liquidity\nWorking with stakeholders\nto secure short term liquidity\nLong term solution\nworking with stakeholders to\nsecure long-term financial\nsolution\n1) Based on updated base case estimates, please see page 17 for further details.\n\n-500\n-300\n-100\n100\n300\n500\n700\n900\n1 100\n1 300\n1 500\n2025 2026 2027 2028 2029 2030 2031 2032 2033 2034 2035 2036 2037 2038 2039 2040 2041 2042 2043 2044 2045 2046 2047 2048 2049 2050 2051 2052 2053 2054 2055 2056 2057 2058 2059 2060 2061 2062 2063\nSignificant investments and asset values\nOur ambition remains intact: The Engebø mine is a strategic,\nlong-life, and cash-generative asset on\n\n[... resten er utelatt ...]",
+        "pdfSupplementPageCount": 20,
+        "pdfSupplementAttachmentId": 330596
+      },
+      "storedOutput": null,
+      "storedValidation": {
+        "valid": true,
+        "errors": [],
+        "errorCode": null,
+        "promptChars": 0,
+        "triageResult": {
+          "kind": "small-routine-bond",
+          "reason": "Rutinemessig obligasjonsutstedelse under én milliard kroner uten sterkere nyhetspoeng.",
+          "newsworthy": false
+        },
+        "sourceBodyChars": 2828
+      },
+      "labels": {
+        "class": "false_skip",
+        "reportRef": "final report 2026-06-02_2026-08-13"
+      },
+      "expected": {
+        "triage": {
+          "deterministicSkipKind": "small-routine-bond"
+        }
+      },
+      "provenance": {
+        "window": {
+          "from": "2026-06-02",
+          "to": "2026-08-13"
+        },
+        "status": "skipped"
+      }
+    },
+    {
+      "messageId": 679314,
+      "generationRunId": "cmsn166iw000eot1jimv63mq8",
+      "promptVersion": "v5.9.1",
+      "sourcePayload": {
+        "messageId": 679314,
+        "title": "International Petroleum Corporation Announces Results of  Normal Course Issuer Bid",
+        "issuerName": "International Petroleum Corporation",
+        "issuerSign": "IPC",
+        "publishedAt": "2026-08-10T09:30:02.156Z",
+        "categories": [
+          "UTSTEDERS MELDEPLIKT VED HANDEL I EGNE AKSJER"
+        ],
+        "markets": [
+          "XOSL"
+        ],
+        "bodyText": "International  Petroleum  Corporation  (IPC  or  the  Corporation)  (TSX, Nasdaq\nStockholm:  IPCO) is pleased to announce that IPC repurchased a total of 72,282\nIPC common shares (ISIN: CA46016U1084) during the period of August 6 to 7, 2026\nunder  IPC's previously  announced normal  course issuer  bid / share repurchase\nprogram (NCIB).\n\nIPC's  NCIB, announced on  December 3, 2025, is being  implemented in accordance\nwith the Market Abuse Regulation (EU) No 596/2014 (MAR) and Commission Delegated\nRegulation  (EU) No 2016/1052 (Safe Harbour Regulation) and the applicable rules\nand  policies  of  the  Toronto  Stock  Exchange  (TSX) and Nasdaq Stockholm and\napplicable Canadian and Swedish securities laws.\n\nDuring  the period of August 6 to 7, 2026, IPC repurchased a total of 57,382 IPC\ncommon  shares on Nasdaq Stockholm. All  of these share repurchases were carried\nout by Pareto Securities AB on behalf of IPC.\n\nA  summary  and  detailed  breakdown  of  the  transactions  conducted on Nasdaq\nStockholm  during the period of August  6 to 7, 2026 according to article 5.3 of\nMAR  and article 2.3 of the Safe Harbour Regulation is available with this press\nrelease  on IPC's website: www.international-petroleum.com/news-and-media/press-\nreleases (http://www.international-petroleum.com/news-and-media/press-releases).\n\nDuring the same period, IPC purchased a total of 14,900 IPC common shares on the\nTSX.  All of these share repurchases were  carried out by ATB Securities Inc. on\nbehalf of IPC.\n\nAll  common shares repurchased  by IPC under  the NCIB will  be cancelled. As at\nAugust  7, 2026, the total number of issued and outstanding IPC common shares is\n112,826,752 with  voting  rights,  of  which  IPC  holds 72,282 common shares in\ntreasury.\n\nA total of 72,282 IPC common shares have been repurchased under the NCIB through\nthe  facilities of the TSX and Nasdaq  Stockholm up to August 7, 2026. A maximum\nof  6,468,077 IPC common  shares may  be repurchased  up to December 4, 2026, or\nuntil such earlier date as the NCIB is completed or terminated by IPC.\n\nInternational  Petroleum Corp. (IPC) is an international oil and gas exploration\nand  production  company  with  a  high  quality  portfolio of assets located in\nCanada,  Malaysia  and  France,  providing  a  solid  foundation for organic and\ninorganic  growth. IPC  is a  member of  the Lundin  Group of  Companies. IPC is\nincorporated in Canada and IPC's shares are listed on the Toronto Stock Exchange\n(TSX) and the Nasdaq Stockholm exchange under the symbol \"IPCO\".\n\nFor further information, please contact:\n\n  Rebecca Gordon                                       Robert Eriksson\n  SVP Corporate Planning and Investor Relations        Media Manager\n  rebecca.gordon@international-petroleum.com      Or   reriksson@rive6.ch\n  Tel: +41 22 595 10 50                                Tel: +46 701 11 26 15\n\n\n\nThis information was submitted for publication, through the contact persons set\nout above, at 11:30 CEST on August 10, 2026.\n\nForward-Looking Statements\nThis   press  release  contains  statements  and  information  which  constitute\n\"forward-looking   statements\"  or  \"forward-looking  information\"  (within  the\nmeaning  of applicable securities legislation).  Such statements and information\n(together,  \"forward-looking statements\") relate to future events, including the\nCorporation's  future performance,  business prospects  or opportunities. Actual\nresults may differ materially from those expressed or implied by forward-looking\nstatements.  The forward-looking statements contained  in this press release are\nexpressly  qualified  by  this  cautionary statement. Forward-looking statements\nspeak only as of the date of this press release, unless otherwise indicated. IPC\ndoes  not intend, and does  not assume any obligation,  to update these forward-\nlooking statements, except as required by applicable laws.\n\nAll  statements other than statements of  historical fact may be forward-looking\nstatements.  Any statements that express or  involve discussions with respect to\npredictions,  expectations,  beliefs,  plans,  projections, forecasts, guidance,\nbudgets, objectives, assumptions or future events or performance (often, but not\nalways, using words or phrases such as \"seek\", \"anticipate\", \"plan\", \"continue\",\n\"estimate\",   \"expect\",   \"may\",   \"will\",   \"project\",  \"forecast\",  \"predict\",\n\"potential\",  \"targeting\",  \"intend\",  \"could\",  \"might\",  \"should\",  \"believe\",\n\"budget\"  and similar expressions) are not statements of historical fact and may\nbe \"forward-looking statements\". Forward-looking statements include, but are not\nlimited  to, statements  with respect  to: the  intention and  ability of IPC to\nacquire  common  shares  under  the  NCIB,  including  the  timing  of  any such\npurchases;  the number of common  shares to be cancelled  and the timing of such\ncancellations;  and the return of value to IPC's shareholders as a result of any\ncommon share repurchases.\n\nThe  forward-looking  statements  are  based  on  certain  key  expectations and\nassumptions  made by IPC, including expectations and assumptions concerning: the\nduration  and impact of tariffs  that are currently in  effect on goods exported\nfrom or imported into Canada, and that other than the tariffs that are currently\nin  effect, neither the U.S. nor Canada (i)  increases the rate or scope of such\ntariffs,  reenacts tariffs that are currently suspended, or imposes new tariffs,\non  the import  of goods  from one  country to  the other,  including on oil and\nnatural  gas,  and/or  (ii)  imposes  any  other  form  of  tax,  restriction or\nprohibition  on the import or export of  products from one country to the other,\nincluding  on  oil  and  natural  gas;  prevailing commodity prices and currency\nexchange  rates; applicable royalty  rates and tax  laws; interest rates; future\nwell  production rates  and reserve  and contingent  resource volumes; operating\ncosts;  IPC's ability to maintain its  existing credit ratings; IPC's ability to\nachieve  its performance targets; the timing of receipt of regulatory approvals;\nthe  performance of existing wells; the  success obtained in drilling new wells;\nanticipated  timing  and  results  of  capital  expenditures; the sufficiency of\nbudgeted  capital expenditures in  carrying out planned  activities; the timing,\nlocation  and extent of future drilling operations; the successful completion of\nacquisitions  and  dispositions  and  that  IPC  will  be  able to implement its\nstandards,  controls, procedures and policies in respect of any acquisitions and\nrealize  the  expected  synergies  on  the  anticipated  timeline or at all; the\nbenefits  of  acquisitions;  the  state  of  the economy and the exploration and\nproduction business in the jurisdictions in which IPC operates and globally; the\navailability  and cost  of financing,  labour and  services; IPC's  intention to\ncomplete share repurchases under the normal course issuer bid program, including\nthe  funding of such  share repurchases, existing  and future market conditions,\nincluding  with respect to the price of IPC's common shares, and compliance with\nrespect  to  applicable  limitations  under  securities laws and regulations and\nstock  exchange policies; and the  ability to market crude  oil, natural gas and\nnatural gas liquids successfully.\n\nAlthough  IPC  believes  that  the  expectations  and  assumptions on which such\nforward-looking  statements are based are  reasonable, undue reliance should not\nbe  placed on the forward-looking statements  because IPC can give no assurances\nthat  they will  prove to  be correct.  Since forward-looking statements address\nfuture  events and conditions, by their  very nature they involve inherent risks\nand  uncertainties. Actual results could  differ materially from those currently\nanticipated due to a number of factors and risks.\n\nThese  include,  but  are  not  limited  to: general global economic, market and\nbusiness  conditions;  the  risks  associated  with  the oil and gas industry in\ngeneral  such as operational  risks in development,  exploration and production;\ndelays  or changes in plans with  respect to exploration or development projects\nor  capital expenditures; the uncertainty  of estimates and projections relating\nto reserves, resources, production, revenues, costs and expenses; health, safety\nand  environmental  risks;  commodity  price  fluctuations;  interest  rate  and\nexchange  rate  fluctuations;  marketing  and  transportation;  loss of markets;\nenvironmental   and   climate-related   risks;   competition;   innovation   and\ncybersecurity  risks related to IPC's systems,  including costs of addressing or\nmitigating  such  risks;  the  ability  to  attract,  engage  and retain skilled\nemployees;  incorrect  assessment  of  the  value  of  acquisitions;  failure to\ncomplete  or realize the  anticipated benefits of  acquisitions or dispositions;\nthe  ability to  access sufficient  capital from  internal and external sources;\nfailure   to  obtain  required  regulatory  and  other  approvals;  geopolitical\nconflicts,  including  current  and  potential  future conflicts in Ukraine, the\nMiddle  East, South America and elsewhere,  and their potential impact on, among\nother  things,  global  market  conditions;  political or economic developments,\nincluding,  without limitation, the risk that (i) the tariffs that are currently\nin  effect on goods exported from or imported into Canada continue in effect for\nan  extended  period  of  time,  the  tariffs  that  have  been  threatened  are\nimplemented, that tariffs that are currently suspended are reactivated, the rate\nor  scope of tariffs are increased, or new tariffs are imposed, including on oil\nand  natural gas,  (ii) the  U.S. and/or  Canada imposes  any other form of tax,\nrestriction  or prohibition on the import or export of products from one country\nto the other, including on oil and natural gas, and (iii) the tariffs imposed or\nthreatened  to be imposed by the U.S. on other countries and retaliatory tariffs\nimposed  or threatened to be imposed by other countries on the U.S. will trigger\na  broader global trade  war which could  have a material  adverse effect on the\nCanadian,  U.S.  and  global  economies,  and  by extension the Canadian oil and\nnatural  gas industry and  the Corporation, including  by decreasing demand for,\nand  the price  of oil,  and natural  gas, disrupting  supply chains, increasing\ncosts,  causing volatility in the global  financial markets, and limiting access\nto financing; and changes in legislation, including but not limited to tax laws,\nroyalties, environmental and abandonment regulations. Readers are cautioned that\nthe foregoing list of factors is not exhaustive.\n\nAdditional  information on these and other factors that could affect IPC, or its\noperations  or financial results, are included  in IPC's annual information form\nfor  the  year  ended  December  31, 2025 (See  \"Cautionary  Statement Regarding\nForward-Looking  Information\",  \"Reserves  and  Resources  Advisory\"  and  \"Risk\nFactors\"),  in the management's discussion and analysis (MD&A) for the three and\nsix  months  ended  June  30, 2026 (See  \"Risk  Factors\",  \"Cautionary Statement\nRegarding  Forward-Looking Information\"  and \"Reserves  and Resources Advisory\")\nand  other reports  on file  with applicable  securities regulatory authorities,\nincluding  previous financial reports, management's  discussion and analysis and\nmaterial  change  reports,  which  may  be  accessed  through the SEDAR+ website\n(www.sedarplus.ca) or IPC's website (www.international-petroleum.com).\n",
+        "hasAttachments": true,
+        "sourceBodyChars": 11672
+      },
+      "storedOutput": null,
+      "storedValidation": {
+        "valid": true,
+        "errors": [],
+        "errorCode": null,
+        "promptChars": 0,
+        "sourceBodyChars": 11672,
+        "skippedCategories": [
+          "UTSTEDERS MELDEPLIKT VED HANDEL I EGNE AKSJER"
+        ]
+      },
+      "labels": {
+        "class": "false_skip",
+        "reportRef": "final report 2026-06-02_2026-08-13"
+      },
+      "expected": {
+        "triage": {
+          "deterministicSkipKind": null
+        }
+      },
+      "provenance": {
+        "window": {
+          "from": "2026-06-02",
+          "to": "2026-08-13"
+        },
+        "status": "skipped"
+      }
+    }
+  ]
+}

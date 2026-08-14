@@ -1,0 +1,165 @@
+{
+  "schemaVersion": 1,
+  "class": "loaded_language",
+  "createdAt": "2026-08-14T07:37:58.256Z",
+  "source": {
+    "db": "render-prod",
+    "query": "generation_runs/source_notices/feedback 2026-06-02..2026-08-13",
+    "gitHead": "059bf86a0f795b807ad7d2cde4d3cb22c0c0c3dd"
+  },
+  "cases": [
+    {
+      "messageId": 675772,
+      "generationRunId": "case_032_675772:challenger",
+      "promptVersion": "v5.9.1:regular_v6_draft",
+      "sourcePayload": {
+        "messageId": 675772,
+        "title": "Diana Shipping Inc. Alerts Genco Shareholders of Institutional Shareholder Services’ Recommendation to Vote Against Genco Shipping & Trading's Poison Pill",
+        "issuerName": "Diana Shipping Inc",
+        "issuerSign": "DIASH",
+        "publishedAt": "2026-06-09T19:33:44.992Z",
+        "categories": [
+          "IKKE-INFORMASJONSPLIKTIGE PRESSEMELDINGER"
+        ],
+        "markets": [
+          "XOSL"
+        ],
+        "bodyText": "ISS Recommendation Cites Entrenchment Concerns While Diana's $24.80 Per Share All-Cash Offer is on the Table\n\nGlass Lewis Recognizes Diana as a \"Serious and Committed Bidder\" and Highlights Risks That the Rights Plan May Limit Shareholders' Ability to Evaluate any Current Offer\n\nGenco Board Resists Even Limited, Constructive Board Refresh with Two Independent Nominees\n\nDiana Urges Genco Shareholders to Vote the GOLD Universal Proxy Card \"FOR\" Jens Ismar and Paul Cornell, \"WITHHOLD\" on Basil G. Mavroleon and Arthur L. Regan, and \"AGAINST\" Ratifying Genco's Poison Pill\n\nAthens, Greece – June 9, 2026 – Diana Shipping Inc. (NYSE: DSX) (“Diana” or “the Company”), a global shipping company specializing in the ownership and bareboat charter-in of dry bulk vessels that is the largest shareholder of Genco Shipping & Trading Limited (NYSE: GNK) (“Genco”), today highlighted Institutional Shareholder Services Inc.'s (\"ISS\") recommendation that Genco shareholders vote AGAINST the ratification of Genco's poison pill. ISS found that the pill's proposed three-year extension raises concern about its potential use as an entrenchment mechanism to prevent shareholders from accepting Diana's $24.80 per share fully financed, all-cash offer or other offers made to Genco shareholders. Glass Lewis & Co. (\"Glass Lewis\"), which characterized Diana as a \"serious and committed bidder,\" also raised concern that the poison pill may limit shareholders' ability to evaluate Diana’s offer. These perspectives reinforce that voting against the poison pill is an important step toward ensuring shareholders have the opportunity they deserve to assess value creation opportunities that impact their investment.\n\nGenco has structured the poison pill ratification as an advisory vote only, with no binding commitment to honor the result — meaning the Genco Board of Directors (the \"Genco Board\") retains the right to maintain – and even extend – the poison pill regardless of how shareholders vote. Diana asks: why won't the Genco Board — which has spent millions of dollars blocking access to a fully financed, all-cash offer — commit to remove the poison pill if shareholders vote it down? \n\nDiana urges all Genco shareholders to vote the GOLD universal proxy card “FOR” Jens Ismar and Paul Cornell — two highly qualified, independent drybulk executives who would bring fresh perspectives and constructive change to the Genco Board — and WITHHOLD on Basil G. Mavroleon and Arthur L. Regan, two long-tenured directors whose continued presence on the Genco Board is emblematic of the entrenchment Diana has sought to address throughout this campaign.\n\nSemiramis Paliou, Diana's Chief Executive Officer, commented:\n\n\"We have spent six months making the case that Genco shareholders deserve a board willing to engage seriously with a fully financed, premium all-cash offer. The Genco Board has proved time and again that it has no such interest, and the poison pill is the centerpiece of its entrenchment strategy. ISS's recommendation that shareholders vote against Genco's poison pill is a meaningful validation of the concerns we have raised throughout this campaign, and we urge shareholders to vote against it to send a clear message to the Genco Board of their desire to make their own informed decision about their investment. We also encourage the election of our two nominees who would bring necessary and constructive change to the Genco Board, whose dismissive response to our good-faith effort to narrow our slate tells shareholders everything they need to know about how afraid the Genco Board and management are of having any voice in the board room that may question management’s agenda.\"\n\nWith respect to Genco's poison pill and its potential to entrench the incumbent Board, ISS recommended a vote AGAINST ratification and stated:\n\n\"A vote AGAINST this proposal is warranted. This is merely an advisory proposal, with no board commitment to terminating the pill should shareholders fail to approve it. Moreover, the proposed extension of the pill for an additional three years and shareholders' limited ability to act outside the annual meeting cycle raises concern about its potential use as an entrenchment mechanism.\"\n\nGlass Lewis, while recommending a vote in favor of the pill, nonetheless raised similar concerns about the poison pill’s entrenchment risk and stated:\n\n\"Rights plans are generally viewed skeptically because they may limit shareholders' ability to receive a takeover premium and may entrench an incumbent board. In the present case, this concern is heightened by the fact that Diana's Tender Offer is live and the Rights Agreement could affect Diana's ability to complete an acquisition if the offer were successful.\"\n\nWith respect to the Genco Board's failure to engage with Diana's proposal, ISS stated:\n\n\"It appears that the initial offer was a reasonable starting point for discussions when it was disclosed.\"\n\n\"That the board did not engage at that time may be cause for concern.\"\n\nGlass Lewis also noted the following about Diana, Genco's largest shareholder, and its involvement:\n\n\"Diana has presented itself as a serious and committed bidder, having accumulated a significant ownership position in Genco, submitted multiple acquisition proposals, commenced a tender offer and subsequently increased its cash offer multiple times. The revised $24.80 offer is supported by committed financing and is not subject to a financing condition.\"\n\n\"Overall, the trading record suggests that Diana's involvement coincided with a significant rerating of Genco's shares.\"\n\n*Diana has neither sought nor obtained consent from ISS or Glass Lewis to use previously published information in this press release.\n\nDiana has updated its GOLD universal proxy card to reflect its updated slate and recommendation that shareholders vote “FOR” Jens Ismar and Paul Cornell and WITHHOLD on Genco nominees Basil G. Mavroleon and Arthur L. Regan. \n\nShareholders who have already voted on the previously circulated GOLD card for Mr. Ismar and Mr. Cornell do not need to take any additional action — votes for Ismar and Cornell will be counted. Shareholders who have voted the WHITE card can change their vote by signing, dating and returning the GOLD universal proxy card. Only the latest-dated proxy will count. Please act as soon as possible —the Annual Meeting is on June 18, 2026, and the tender offer expires at 5:00 p.m., New York City time, on June 26, 2026, unless further extended.\n\nFor additional information about Diana's nominees, its case for change, and other materials related to its proxy campaign, please visit www.CashforGenco.com.\n\nFor assistance voting or tendering shares, contact Diana’s proxy solicitor and information agent, Okapi Partners LLC, toll-free at (855) 305-0857 or by email at info@okapipartners.com.\n\nAbout Diana Shipping Inc.\n\nDiana Shipping Inc. (“Diana”) (NYSE: DSX) is a global provider of shipping transportation services through its ownership and bareboat charter-in of dry bulk vessels...",
+        "hasAttachments": true,
+        "sourceBodyChars": 7031,
+        "pdfSupplementText": "Corporate Contact:\nMargarita Veniou\nChief Corporate Development, Governance &\nCommunications Officer and Board Secretary\nTelephone: + 30-210-9470-100\nEmail: mveniou@dianashippinginc.com\nWebsite: www.dianashippinginc.com\nX: @Dianaship\nInvestor Relations Contact:\nNicolas Bornozis / Daniela Guerrero\nCapital Link, Inc.\n230 Park Avenue, Suite 1540\nNew York, N.Y. 10169\nTel.: (212) 661-7566\nEmail: diana@capitallink.com\nBruce Goldfarb / Chuck Garske / Lisa Patel\nOkapi Partners\n(212) 297-0720\ninfo@okapipartners.com\nMedia Contact:\nMark Semer / Grace Cartwright\nGasthalter & Co.\nTel: (212) 257-4170\nDianaShipping@gasthalter.com\nDIANA SHIPPING INC. ALERTS GENCO SHAREHOLDERS OF INSTITUTIONAL\nSHAREHOLDER SERVICES’ RECOMMENDATION TO VOTE AGAINST GENCO SHIPPING\n& TRADING'S POISON PILL\nISS Recommendation Cites Entrenchment Concerns While Diana's $24.80 Per Share All-Cash Offer is on\nthe Table\nGlass Lewis Recognizes Diana as a \"Serious and Committed Bidder\" and Highlights Risks That the\nRights Plan May Limit Shareholders' Ability to Evaluate any Current Offer\nGenco Board Resists Even Limited, Constructive Board Refresh with Two Independent Nominees\nDiana Urges Genco Shareholders to Vote the GOLD Universal Proxy Card \"FOR\" Jens Ismar and Paul\nCornell, \"WITHHOLD\" on Basil G. Mavroleon and Arthur L. Regan, and \"AGAINST\" Ratifying\nGenco's Poison Pill\n\nAthens, Greece – June 9, 2026 – Diana Shipping Inc. (NYSE: DSX) (“Diana” or “the Company”), a global\nshipping company specializing in the ownership and bareboat charter-in of dry bulk vessels that is the\nlargest shareholder of Genco Shipping & Trading Limited (NYSE: GNK) (“Genco”), today highlighted\nInstitutional Shareholder Services Inc.'s (\"ISS\") recommendation that Genco shareholders vote AGAINST\nthe ratification of Genco's poison pill. ISS found that the pill's proposed three-year extension raises concern\nabout its potential use as an entrenchment mechanism to prevent shareholders from accepting Diana's\n$24.80 per share fully financed, all-cash offer or other offers made to Genco shareholders. Glass Lewis &\nCo. (\"Glass Lewis\"), which characterized Diana as a \"serious and committed bidder,\" also raised concern\nthat the poison pill may limit shareholders' ability to evaluate Diana’s offer. These perspectives reinforce\nthat voting against the poison pill is an important step toward ensuring shareholders have the opportunity\nthey deserve to assess value creation opportunities that impact their investment.\nGenco has structured the poison pill ratification as an advisory vote only, with no binding commitment to\nhonor the result — meaning the Genco Board of Directors (the \"Genco Board\") retains the right to maintain\n– and even extend – the poison pill regardless of how shareholders vote. Diana asks: why won't the Genco\nBoard — which has spent millions of dollars blocking access to a fully financed, all-cash offer — commit\nto remove the poison pill if shareholders vote it down?\nDiana urges all Genco shareholders to vote the GOLD universal proxy card “ FOR ” Jens Ismar and Paul\nCornell — two highly qualified, independent drybulk executives who would bring fresh perspectives and\nconstructive change to the Genco Board — and WITHHOLD on Basil G. Mavroleon and Arthur L. Regan,\ntwo long-tenured directors whose continued presence on the Genco Board is emblematic of the\nentrenchment Diana has sought to address throughout this campaign.\nSemiramis Paliou, Diana's Chief Executive Officer, commented:\n\"We have spent six months making the case that Genco shareholders deserve a board willing to engage\nseriously with a fully financed, premium all-cash offer. The Genco Board has proved time and again that it\nhas no such interest, and the poison pill is the centerpiece of its entrenchment strategy. ISS's\nrecommendation that shareholders vote against Genco's poison pill is a meaningful validation of the\nconcerns we have raised throughout this campaign, and we urge shareholders to vote against it to send a\nclear message to the Genco Board of their desire to make their own informed decision about their\ninvestment. We also encourage the election of our two nominees who would bring necessary and\nconstructive change to the Genco Board, whose dismissive response to our good-faith effort to narrow our\nslate tells shareholders everything they need to know about how afraid the Genco Board and management\nare of having any voice in the board room that may question management’s agenda.\"\nWith respect to Genco's poison pill and its potential to entrench the incumbent Board, ISS\nrecommended a vote AGAINST ratification and stated:\n\"A vote AGAINST this proposal is warranted. This is merely an advisory proposal, with no board\ncommitment to terminating the pill should shareholders fail to approve it. Moreover, the proposed extension\nof the pill for an additional three years and shareholders' limited ability to act outside the annual meeting\ncycle raises concern about its potential use as an entrenchment mechanism.\"\n\nGlass Lewis, while recommending a vote in favor of the pill, nonetheless raised similar concerns about\nthe poison pill’s entrenchment risk and stated:\n\"Rights plans are generally viewed skeptically because they may limit shareholders' ability to receive a\ntakeover premium and may entrench an incumbent board. In the present case, this concern is heightened\nby the fact that Diana's Tender Offer is live and the Rights Agreement could affect Diana's ability to\ncomplete an acquisition if the offer were successful.\"\nWith respect to the Genco Board's failure to engage with Diana's proposal, ISS stated:\n\"It appears that the initial offer was a reasonable starting point for discussions when it was disclosed.\"\n\"That the board did not engage at that time may be cause for concern.\"\nGlass Lewis also noted the following about Diana, Genco's largest shareholder, and its involvement:\n\"Diana has presented itself as a serious and committed bidder, having accumulated a significant ownership\nposition in Genco, submitted multiple acquisition proposals, commenced a tender offer and subsequently\nincreased its cash offer multiple times. The revised $24.80 offer is supported by committed financing and\nis not subject to a financing condition.\"\n\"Overall, the trading record suggests that Diana's involvement coincided with a significant rerating of\nGenco's shares.\"\n*Diana has neither sought nor obtained consent from ISS or Glass Lewis to use previously published\ninformation in this press release.\nDiana has updated its GOLD universal proxy card to reflect its updated slate and recommendation that\nshareholders vote “FOR” Jens Ismar and Paul Cornell and WITHHOLD on Genco nominees Basil G.\nMavroleon and Arthur L. Regan.\nShareholders who have already voted on the previously circulated GOLD card for Mr. Ismar and Mr.\nCornell do not need to take any additional action — votes for Ismar and Cornell will be counted.\nShareholders who have voted the WHITE card can change their vote by signing, dating and returning the\nGOLD universal proxy card. Only the latest-dated proxy will count. Please act as soon as possible —the\nAnnual Meeting is on June 18, 2026, and the tender offer expires at 5:00 p.m., New York City time, on June\n26, 2026, unless further extended.\nFor additional information about Diana's nominees, its case for change, and other materials related to its\nproxy campaign, please visit www.CashforGenco.com.\nFor assistance voting or tendering shares, contact Diana’s proxy solicitor and information agent, Okapi\nPartners LLC, toll-free at (855) 305-0857 or by email at info@okapipartners.com.\n\nAbout Diana Shipping Inc.\nDiana Shipping Inc. (“Diana”) (NYSE: DSX) is a global provider of shipping transportation services\nthrough its ownership and bareboat charter-in of dry bulk vessels. Diana’s vessels are employed primarily\non short to medium-term time charters and transport a range of dry bulk cargoes, including such\ncommodities as iron ore, coal, grain and other materials along worldwide shipping routes.\nAbout Star Bulk Carriers Corp.\nStar Bulk Carriers Corp. (“Star Bulk”) is a global shipping company providing worldwide seaborne\ntransportation solutions in the dry bulk sector. Star Bulk’s vessels transport major bulks, which include\niron ore, minerals and grain, and minor bulks, which include bauxite, fertilizers and steel products. Star\nBulk was incorporated in the Marshall Islands on December 13, 2006 and maintains executive offices in\nAthens, New York, Stamford and Singapore.\nCautionary Statement Regarding Forward-Looking Statements\nMatters discussed in this communication and other statements made by Diana or Star Bulk, as applicable,\nmay constitute forward-looking statements. The Private Securities Litigation Reform Act of 1995 provides\nsafe harbor protections for forward-looking statements in order to encourage companies to provide\nprospective information about their business. Forward-looking statements include, but are not limited to,\nstatements regarding the intent, beliefs, expectations, objectives, goals, future events, performance or\nstrategies and other statements of Diana, Star Bulk or their respective management teams, which are other\nthan statements of historical facts.\nDiana and Star Bulk desire to take advantage of the safe harbor provisions of the Private Securities\nLitigation Reform Act of 1995 and is including this cautionary statement in connection with this safe harbor\nlegislation. These forward-looking statements relate to, among other things, Diana’s proposal to acquire\nGenco and the anticipated benefits of such a transaction, and Diana’s ability to finance such transaction.\nForward looking statements can be identified by words such as “believe,” “will,” “anticipate,” “intend,”\n“estimate,” “forecast,” “project,” “plan,” “potential,” “may,” “should,” “expect,” “pending” and similar\nexpressions identify forward-looking statements.\nThe forward-looking statements in this press release and in other statements made by Diana or Star Bulk,\nas applicable, are based upon various assumptions, many of which are based, in turn, upon further\nassumptions, including without limitation, management’s examination of historical operating trends, data\ncontained in Diana’s or Star Bulk’s records, Genco’s public filings and disclosures and data available from\nthird parties. Although Diana or Star Bulk, as applicable, believes that these assumptions were reasonable\nwhen made, because these assumptions are inherently subject to significant uncertainties and contingencies\nthat are difficult or impossible to predict and are beyond their control, Diana or Star Bulk, as applicable,\ncannot assure you that it will achieve or accomplish these expectations, beliefs or projections.\n\nThe forward-looking statements in this communication are based on current expectations, assumptions, and\nestimates, and are subject to numerous risks and uncertainties. These include, without limitation, risks\nrelating to: (i) the possibility that the proposed transaction may not proceed; (ii) the ability to obtain\nregulatory or shareholder approvals, if required; (iii) the risk that Genco’s Board of Directors or\nmanagement may continue to oppose the proposal or not respond to further attempted engagement by\nDiana; (iv) failure to realize anticipated benefits of the transaction; (v) changes in the financial or operating\nperformance of Diana, Star Bulk or Genco; (vi) the possibility that shareholders of Genco will not elect to\ntender their shares of common stock of Genco in connection with the Offer (as defined below) or that the\nconditions to consummation of the Offer are not satisfied; and (vii) general economic, market, and industry\nconditions. These and other risks are described in documents filed by Diana with, or furnished by Diana to,\nthe U.S. Securities and Exchange Commission (“SEC”), including its Annual Report on Form 20-F for the\nfiscal year ended December 31, 2025, and its other subsequent documents filed with, or furnished to, the\nSEC, and are described in documents filed by Star Bulk with, or furnished by Star Bulk to, the SEC,\nincluding its Annual Report on Form 20-F for the fiscal year ended December 31, 2025, and its other\nsubsequent documents filed with, or furnished to, the SEC. Neither Diana nor Star Bulk undertake any\nobligation to revise or update any forward-looking statement, or to make any other forward-looking\nstatements, whether as a result of new information, future events or otherwise, except to the extent required\nby law.\nImportant Additional Information and Where to Find It\nDiana and certain other Participants (as defined below) have filed a definitive proxy statement and\naccompanying GOLD universal proxy card with the SEC to be used to solicit proxies for, among other\nmatters, the election of Diana’s director nominees to the board of directors of Genco at Genco’s 2026\nAnnual Meeting, the passage of Diana’s proposal to repeal, at Genco’s 2026 Annual Meeting, by-laws of\nGenco not publicly disclosed by Genco on or prior to August 28, 2025 and a proposal that the board of\ndirectors of Genco conduct a process to explore strategic alternatives (such definitive proxy statement and\nthe accompanying universal GOLD proxy card are available here).\nShareholders of Genco are strongly advised to read the Participants’ proxy statement and other proxy\nmaterials, including the accompanying GOLD proxy card, as they become available because they will\ncontain important information. The Participants’ definitive proxy statement, and other proxy materials\nwhen filed, are available at no charge on the SEC’s website at www.sec.gov.\nThe definitive proxy statement and other relevant documents filed by Genco with the SEC are also\navailable, without charge, by directing a request to Diana’s proxy solicitor, Okapi Partners LLC, at its toll-\nfree number (855) 305-0857 or via email at info@okapipartners.com.\nCertain Information Regarding Participants in the Solicitation\nThe participants in the proxy solicitation (the “Participants”) are Diana; Semiramis Paliou, Director and\nChief Executive Officer of Diana; Simeon Palios, Director and Chairman of Diana; Ioannis G. Zafirakis,\nDirector and President of Diana; Maria Dede, co-Chief Financial Officer and Treasurer of Diana; Margarita\nVeniou, Chief Corporate Development, Governance & Communications Officer and Secretary of Diana;\n\nEvangelos Sfakiotakis, Chief Technical Investment Officer of Diana; Maria-Christina Tsemani, Chief\nPeople and Culture Officer of Diana; Anastasios Margaronis, Director of Diana; Kyriacos Riris, Director\nof Diana; Apostolos Kontoyannis, Director of Diana; Eleftherios Papatrifon, Director of Diana; Simon\nFrank Peter Morecroft, Director of Diana; and Jane Sih Ho Chao, Director of Diana; Diana’s nominees,\nJens Ismar and Paul Cornell; Star Bulk Carriers Corp. (“Star Bulk”); Petros Pappas, Director and Chief\nExecutive Officer of Star Bulk; and Hamish Norton, President of Star Bulk.\nAs of the date hereof, Diana is the benefi\n\n[... resten er utelatt ...]",
+        "pdfSupplementPageCount": 6,
+        "pdfSupplementAttachmentId": 327868
+      },
+      "storedOutput": {
+        "title": "ISS anbefaler nei til Gencos giftpille",
+        "lead": "Rådgivningsselskapet ISS anbefaler Genco-aksjonærene å stemme mot en treårig forlengelse av selskapets giftpille. Diana Shipping opplyser dette i en børsmelding.",
+        "body": [
+          "ISS mener ordningen kan hindre aksjonærene i å akseptere Dianas fullfinansierte kontantbud på 24,80 dollar per aksje. En giftpille er en forsvarsmekanisme som kan gjøre et oppkjøp vanskeligere.",
+          "Også Glass Lewis peker ifølge Diana på at ordningen kan begrense aksjonærenes mulighet til å vurdere budet, selv om rådgiveren anbefaler å stemme for giftpillen."
+        ],
+        "company_sentence": "Diana Shipping er et rederi som eier og leier inn tørrlastskip.",
+        "key_facts": [
+          "ISS anbefaler Genco-aksjonærene å stemme mot giftpillen",
+          "Diana har et kontantbud på 24,80 dollar per Genco-aksje",
+          "Giftpillen foreslås forlenget med tre år",
+          "Glass Lewis peker også på begrenset aksjonærvurdering av budet"
+        ],
+        "negative_or_surprising": [
+          "ISS mener den foreslåtte treårige forlengelsen kan brukes til å beskytte sittende styre"
+        ],
+        "excluded_hype": [
+          "Semiramis Paliou omtaler Genco-styrets håndtering som frykt for kritiske stemmer — partsinnlegg i pågående styrekampanje"
+        ],
+        "source_limitations": [
+          "Meldingen er ensidig fra Diana i en pågående bud- og styrekampanje; Gencos syn er ikke gjengitt.",
+          "Vedlegg er ikke analysert."
+        ],
+        "confidence": "high",
+        "importance": "medium",
+        "source_spans": [
+          "ISS recommended a vote AGAINST ratification",
+          "the proposed extension of the pill for an additional three years ... raises concern about its potential use as an entrenchment mechanism",
+          "Diana's $24.80 per share fully financed, all-cash offer",
+          "Glass Lewis ... raised concern that the poison pill may limit shareholders' ability to evaluate Diana’s offer"
+        ]
+      },
+      "storedValidation": {
+        "validation": {
+          "valid": false,
+          "issues": [
+            {
+              "code": "MISSING_QUOTE_OPPORTUNITY",
+              "severity": "warning",
+              "message": "Source contains a named key-person statement, but visible article text has no quote, source-close wording, or named-person attribution."
+            }
+          ],
+          "blockingErrors": [],
+          "warnings": [
+            "Source contains a named key-person statement, but visible article text has no quote, source-close wording, or named-person attribution."
+          ]
+        },
+        "referenceCheck": {
+          "coveragePercent": 83,
+          "unsupportedSentenceCount": 1,
+          "blocking": true,
+          "blockingReason": "Reference check found unsupported high-risk factual claims.",
+          "highRiskUnsupportedSentenceCount": 1,
+          "coverage": {
+            "totalSentences": 6,
+            "visibleArticleSentenceCount": 5,
+            "groundedSentences": 5,
+            "coveragePercent": 83,
+            "items": [
+              {
+                "index": 0,
+                "sentence": "Rådgivningsselskapet ISS anbefaler Genco-aksjonærene å stemme mot en treårig forlengelse av selskapets giftpille.",
+                "grounded": true,
+                "interpretation": "ISS anbefaler å stemme mot ratifisering, og begrunner dette blant annet med den foreslåtte treårige forlengelsen.",
+                "sourceEvidence": "“ISS ... recommendation that Genco shareholders vote AGAINST the ratification of Genco's poison pill” og “proposed extension ... for an additional three years”"
+              },
+              {
+                "index": 1,
+                "sentence": "Diana Shipping opplyser dette i en børsmelding.",
+                "grounded": true,
+                "interpretation": "Opplysningen fremgår av Dianas utgitte melding; kildeattribusjon som børsmelding er tillatt.",
+                "sourceEvidence": "“Diana Shipping Inc. ... today highlighted ... ISS's ... recommendation”"
+              },
+              {
+                "index": 2,
+                "sentence": "ISS mener ordningen kan hindre aksjonærene i å akseptere Dianas fullfinansierte kontantbud på 24,80 dollar per aksje.",
+                "grounded": true,
+                "interpretation": "ISS uttrykker bekymring for at ordningen kan brukes til å hindre aksjonærene i å akseptere dette budet.",
+                "sourceEvidence": "“potential use ... to prevent shareholders from accepting Diana's $24.80 per share fully financed, all-cash offer”"
+              },
+              {
+                "index": 3,
+                "sentence": "En giftpille er en forsvarsmekanisme som kan gjøre et oppkjøp vanskeligere.",
+                "grounded": false,
+                "interpretation": "Referansen sier at rettighetsplanen kan påvirke Dianas evne til å fullføre et oppkjøp, men gir ikke denne generelle definisjonen av en giftpille som forsvarsmekanisme.",
+                "sourceEvidence": ""
+              },
+              {
+                "index": 4,
+                "sentence": "Også Glass Lewis peker ifølge Diana på at ordningen kan begrense aksjonærenes mulighet til å vurdere budet, selv om rådgiveren anbefaler å stemme for giftpillen.",
+                "grounded": true,
+                "interpretation": "Diana gjengir at Glass Lewis anbefaler for giftpillen, men samtidig uttrykker bekymring for begrenset mulighet til å vurdere Dianas bud.",
+                "sourceEvidence": "“Glass Lewis, while recommending a vote in favor of the pill ... raised ... concern” og “may limit shareholders' ability to evaluate Diana’s offer”"
+              },
+              {
+                "index": 5,
+                "sentence": "Diana Shipping er et rederi som eier og leier inn tørrlastskip.",
+                "grounded": true,
+                "interpretation": "Diana beskrives som et globalt shippingselskap som eier og bareboat-chartrer inn tørrlastfartøy.",
+                "sourceEvidence": "“a global shipping company specializing in the ownership and bareboat charter-in of dry bulk vessels”"
+              }
+            ],
+            "unsupportedSentences": [
+              {
+                "index": 3,
+                "sentence": "En giftpille er en forsvarsmekanisme som kan gjøre et oppkjøp vanskeligere.",
+                "grounded": false,
+                "interpretation": "Referansen sier at rettighetsplanen kan påvirke Dianas evne til å fullføre et oppkjøp, men gir ikke denne generelle definisjonen av en giftpille som forsvarsmekanisme.",
+                "sourceEvidence": ""
+              }
+            ]
+          },
+          "checkerError": null
+        }
+      },
+      "labels": {
+        "class": "loaded_language",
+        "note": "challenger (regular_v6_draft) output from legacy A/B run editorial_eval_2026-08-12T20-52-31-183Z",
+        "reportRef": "final report 2026-06-02_2026-08-13"
+      },
+      "expected": {},
+      "provenance": {
+        "window": {
+          "from": "2026-06-02",
+          "to": "2026-08-13"
+        },
+        "status": "ab_challenger_output"
+      }
+    }
+  ]
+}
