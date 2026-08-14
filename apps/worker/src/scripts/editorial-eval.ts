@@ -65,6 +65,7 @@ import {
 } from "../services/editorial-eval-artifact.js";
 import {
   replayExpected,
+  safetyClassBehavior,
   type SafetyCase,
   type SafetyFixtureFile,
   type SafetyFixtureManifest,
@@ -636,9 +637,47 @@ async function safetyCaseFromRow(
   feedback: string[] | undefined,
   fetchSourceNotice: (messageId: number) => Promise<PromptPayload | null>
 ): Promise<SafetyCase | null> {
-  const payload =
-    extractRegularPayload(row.inputJson) ??
-    (await fetchSourceNotice(row.messageId));
+  // Validation-replay classes must be seeded with the payload production
+  // VALIDATED against (report flows validate a reportReferencePayload join,
+  // not the raw notice); triage and integrity classes replay the raw
+  // generation payload, which the legacy chain below provides.
+  let payload: PromptPayload | null = null;
+  if (safetyClassBehavior[gateClass] === "validation") {
+    const replayResult = replayValidationPayloadFromRow({
+      sourcePayload: asRecord(row.inputJson)?.sourcePayload,
+      validationJson: row.validationJson
+    });
+    if (replayResult) {
+      if (
+        replayResult.flow === "report" &&
+        replayResult.validationSourceCharsMatch === false
+      ) {
+        console.warn(
+          `[safety-fixtures] excluding ${gateClass} ${row.messageId}: report payload reconstruction failed the validationSourceChars tripwire`
+        );
+        return null;
+      }
+      payload = replayResult.payload;
+    } else if (asRecord(row.validationJson)?.reportExtraction) {
+      console.warn(
+        `[safety-fixtures] excluding ${gateClass} ${row.messageId}: report row without a reconstructable source payload`
+      );
+      return null;
+    } else {
+      payload =
+        extractRegularPayload(row.inputJson) ??
+        (await fetchSourceNotice(row.messageId));
+      if (payload) {
+        console.warn(
+          `[safety-fixtures] ${gateClass} ${row.messageId}: validation payload from source-notice fallback (stored payload missing; pdf/supplemental text unavailable)`
+        );
+      }
+    }
+  } else {
+    payload =
+      extractRegularPayload(row.inputJson) ??
+      (await fetchSourceNotice(row.messageId));
+  }
   if (!payload) {
     console.warn(
       `[safety-fixtures] skipping ${gateClass} ${row.messageId}: no source payload`
