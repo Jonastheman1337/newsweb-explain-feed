@@ -16,6 +16,12 @@ import { getSessionToken } from "../../../lib/session";
 
 type FeedData = Awaited<ReturnType<typeof getFeed>>;
 
+const RATE_FIXING_CATEGORY = "RENTEREGULERING";
+const RATE_FIXING_MUTE_OPTION = {
+  value: RATE_FIXING_CATEGORY,
+  label: "Rentefastsettelser"
+};
+
 type FeedPageProps = {
   searchParams: Promise<{
     cursor?: string;
@@ -173,10 +179,15 @@ export default async function FeedPage({ searchParams }: FeedPageProps) {
         />
         <MuteCategoriesSelect
           defaultMuted={mutedCategories}
-          options={filters.categories.map((c) => ({
-            value: c.categoryNo,
-            label: formatCategoryLabel(c.categoryNo)
-          }))}
+          options={[
+            RATE_FIXING_MUTE_OPTION,
+            ...filters.categories
+              .filter((c) => c.categoryNo !== RATE_FIXING_CATEGORY)
+              .map((c) => ({
+                value: c.categoryNo,
+                label: formatCategoryLabel(c.categoryNo)
+              }))
+          ]}
         />
         <button type="submit">Oppdater feed</button>
       </form>
