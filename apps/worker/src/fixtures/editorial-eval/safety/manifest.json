@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "corpusId": "editorial_safety_46423840b14094e6",
-  "createdAt": "2026-08-14T07:37:58.256Z",
+  "corpusId": "editorial_safety_dccd1d468a178e32",
+  "createdAt": "2026-08-14T08:58:10.355Z",
   "files": [
     {
       "path": "checker-error-published.json",
@@ -31,13 +31,13 @@
       "path": "numeric-false-block.json",
       "class": "numeric_false_block",
       "caseCount": 40,
-      "contentSha256": "4657ba15b8f28ece6d620e8bdd02b581100ea007ddf90a029701afd1a1566c60"
+      "contentSha256": "aff258f2c499a243c5242639d4fe539c6492c2c3030a42c97abef5d8e33923f8"
     },
     {
       "path": "numeric-unresolved.json",
       "class": "numeric_unresolved",
       "caseCount": 6,
-      "contentSha256": "3cb3786bcd27dca62b6f798e8fb9fa4626111d58dc9a432e8cf5ac3a19830803"
+      "contentSha256": "22fc7ea66bd976b1cbf68c9a6ecf1ffa3107b61220c25f7f82f351961caaed68"
     },
     {
       "path": "routine-not-news.json",
@@ -47,7 +47,7 @@
     }
   ],
   "uniformExpectations": {
-    "numeric_false_block": "UNEXPECTED_NUMBERS present under current validator; P2 flips per approved rule class via --update-expected",
+    "numeric_false_block": "UNEXPECTED_NUMBERS present under current validator except where validator evolution already cleared the stored case (see refresh diff); P2 flips per approved rule class via --update-expected",
     "numeric_unresolved": "UNEXPECTED_NUMBERS present; hard invariant, never flips"
   },
   "excludedNumericMessageIds": [

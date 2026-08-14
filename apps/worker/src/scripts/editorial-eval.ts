@@ -226,6 +226,8 @@ async function main(): Promise<void> {
     await buildSafetyFixturesCommand(parsed.options, rootDir);
   } else if (parsed.command === "replay-numbers") {
     await replayNumbersCommand(parsed.options, rootDir);
+  } else if (parsed.command === "refresh-numeric-payloads") {
+    await refreshNumericPayloadsCommand(parsed.options, rootDir);
   } else {
     throw new Error(`Unknown command: ${parsed.command}`);
   }
@@ -955,6 +957,238 @@ async function replayNumbersCommand(
     );
   }
   console.log(`[replay-numbers] artifact written to ${outPath}`);
+}
+
+// One-time fidelity repair for the frozen numeric fixture classes: 21 of the
+// 46 cases were report-flow rows seeded with the raw notice body instead of
+// the reportReferencePayload join production validated against. The refresh
+// keeps the same case membership and stored outputs (run-matched, asserted)
+// and replaces only the payloads plus the recomputed expected blocks.
+async function refreshNumericPayloadsCommand(
+  options: Map<string, string>,
+  rootDir: string
+): Promise<void> {
+  const corpusPath = path.resolve(
+    rootDir,
+    options.get("corpus") ??
+      path.join("tmp", "editorial-eval", "replay-corpus-2026-06-02_2026-08-13.jsonl")
+  );
+  const replayArtifactPath = path.resolve(
+    rootDir,
+    options.get("replay-artifact") ??
+      path.join("tmp", "editorial-eval", "replay-numbers-2026-06-02_2026-08-13.json")
+  );
+  const outDir =
+    options.get("out") ??
+    path.join(rootDir, "apps", "worker", "src", "fixtures", "editorial-eval", "safety");
+  const manifestPath = path.join(outDir, "manifest.json");
+
+  let rawCorpus: string;
+  try {
+    rawCorpus = await fs.readFile(corpusPath, "utf8");
+  } catch {
+    throw new Error(`Replay corpus not found: ${corpusPath}`);
+  }
+  const rowsByRunId = new Map<string, ReplayCorpusJsonlRow>();
+  for (const line of rawCorpus.replace(/^﻿/, "").split(/\r?\n/)) {
+    if (line.trim().length === 0) continue;
+    const row = JSON.parse(line) as ReplayCorpusJsonlRow;
+    rowsByRunId.set(row.id, row);
+  }
+
+  const replayArtifact = await readJson<{
+    summary?: { alreadyCleanUnderLegacy?: number[] };
+  }>(replayArtifactPath).catch(() => null);
+  const alreadyCleanIds = new Set(
+    replayArtifact?.summary?.alreadyCleanUnderLegacy ?? []
+  );
+  if (!replayArtifact) {
+    throw new Error(
+      [
+        `Replay artifact not found: ${replayArtifactPath}`,
+        "Run `npm run eval:editorial -w apps/worker -- replay-numbers` first;",
+        "its already-clean set is the independent cross-check for expectation flips."
+      ].join("\n")
+    );
+  }
+
+  const manifest = await readJson<SafetyFixtureManifest>(manifestPath);
+  const numericClasses: SafetyGateClass[] = [
+    "numeric_false_block",
+    "numeric_unresolved"
+  ];
+  const diffLines: string[] = [];
+  const cleanAfterIds: number[] = [];
+  const fixtureMessageIds = new Set<number>();
+  const refreshedFiles: Array<{
+    entry: SafetyFixtureManifest["files"][number];
+    filePath: string;
+    file: SafetyFixtureFile;
+  }> = [];
+  const gitHead = (await collectGitSourceState(rootDir)).headRevision;
+
+  // Pass 1: validate and rebuild everything in memory. Nothing is written
+  // until every case in both classes has passed every check.
+  for (const entry of manifest.files) {
+    if (!numericClasses.includes(entry.class)) continue;
+    const filePath = path.join(outDir, entry.path);
+    const file = await readJson<SafetyFixtureFile>(filePath);
+
+    for (const item of file.cases) {
+      fixtureMessageIds.add(item.messageId);
+      if (!item.generationRunId) {
+        throw new Error(
+          `${entry.class} ${item.messageId}: fixture has no generationRunId; cannot run-match`
+        );
+      }
+      const row = rowsByRunId.get(item.generationRunId);
+      if (!row) {
+        throw new Error(
+          `${entry.class} ${item.messageId}: corpus has no row for run ${item.generationRunId}`
+        );
+      }
+
+      const reUnwrapped = storedRewriteOutputFromRow(row);
+      if (!reUnwrapped || !item.storedOutput) {
+        throw new Error(
+          `${entry.class} ${item.messageId}: stored output missing on ${
+            reUnwrapped ? "fixture" : "corpus row"
+          }`
+        );
+      }
+      if (
+        sha256CanonicalJson(reUnwrapped) !== sha256CanonicalJson(item.storedOutput)
+      ) {
+        throw new Error(
+          `${entry.class} ${item.messageId}: corpus stored output differs from frozen fixture output (run ${item.generationRunId}); investigate before overwriting`
+        );
+      }
+
+      const payloadResult = replayValidationPayloadFromRow(row);
+      if (!payloadResult) {
+        throw new Error(
+          `${entry.class} ${item.messageId}: corpus payload missing or malformed`
+        );
+      }
+      if (
+        payloadResult.flow === "report" &&
+        payloadResult.validationSourceCharsMatch !== true
+      ) {
+        throw new Error(
+          `${entry.class} ${item.messageId}: report payload reconstruction failed the validationSourceChars tripwire (${String(
+            payloadResult.validationSourceCharsMatch
+          )})`
+        );
+      }
+
+      const before = item.expected.validation;
+      item.sourcePayload = payloadResult.payload;
+      item.expected = replayExpected(item);
+      const after = item.expected.validation;
+      if (!after) {
+        throw new Error(
+          `${entry.class} ${item.messageId}: replay produced no validation expectation`
+        );
+      }
+
+      if (
+        entry.class === "numeric_unresolved" &&
+        after.hasUnexpectedNumbers !== true
+      ) {
+        throw new Error(
+          `HARD STOP: unresolved case ${item.messageId} would lose UNEXPECTED_NUMBERS under the faithful payload. Adjudicate its classification (the 675221 pattern) first; nothing was written.`
+        );
+      }
+
+      const beforeCodes = before?.issueCodes ?? [];
+      const added = after.issueCodes.filter((code) => !beforeCodes.includes(code));
+      const removed = beforeCodes.filter((code) => !after.issueCodes.includes(code));
+      if (
+        entry.class === "numeric_false_block" &&
+        after.hasUnexpectedNumbers !== true
+      ) {
+        cleanAfterIds.push(item.messageId);
+      }
+      diffLines.push(
+        [
+          `${entry.class} ${item.messageId} [${payloadResult.flow}]`,
+          `payloadChars ${String((item.sourcePayload as PromptPayload).sourceBodyChars)}`,
+          `unexpected ${String(before?.hasUnexpectedNumbers)} -> ${String(after.hasUnexpectedNumbers)}`,
+          added.length > 0 ? `+[${added.join(",")}]` : "",
+          removed.length > 0 ? `-[${removed.join(",")}]` : ""
+        ]
+          .filter(Boolean)
+          .join("  ")
+      );
+    }
+
+    file.createdAt = new Date().toISOString();
+    file.source = {
+      ...file.source,
+      gitHead,
+      query: `${file.source.query}; payloads refreshed run-matched from ${path
+        .relative(rootDir, corpusPath)
+        .replaceAll("\\", "/")}`
+    };
+    refreshedFiles.push({ entry, filePath, file });
+  }
+
+  // Independent cross-check before writing: the END STATE must agree with the
+  // replay harness — a false-block case replays clean under the faithful
+  // payload here if and only if the harness's already-clean-under-legacy set
+  // contains it. (Cases can be clean in the frozen expectations already:
+  // 675221's "1,02" grounded against even the raw-body payload at freeze
+  // time, so "flip transitions" are the wrong comparison surface.) Any
+  // disagreement means the engine changed behavior between the replay run and
+  // this refresh, or fixture rows diverge from the corpus's latest rows.
+  const cleanAfterSet = new Set(cleanAfterIds);
+  const replayCleanFixtureIds = new Set(
+    [...alreadyCleanIds].filter((id) => fixtureMessageIds.has(id))
+  );
+  const cleanButNotReplayClean = cleanAfterIds.filter(
+    (id) => !replayCleanFixtureIds.has(id)
+  );
+  const replayCleanButStillBlocked = [...replayCleanFixtureIds].filter(
+    (id) => !cleanAfterSet.has(id)
+  );
+  if (cleanButNotReplayClean.length > 0 || replayCleanButStillBlocked.length > 0) {
+    throw new Error(
+      [
+        "HARD STOP: refreshed expectations disagree with the replay harness already-clean set; nothing was written.",
+        `clean here but not replay-clean: [${cleanButNotReplayClean.join(", ")}]`,
+        `replay-clean fixture members still blocked here: [${replayCleanButStillBlocked.join(", ")}]`,
+        "Re-run replay-numbers on the current build and investigate before retrying."
+      ].join("\n")
+    );
+  }
+
+  // Pass 2: all checks passed; write files and manifest.
+  for (const { entry, filePath, file } of refreshedFiles) {
+    await writeJson(filePath, file);
+    entry.caseCount = file.cases.length;
+    entry.contentSha256 = sha256CanonicalJson(file);
+  }
+  manifest.createdAt = new Date().toISOString();
+  manifest.corpusId = `editorial_safety_${sha256CanonicalJson(
+    manifest.files.map((entry) => entry.contentSha256)
+  ).slice(0, 16)}`;
+  manifest.uniformExpectations.numeric_false_block =
+    "UNEXPECTED_NUMBERS present under current validator except where validator evolution already cleared the stored case (see refresh diff); P2 flips per approved rule class via --update-expected";
+  await writeJson(manifestPath, manifest);
+
+  console.log(`[refresh-numeric-payloads] per-case diff:`);
+  for (const line of diffLines) console.log(`  ${line}`);
+  console.log(
+    `[refresh-numeric-payloads] rewrote ${refreshedFiles
+      .map(({ entry }) => entry.path)
+      .join(", ")} + manifest (corpusId ${manifest.corpusId})`
+  );
+  console.log(
+    `[refresh-numeric-payloads] false-block cases clean under faithful payloads: [${cleanAfterIds.join(", ")}] — matches the replay already-clean set`
+  );
+  console.log(
+    "[refresh-numeric-payloads] review the diff before committing; it is part of the release record."
+  );
 }
 
 async function buildSafetyFixturesCommand(
@@ -2640,6 +2874,8 @@ function printUsage(): void {
     "  npm run eval:editorial -w apps/worker -- build-safety-fixtures --update-expected  (offline; re-replays validators and rewrites expected blocks)",
     "  npm run eval:editorial -w apps/worker -- replay-numbers [--corpus tmp/editorial-eval/replay-corpus-2026-06-02_2026-08-13.jsonl] [--out PATH]",
     "  (offline; replays the exported UNEXPECTED_NUMBERS corpus through the current assessment engine; paths resolve from the repo root)",
+    "  npm run eval:editorial -w apps/worker -- refresh-numeric-payloads [--corpus PATH] [--replay-artifact PATH]",
+    "  (offline one-time fidelity repair: run-matched faithful payloads for the two numeric fixture classes; requires a fresh replay-numbers artifact as cross-check)",
     "  Seeding commands need DATABASE_URL / GENERATION_LOG_DATABASE_URL in .env (Render external URLs or local prod clone). Paths resolve from apps/worker under npm -w; absolute paths are safest."
   ].join("\n"));
 }
