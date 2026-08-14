@@ -1012,7 +1012,15 @@ export type NumberAssessmentRuleId =
 // and the config-validation whitelist. Attribution order is frozen for the
 // same reason as the legacy chain: telemetry compares rule mixes across
 // releases. Append new ids at the END; never reorder.
-export const numberDerivationRuleIds = [] as const;
+//
+// source_cell_subrun (2026-08-14, corpus-demanded): report-table rows
+// tokenize as ONE long digit run, so a source_spans entry quoting a row
+// fragment ("primary: Resultat etter skatt 297 689 186 914") fails exact
+// matching and false-blocks the row. The rule accepts a multi-group token
+// ONLY when (a) it sits inside the non-visible source_spans field and (b) its
+// space-separated groups appear as a consecutive, string-exact subsequence of
+// a strictly longer source digit run. Visible-text numbers never qualify.
+export const numberDerivationRuleIds = ["source_cell_subrun"] as const;
 
 export type NumberDerivationRuleId = (typeof numberDerivationRuleIds)[number];
 
@@ -1067,8 +1075,80 @@ type NumberDerivationRule = {
   } | null;
 };
 
+// Locates the character range of the source_spans array value inside the
+// JSON.stringify'd rewrite, escape-aware (span strings may contain brackets).
+function sourceSpansRegion(
+  rewriteText: string
+): { start: number; end: number } | null {
+  const marker = '"source_spans":[';
+  const start = rewriteText.indexOf(marker);
+  if (start === -1) return null;
+  let inString = false;
+  for (let i = start + marker.length; i < rewriteText.length; i += 1) {
+    const ch = rewriteText[i];
+    if (inString) {
+      if (ch === "\\") i += 1;
+      else if (ch === '"') inString = false;
+    } else if (ch === '"') {
+      inString = true;
+    } else if (ch === "]") {
+      return { start: start + marker.length, end: i };
+    }
+  }
+  return null;
+}
+
+const NUMBER_GROUP_SEPARATOR_PATTERN = /[\s ]+/;
+
 // Registry order must mirror numberDerivationRuleIds; first match wins.
-const numberDerivationRules: readonly NumberDerivationRule[] = [];
+const numberDerivationRules: readonly NumberDerivationRule[] = [
+  {
+    id: "source_cell_subrun",
+    match: (context) => {
+      const groups = context.parsed.display.split(NUMBER_GROUP_SEPARATOR_PATTERN);
+      if (groups.length < 2) return null;
+      const region = sourceSpansRegion(context.rewriteText);
+      if (
+        !region ||
+        context.token.index < region.start ||
+        context.token.index >= region.end
+      ) {
+        return null;
+      }
+      for (const source of context.sourceNumbers()) {
+        const sourceGroups = source.display.split(NUMBER_GROUP_SEPARATOR_PATTERN);
+        // Strictly longer: an equal run would already have matched exactly.
+        if (sourceGroups.length <= groups.length) continue;
+        for (
+          let offset = 0;
+          offset + groups.length <= sourceGroups.length;
+          offset += 1
+        ) {
+          let contiguous = true;
+          for (let j = 0; j < groups.length; j += 1) {
+            if (sourceGroups[offset + j] !== groups[j]) {
+              contiguous = false;
+              break;
+            }
+          }
+          if (contiguous) {
+            return {
+              provenance: {
+                source_run:
+                  source.display.length > 120
+                    ? `${source.display.slice(0, 117)}...`
+                    : source.display,
+                group_offset: offset,
+                group_count: groups.length
+              }
+            };
+          }
+        }
+      }
+      return null;
+    }
+  }
+];
 
 function lazyMemo<T>(compute: () => T): () => T {
   let computed = false;

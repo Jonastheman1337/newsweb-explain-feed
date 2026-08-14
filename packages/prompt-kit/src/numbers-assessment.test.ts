@@ -233,10 +233,11 @@ describe("derivation slot", () => {
   });
   const source = "The company will raise NOK 1,5 billion in the offering.";
 
-  it("keeps the registry and default enabled set frozen-empty until the corpus demands a rule", () => {
+  it("pins the registry contents and the default enabled set", () => {
     // Updating these expectations is a deliberate release act: appending a
-    // rule id must come with corpus-replay evidence (see the plan doc).
-    expect([...numberDerivationRuleIds]).toEqual([]);
+    // rule id must come with corpus-replay evidence, and enabling one must
+    // come with refreshed fixture expectations (see the plan doc).
+    expect([...numberDerivationRuleIds]).toEqual(["source_cell_subrun"]);
     expect([...defaultEnabledDerivationRules]).toEqual([]);
   });
 
@@ -271,5 +272,99 @@ describe("derivation slot", () => {
       { display: "1,5", disposition: "matched", ruleId: "exact_source_match", count: 1 }
     ]);
     expect(displays).toEqual(["2,7"]);
+  });
+});
+
+describe("source_cell_subrun rule", () => {
+  // Real corpus shape (679614): the source table row tokenizes as one long
+  // digit run; the rewrite's source_spans quotes the first two cells.
+  const tableSource = [
+    "Kvartalsrapport for konsernet",
+    "Resultat etter skatt 297 689 186 914 484 438 328 548 847 619",
+    "Totalresultat 297 689 186 914 484 438 328 548 847 619"
+  ].join("\n");
+  const spanQuotingRewrite = createRewrite({
+    lead: "Konsernet fikk et resultat etter skatt paa 298 millioner kroner.",
+    source_spans: ["primary: Resultat etter skatt 297 689 186 914"]
+  });
+
+  it("shadows a span-quoted cell sub-run while disabled by default", () => {
+    const assessments = assessNumbers(spanQuotingRewrite, tableSource);
+    expect(assessments).toContainEqual({
+      display: "297 689 186 914",
+      disposition: "unexpected",
+      ruleId: null,
+      count: 1,
+      candidateRuleId: "source_cell_subrun"
+    });
+    // The warning still fires: shadow candidates do not change behavior.
+    expect(findUnexpectedNumbers(spanQuotingRewrite, tableSource)).toContain(
+      "297 689 186 914"
+    );
+  });
+
+  it("derives the sub-run with provenance when enabled", () => {
+    const enabled = { enabledDerivationRules: ["source_cell_subrun"] as const };
+    const assessments = assessNumbers(spanQuotingRewrite, tableSource, enabled);
+    expect(assessments).toContainEqual({
+      display: "297 689 186 914",
+      disposition: "derived",
+      ruleId: "source_cell_subrun",
+      count: 1,
+      provenance: {
+        source_run: "297 689 186 914 484 438 328 548 847 619",
+        group_offset: 0,
+        group_count: 4
+      }
+    });
+    expect(
+      findUnexpectedNumbers(spanQuotingRewrite, tableSource, enabled)
+    ).not.toContain("297 689 186 914");
+  });
+
+  it("ignores the same digits in visible text", () => {
+    const visibleRewrite = createRewrite({
+      lead: "Resultatet ble 297 689 186 914 kroner i kvartalet.",
+      source_spans: ["primary: Resultat etter skatt"]
+    });
+    const assessments = assessNumbers(visibleRewrite, tableSource, {
+      enabledDerivationRules: ["source_cell_subrun"]
+    });
+    expect(assessments).toContainEqual({
+      display: "297 689 186 914",
+      disposition: "unexpected",
+      ruleId: null,
+      count: 1
+    });
+  });
+
+  it("requires the groups to be contiguous in a single source run", () => {
+    const gappedRewrite = createRewrite({
+      source_spans: ["primary: Resultat etter skatt 297 689 328 548"]
+    });
+    const assessments = assessNumbers(gappedRewrite, tableSource, {
+      enabledDerivationRules: ["source_cell_subrun"]
+    });
+    expect(assessments).toContainEqual({
+      display: "297 689 328 548",
+      disposition: "unexpected",
+      ruleId: null,
+      count: 1
+    });
+  });
+
+  it("leaves single-group numbers to the legacy chain", () => {
+    const singleRewrite = createRewrite({
+      source_spans: ["primary: Sum 999888"]
+    });
+    const assessments = assessNumbers(singleRewrite, tableSource, {
+      enabledDerivationRules: ["source_cell_subrun"]
+    });
+    expect(assessments).toContainEqual({
+      display: "999888",
+      disposition: "unexpected",
+      ruleId: null,
+      count: 1
+    });
   });
 });
