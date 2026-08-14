@@ -284,6 +284,20 @@ test("aggregates numeric assessments by prompt version", () => {
                 disposition: "unexpected",
                 ruleId: null,
                 count: 1
+              },
+              {
+                display: "95.000",
+                disposition: "unexpected",
+                ruleId: null,
+                count: 1,
+                candidateRuleId: "purchase_sum_total"
+              },
+              {
+                display: "34.300",
+                disposition: "derived",
+                ruleId: "purchase_sum_total",
+                count: 1,
+                provenance: { terms: [34000, 300], sum: 34300 }
               }
             ]
           })
@@ -305,20 +319,29 @@ test("aggregates numeric assessments by prompt version", () => {
     {
       prompt_version: "v5.9.1",
       runs_with_assessments: 1,
-      assessed_number_count: 4,
+      assessed_number_count: 6,
       matched_count: 3,
-      unexpected_count: 1,
-      unexpected_rate: 0.25,
+      derived_count: 1,
+      unexpected_count: 2,
+      unexpected_rate: 0.3333,
       dispositions: [
+        { disposition: "unexpected", rule_id: "(none)", count: 2 },
         { disposition: "matched", rule_id: "exact_source_match", count: 2 },
-        { disposition: "unexpected", rule_id: "(none)", count: 1 },
+        { disposition: "derived", rule_id: "purchase_sum_total", count: 1 },
         { disposition: "matched", rule_id: "scaled_unit_amount", count: 1 }
+      ],
+      shadow_candidates: [
+        { candidate_rule_id: "purchase_sum_total", count: 1 }
       ]
     }
   ]);
   assert.deepEqual(numeric.rankedDispositions, [
+    { disposition: "unexpected", rule_id: "(none)", count: 2 },
     { disposition: "matched", rule_id: "exact_source_match", count: 2 },
-    { disposition: "unexpected", rule_id: "(none)", count: 1 },
+    { disposition: "derived", rule_id: "purchase_sum_total", count: 1 },
     { disposition: "matched", rule_id: "scaled_unit_amount", count: 1 }
+  ]);
+  assert.deepEqual(numeric.rankedShadowCandidates, [
+    { candidate_rule_id: "purchase_sum_total", count: 1 }
   ]);
 });

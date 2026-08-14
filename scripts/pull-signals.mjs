@@ -872,6 +872,7 @@ function validationIssueStats(generations) {
 function numericAssessmentStats(generations) {
   const byVersion = new Map();
   const dispositionTotals = new Map();
+  const shadowCandidateTotals = new Map();
 
   for (const row of generations) {
     const validation = parseJsonField(row.validation_json);
@@ -888,8 +889,10 @@ function numericAssessmentStats(generations) {
         runs_with_assessments: 0,
         assessed_number_count: 0,
         matched_count: 0,
+        derived_count: 0,
         unexpected_count: 0,
-        disposition_counts: new Map()
+        disposition_counts: new Map(),
+        shadow_candidate_counts: new Map()
       };
       byVersion.set(version, bucket);
     }
@@ -906,12 +909,26 @@ function numericAssessmentStats(generations) {
       const key = `${disposition}:${ruleId}`;
       bucket.assessed_number_count += count;
       if (disposition === "matched") bucket.matched_count += count;
+      if (disposition === "derived") bucket.derived_count += count;
       if (disposition === "unexpected") bucket.unexpected_count += count;
       bucket.disposition_counts.set(
         key,
         (bucket.disposition_counts.get(key) ?? 0) + count
       );
       dispositionTotals.set(key, (dispositionTotals.get(key) ?? 0) + count);
+      // candidateRuleId is the live shadow signal: a disabled derivation rule
+      // that would have accepted the number. Historical rows lack the key.
+      if (typeof assessment.candidateRuleId === "string") {
+        bucket.shadow_candidate_counts.set(
+          assessment.candidateRuleId,
+          (bucket.shadow_candidate_counts.get(assessment.candidateRuleId) ?? 0) +
+            count
+        );
+        shadowCandidateTotals.set(
+          assessment.candidateRuleId,
+          (shadowCandidateTotals.get(assessment.candidateRuleId) ?? 0) + count
+        );
+      }
     }
   }
 
@@ -927,6 +944,17 @@ function numericAssessmentStats(generations) {
       })
       .sort((a, b) => b.count - a.count || a.rule_id.localeCompare(b.rule_id));
 
+  const toRankedCandidates = (map) =>
+    [...map.entries()]
+      .map(([candidateRuleId, count]) => ({
+        candidate_rule_id: candidateRuleId,
+        count
+      }))
+      .sort(
+        (a, b) =>
+          b.count - a.count || a.candidate_rule_id.localeCompare(b.candidate_rule_id)
+      );
+
   return {
     byPromptVersion: [...byVersion.values()]
       .map((bucket) => ({
@@ -934,12 +962,15 @@ function numericAssessmentStats(generations) {
         runs_with_assessments: bucket.runs_with_assessments,
         assessed_number_count: bucket.assessed_number_count,
         matched_count: bucket.matched_count,
+        derived_count: bucket.derived_count,
         unexpected_count: bucket.unexpected_count,
         unexpected_rate: rate(bucket.unexpected_count, bucket.assessed_number_count),
-        dispositions: toRanked(bucket.disposition_counts)
+        dispositions: toRanked(bucket.disposition_counts),
+        shadow_candidates: toRankedCandidates(bucket.shadow_candidate_counts)
       }))
       .sort((a, b) => a.prompt_version.localeCompare(b.prompt_version)),
-    rankedDispositions: toRanked(dispositionTotals)
+    rankedDispositions: toRanked(dispositionTotals),
+    rankedShadowCandidates: toRankedCandidates(shadowCandidateTotals)
   };
 }
 
