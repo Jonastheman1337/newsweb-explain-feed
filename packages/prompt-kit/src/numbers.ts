@@ -1006,21 +1006,81 @@ export type NumberAssessmentRuleId =
   | "trade_arithmetic_pair"
   | "trade_arithmetic_aggregate";
 
-export type NumberAssessmentDisposition = "matched" | "unexpected";
+// Derivation rules are the P2 Phase B extension slot: they may accept numbers
+// the frozen legacy chain leaves "unexpected", via explicit arithmetic or
+// normalization over source values. The tuple is the runtime registry order
+// and the config-validation whitelist. Attribution order is frozen for the
+// same reason as the legacy chain: telemetry compares rule mixes across
+// releases. Append new ids at the END; never reorder.
+export const numberDerivationRuleIds = [] as const;
+
+export type NumberDerivationRuleId = (typeof numberDerivationRuleIds)[number];
+
+// The production default. CI safety gates replay validateRewriteOutput with no
+// options, so this constant — not env — is what release flips change; the env
+// override (NUMERIC_ACCEPTANCE_RULES) is an emergency kill-switch only.
+// Enabling a rule = append here + refresh fixture expectations in the same
+// commit; that fixture diff is the release record.
+export const defaultEnabledDerivationRules: readonly NumberDerivationRuleId[] =
+  [];
+
+export type NumberAssessmentDisposition = "matched" | "derived" | "unexpected";
 
 export type NumberAssessment = {
   display: string;
   disposition: NumberAssessmentDisposition;
-  ruleId: NumberAssessmentRuleId | null;
+  ruleId: NumberAssessmentRuleId | NumberDerivationRuleId | null;
   count: number;
   provenance?: Record<string, number | string | boolean | number[]>;
+  // Set only on "unexpected" records when a disabled derivation rule would
+  // have accepted the number — the live shadow signal for enablement decisions.
+  candidateRuleId?: NumberDerivationRuleId;
 };
 
 type TokenAssessment = {
   disposition: NumberAssessmentDisposition;
-  ruleId: NumberAssessmentRuleId | null;
+  ruleId: NumberAssessmentRuleId | NumberDerivationRuleId | null;
   provenance?: Record<string, number | string | boolean | number[]>;
+  candidateRuleId?: NumberDerivationRuleId;
 };
+
+type SourceNumberToken = ParsedNumberToken & { index: number };
+
+type DerivationRuleContext = {
+  parsed: ParsedNumberToken;
+  token: NumberTokenMatch;
+  rewriteText: string;
+  sourceText: string;
+  sourceIndex: SourceNumberIndex;
+  // Lazy and memoized per assessNumbers call: report-scale source texts are
+  // large, and most tokens never reach the derivation registry.
+  sourceNumbers: () => readonly SourceNumberToken[];
+  tradeCandidates: () => readonly TradeArithmeticCandidate[];
+};
+
+type NumberDerivationRule = {
+  id: NumberDerivationRuleId;
+  match: (
+    context: DerivationRuleContext
+  ) => {
+    provenance?: Record<string, number | string | boolean | number[]>;
+  } | null;
+};
+
+// Registry order must mirror numberDerivationRuleIds; first match wins.
+const numberDerivationRules: readonly NumberDerivationRule[] = [];
+
+function lazyMemo<T>(compute: () => T): () => T {
+  let computed = false;
+  let value: T;
+  return () => {
+    if (!computed) {
+      value = compute();
+      computed = true;
+    }
+    return value;
+  };
+}
 
 // The rule evaluation order below is frozen: telemetry attribution depends on
 // which rule is named first, and consumers compare rule mixes across releases.
@@ -1102,31 +1162,95 @@ function assessRewriteToken(
   return { disposition: "unexpected", ruleId: null };
 }
 
+export type AssessNumbersOptions = {
+  enabledDerivationRules?: readonly NumberDerivationRuleId[];
+};
+
+function assessTokenWithDerivation(
+  legacy: TokenAssessment,
+  context: DerivationRuleContext,
+  enabledDerivationRules: readonly NumberDerivationRuleId[]
+): TokenAssessment {
+  for (const rule of numberDerivationRules) {
+    const match = rule.match(context);
+    if (!match) {
+      continue;
+    }
+    if (enabledDerivationRules.includes(rule.id)) {
+      return {
+        disposition: "derived",
+        ruleId: rule.id,
+        ...(match.provenance ? { provenance: match.provenance } : {})
+      };
+    }
+    // Disabled rule: the number stays blocked, but the shadow record names
+    // the rule that would have cleared it. No provenance on shadow records.
+    return {
+      disposition: "unexpected",
+      ruleId: null,
+      candidateRuleId: rule.id
+    };
+  }
+  return legacy;
+}
+
 export function assessNumbers(
   rewrite: RewriteOutput,
-  sourceText: string
+  sourceText: string,
+  options?: AssessNumbersOptions
 ): NumberAssessment[] {
+  const enabledDerivationRules =
+    options?.enabledDerivationRules ?? defaultEnabledDerivationRules;
   const sourceNumberIndex = collectSourceNumberIndex(sourceText);
   const rewriteText = JSON.stringify(rewrite);
   const rewriteTokens = collectNumberTokenMatches(rewriteText);
   const assessments = new Map<string, NumberAssessment>();
+
+  const sourceNumbers = lazyMemo((): readonly SourceNumberToken[] =>
+    collectNumberTokenMatches(sourceText).flatMap((match) => {
+      const parsedToken = parseNumberToken(match.token);
+      return parsedToken ? [{ ...parsedToken, index: match.index }] : [];
+    })
+  );
+  const tradeCandidates = lazyMemo(() =>
+    collectTradeArithmeticCandidates(sourceText)
+  );
 
   for (const token of rewriteTokens) {
     const parsed = parseNumberToken(token.token);
     if (!parsed) {
       continue;
     }
-    const result = assessRewriteToken(
+    let result = assessRewriteToken(
       parsed,
       token,
       rewriteText,
       sourceNumberIndex,
       sourceText
     );
+    if (
+      result.disposition === "unexpected" &&
+      numberDerivationRules.length > 0
+    ) {
+      result = assessTokenWithDerivation(
+        result,
+        {
+          parsed,
+          token,
+          rewriteText,
+          sourceText,
+          sourceIndex: sourceNumberIndex,
+          sourceNumbers,
+          tradeCandidates
+        },
+        enabledDerivationRules
+      );
+    }
     const foldKey = [
       parsed.display,
       result.disposition,
-      result.ruleId ?? ""
+      result.ruleId ?? "",
+      result.candidateRuleId ?? ""
     ].join("\u0000");
     const existing = assessments.get(foldKey);
     if (existing) {
@@ -1138,7 +1262,10 @@ export function assessNumbers(
       disposition: result.disposition,
       ruleId: result.ruleId,
       count: 1,
-      ...(result.provenance ? { provenance: result.provenance } : {})
+      ...(result.provenance ? { provenance: result.provenance } : {}),
+      ...(result.candidateRuleId
+        ? { candidateRuleId: result.candidateRuleId }
+        : {})
     });
   }
 
@@ -1148,14 +1275,21 @@ export function assessNumbers(
 export function unexpectedNumberDisplays(
   assessments: NumberAssessment[]
 ): string[] {
-  return assessments
-    .filter((assessment) => assessment.disposition === "unexpected")
-    .map((assessment) => assessment.display);
+  // Deduped: the same display can fold into several unexpected records once
+  // candidateRuleId exists as a fold segment; issue messages must not repeat it.
+  return [
+    ...new Set(
+      assessments
+        .filter((assessment) => assessment.disposition === "unexpected")
+        .map((assessment) => assessment.display)
+    )
+  ];
 }
 
 export function findUnexpectedNumbers(
   rewrite: RewriteOutput,
-  sourceText: string
+  sourceText: string,
+  options?: AssessNumbersOptions
 ): string[] {
-  return unexpectedNumberDisplays(assessNumbers(rewrite, sourceText));
+  return unexpectedNumberDisplays(assessNumbers(rewrite, sourceText, options));
 }

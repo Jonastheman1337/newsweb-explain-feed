@@ -2,7 +2,9 @@ import type { RewriteOutput } from "@newsweb/shared";
 import { describe, expect, it } from "vitest";
 import {
   assessNumbers,
+  defaultEnabledDerivationRules,
   findUnexpectedNumbers,
+  numberDerivationRuleIds,
   unexpectedNumberDisplays
 } from "./numbers.js";
 
@@ -220,5 +222,54 @@ describe("assessNumbers", () => {
       count: 1
     });
     expect(findUnexpectedNumbers(rewrite, source)).toEqual(["33,6"]);
+  });
+});
+
+describe("derivation slot", () => {
+  // Mixed matched + unexpected fixture exercising both dispositions.
+  const rewrite = createRewrite({
+    lead: "Selskapet henter 1,5 milliarder kroner, mot ventet 2,7 milliarder.",
+    key_facts: ["Henter 1,5 milliarder kroner"]
+  });
+  const source = "The company will raise NOK 1,5 billion in the offering.";
+
+  it("keeps the registry and default enabled set frozen-empty until the corpus demands a rule", () => {
+    // Updating these expectations is a deliberate release act: appending a
+    // rule id must come with corpus-replay evidence (see the plan doc).
+    expect([...numberDerivationRuleIds]).toEqual([]);
+    expect([...defaultEnabledDerivationRules]).toEqual([]);
+  });
+
+  it("returns identical assessments with an explicit empty enabled set", () => {
+    expect(
+      assessNumbers(rewrite, source, { enabledDerivationRules: [] })
+    ).toEqual(assessNumbers(rewrite, source));
+  });
+
+  it("accepts the options argument on findUnexpectedNumbers without behavior change", () => {
+    expect(
+      findUnexpectedNumbers(rewrite, source, { enabledDerivationRules: [] })
+    ).toEqual(findUnexpectedNumbers(rewrite, source));
+  });
+
+  it("emits no candidateRuleId key while the registry is empty", () => {
+    for (const assessment of assessNumbers(rewrite, source)) {
+      expect("candidateRuleId" in assessment).toBe(false);
+    }
+  });
+
+  it("dedupes repeated displays in unexpectedNumberDisplays", () => {
+    const displays = unexpectedNumberDisplays([
+      { display: "2,7", disposition: "unexpected", ruleId: null, count: 1 },
+      {
+        display: "2,7",
+        disposition: "unexpected",
+        ruleId: null,
+        count: 1,
+        candidateRuleId: undefined
+      },
+      { display: "1,5", disposition: "matched", ruleId: "exact_source_match", count: 1 }
+    ]);
+    expect(displays).toEqual(["2,7"]);
   });
 });
