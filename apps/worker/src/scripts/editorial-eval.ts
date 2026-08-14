@@ -189,8 +189,6 @@ type SourceNoticeCaseRow = {
   hasAttachments: boolean;
 };
 
-await main();
-
 async function main(): Promise<void> {
   const rootDir = await findRepoRoot();
   loadDotEnv({ path: path.join(rootDir, ".env"), override: false });
@@ -554,9 +552,15 @@ async function lockCasesCommand(options: Map<string, string>): Promise<void> {
   );
 }
 
+// 675221 (Norse Atlantic rights issue) was reclassified out of
+// numeric_unresolved on 2026-08-13: the current validator's scaled_unit_amount
+// rule accepts its "1,02 milliarder kroner" as the rounded form of the source's
+// NOK 1,019,832,000 — the deliberate, test-pinned behavior the rule was built
+// for (see packages/prompt-kit numbers tests). It stays in the recoverable
+// numeric_false_block pool.
 const SAFETY_SEED_MESSAGE_IDS: Partial<Record<SafetyGateClass, number[]>> = {
   checker_error_published: [679311, 677571, 677082, 675348],
-  numeric_unresolved: [679626, 679552, 679469, 678266, 676662, 676354, 675221]
+  numeric_unresolved: [679626, 679552, 679469, 678266, 676662, 676354]
 };
 
 // The marker leak and loaded-language evidence exists only in the rejected
@@ -609,6 +613,39 @@ function strideSample<T>(items: T[], limit: number): T[] {
   return sampled;
 }
 
+function parseSafetyReplayOutput(row: SafetySeedRow): RewriteOutput | null {
+  const storedOutput = rewriteOutputSchema.safeParse(row.outputJson);
+  if (storedOutput.success) return storedOutput.data;
+
+  // Validation-blocked rows wrap the full rejected rewrite as
+  // output_json.blockedRewrite (worker rewriteJsonForValidation, since
+  // 2026-05-29 — before the corpus window), so prefer that: it preserves
+  // key_facts/source_spans/source_limitations exactly as the validator saw
+  // them.
+  const blockedRewrite = rewriteOutputSchema.safeParse(
+    asRecord(row.outputJson)?.blockedRewrite
+  );
+  if (blockedRewrite.success) return blockedRewrite.data;
+
+  // Last resort for rows without a usable output_json: the worker keeps the
+  // rejected visible article fields in validation_json.hiddenDraft. Hydrate
+  // only the non-visible schema fields with number-free values so the current
+  // validators can deterministically replay the persisted article text.
+  const hiddenDraft = asRecord(asRecord(row.validationJson)?.hiddenDraft);
+  if (!hiddenDraft) return null;
+  const replayOutput = rewriteOutputSchema.safeParse({
+    ...hiddenDraft,
+    key_facts: ["Fixture replay placeholder"],
+    negative_or_surprising: [],
+    excluded_hype: [],
+    source_limitations: [],
+    confidence: "medium",
+    importance: "medium",
+    source_spans: ["Fixture replay source span"]
+  });
+  return replayOutput.success ? replayOutput.data : null;
+}
+
 async function safetyCaseFromRow(
   gateClass: SafetyGateClass,
   row: SafetySeedRow,
@@ -625,13 +662,13 @@ async function safetyCaseFromRow(
     );
     return null;
   }
-  const parsedOutput = rewriteOutputSchema.safeParse(row.outputJson);
+  const parsedOutput = parseSafetyReplayOutput(row);
   const item: SafetyCase = {
     messageId: row.messageId,
     generationRunId: row.id,
     promptVersion: row.promptVersion,
     sourcePayload: payload,
-    storedOutput: parsedOutput.success ? parsedOutput.data : null,
+    storedOutput: parsedOutput,
     storedValidation: row.validationJson ?? null,
     labels: { class: gateClass, reportRef: "final report 2026-06-02_2026-08-13" },
     expected: {},
@@ -2329,3 +2366,5 @@ function printUsage(): void {
     "  Seeding commands need DATABASE_URL / GENERATION_LOG_DATABASE_URL in .env (Render external URLs or local prod clone). Paths resolve from apps/worker under npm -w; absolute paths are safest."
   ].join("\n"));
 }
+
+await main();

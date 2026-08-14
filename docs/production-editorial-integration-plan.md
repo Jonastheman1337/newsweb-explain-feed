@@ -145,6 +145,35 @@ telemetry defect: the admin-signals export dropped
 `promptCacheMode`/`promptCacheKey` from `model_calls`, which would have made
 the cache rollout gates unverifiable in production.
 
+*E1 seeding amendment — 2026-08-13/14:*
+
+- **There is no separate production log database.** Render runs a single
+  Postgres (`newsweb-explain-db`); `generation_runs` lives there via the
+  `logPrisma` fallback. The `newsweb-explain-log-db` entry in `render.yaml`
+  does not reflect provisioned resources. `RENDER_LOG_DATABASE_EXTERNAL_URL`
+  is therefore set to the primary external URL, and seeding/replay ran against
+  it directly under a temporary IP allowlist rule ("Temporary local fixture
+  seeding 2026-08-13") instead of the Docker clone (Docker is not installed on
+  this machine).
+- **Blocked-output replay is faithful.** Failed rows carry the full rejected
+  rewrite in `output_json.blockedRewrite` (wrapper landed 2026-05-29, before
+  the corpus window). The seeder unwraps it; the `hiddenDraft`-plus-placeholder
+  reconstruction is a last resort only, since fabricated fields distort
+  replayed issue codes and drop `key_facts`/`source_spans` numbers.
+- **675221 reclassified (unresolved 7 → 6).** The Norse Atlantic rights-issue
+  row is the exact case the vetted `scaled_unit_amount` rule and its canonical
+  test fixture were built from; replaying its stored output resolves every
+  number ("1,02" ← NOK 1,019,832,000, `{nok, billion}`). The report's
+  "unresolved" label predates that rule. It remains in the recoverable
+  `numeric_false_block` pool.
+- **Offline replay corpus.** All number-block rows in the window were exported
+  to `tmp/editorial-eval/replay-corpus-2026-06-02_2026-08-13.jsonl` (exact
+  `sourcePayload` each generation saw, stored output incl. `blockedRewrite`,
+  validation). The export holds 144 rows — a strict superset of the report's
+  135, because production accumulated further number blocks after the report
+  was frozen on 2026-08-13. Phase B replay iterates on this file; the
+  temporary IP rule is removed after the export and does not need to return.
+
 ## Outcome
 
 Integrate the verified production findings into Autoweb without using the confounded A/B comparison as promotion evidence. Repair evaluation integrity first, then introduce production safety and efficiency changes behind shadowable controls, and keep prompt/model experiments isolated until they can be evaluated one variable at a time.
