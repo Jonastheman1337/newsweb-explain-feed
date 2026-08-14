@@ -41,7 +41,7 @@ services:
       - key: LOGIN_PASSWORD
         sync: false
       - key: MAGIC_LINK_BASE_URL
-        value: https://autoweb-f4dw.onrender.com/login
+        value: https://autoweb24.no/login
       - key: SMTP_HOST
         value: ""
       - key: SMTP_PORT
