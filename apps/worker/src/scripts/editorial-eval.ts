@@ -1,12 +1,16 @@
+import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { config as loadDotEnv } from "dotenv";
 import {
+  assessNumbers,
   createRegularPromptVariantMessages,
   getRegularPromptVariantProfile,
   isRegularPromptVariantId,
+  numberDerivationRuleIds,
   regularPromptVariantIds,
+  unexpectedNumberDisplays,
   type PromptPayload,
   type RegularPromptVariantId
 } from "@newsweb/prompt-kit";
@@ -76,7 +80,15 @@ import {
   type OpenAIServiceTier
 } from "../services/openai-responses.js";
 import { sanitizeRewriteStyle } from "../services/style-sanitizer.js";
-import { validateRewriteOutput } from "../services/rewrite-validation.js";
+import {
+  buildValidationSourceText,
+  validateRewriteOutput
+} from "../services/rewrite-validation.js";
+import {
+  replayValidationPayloadFromRow,
+  storedRewriteOutputFromRow,
+  storedUnexpectedNumberDisplays
+} from "../services/generation-run-replay.js";
 
 type CasesFile = {
   schemaVersion: 1 | 2;
@@ -212,6 +224,8 @@ async function main(): Promise<void> {
     await lockCasesCommand(parsed.options);
   } else if (parsed.command === "build-safety-fixtures") {
     await buildSafetyFixturesCommand(parsed.options, rootDir);
+  } else if (parsed.command === "replay-numbers") {
+    await replayNumbersCommand(parsed.options, rootDir);
   } else {
     throw new Error(`Unknown command: ${parsed.command}`);
   }
@@ -613,39 +627,6 @@ function strideSample<T>(items: T[], limit: number): T[] {
   return sampled;
 }
 
-function parseSafetyReplayOutput(row: SafetySeedRow): RewriteOutput | null {
-  const storedOutput = rewriteOutputSchema.safeParse(row.outputJson);
-  if (storedOutput.success) return storedOutput.data;
-
-  // Validation-blocked rows wrap the full rejected rewrite as
-  // output_json.blockedRewrite (worker rewriteJsonForValidation, since
-  // 2026-05-29 — before the corpus window), so prefer that: it preserves
-  // key_facts/source_spans/source_limitations exactly as the validator saw
-  // them.
-  const blockedRewrite = rewriteOutputSchema.safeParse(
-    asRecord(row.outputJson)?.blockedRewrite
-  );
-  if (blockedRewrite.success) return blockedRewrite.data;
-
-  // Last resort for rows without a usable output_json: the worker keeps the
-  // rejected visible article fields in validation_json.hiddenDraft. Hydrate
-  // only the non-visible schema fields with number-free values so the current
-  // validators can deterministically replay the persisted article text.
-  const hiddenDraft = asRecord(asRecord(row.validationJson)?.hiddenDraft);
-  if (!hiddenDraft) return null;
-  const replayOutput = rewriteOutputSchema.safeParse({
-    ...hiddenDraft,
-    key_facts: ["Fixture replay placeholder"],
-    negative_or_surprising: [],
-    excluded_hype: [],
-    source_limitations: [],
-    confidence: "medium",
-    importance: "medium",
-    source_spans: ["Fixture replay source span"]
-  });
-  return replayOutput.success ? replayOutput.data : null;
-}
-
 async function safetyCaseFromRow(
   gateClass: SafetyGateClass,
   row: SafetySeedRow,
@@ -662,7 +643,7 @@ async function safetyCaseFromRow(
     );
     return null;
   }
-  const parsedOutput = parseSafetyReplayOutput(row);
+  const parsedOutput = storedRewriteOutputFromRow(row);
   const item: SafetyCase = {
     messageId: row.messageId,
     generationRunId: row.id,
@@ -680,6 +661,300 @@ async function safetyCaseFromRow(
   };
   item.expected = replayExpected(item);
   return item;
+}
+
+type ReplayCorpusJsonlRow = {
+  id: string;
+  messageId: string | number;
+  promptVersion?: string | null;
+  requestedAt?: string;
+  reason?: string | null;
+  sourcePayload?: unknown;
+  outputJson?: unknown;
+  validationJson?: unknown;
+};
+
+type ReplayNumbersRowResult = {
+  messageId: number;
+  generationRunId: string;
+  promptVersion: string | null;
+  flow: "regular" | "report";
+  unresolved: boolean;
+  storedUnexpected: string[] | null;
+  replayedUnexpected: string[];
+  fidelity: { onlyStored: string[]; onlyReplayed: string[]; rawMatch: boolean | null };
+  candidateClears: Array<{ display: string; ruleId: string }>;
+  residualUnexpected: string[];
+  fullyCleared: boolean;
+  validationSourceCharsMatch: boolean | null;
+  crossCheckClean: boolean;
+};
+
+async function replayNumbersCommand(
+  options: Map<string, string>,
+  rootDir: string
+): Promise<void> {
+  const corpusPath = path.resolve(
+    rootDir,
+    options.get("corpus") ??
+      path.join("tmp", "editorial-eval", "replay-corpus-2026-06-02_2026-08-13.jsonl")
+  );
+  const corpusBase = path.basename(corpusPath);
+  const windowLabel =
+    /^replay-corpus-(.+)\.jsonl$/.exec(corpusBase)?.[1] ?? "output";
+  const outPath = path.resolve(
+    rootDir,
+    options.get("out") ??
+      path.join("tmp", "editorial-eval", `replay-numbers-${windowLabel}.json`)
+  );
+
+  let rawCorpus: string;
+  try {
+    rawCorpus = await fs.readFile(corpusPath, "utf8");
+  } catch {
+    throw new Error(
+      [
+        `Replay corpus not found: ${corpusPath}`,
+        "The corpus is gitignored; regenerate it with the export documented in",
+        "docs/editorial-eval.md (tmp/export-replay-corpus.mts against the",
+        "generation-log database) or pass --corpus <path>."
+      ].join("\n")
+    );
+  }
+  const corpusSha256 = createHash("sha256").update(rawCorpus).digest("hex");
+  const rows = rawCorpus
+    .replace(/^﻿/, "")
+    .split(/\r?\n/)
+    .filter((line) => line.trim().length > 0)
+    .map((line) => JSON.parse(line) as ReplayCorpusJsonlRow);
+
+  const latestByMessage = new Map<number, ReplayCorpusJsonlRow>();
+  let malformedIds = 0;
+  for (const row of rows) {
+    const messageId = Number(row.messageId);
+    if (!Number.isFinite(messageId)) {
+      malformedIds += 1;
+      continue;
+    }
+    const previous = latestByMessage.get(messageId);
+    if (
+      !previous ||
+      String(row.requestedAt ?? "") > String(previous.requestedAt ?? "")
+    ) {
+      latestByMessage.set(messageId, row);
+    }
+  }
+
+  const unresolvedIds = new Set(
+    SAFETY_SEED_MESSAGE_IDS.numeric_unresolved ?? []
+  );
+  const allDerivationRules = [...numberDerivationRuleIds];
+  const results: ReplayNumbersRowResult[] = [];
+  const skips: Array<{ messageId: number; generationRunId: string; reason: string }> = [];
+
+  for (const [messageId, row] of latestByMessage) {
+    const storedOutput = storedRewriteOutputFromRow(row);
+    if (!storedOutput) {
+      skips.push({ messageId, generationRunId: row.id, reason: "no-stored-output" });
+      continue;
+    }
+    const payloadResult = replayValidationPayloadFromRow(row);
+    if (!payloadResult) {
+      skips.push({ messageId, generationRunId: row.id, reason: "no-payload" });
+      continue;
+    }
+    const sourceText = buildValidationSourceText(payloadResult.payload);
+    const legacy = assessNumbers(storedOutput, sourceText, {
+      enabledDerivationRules: []
+    });
+    const allOn = assessNumbers(storedOutput, sourceText, {
+      enabledDerivationRules: allDerivationRules
+    });
+
+    const replayedUnexpected = unexpectedNumberDisplays(legacy).sort();
+    const residualUnexpected = unexpectedNumberDisplays(allOn).sort();
+    const candidatePairs = legacy
+      .filter((assessment) => assessment.candidateRuleId)
+      .map((assessment) => ({
+        display: assessment.display,
+        ruleId: String(assessment.candidateRuleId)
+      }))
+      .sort((a, b) =>
+        a.display.localeCompare(b.display) || a.ruleId.localeCompare(b.ruleId)
+      );
+    const derivedPairs = allOn
+      .filter((assessment) => assessment.disposition === "derived")
+      .map((assessment) => ({
+        display: assessment.display,
+        ruleId: String(assessment.ruleId)
+      }))
+      .sort((a, b) =>
+        a.display.localeCompare(b.display) || a.ruleId.localeCompare(b.ruleId)
+      );
+    const crossCheckClean =
+      JSON.stringify(candidatePairs) === JSON.stringify(derivedPairs);
+
+    const stored = storedUnexpectedNumberDisplays(row.validationJson);
+    const storedDisplays = stored ? [...stored.displays].sort() : null;
+    const replayedSet = new Set(replayedUnexpected);
+    const storedSet = new Set(storedDisplays ?? []);
+    const fidelity = {
+      onlyStored: (storedDisplays ?? []).filter(
+        (display) => !replayedSet.has(display)
+      ),
+      onlyReplayed: storedDisplays
+        ? replayedUnexpected.filter((display) => !storedSet.has(display))
+        : [],
+      rawMatch: stored
+        ? stored.raw === unexpectedNumberDisplays(legacy).join(", ")
+        : null
+    };
+
+    results.push({
+      messageId,
+      generationRunId: row.id,
+      promptVersion:
+        typeof row.promptVersion === "string" ? row.promptVersion : null,
+      flow: payloadResult.flow,
+      unresolved: unresolvedIds.has(messageId),
+      storedUnexpected: storedDisplays,
+      replayedUnexpected,
+      fidelity,
+      candidateClears: candidatePairs,
+      residualUnexpected,
+      fullyCleared: residualUnexpected.length === 0,
+      validationSourceCharsMatch: payloadResult.validationSourceCharsMatch,
+      crossCheckClean
+    });
+  }
+
+  results.sort((a, b) => a.messageId - b.messageId);
+  skips.sort((a, b) => a.messageId - b.messageId);
+
+  const fidelityMismatches = results.filter(
+    (row) =>
+      row.fidelity.onlyStored.length > 0 || row.fidelity.onlyReplayed.length > 0
+  );
+  const tripwireFailures = results.filter(
+    (row) => row.validationSourceCharsMatch === false
+  );
+  const alreadyClean = results.filter(
+    (row) => row.replayedUnexpected.length === 0
+  );
+  const crossCheckFailures = results.filter((row) => !row.crossCheckClean);
+  const clearsByRule = new Map<string, number>();
+  for (const row of results) {
+    for (const pair of row.candidateClears) {
+      clearsByRule.set(pair.ruleId, (clearsByRule.get(pair.ruleId) ?? 0) + 1);
+    }
+  }
+  const unresolvedRows = results.filter((row) => row.unresolved);
+  const unresolvedAlarms = unresolvedRows.filter(
+    (row) => row.fullyCleared || row.replayedUnexpected.length === 0
+  );
+
+  const artifact = {
+    header: {
+      corpus: path.relative(rootDir, corpusPath).replaceAll("\\", "/"),
+      corpusSha256,
+      gitHead: (await collectGitSourceState(rootDir)).headRevision,
+      derivationRuleIds: allDerivationRules,
+      unresolvedMessageIds: [...unresolvedIds].sort((a, b) => a - b)
+    },
+    summary: {
+      corpusRows: rows.length,
+      malformedIds,
+      pool: latestByMessage.size,
+      replayed: results.length,
+      skips,
+      fidelityMismatchCount: fidelityMismatches.length,
+      tripwireFailureCount: tripwireFailures.length,
+      alreadyCleanUnderLegacy: alreadyClean.map((row) => row.messageId),
+      crossCheckFailureCount: crossCheckFailures.length,
+      candidateClearsByRule: [...clearsByRule.entries()]
+        .map(([ruleId, count]) => ({ ruleId, count }))
+        .sort((a, b) => b.count - a.count || a.ruleId.localeCompare(b.ruleId))
+    },
+    rows: results
+  };
+  await writeJson(outPath, artifact);
+
+  console.log(`[replay-numbers] corpus ${corpusPath}`);
+  console.log(
+    `[replay-numbers] rows ${rows.length} -> pool ${latestByMessage.size} (latest per message), replayed ${results.length}, skipped ${skips.length}${
+      malformedIds > 0 ? `, malformed ids ${malformedIds}` : ""
+    }`
+  );
+  for (const skip of skips) {
+    console.warn(
+      `[replay-numbers] skipped ${skip.messageId} (${skip.generationRunId}): ${skip.reason}`
+    );
+  }
+  const reportRows = results.filter((row) => row.flow === "report");
+  const tripwireChecked = reportRows.filter(
+    (row) => row.validationSourceCharsMatch !== null
+  );
+  console.log(
+    `[replay-numbers] flows: report ${reportRows.length} (tripwire ${
+      tripwireChecked.filter((row) => row.validationSourceCharsMatch).length
+    }/${tripwireChecked.length} ok), regular ${results.length - reportRows.length}`
+  );
+  console.log(
+    `[replay-numbers] fidelity: ${fidelityMismatches.length} row(s) with stored/replayed display drift`
+  );
+  for (const row of fidelityMismatches) {
+    console.warn(
+      `[replay-numbers] fidelity drift ${row.messageId}: onlyStored=[${row.fidelity.onlyStored.join(
+        " | "
+      )}] onlyReplayed=[${row.fidelity.onlyReplayed.join(" | ")}]`
+    );
+  }
+  console.log(
+    `[replay-numbers] already clean under legacy rules: ${alreadyClean.length} (${alreadyClean
+      .map((row) => row.messageId)
+      .join(", ")})`
+  );
+  if (allDerivationRules.length === 0) {
+    console.log(
+      "[replay-numbers] derivation registry is empty; legacy and all-rules runs are identical by construction"
+    );
+  } else {
+    console.log(
+      `[replay-numbers] candidate clears by rule: ${
+        artifact.summary.candidateClearsByRule
+          .map((entry) => `${entry.ruleId}=${entry.count}`)
+          .join(", ") || "none"
+      }`
+    );
+  }
+  if (crossCheckFailures.length > 0) {
+    console.error(
+      `[replay-numbers] WARNING: derived/candidate cross-check failed for ${crossCheckFailures
+        .map((row) => row.messageId)
+        .join(", ")}`
+    );
+  }
+  console.log("[replay-numbers] unresolved cases:");
+  for (const id of [...unresolvedIds].sort((a, b) => a - b)) {
+    const row = results.find((entry) => entry.messageId === id);
+    if (!row) {
+      console.warn(`[replay-numbers]   ${id}: NOT IN POOL`);
+      continue;
+    }
+    console.log(
+      `[replay-numbers]   ${id} (${row.generationRunId}): replayedUnexpected=[${row.replayedUnexpected.join(
+        " | "
+      )}] residual=[${row.residualUnexpected.join(" | ")}]`
+    );
+  }
+  if (unresolvedAlarms.length > 0) {
+    console.error(
+      `[replay-numbers] HARD WARNING: unresolved case(s) would clear: ${unresolvedAlarms
+        .map((row) => row.messageId)
+        .join(", ")} - adjudicate before any fixture or rule change`
+    );
+  }
+  console.log(`[replay-numbers] artifact written to ${outPath}`);
 }
 
 async function buildSafetyFixturesCommand(
@@ -2363,6 +2638,8 @@ function printUsage(): void {
     "  npm run eval:editorial -w apps/worker -- build-safety-fixtures [--from YYYY-MM-DD] [--to YYYY-MM-DD] [--numeric-limit 40] [--not-news-ids IDS] [--false-skip-ids IDS] [--legacy-run PATH] [--out DIR]",
     "  (marker_leak/loaded_language seed from the legacy A/B artifact --legacy-run, default tmp/editorial-eval/run-v6draft-50.json; the rest from the generation-log DB)",
     "  npm run eval:editorial -w apps/worker -- build-safety-fixtures --update-expected  (offline; re-replays validators and rewrites expected blocks)",
+    "  npm run eval:editorial -w apps/worker -- replay-numbers [--corpus tmp/editorial-eval/replay-corpus-2026-06-02_2026-08-13.jsonl] [--out PATH]",
+    "  (offline; replays the exported UNEXPECTED_NUMBERS corpus through the current assessment engine; paths resolve from the repo root)",
     "  Seeding commands need DATABASE_URL / GENERATION_LOG_DATABASE_URL in .env (Render external URLs or local prod clone). Paths resolve from apps/worker under npm -w; absolute paths are safest."
   ].join("\n"));
 }
