@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "corpusId": "editorial_safety_dccd1d468a178e32",
-  "createdAt": "2026-08-14T08:58:10.355Z",
+  "corpusId": "editorial_safety_357244f61a9714cd",
+  "createdAt": "2026-08-14T09:21:08.700Z",
   "files": [
     {
       "path": "checker-error-published.json",
@@ -30,14 +30,14 @@
     {
       "path": "numeric-false-block.json",
       "class": "numeric_false_block",
-      "caseCount": 40,
-      "contentSha256": "aff258f2c499a243c5242639d4fe539c6492c2c3030a42c97abef5d8e33923f8"
+      "caseCount": 41,
+      "contentSha256": "f802e505e7d473fa41a70a8bdfa2d42adf7a6664931b3ad88b69e4a4b6398569"
     },
     {
       "path": "numeric-unresolved.json",
       "class": "numeric_unresolved",
-      "caseCount": 6,
-      "contentSha256": "22fc7ea66bd976b1cbf68c9a6ecf1ffa3107b61220c25f7f82f351961caaed68"
+      "caseCount": 5,
+      "contentSha256": "ffb6f1a35edf194e1ccdc4561378e22992057189880759a9b87c98007086069e"
     },
     {
       "path": "routine-not-news.json",

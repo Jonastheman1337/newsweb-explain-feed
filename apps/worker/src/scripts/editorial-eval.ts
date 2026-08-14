@@ -575,9 +575,15 @@ async function lockCasesCommand(options: Map<string, string>): Promise<void> {
 // NOK 1,019,832,000 — the deliberate, test-pinned behavior the rule was built
 // for (see packages/prompt-kit numbers tests). It stays in the recoverable
 // numeric_false_block pool.
+// 679626 was reclassified out on 2026-08-14 (owner adjudication): its three
+// blocking displays are digit-exact contiguous quotes of source table rows in
+// the non-visible source_spans field — the source_cell_subrun mechanism shared
+// with ten known false blocks — and its visible article numbers already pass.
+// The report's "unresolved" label was a reference-coverage artifact, the same
+// instrument that had misclassified 675221.
 const SAFETY_SEED_MESSAGE_IDS: Partial<Record<SafetyGateClass, number[]>> = {
   checker_error_published: [679311, 677571, 677082, 675348],
-  numeric_unresolved: [679626, 679552, 679469, 678266, 676662, 676354]
+  numeric_unresolved: [679552, 679469, 678266, 676662, 676354]
 };
 
 // The marker leak and loaded-language evidence exists only in the rejected
