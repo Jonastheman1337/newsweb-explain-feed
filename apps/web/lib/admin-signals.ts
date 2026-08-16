@@ -1,4 +1,9 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
+import {
+  NUMERIC_SHADOW_MONITOR_APP_SETTING_KEY,
+  numericShadowMonitorSnapshotSchema,
+  type NumericShadowMonitorSnapshot
+} from "@newsweb/shared";
 import { isDedicatedLogDatabaseConfigured, logPrisma, prisma } from "@newsweb/shared/db";
 
 export const SIGNAL_TABS = [
@@ -832,6 +837,28 @@ export type DatabaseSizes = {
   // null when no dedicated log DB is configured (it would be the same DB).
   logBytes: number | null;
 };
+
+export type NumericShadowMonitorReadResult = {
+  snapshot: NumericShadowMonitorSnapshot | null;
+  error: string | null;
+};
+
+export async function getNumericShadowMonitorStatus(): Promise<NumericShadowMonitorReadResult> {
+  const row = await prisma.appSetting.findUnique({
+    where: { key: NUMERIC_SHADOW_MONITOR_APP_SETTING_KEY },
+    select: { valueJson: true }
+  });
+  if (!row) return { snapshot: null, error: null };
+
+  const parsed = numericShadowMonitorSnapshotSchema.safeParse(row.valueJson);
+  if (!parsed.success) {
+    return {
+      snapshot: null,
+      error: "The stored numeric shadow monitor status is invalid or from an unsupported version."
+    };
+  }
+  return { snapshot: parsed.data, error: null };
+}
 
 export async function getDatabaseSizes(): Promise<DatabaseSizes> {
   async function sizeOf(client: PrismaClient): Promise<number> {

@@ -10,7 +10,9 @@ import {
   type TitleSignal,
   formatDatabaseSize,
   getDatabaseSizes,
+  getNumericShadowMonitorStatus,
   getSignalsData,
+  type NumericShadowMonitorReadResult,
   parseSignalsQuery,
   previewJson,
   queryToSearchParams
@@ -111,6 +113,125 @@ function ReferenceCheckDetails({ row }: { row: GenerationSignal }) {
         value={previewJson(row.referenceCheck.detailJson)}
       />
     </div>
+  );
+}
+
+function NumericShadowMonitorPanel({
+  result
+}: {
+  result: NumericShadowMonitorReadResult;
+}) {
+  if (result.error) {
+    return <div className="signalsWarning">{result.error}</div>;
+  }
+  if (!result.snapshot) {
+    return (
+      <section className="signalsMonitor">
+        <div className="signalsMonitorHeader">
+          <strong>Numeric shadow monitor</strong>
+          <span className="signalsMonitorBadge">Awaiting first run</span>
+        </div>
+        <p className="muted">
+          No durable monitor snapshot has been written yet. The worker writes one on startup
+          and then every weekday at 18:30 Oslo time.
+        </p>
+      </section>
+    );
+  }
+
+  const snapshot = result.snapshot;
+  const stale = Date.now() - new Date(snapshot.generatedAt).getTime() > 96 * 60 * 60 * 1000;
+  const needsAttention = snapshot.attention.required || stale;
+  const enabledRules = snapshot.enabledRuleIds.length
+    ? snapshot.enabledRuleIds.join(", ")
+    : "none (shadow only)";
+
+  return (
+    <section className={needsAttention ? "signalsMonitor warning" : "signalsMonitor"}>
+      <div className="signalsMonitorHeader">
+        <div>
+          <strong>Numeric shadow monitor</strong>
+          <div className="muted">
+            Last run {formatDate(snapshot.generatedAt)} · weekdays at 18:30 Oslo
+          </div>
+        </div>
+        <span className="signalsMonitorBadge">
+          {stale ? "Stale" : snapshot.attention.required ? "Review evidence" : "Quiet"}
+        </span>
+      </div>
+
+      <div className="signalsMonitorStats">
+        <div>
+          <strong>{snapshot.query.dedupedRuns}</strong>
+          <span>latest runs</span>
+        </div>
+        <div>
+          <strong>{snapshot.query.retriesDiscarded}</strong>
+          <span>retries deduped</span>
+        </div>
+        <div>
+          <strong>{snapshot.totals.assessedOccurrences}</strong>
+          <span>numbers assessed</span>
+        </div>
+        <div>
+          <strong>{snapshot.totals.unexpectedOccurrences}</strong>
+          <span>unexpected numbers</span>
+        </div>
+        <div>
+          <strong>{snapshot.totals.shadowCandidateOccurrences}</strong>
+          <span>shadow occurrences</span>
+        </div>
+      </div>
+
+      <p className="muted signalsMonitorMeta">
+        Oslo window {snapshot.window.fromDate}–{snapshot.window.throughDate} · enabled rules: {enabledRules}
+        {snapshot.attention.newCandidateAssessmentRecords > 0
+          ? ` · ${snapshot.attention.newCandidateAssessmentRecords} new candidate record(s) since the previous run`
+          : ""}
+      </p>
+
+      {stale ? (
+        <div className="signalsMonitorReason">
+          No successful snapshot has been recorded for more than 96 hours.
+        </div>
+      ) : null}
+      {snapshot.attention.reasons.map((reason) => (
+        <div className="signalsMonitorReason" key={reason}>
+          {reason}
+        </div>
+      ))}
+
+      <div className="signalsMonitorRules">
+        {snapshot.rules.map((rule) => (
+          <div className="signalsMonitorRule" key={rule.ruleId}>
+            <div>
+              <strong className="signalsMono">{rule.ruleId}</strong>{" "}
+              <span className="muted">{rule.enabled ? "enabled" : "shadow"}</span>
+            </div>
+            <div>
+              {rule.candidateOccurrences} candidate occurrence(s) in {rule.candidateNotices}{" "}
+              notice(s); {rule.numericWouldClearRuns}/{rule.candidateRuns} latest candidate run(s)
+              would clear the numeric unexpected-number blocker. {rule.derivedOccurrences} accepted
+              derivation occurrence(s).
+            </div>
+            {rule.examples.length > 0 ? (
+              <div className="signalsMonitorExamples">
+                Examples:{" "}
+                {rule.examples.slice(0, 5).map((example, index) => (
+                  <span key={`${example.messageId}:${example.version ?? "null"}`}>
+                    {index > 0 ? ", " : ""}
+                    {noticeLink(
+                      example.messageId,
+                      `${example.messageId}${example.version == null ? "" : ` v${example.version}`} (${example.candidateDisplays.join(", ")})`
+                    )}
+                  </span>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -315,9 +436,17 @@ function GenerationsTable({ rows }: { rows: GenerationSignal[] }) {
 export default async function SignalsPage({ searchParams }: SignalsPageProps) {
   const params = await searchParams;
   const query = parseSignalsQuery(params);
-  const result = await getSignalsData(query);
+  const [result, dbSizes, numericShadowMonitor] = await Promise.all([
+    getSignalsData(query),
+    getDatabaseSizes().catch(() => null),
+    getNumericShadowMonitorStatus().catch(
+      (): NumericShadowMonitorReadResult => ({
+        snapshot: null,
+        error: "Numeric shadow monitor status could not be read."
+      })
+    )
+  ]);
   const rowCount = result.data.rows.length;
-  const dbSizes = await getDatabaseSizes().catch(() => null);
 
   return (
     <section className="signalsPage">
@@ -347,6 +476,8 @@ export default async function SignalsPage({ searchParams }: SignalsPageProps) {
           ? "Dedicated log database configured. Events and generation runs are read from both the log DB and legacy primary rows."
           : "Dedicated log database is not configured. Events and generation runs are currently stored in the primary app database."}
       </div>
+
+      <NumericShadowMonitorPanel result={numericShadowMonitor} />
 
       {result.warnings.map((warning) => (
         <div className="signalsWarning" key={warning}>

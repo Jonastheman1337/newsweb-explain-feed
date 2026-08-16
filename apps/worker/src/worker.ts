@@ -1,6 +1,9 @@
 import {
   QUEUE_NAMES,
   GENERATION_RUN_STALE_MS,
+  NUMERIC_SHADOW_MONITOR_APP_SETTING_KEY,
+  NUMERIC_SHADOW_MONITOR_CRON_PATTERN,
+  NUMERIC_SHADOW_MONITOR_TIME_ZONE,
   REDIS_CHANNELS,
   fixDoubleEncodedUtf8,
   isYearlyReportCategory,
@@ -18,8 +21,12 @@ import {
   type RewriteOutput
 } from "@newsweb/shared";
 import { loadConfig } from "./config.js";
-import { logPrisma, prisma } from "@newsweb/shared/db";
-import type { Prisma } from "@prisma/client";
+import {
+  isDedicatedLogDatabaseConfigured,
+  logPrisma,
+  prisma
+} from "@newsweb/shared/db";
+import type { Prisma, PrismaClient } from "@prisma/client";
 import {
   PROMPT_VERSION,
   createDeveloperPrompt,
@@ -36,6 +43,7 @@ import {
   createYearlyReportUserPrompt,
   defaultEnabledDerivationRules,
   maxVisibleArticleCharsForOutputMode,
+  numberDerivationRuleIds,
   type PromptPayload,
   type SupplementalMaterialPayload,
   type ReportPromptPayload,
@@ -122,6 +130,12 @@ import {
 } from "./services/stale-generation-recovery.js";
 import { sanitizeRewriteStyle } from "./services/style-sanitizer.js";
 import { setGenerationPhase } from "./services/generation-phase.js";
+import {
+  buildNumericShadowMonitorSnapshot,
+  numericShadowQuerySince,
+  previousSeenCandidateKeys,
+  type NumericShadowGenerationRow
+} from "./services/numeric-shadow-monitor.js";
 
 const NEWSWEB_LIST_URL = "https://api3.oslo.oslobors.no/v1/newsreader/list";
 const NEWSWEB_MESSAGE_URL = "https://api3.oslo.oslobors.no/v1/newsreader/message";
@@ -3003,6 +3017,8 @@ async function upsertRewrite(args: {
 }
 
 const JOB_RUNS_CLEANUP_JOB_NAME = "cleanup-job-runs";
+const NUMERIC_SHADOW_MONITOR_JOB_NAME = "numeric-shadow-monitor";
+const NUMERIC_SHADOW_MONITOR_QUERY_LIMIT = 5_000;
 const JOB_RUNS_CLEANUP_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const POLL_JOB_RUN_RETENTION_MS = 14 * 24 * 60 * 60 * 1000;
 const JOB_RUNS_CLEANUP_BATCH_SIZE = 1000;
@@ -3043,11 +3059,119 @@ async function cleanupPollJobRuns(): Promise<void> {
   );
 }
 
+async function queryNumericShadowGenerationRows(
+  client: PrismaClient,
+  querySince: Date
+): Promise<NumericShadowGenerationRow[]> {
+  // Reference-check telemetry makes the full validation JSON large. Project
+  // only numberAssessments in Postgres so the daily monitor stays cheap.
+  return client.$queryRaw<NumericShadowGenerationRow[]>`
+      SELECT
+        id,
+        message_id AS "messageId",
+        version,
+        status,
+        requested_at AS "requestedAt",
+        CASE
+          WHEN jsonb_typeof(validation_json -> 'numberAssessments') = 'array'
+          THEN jsonb_build_object(
+            'numberAssessments',
+            validation_json -> 'numberAssessments'
+          )
+          ELSE NULL
+        END AS "validationJson"
+      FROM generation_runs
+      WHERE requested_at >= ${querySince}
+        AND reason IN ('new-message', 'manual-reprocess')
+      ORDER BY requested_at DESC, id DESC
+      LIMIT ${NUMERIC_SHADOW_MONITOR_QUERY_LIMIT + 1}
+    `;
+}
+
+async function runNumericShadowMonitor(): Promise<void> {
+  const now = new Date();
+  const querySince = numericShadowQuerySince(now);
+  const [previousSetting, logRows, legacyPrimaryRows] = await Promise.all([
+    prisma.appSetting.findUnique({
+      where: { key: NUMERIC_SHADOW_MONITOR_APP_SETTING_KEY },
+      select: { valueJson: true }
+    }),
+    queryNumericShadowGenerationRows(logPrisma, querySince),
+    isDedicatedLogDatabaseConfigured
+      ? queryNumericShadowGenerationRows(prisma, querySince)
+      : Promise.resolve([])
+  ]);
+
+  const rowsById = new Map<string, NumericShadowGenerationRow>();
+  for (const row of [...logRows, ...legacyPrimaryRows]) {
+    if (!rowsById.has(row.id)) rowsById.set(row.id, row);
+  }
+  const queriedRows = [...rowsById.values()].sort((left, right) => {
+    const timeDifference =
+      right.requestedAt.getTime() - left.requestedAt.getTime();
+    return timeDifference || right.id.localeCompare(left.id);
+  });
+
+  const queryTruncated =
+    logRows.length > NUMERIC_SHADOW_MONITOR_QUERY_LIMIT ||
+    legacyPrimaryRows.length > NUMERIC_SHADOW_MONITOR_QUERY_LIMIT ||
+    queriedRows.length > NUMERIC_SHADOW_MONITOR_QUERY_LIMIT;
+  const rows = queriedRows.slice(0, NUMERIC_SHADOW_MONITOR_QUERY_LIMIT);
+  const enabledRuleIds =
+    config.NUMERIC_ACCEPTANCE_RULES ?? defaultEnabledDerivationRules;
+  const snapshot = buildNumericShadowMonitorSnapshot({
+    rows,
+    now,
+    monitoredRuleIds: numberDerivationRuleIds,
+    enabledRuleIds,
+    previousSeenCandidateKeys: previousSeenCandidateKeys(
+      previousSetting?.valueJson
+    ),
+    rowLimit: NUMERIC_SHADOW_MONITOR_QUERY_LIMIT,
+    queryTruncated
+  });
+
+  await prisma.appSetting.upsert({
+    where: { key: NUMERIC_SHADOW_MONITOR_APP_SETTING_KEY },
+    create: {
+      key: NUMERIC_SHADOW_MONITOR_APP_SETTING_KEY,
+      valueJson: toPrismaJsonValue(snapshot)
+    },
+    update: {
+      valueJson: toPrismaJsonValue(snapshot)
+    }
+  });
+
+  console.log(
+    JSON.stringify({
+      service: "worker",
+      event: "numeric_shadow_monitor",
+      generatedAt: snapshot.generatedAt,
+      window: snapshot.window,
+      dedupedRuns: snapshot.query.dedupedRuns,
+      retriesDiscarded: snapshot.query.retriesDiscarded,
+      candidateOccurrences: snapshot.totals.shadowCandidateOccurrences,
+      newCandidateAssessmentRecords:
+        snapshot.attention.newCandidateAssessmentRecords,
+      enabledRuleIds: snapshot.enabledRuleIds,
+      attentionRequired: snapshot.attention.required,
+      attentionReasons: snapshot.attention.reasons
+    })
+  );
+}
+
 const ingestWorker = new Worker<IngestJobData>(
   QUEUE_NAMES.ingest,
   async (job: Job<IngestJobData>) => {
     if (job.name === JOB_RUNS_CLEANUP_JOB_NAME) {
       return withJobRun("cleanup", null, cleanupPollJobRuns);
+    }
+    if (job.name === NUMERIC_SHADOW_MONITOR_JOB_NAME) {
+      return withJobRun(
+        NUMERIC_SHADOW_MONITOR_JOB_NAME,
+        null,
+        runNumericShadowMonitor
+      );
     }
     if (job.name === "poll-list") {
       return withJobRun("poll", null, async () => {
@@ -4545,7 +4669,8 @@ async function bootstrap(): Promise<void> {
   for (const repeatable of repeatables) {
     if (
       repeatable.name === "poll-list" ||
-      repeatable.name === JOB_RUNS_CLEANUP_JOB_NAME
+      repeatable.name === JOB_RUNS_CLEANUP_JOB_NAME ||
+      repeatable.name === NUMERIC_SHADOW_MONITOR_JOB_NAME
     ) {
       await ingestQueue.removeRepeatableByKey(repeatable.key);
     }
@@ -4564,6 +4689,39 @@ async function bootstrap(): Promise<void> {
       },
       removeOnComplete: 10,
       removeOnFail: 10
+    }
+  );
+
+  // A deterministic production-side shadow summary runs on worker boot and at
+  // 18:30 Oslo each weekday. It only reads telemetry and writes its own status;
+  // it never changes numeric acceptance rules.
+  await ingestQueue.add(
+    NUMERIC_SHADOW_MONITOR_JOB_NAME,
+    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+    {} as IngestJobData,
+    {
+      jobId: "numeric-shadow-monitor-repeat",
+      repeat: {
+        pattern: NUMERIC_SHADOW_MONITOR_CRON_PATTERN,
+        tz: NUMERIC_SHADOW_MONITOR_TIME_ZONE
+      },
+      attempts: 3,
+      backoff: { type: "exponential", delay: 5_000 },
+      removeOnComplete: 20,
+      removeOnFail: 20
+    }
+  );
+
+  await ingestQueue.add(
+    NUMERIC_SHADOW_MONITOR_JOB_NAME,
+    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+    {} as IngestJobData,
+    {
+      jobId: `numeric-shadow-monitor-bootstrap-${Math.floor(Date.now() / (60 * 60 * 1000))}`,
+      attempts: 3,
+      backoff: { type: "exponential", delay: 5_000 },
+      removeOnComplete: 20,
+      removeOnFail: 20
     }
   );
 

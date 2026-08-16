@@ -1180,6 +1180,89 @@ a {
   color: var(--warning);
 }
 
+.signalsMonitor {
+  display: grid;
+  gap: 0.7rem;
+  padding: 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+  font-size: 0.85rem;
+}
+
+.signalsMonitor.warning {
+  border-color: var(--warning);
+}
+
+.signalsMonitor p {
+  margin: 0;
+}
+
+.signalsMonitorHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.signalsMonitorBadge {
+  flex: 0 0 auto;
+  padding: 0.2rem 0.45rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--ink-soft);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.signalsMonitor.warning .signalsMonitorBadge,
+.signalsMonitorReason {
+  color: var(--warning);
+}
+
+.signalsMonitorStats {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.signalsMonitorStats > div {
+  display: grid;
+  gap: 0.1rem;
+  padding: 0.55rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.signalsMonitorStats strong {
+  font-size: 1.1rem;
+}
+
+.signalsMonitorStats span,
+.signalsMonitorExamples {
+  color: var(--ink-soft);
+  font-size: 0.76rem;
+}
+
+.signalsMonitorRules {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.signalsMonitorRule {
+  display: grid;
+  gap: 0.2rem;
+  padding-top: 0.55rem;
+  border-top: 1px solid var(--line);
+}
+
+@media (max-width: 680px) {
+  .signalsMonitorStats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 .signalsTabs {
   display: flex;
   flex-wrap: wrap;
