@@ -131,6 +131,10 @@ import {
 import { sanitizeRewriteStyle } from "./services/style-sanitizer.js";
 import { setGenerationPhase } from "./services/generation-phase.js";
 import {
+  classifyIngestJobName,
+  ingestJobNames
+} from "./services/ingest-job-routing.js";
+import {
   buildNumericShadowMonitorSnapshot,
   numericShadowQuerySince,
   previousSeenCandidateKeys,
@@ -3016,8 +3020,8 @@ async function upsertRewrite(args: {
   }
 }
 
-const JOB_RUNS_CLEANUP_JOB_NAME = "cleanup-job-runs";
-const NUMERIC_SHADOW_MONITOR_JOB_NAME = "numeric-shadow-monitor";
+const JOB_RUNS_CLEANUP_JOB_NAME = ingestJobNames.cleanup;
+const NUMERIC_SHADOW_MONITOR_JOB_NAME = ingestJobNames.numericShadowMonitor;
 const NUMERIC_SHADOW_MONITOR_QUERY_LIMIT = 5_000;
 const JOB_RUNS_CLEANUP_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const POLL_JOB_RUN_RETENTION_MS = 14 * 24 * 60 * 60 * 1000;
@@ -3163,17 +3167,18 @@ async function runNumericShadowMonitor(): Promise<void> {
 const ingestWorker = new Worker<IngestJobData>(
   QUEUE_NAMES.ingest,
   async (job: Job<IngestJobData>) => {
-    if (job.name === JOB_RUNS_CLEANUP_JOB_NAME) {
+    const jobKind = classifyIngestJobName(job.name);
+    if (jobKind === "cleanup") {
       return withJobRun("cleanup", null, cleanupPollJobRuns);
     }
-    if (job.name === NUMERIC_SHADOW_MONITOR_JOB_NAME) {
+    if (jobKind === "numericShadowMonitor") {
       return withJobRun(
         NUMERIC_SHADOW_MONITOR_JOB_NAME,
         null,
         runNumericShadowMonitor
       );
     }
-    if (job.name === "poll-list") {
+    if (jobKind === "poll") {
       return withJobRun("poll", null, async () => {
         const list = await fetchList();
         const ids = list.map((item) => item.messageId);
@@ -3205,6 +3210,10 @@ const ingestWorker = new Worker<IngestJobData>(
           });
         }
       });
+    }
+
+    if (jobKind === "unsupported") {
+      throw new Error(`Unsupported ${QUEUE_NAMES.ingest} job name: ${job.name}`);
     }
 
     // SourceNotice does not exist yet for ingest, so do not FK-link this run on create.
@@ -4712,18 +4721,25 @@ async function bootstrap(): Promise<void> {
     }
   );
 
-  await ingestQueue.add(
-    NUMERIC_SHADOW_MONITOR_JOB_NAME,
-    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
-    {} as IngestJobData,
-    {
-      jobId: `numeric-shadow-monitor-bootstrap-${Math.floor(Date.now() / (60 * 60 * 1000))}`,
-      attempts: 3,
-      backoff: { type: "exponential", delay: 5_000 },
-      removeOnComplete: 20,
-      removeOnFail: 20
-    }
-  );
+  // Run the boot snapshot in this worker process. During a blue-green deploy,
+  // the outgoing worker can still consume jobs from the shared ingest queue;
+  // queueing a newly introduced job name here would let the old code
+  // misinterpret it as an ingest-notice job before the new instance is live.
+  try {
+    await withJobRun(
+      NUMERIC_SHADOW_MONITOR_JOB_NAME,
+      null,
+      runNumericShadowMonitor
+    );
+  } catch (error) {
+    console.error(
+      JSON.stringify({
+        service: "worker",
+        event: "numeric_shadow_monitor_boot_failed",
+        error: error instanceof Error ? error.message : String(error)
+      })
+    );
+  }
 
   if (config.NEWSWEB_POLLING_ENABLED) {
     await ingestQueue.add(
