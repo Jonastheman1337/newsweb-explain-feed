@@ -187,12 +187,14 @@ const MARKER_LEAK_GUARDRAILS: Array<{
     id: "assistant_channel",
     pattern: /assistant(?:final|analysis|commentary)/i
   },
-  // Case-sensitive: English planning voice inside Norwegian copy.
+  // Case-sensitive English planning voice, anchored to generation machinery
+  // nouns only: quoted executive English ("We need to identify further cost
+  // reductions") must never fire, so business verbs stay out of the list.
   {
     category: "reasoning_spill",
     id: "we_need_meta",
     pattern:
-      /\b(?:We|I)\s+(?:need|should|must)\b[^.!?]{0,80}\b(?:JSON|schema|prompt|respond|answer|identify|malformed)\b/
+      /\b(?:We|I)\s+(?:need|should|must)\b[^.!?]{0,80}\b(?:JSON|schema|prompt|malformed)\b/
   },
   {
     category: "reasoning_spill",
@@ -214,12 +216,16 @@ const MARKER_LEAK_GUARDRAILS: Array<{
     id: "schema_key_kv",
     pattern: /"?(?:confidence|importance|source_spans|key_facts|company_sentence)"\s*:\s*"/
   },
+  // The quote after the key is mandatory: plain prose "confidence: high"
+  // in quoted English must not fire.
   {
     category: "serialization_fragment",
     id: "confidence_level_kv",
-    pattern: /confidence"?\s*:\s*"?(?:high|medium|low)\b/i
+    pattern: /confidence"\s*:\s*"?(?:high|medium|low)\b/i
   },
-  // 4+ so a short quoted CJK brand name does not trip on its own.
+  // 4+ for both scripts so a short quoted brand name (华为, 삼성, 네이버)
+  // does not trip on its own; bracket debris must be an adjacent pair, since
+  // a single 【 can appear in a legitimately quoted Asian press-release title.
   {
     category: "foreign_script_spam",
     id: "cjk_run",
@@ -228,12 +234,12 @@ const MARKER_LEAK_GUARDRAILS: Array<{
   {
     category: "foreign_script_spam",
     id: "hangul_run",
-    pattern: /[가-힯]{2,}/
+    pattern: /[가-힯]{4,}/
   },
   {
     category: "foreign_script_spam",
     id: "fullwidth_bracket",
-    pattern: /[【】]/
+    pattern: /[【】]{2,}/
   }
 ];
 
@@ -243,15 +249,23 @@ export function detectMarkerLeaks(visibleText: string): MarkerLeakMatch[] {
   ).map((guardrail) => ({ category: guardrail.category, id: guardrail.id }));
 }
 
-// The release surface for the marker detector. Promotion = flip to
+// The release surface for the marker detector. While severity is "warning"
+// the detector is fully shadow: matches persist only as the markerLeaks
+// telemetry field and NO issue is added, so valid/errorCode series are
+// untouched (mirrors the P2 candidateRuleId pattern). Promotion = flip to
 // { code: "MARKER_LEAK", severity: "blocking" } + refresh fixture
 // expectations in the same commit. Deliberately NOT routed through the
 // high-risk repair ladder: a marker leak means the generation went off the
 // rails, so enforcement is an immediate block (owner decision 2026-08-17).
-export const markerLeakEnforcement: {
+export type MarkerLeakEnforcement = {
   code: "MARKER_LEAK_SHADOW" | "MARKER_LEAK";
   severity: RewriteValidationSeverity;
-} = { code: "MARKER_LEAK_SHADOW", severity: "warning" };
+};
+
+export const markerLeakEnforcement: MarkerLeakEnforcement = {
+  code: "MARKER_LEAK_SHADOW",
+  severity: "warning"
+};
 
 const CURRENCY_MARKER_GROUPS: Array<{
   label: string;
@@ -709,6 +723,9 @@ export function validateRewriteOutput(
     // Kill-switch passthrough only; when absent the engine uses the code
     // default (defaultEnabledDerivationRules), which is what CI gates replay.
     enabledDerivationRules?: readonly NumberDerivationRuleId[];
+    // Same passthrough pattern for the marker detector; absent = the code
+    // default (markerLeakEnforcement).
+    markerLeakEnforcement?: MarkerLeakEnforcement;
   }
 ): {
   valid: boolean;
@@ -718,6 +735,7 @@ export function validateRewriteOutput(
   warnings: string[];
   quoteTelemetry: QuoteTelemetry;
   numberAssessments: NumberAssessment[];
+  markerLeaks: MarkerLeakMatch[];
 } {
   const issues: RewriteValidationIssue[] = [];
   const validationSourceText = buildValidationSourceText(payload);
@@ -765,12 +783,18 @@ export function validateRewriteOutput(
     );
   }
 
+  const activeMarkerEnforcement =
+    options?.markerLeakEnforcement ?? markerLeakEnforcement;
   const markerLeaks = detectMarkerLeaks(visibleText);
-  if (markerLeaks.length > 0) {
+  // Shadow neutrality: while the detector is at warning severity, matches
+  // reach only the markerLeaks result field — adding even a warning issue
+  // would flip valid/errorCode for otherwise-clean runs and contaminate the
+  // series the promotion decision reads.
+  if (markerLeaks.length > 0 && activeMarkerEnforcement.severity === "blocking") {
     addIssue(
       issues,
-      markerLeakEnforcement.code,
-      markerLeakEnforcement.severity,
+      activeMarkerEnforcement.code,
+      activeMarkerEnforcement.severity,
       `Visible article text contains internal marker leakage: ${markerLeaks
         .map((match) => `${match.category}(${match.id})`)
         .join(", ")}.`
@@ -964,6 +988,7 @@ export function validateRewriteOutput(
     blockingErrors,
     warnings,
     quoteTelemetry,
-    numberAssessments
+    numberAssessments,
+    markerLeaks
   };
 }

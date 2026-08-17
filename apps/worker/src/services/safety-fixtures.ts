@@ -183,15 +183,24 @@ export function replayTriageExpectation(
 function coverageReportFromStored(
   raw: unknown
 ): ReferenceCoverageReport | null {
-  if (!raw || typeof raw !== "object") return null;
+  // Strict: a blob missing the referenceCoverageJson fields returns null and
+  // fails the never-flips coverage invariant LOUDLY, instead of silently
+  // reconstructing a vacuous report that would turn the gate into a no-op.
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
   const blob = raw as Record<string, unknown>;
-  const reviews = Array.isArray(blob.sentenceReviews)
-    ? blob.sentenceReviews
-    : [];
-  const items = reviews
+  if (
+    typeof blob.totalSentences !== "number" ||
+    typeof blob.visibleArticleSentenceCount !== "number" ||
+    typeof blob.groundedSentences !== "number" ||
+    typeof blob.coveragePercent !== "number" ||
+    !Array.isArray(blob.sentenceReviews)
+  ) {
+    return null;
+  }
+  const items = blob.sentenceReviews
     .filter(
       (item): item is Record<string, unknown> =>
-        !!item && typeof item === "object"
+        !!item && typeof item === "object" && !Array.isArray(item)
     )
     .map((item) => ({
       index: Number(item.index ?? 0),
@@ -201,10 +210,10 @@ function coverageReportFromStored(
       sourceEvidence: String(item.sourceEvidence ?? "")
     }));
   return {
-    totalSentences: Number(blob.totalSentences ?? items.length),
-    visibleArticleSentenceCount: Number(blob.visibleArticleSentenceCount ?? 0),
-    groundedSentences: Number(blob.groundedSentences ?? 0),
-    coveragePercent: Number(blob.coveragePercent ?? 0),
+    totalSentences: blob.totalSentences,
+    visibleArticleSentenceCount: blob.visibleArticleSentenceCount,
+    groundedSentences: blob.groundedSentences,
+    coveragePercent: blob.coveragePercent,
     items,
     unsupportedSentences: items.filter((item) => !item.grounded)
   };
@@ -225,19 +234,44 @@ export function replayCheckerOutcomeExpectation(
           | undefined)
       : undefined;
   if (!referenceCheck || typeof referenceCheck !== "object") return null;
+  // Prefer the structured entries the P4 worker persists (exact kinds and
+  // multi-stage history); fall back to classifying the legacy last-error
+  // string for pre-P4 rows.
+  const storedOutcome =
+    referenceCheck.outcome && typeof referenceCheck.outcome === "object"
+      ? (referenceCheck.outcome as Record<string, unknown>)
+      : null;
+  const storedEntries = Array.isArray(storedOutcome?.checkerErrors)
+    ? (storedOutcome!.checkerErrors as unknown[]).filter(
+        (entry): entry is Record<string, unknown> =>
+          !!entry && typeof entry === "object" && !Array.isArray(entry)
+      )
+    : [];
   const message =
     typeof referenceCheck.checkerError === "string"
       ? referenceCheck.checkerError
       : null;
-  const checkerErrors: ReferenceCheckerErrorEntry[] = message
-    ? [
-        {
-          stage: 1,
-          kind: classifyLegacyCheckerErrorMessage(message).kind,
-          message
-        }
-      ]
-    : [];
+  const checkerErrors: ReferenceCheckerErrorEntry[] =
+    storedEntries.length > 0
+      ? storedEntries.map((entry, index) => ({
+          stage: typeof entry.stage === "number" ? entry.stage : index + 1,
+          kind: String(
+            entry.kind ?? "unknown"
+          ) as ReferenceCheckerErrorEntry["kind"],
+          message: String(entry.message ?? ""),
+          ...(typeof entry.afterCorrection === "boolean"
+            ? { afterCorrection: entry.afterCorrection }
+            : {})
+        }))
+      : message
+        ? [
+            {
+              stage: 1,
+              kind: classifyLegacyCheckerErrorMessage(message).kind,
+              message
+            }
+          ]
+        : [];
   const outcome = resolveReferenceCheckOutcome({
     checkerErrors,
     initialCoverage: coverageReportFromStored(referenceCheck.initialCoverage),

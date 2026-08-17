@@ -71,6 +71,8 @@ describe.runIf(manifest !== null)("editorial safety gates", () => {
           });
         } else if (behavior === "checker_outcome") {
           it(`case ${item.messageId} keeps its expected checker outcome`, () => {
+            expect(item.sourcePayload.messageId).toBe(item.messageId);
+            expect(item.storedValidation).toBeTruthy();
             expect(item.expected.checkerOutcome).toBeDefined();
             expect(replayCheckerOutcomeExpectation(item)).toEqual(
               item.expected.checkerOutcome
@@ -78,6 +80,9 @@ describe.runIf(manifest !== null)("editorial safety gates", () => {
           });
         } else if (behavior === "marker") {
           it(`case ${item.messageId} keeps its expected marker detection`, () => {
+            expect(item.sourcePayload.messageId).toBe(item.messageId);
+            expect(item.storedValidation).toBeTruthy();
+            expect(item.storedOutput).toBeTruthy();
             expect(item.expected.marker).toBeDefined();
             expect(replayMarkerExpectation(item)).toEqual(item.expected.marker);
           });
@@ -109,6 +114,18 @@ describe.runIf(manifest !== null)("editorial safety gates", () => {
               "none"
             );
           }
+        });
+
+        it("never flips: 675348 remains the published run enforcement would have blocked", () => {
+          // The concrete release-record pin (like numeric_unresolved's
+          // UNEXPECTED_NUMBERS): a regression in the gate or the coverage
+          // reconstruction followed by --update-expected must not silently
+          // rewrite the fail-open proof.
+          const proof = file.cases.find((item) => item.messageId === 675348);
+          expect(proof?.expected.checkerOutcome?.state).toBe(
+            "residual_unsupported"
+          );
+          expect(proof?.expected.checkerOutcome?.wouldBlock).toBe(true);
         });
       }
 

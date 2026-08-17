@@ -90,6 +90,7 @@ import {
 import {
   absorbReferenceRepairResult,
   createReferenceRepairAccumulator,
+  maybeAccumulatedReferenceCheckOutcome,
   referenceCheckFailureJson,
   referenceCheckValidationJson,
   resolveAccumulatedReferenceCheckOutcome,
@@ -639,6 +640,7 @@ function validateRewriteWithRevisionCompliance(
   warnings: string[];
   quoteTelemetry: ReturnType<typeof validateRewriteOutput>["quoteTelemetry"];
   numberAssessments: ReturnType<typeof validateRewriteOutput>["numberAssessments"];
+  markerLeaks: ReturnType<typeof validateRewriteOutput>["markerLeaks"];
   revisionCompliance: RevisionInstructionCompliance | null;
 } {
   const revisionCompliance = validateRevisionInstructionCompliance(rewrite, {
@@ -679,6 +681,7 @@ function validateRewriteWithRevisionCompliance(
     warnings,
     quoteTelemetry: validation.quoteTelemetry,
     numberAssessments: validation.numberAssessments,
+    markerLeaks: validation.markerLeaks,
     revisionCompliance
   };
 }
@@ -1493,7 +1496,10 @@ async function applyReferenceCheckRepair<TPayload extends PromptPayload>({
       checkerErrors.push({
         stage: repairHistory.length + 1,
         kind: classifyCheckerErrorKind(error),
-        message: error instanceof Error ? error.message : String(error)
+        message: error instanceof Error ? error.message : String(error),
+        // A prior correction in this call means the last successful coverage
+        // describes the pre-repair draft.
+        afterCorrection: correctionAttempts > 0
       });
       return {
         rewrite: currentRewrite,
@@ -2242,10 +2248,17 @@ async function processReportRewrite(
       applyReferenceCheckEnforcement(referenceOutcome, {
         legacyCheckerError: referenceRepairState.checkerError
       });
+    if (referenceForceNeedsRetry) {
+      // Promotion-only path (retryOnUnavailable). Throwing routes through the
+      // existing catch/retry machinery: BullMQ re-attempts, finalAttempt
+      // handling applies, and nothing persists a needs_retry the queue would
+      // never pick up again.
+      throw new Error(
+        "Reference check unavailable: checker failed with no usable coverage evidence."
+      );
+    }
     const validation = applyReferenceCheckGate(validationResult, referenceGate);
-    const rewriteStatus = referenceForceNeedsRetry
-      ? "needs_retry"
-      : statusForValidation(validation);
+    const rewriteStatus = statusForValidation(validation);
     const persistedRewriteJson = rewriteJsonForValidation(rewrite, validation);
 
     await upsertRewrite({
@@ -2270,6 +2283,7 @@ async function processReportRewrite(
         warnings: validation.warnings,
         quoteTelemetry: validation.quoteTelemetry,
         numberAssessments: validation.numberAssessments,
+        markerLeaks: validation.markerLeaks,
         revisionInstructionCompliance: validation.revisionCompliance,
         sourceBodyChars: payload.sourceBodyChars,
         promptChars,
@@ -2642,10 +2656,17 @@ async function processYearlyReportRewrite(
       applyReferenceCheckEnforcement(referenceOutcome, {
         legacyCheckerError: referenceRepairState.checkerError
       });
+    if (referenceForceNeedsRetry) {
+      // Promotion-only path (retryOnUnavailable). Throwing routes through the
+      // existing catch/retry machinery: BullMQ re-attempts, finalAttempt
+      // handling applies, and nothing persists a needs_retry the queue would
+      // never pick up again.
+      throw new Error(
+        "Reference check unavailable: checker failed with no usable coverage evidence."
+      );
+    }
     const validation = applyReferenceCheckGate(validationResult, referenceGate);
-    const rewriteStatus = referenceForceNeedsRetry
-      ? "needs_retry"
-      : statusForValidation(validation);
+    const rewriteStatus = statusForValidation(validation);
     const persistedRewriteJson = rewriteJsonForValidation(rewrite, validation);
 
     await upsertRewrite({
@@ -2670,6 +2691,7 @@ async function processYearlyReportRewrite(
         warnings: validation.warnings,
         quoteTelemetry: validation.quoteTelemetry,
         numberAssessments: validation.numberAssessments,
+        markerLeaks: validation.markerLeaks,
         revisionInstructionCompliance: validation.revisionCompliance,
         sourceBodyChars: payload.sourceBodyChars,
         promptChars,
@@ -3973,10 +3995,14 @@ const rewriteWorker = new Worker<RewriteJobData>(
         } = applyReferenceCheckEnforcement(referenceOutcome, {
           legacyCheckerError: referenceRepairState.checkerError
         });
+        if (referenceForceNeedsRetry) {
+          // Promotion-only path (retryOnUnavailable); see the report flow.
+          throw new Error(
+            "Reference check unavailable: checker failed with no usable coverage evidence."
+          );
+        }
         const validation = applyReferenceCheckGate(validationResult, referenceGate);
-        const rewriteStatus = referenceForceNeedsRetry
-          ? "needs_retry"
-          : statusForValidation(validation);
+        const rewriteStatus = statusForValidation(validation);
         const persistedRewriteJson = rewriteJsonForValidation(rewrite, validation);
 
         await upsertRewrite({
@@ -4001,6 +4027,7 @@ const rewriteWorker = new Worker<RewriteJobData>(
             warnings: validation.warnings,
             quoteTelemetry: validation.quoteTelemetry,
             numberAssessments: validation.numberAssessments,
+            markerLeaks: validation.markerLeaks,
             revisionInstructionCompliance: validation.revisionCompliance,
             sourceBodyChars: payload.sourceBodyChars,
             promptChars,
@@ -4071,7 +4098,7 @@ const rewriteWorker = new Worker<RewriteJobData>(
                   importanceAdjusted,
                   importanceAdjustReason
                 },
-                resolveAccumulatedReferenceCheckOutcome(referenceRepairState)
+                maybeAccumulatedReferenceCheckOutcome(referenceRepairState)
               )
             } as Prisma.InputJsonValue
           });
@@ -4109,7 +4136,7 @@ const rewriteWorker = new Worker<RewriteJobData>(
                 importanceAdjusted,
                 importanceAdjustReason
               },
-              resolveAccumulatedReferenceCheckOutcome(referenceRepairState)
+              maybeAccumulatedReferenceCheckOutcome(referenceRepairState)
             )
           } as Prisma.InputJsonValue
         });

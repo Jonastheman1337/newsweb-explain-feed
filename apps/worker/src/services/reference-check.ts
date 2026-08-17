@@ -481,6 +481,10 @@ export type ReferenceCheckerErrorEntry = {
   stage: number;
   kind: ReferenceCheckerErrorKind;
   message: string;
+  // Checker-kind failures only: true when a successful correction rewrite
+  // preceded this failure in the same repair call, meaning the last
+  // successful coverage describes a draft that has since been repaired.
+  afterCorrection?: boolean;
 };
 
 export type ReferenceCheckOutcomeState =
@@ -494,6 +498,10 @@ export type ReferenceCheckOutcome = {
   state: ReferenceCheckOutcomeState;
   evaluatedCoverage: "final" | "initial" | "none";
   degraded: boolean;
+  // True when the evaluated coverage predates a successful repair (the
+  // verifying check errored): the gate verdict describes a superseded draft,
+  // so enforcement must fall back to retry rather than block on it.
+  evidenceStale: boolean;
   checkerErrors: ReferenceCheckerErrorEntry[];
   gate: ReferenceCheckGateResult;
   correctionAttempts: number;
@@ -533,15 +541,11 @@ export function classifyLegacyCheckerErrorMessage(message: string): {
   kind: ReferenceCheckerErrorKind;
   phase: "checker" | "repair_rewrite" | "unknown";
 } {
+  // Schema-name branches first: a transport failure whose diagnostics embed
+  // JSON-parse wording (gateway HTML -> "Unexpected token <") must classify
+  // by its schema name, not the embedded parse text.
   if (/\bfor rewrite_output\b/.test(message)) {
     return { kind: "repair_rewrite_failed", phase: "repair_rewrite" };
-  }
-  if (
-    /in JSON at position|Unexpected end of JSON input|Unexpected token/.test(
-      message
-    )
-  ) {
-    return { kind: "checker_parse", phase: "checker" };
   }
   if (/\bfor reference_check_result\b/.test(message)) {
     if (
@@ -556,6 +560,15 @@ export function classifyLegacyCheckerErrorMessage(message: string): {
     }
     return { kind: "unknown", phase: "checker" };
   }
+  // Bare JSON-parse messages carry no schema name; the phase cannot be
+  // proven from the string alone (the rewrite calls also JSON.parse bare).
+  if (
+    /in JSON at position|Unexpected end of JSON input|Unexpected token/.test(
+      message
+    )
+  ) {
+    return { kind: "checker_parse", phase: "unknown" };
+  }
   return { kind: "unknown", phase: "unknown" };
 }
 
@@ -564,12 +577,28 @@ export function resolveReferenceCheckOutcome(input: {
   initialCoverage: ReferenceCoverageReport | null;
   finalCoverage: ReferenceCoverageReport | null;
   correctionAttempts: number;
+  // Total successful checks in the run (repairHistory length). Used to tell
+  // whether the last checker failure happened after the last success — a
+  // later successful check refreshes the evidence.
+  completedCheckCount?: number;
 }): ReferenceCheckOutcome {
   const evaluated = input.finalCoverage ?? input.initialCoverage;
   const evaluatedCoverage: ReferenceCheckOutcome["evaluatedCoverage"] =
     input.finalCoverage ? "final" : input.initialCoverage ? "initial" : "none";
   const degraded = input.checkerErrors.length > 0;
   const gate = assessReferenceCheckGate(evaluated);
+  // A repair-rewrite failure cannot be the reason coverage is missing or
+  // stale (a checker success always precedes a repair call, and a failed
+  // repair leaves the checked draft unchanged), so both classifications key
+  // off the last checker-stage failure.
+  const lastCheckerFailure = [...input.checkerErrors]
+    .reverse()
+    .find((entry) => entry.kind !== "repair_rewrite_failed");
+  const evidenceStale =
+    evaluated != null &&
+    lastCheckerFailure?.afterCorrection === true &&
+    (input.completedCheckCount == null ||
+      lastCheckerFailure.stage > input.completedCheckCount);
 
   let state: ReferenceCheckOutcomeState;
   if (evaluated) {
@@ -579,12 +608,6 @@ export function resolveReferenceCheckOutcome(input: {
         ? "repaired_pass"
         : "pass";
   } else {
-    // A repair-rewrite failure cannot be the reason coverage is missing (a
-    // checker success always precedes a repair call), so classify on the
-    // last checker-stage failure.
-    const lastCheckerFailure = [...input.checkerErrors]
-      .reverse()
-      .find((entry) => entry.kind !== "repair_rewrite_failed");
     state =
       lastCheckerFailure?.kind === "checker_parse" ||
       lastCheckerFailure?.kind === "checker_schema"
@@ -596,11 +619,17 @@ export function resolveReferenceCheckOutcome(input: {
     state,
     evaluatedCoverage,
     degraded,
+    evidenceStale,
     checkerErrors: input.checkerErrors,
     gate,
     correctionAttempts: input.correctionAttempts,
-    wouldBlock: gate.blocking,
-    wouldRetry: degraded && evaluatedCoverage === "none"
+    // Stale blocking evidence describes a draft a repair already replaced:
+    // never a block signal, but grounds for a retry (current coverage is
+    // unknown).
+    wouldBlock: gate.blocking && !evidenceStale,
+    wouldRetry:
+      degraded &&
+      (evaluatedCoverage === "none" || (evidenceStale && gate.blocking))
   };
 }
 
@@ -636,8 +665,12 @@ export function applyReferenceCheckEnforcement(
     reason: null,
     highRiskUnsupportedSentences: []
   };
+  // Stale evidence never blocks even when promoted — the verdict describes a
+  // superseded draft; those runs fall through to the retry arm instead.
   const gate = enforcement.blockOnResidualUnsupported
-    ? outcome.gate
+    ? outcome.evidenceStale
+      ? vacuousGate
+      : outcome.gate
     : options.legacyCheckerError
       ? vacuousGate
       : outcome.gate;

@@ -1095,14 +1095,37 @@ describe("detectMarkerLeaks", () => {
     ).toEqual([]);
   });
 
-  it("calibrates CJK detection to runs, not short quoted names", () => {
+  it("ignores quoted English management commentary and prose confidence wording", () => {
+    expect(
+      detectMarkerLeaks(
+        "«We need to identify further cost reductions», sier konsernsjefen."
+      )
+    ).toEqual([]);
+    expect(
+      detectMarkerLeaks("«We must respond to the changing market», heter det.")
+    ).toEqual([]);
+    expect(
+      detectMarkerLeaks("Styret beskriver sin confidence: high street-salget stiger.")
+    ).toEqual([]);
+  });
+
+  it("calibrates foreign-script detection to runs, not short quoted names", () => {
     expect(
       detectMarkerLeaks("Selskapet samarbeider med 华为 om utbyggingen.")
+    ).toEqual([]);
+    expect(
+      detectMarkerLeaks("Kontrakten med 삼성 og 네이버 er signert.")
+    ).toEqual([]);
+    expect(
+      detectMarkerLeaks("Rapporten siterer tittelen 【Årsrapport】 fra vedlegget.")
     ).toEqual([]);
     expect(
       detectMarkerLeaks("Avtalen omtales som 天天彩票提现 i vedlegget.")
     ).toEqual([
       { category: "foreign_script_spam", id: "cjk_run" }
+    ]);
+    expect(detectMarkerLeaks("】【 debris 】【")).toEqual([
+      { category: "foreign_script_spam", id: "fullwidth_bracket" }
     ]);
   });
 
@@ -1119,8 +1142,8 @@ describe("detectMarkerLeaks", () => {
   });
 });
 
-describe("marker leak shadow issue", () => {
-  it("adds the shadow warning with redacted identifiers only", () => {
+describe("marker leak shadow neutrality", () => {
+  it("surfaces matches only via the markerLeaks field while in shadow", () => {
     const payload = createPayload();
     const rewrite = createRewrite({
       body: [
@@ -1131,21 +1154,55 @@ describe("marker leak shadow issue", () => {
     });
 
     const result = validateRewriteOutput(rewrite, payload);
-    const issue = result.issues.find(
-      (item) => item.code === markerLeakEnforcement.code
+    expect(result.markerLeaks.length).toBeGreaterThan(0);
+    // Shadow neutrality: no issue of any severity — even a warning would
+    // flip valid/errorCode for otherwise-clean runs.
+    expect(
+      result.issues.some((item) => item.code.startsWith("MARKER_LEAK"))
+    ).toBe(false);
+  });
+
+  it("does not change valid or issue codes for a marker-tripping but otherwise clean run", () => {
+    const payload = createPayload();
+    const clean = createRewrite();
+    const tripping = createRewrite({
+      body: [
+        ...clean.body.slice(0, 2),
+        "Meldingen oppgir ingen ny guiding assistant to=system."
+      ]
+    });
+
+    const cleanResult = validateRewriteOutput(clean, payload);
+    const trippingResult = validateRewriteOutput(tripping, payload);
+    expect(trippingResult.valid).toBe(cleanResult.valid);
+    expect(trippingResult.issues.map((item) => item.code)).toEqual(
+      cleanResult.issues.map((item) => item.code)
     );
-    expect(issue).toBeDefined();
-    expect(issue?.severity).toBe("warning");
+    expect(trippingResult.markerLeaks).toEqual([
+      { category: "role_marker", id: "assistant_to_role" }
+    ]);
+  });
+
+  it("blocks with a redacted message under the promoted enforcement", () => {
+    const payload = createPayload();
+    const rewrite = createRewrite({
+      body: [
+        "Omsetningen i kvartalet var 100.",
+        LEAKED_675713_BODY,
+        "Meldingen oppgir ingen ny guiding."
+      ]
+    });
+
+    const result = validateRewriteOutput(rewrite, payload, {
+      markerLeakEnforcement: { code: "MARKER_LEAK", severity: "blocking" }
+    });
+    const issue = result.issues.find((item) => item.code === "MARKER_LEAK");
+    expect(issue?.severity).toBe("blocking");
     expect(issue?.message).toContain("role_marker(assistant_to_role)");
     // Redaction: the leaked text itself never reaches the message.
     expect(issue?.message).not.toContain('confidence":"high');
     expect(issue?.message).not.toContain("Ensure title max 8");
-    // Shadow: the run is not blocked by the marker issue.
-    expect(
-      result.blockingErrors.some((error) =>
-        error.includes("marker leakage")
-      )
-    ).toBe(false);
+    expect(result.blockingErrors.length).toBeGreaterThan(0);
   });
 
   it("scans only visible text, not source_spans", () => {
@@ -1155,6 +1212,7 @@ describe("marker leak shadow issue", () => {
     });
 
     const result = validateRewriteOutput(rewrite, payload);
+    expect(result.markerLeaks).toEqual([]);
     expect(
       result.issues.some((item) => item.code === markerLeakEnforcement.code)
     ).toBe(false);

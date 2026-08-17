@@ -350,7 +350,6 @@
             "ensure_field_max",
             "field_word_budget",
             "fullwidth_bracket",
-            "hangul_run",
             "last_assistant_answer",
             "schema_key_kv",
             "we_need_meta"

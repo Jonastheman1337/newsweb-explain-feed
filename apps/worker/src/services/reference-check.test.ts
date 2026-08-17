@@ -507,6 +507,38 @@ describe("resolveReferenceCheckOutcome", () => {
     expect(outcome.checkerErrors).toHaveLength(1);
   });
 
+  it("downgrades blocking evidence that predates a successful repair to a retry signal", () => {
+    // check 1 blocked -> repair succeeded -> check 2 errored: the blocking
+    // verdict describes the pre-repair draft, so it must not count as a
+    // would-block, and the unknown current coverage becomes a retry signal.
+    const outcome = resolveReferenceCheckOutcome({
+      checkerErrors: [
+        { ...transportEntry, stage: 2, afterCorrection: true }
+      ],
+      initialCoverage: blockingCoverageReport(),
+      finalCoverage: blockingCoverageReport(),
+      correctionAttempts: 1,
+      completedCheckCount: 1
+    });
+    expect(outcome.evidenceStale).toBe(true);
+    expect(outcome.wouldBlock).toBe(false);
+    expect(outcome.wouldRetry).toBe(true);
+  });
+
+  it("treats evidence as fresh when a later check succeeded after the stale error", () => {
+    const outcome = resolveReferenceCheckOutcome({
+      checkerErrors: [
+        { ...transportEntry, stage: 2, afterCorrection: true }
+      ],
+      initialCoverage: blockingCoverageReport(),
+      finalCoverage: blockingCoverageReport(),
+      correctionAttempts: 1,
+      completedCheckCount: 2
+    });
+    expect(outcome.evidenceStale).toBe(false);
+    expect(outcome.wouldBlock).toBe(true);
+  });
+
   it("retains a stage-1 error through a later successful check", () => {
     // Legacy overwrite semantics silently reset checkerError to null here.
     const outcome = resolveReferenceCheckOutcome({
@@ -570,14 +602,25 @@ describe("classifyLegacyCheckerErrorMessage", () => {
         "OpenAI request failed for rewrite_output: Request was aborted."
       )
     ).toEqual({ kind: "repair_rewrite_failed", phase: "repair_rewrite" });
+    // Bare JSON-parse strings carry no schema name, so the phase cannot be
+    // proven from the message alone.
     expect(
       classifyLegacyCheckerErrorMessage(
         "Expected ',' or '}' after property value in JSON at position 2310 (line 1 column 2311)"
       )
-    ).toEqual({ kind: "checker_parse", phase: "checker" });
+    ).toEqual({ kind: "checker_parse", phase: "unknown" });
     expect(
       classifyLegacyCheckerErrorMessage(
         "OpenAI request failed for reference_check_result: Request was aborted."
+      )
+    ).toEqual({ kind: "checker_transport", phase: "checker" });
+  });
+
+  it("classifies by schema name before embedded parse wording", () => {
+    // Gateway HTML inside a transport failure must stay transport.
+    expect(
+      classifyLegacyCheckerErrorMessage(
+        "OpenAI request failed for reference_check_result: Unexpected token < in JSON at position 0"
       )
     ).toEqual({ kind: "checker_transport", phase: "checker" });
   });
@@ -642,5 +685,24 @@ describe("applyReferenceCheckEnforcement", () => {
     );
     expect(enforcedRetry.forceNeedsRetry).toBe(true);
     expect(enforcedRetry.gate.blocking).toBe(false);
+  });
+
+  it("routes stale blocking evidence to retry instead of blocking when promoted", () => {
+    const stale = resolveReferenceCheckOutcome({
+      checkerErrors: [
+        { ...transportEntry, stage: 2, afterCorrection: true }
+      ],
+      initialCoverage: blockingCoverageReport(),
+      finalCoverage: blockingCoverageReport(),
+      correctionAttempts: 1,
+      completedCheckCount: 1
+    });
+    const enforced = applyReferenceCheckEnforcement(
+      stale,
+      { legacyCheckerError: transportEntry.message },
+      { blockOnResidualUnsupported: true, retryOnUnavailable: true }
+    );
+    expect(enforced.gate.blocking).toBe(false);
+    expect(enforced.forceNeedsRetry).toBe(true);
   });
 });

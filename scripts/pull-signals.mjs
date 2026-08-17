@@ -974,6 +974,61 @@ function numericAssessmentStats(generations) {
   };
 }
 
+// P4 marker-leak shadow telemetry: matches persist only as the
+// validation_json.markerLeaks field (no issue while in shadow), so the
+// false-positive record the promotion decision needs is counted here.
+function markerLeakStats(generations) {
+  const byVersion = new Map();
+  for (const row of generations) {
+    const validation = parseJsonField(row.validation_json);
+    if (!validation || typeof validation !== "object") continue;
+    const leaks = Array.isArray(validation.markerLeaks)
+      ? validation.markerLeaks
+      : null;
+    if (!leaks) continue;
+    const version = promptVersionBucket(row);
+    let bucket = byVersion.get(version);
+    if (!bucket) {
+      bucket = {
+        prompt_version: version,
+        runs_with_field: 0,
+        runs_with_leaks: 0,
+        category_counts: new Map(),
+        pattern_counts: new Map()
+      };
+      byVersion.set(version, bucket);
+    }
+    bucket.runs_with_field += 1;
+    if (leaks.length === 0) continue;
+    bucket.runs_with_leaks += 1;
+    for (const leak of leaks) {
+      if (!leak || typeof leak !== "object") continue;
+      const category = String(leak.category ?? "(unknown)");
+      const id = String(leak.id ?? "(unknown)");
+      bucket.category_counts.set(
+        category,
+        (bucket.category_counts.get(category) ?? 0) + 1
+      );
+      bucket.pattern_counts.set(id, (bucket.pattern_counts.get(id) ?? 0) + 1);
+    }
+  }
+
+  const ranked = (map) =>
+    [...map.entries()]
+      .map(([value, count]) => ({ value, count }))
+      .sort((a, b) => b.count - a.count || a.value.localeCompare(b.value));
+
+  return [...byVersion.values()]
+    .map((bucket) => ({
+      prompt_version: bucket.prompt_version,
+      runs_with_field: bucket.runs_with_field,
+      runs_with_leaks: bucket.runs_with_leaks,
+      categories: ranked(bucket.category_counts),
+      pattern_ids: ranked(bucket.pattern_counts)
+    }))
+    .sort((a, b) => a.prompt_version.localeCompare(b.prompt_version));
+}
+
 function referenceRepairStats(generations) {
   const byVersion = new Map();
 
@@ -1556,6 +1611,7 @@ export function analyze(data, timeZone) {
     qualityPipeline: {
       validationIssues: validationIssueStats(generations),
       numericAssessmentsByPromptVersion: numericAssessmentStats(generations),
+      markerLeaksByPromptVersion: markerLeakStats(generations),
       referenceRepairByPromptVersion: referenceRepairStats(generations),
       modelCallsByPromptVersion: modelCallStats(generations),
       openAIUsageAndCost: openAICostStats(generations),
@@ -1704,6 +1760,7 @@ async function main() {
         numericAssessments:
           artifact.summary.qualityPipeline.numericAssessmentsByPromptVersion
             .byPromptVersion,
+        markerLeaks: artifact.summary.qualityPipeline.markerLeaksByPromptVersion,
         referenceRepair: artifact.summary.qualityPipeline.referenceRepairByPromptVersion,
         modelCalls: artifact.summary.qualityPipeline.modelCallsByPromptVersion,
         openAIUsageAndCost: artifact.summary.qualityPipeline.openAIUsageAndCost,

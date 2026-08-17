@@ -97,8 +97,20 @@ export function resolveAccumulatedReferenceCheckOutcome(
     checkerErrors: state.checkerErrors,
     initialCoverage: state.initialCoverage,
     finalCoverage: state.finalCoverage,
-    correctionAttempts: state.correctionAttempts
+    correctionAttempts: state.correctionAttempts,
+    completedCheckCount: state.repairHistory.length
   });
+}
+
+// Failure paths can fire before any reference-check stage ran (the initial
+// draft call throwing); persisting an outcome there would count generation
+// failures as checker unavailability in the shadow telemetry.
+export function maybeAccumulatedReferenceCheckOutcome(
+  state: ReferenceRepairAccumulator
+): ReferenceCheckOutcome | undefined {
+  return state.absorbedStages > 0
+    ? resolveAccumulatedReferenceCheckOutcome(state)
+    : undefined;
 }
 
 // The persisted shadow record. Additive-only: it is appended as the LAST key
@@ -113,6 +125,7 @@ export function referenceCheckOutcomeJson(
     state: outcome.state,
     evaluatedCoverage: outcome.evaluatedCoverage,
     degraded: outcome.degraded,
+    evidenceStale: outcome.evidenceStale,
     checkerErrors: outcome.checkerErrors,
     shadow: {
       wouldBlock: outcome.wouldBlock,

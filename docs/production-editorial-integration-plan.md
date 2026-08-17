@@ -588,16 +588,26 @@ enablement window closed.
 - Enforcement surface `defaultReferenceCheckEnforcement` (same code-constant
   release model as `defaultEnabledDerivationRules`): both flags `false` =
   today's behavior byte-identically; the flows persist an additive trailing
-  `referenceCheck.outcome` block with `shadow.wouldBlock`/`shadow.wouldRetry`
-  and the active enforcement snapshot. `forceNeedsRetry` plumbing is wired and
-  inert. Shared absorption/persistence builders
-  (`reference-check-outcome.ts`) replaced the triplicated flow code; golden
-  tests pin the legacy JSON shape and key order.
+  `referenceCheck.outcome` block with `shadow.wouldBlock`/`shadow.wouldRetry`,
+  `evidenceStale`, and the active enforcement snapshot. Blocking evidence
+  that predates a successful repair (`evidenceStale`) never counts as a
+  would-block — the verdict describes a superseded draft — and instead feeds
+  the retry signal. On promotion, `retryOnUnavailable` throws into the
+  existing catch/retry machinery (BullMQ re-attempts, `finalAttempt`
+  applies), so no run can persist a `needs_retry` the queue never picks up.
+  Shared absorption/persistence builders (`reference-check-outcome.ts`)
+  replaced the triplicated flow code; golden tests pin the legacy JSON shape
+  and key order. Failure paths that die before any checker stage persist no
+  outcome block, keeping unavailable-rate telemetry honest.
 - Marker-leak detector (`rewrite-validation.ts`): deterministic
   `MARKER_LEAK_GUARDRAILS` (role markers incl. glued forms, English reasoning
-  spill, instruction echo, serialization fragments, foreign-script spam),
-  visible text only, category+pattern-id redaction. Shadow issue code
-  `MARKER_LEAK_SHADOW` (warning); release surface `markerLeakEnforcement`.
+  spill anchored to generation-machinery nouns, instruction echo,
+  serialization fragments, foreign-script runs of 4+ with paired-bracket
+  debris), visible text only, category+pattern-id redaction. While in shadow
+  the detector is fully neutral: matches persist only as the
+  `validation_json.markerLeaks` field and add NO issue, so `valid`/`errorCode`
+  series are untouched. Release surface `markerLeakEnforcement`; promotion
+  adds the blocking `MARKER_LEAK` issue.
 - Fixture classes `checker_error_published` and `marker_leak` flipped from
   `integrity_only` to replayable behaviors with hard never-flips invariants.
   Release record of the flip: 675348 replays `residual_unsupported` with
@@ -605,9 +615,18 @@ enablement window closed.
   `pass`, 677571/679311 `repaired_pass`; all four preserve coverage evidence.
   675713 trips all five marker categories.
 - Signals: `referenceRepairStats` gains `outcome_state_counts`,
-  `checker_error_kind_counts`, `would_block_count`, `would_retry_count`; the
-  admin reference-check summary appends `outcome: <state>` last (the
-  `checker error:` prefix series stays stable).
+  `checker_error_kind_counts`, `would_block_count`, `would_retry_count`;
+  `markerLeaksByPromptVersion` counts the shadow marker field by category and
+  pattern id; the admin reference-check summary appends `outcome: <state>`
+  last (the `checker error:` prefix series stays stable).
+- An adversarial review pass over the branch (2026-08-17) surfaced and fixed:
+  stranded-`needs_retry` mechanics, stale-evidence would-block inflation,
+  outcome pollution from pre-checker generation failures, shadow
+  non-neutrality of the original `MARKER_LEAK_SHADOW` warning, verified
+  marker false positives (quoted executive English, 2-3 char Korean names,
+  single quoted fullwidth brackets), legacy-classifier ordering on messages
+  embedding parse wording, silent zero-default coverage reconstruction in
+  fixture replay, and the missing concrete 675348 release-record pin.
 
 **Gate-count reconciliation:** the "eleven checker-error cases" in the gates
 above is the pre-curation window count (eleven errors, ten published — see
@@ -620,8 +639,9 @@ owed.
 same commit, never with a cache flip):**
 
 1. Watch the shadow window via `signals:pull`: `would_block_count` /
-   `would_retry_count` and `MARKER_LEAK_SHADOW` issue counts. A marker false
-   positive returns the detector to pattern review, not promotion.
+   `would_retry_count` (segmented by `evidenceStale`) and
+   `markerLeaksByPromptVersion`. A marker false positive returns the detector
+   to pattern review, not promotion.
 2. Checker enforcement: flip `defaultReferenceCheckEnforcement` to
    `{ blockOnResidualUnsupported: true, retryOnUnavailable: true }` +
    `build-safety-fixtures --update-expected`. Checker blocking cannot be
