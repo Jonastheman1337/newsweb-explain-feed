@@ -998,6 +998,11 @@ function referenceRepairStats(generations) {
         attribution_correction_count: 0,
         validation_repair_applied_count: 0,
         editorial_review_repair_count: 0,
+        outcome_runs: 0,
+        outcome_state_counts: new Map(),
+        checker_error_kind_counts: new Map(),
+        would_block_count: 0,
+        would_retry_count: 0,
         initial_coverages: [],
         final_coverages: []
       };
@@ -1033,12 +1038,44 @@ function referenceRepairStats(generations) {
     const final = Number(referenceCheck.finalCoveragePercent);
     if (Number.isFinite(initial)) bucket.initial_coverages.push(initial);
     if (Number.isFinite(final)) bucket.final_coverages.push(final);
+    // P4 shadow outcome block; historical rows lack the key.
+    const outcome = referenceCheck.outcome;
+    if (outcome && typeof outcome === "object" && !Array.isArray(outcome)) {
+      bucket.outcome_runs += 1;
+      const state = String(outcome.state ?? "(unknown)");
+      bucket.outcome_state_counts.set(
+        state,
+        (bucket.outcome_state_counts.get(state) ?? 0) + 1
+      );
+      const entries = Array.isArray(outcome.checkerErrors)
+        ? outcome.checkerErrors
+        : [];
+      for (const entry of entries) {
+        if (!entry || typeof entry !== "object") continue;
+        const kind = String(entry.kind ?? "(unknown)");
+        bucket.checker_error_kind_counts.set(
+          kind,
+          (bucket.checker_error_kind_counts.get(kind) ?? 0) + 1
+        );
+      }
+      const shadow =
+        outcome.shadow && typeof outcome.shadow === "object"
+          ? outcome.shadow
+          : null;
+      if (shadow?.wouldBlock) bucket.would_block_count += 1;
+      if (shadow?.wouldRetry) bucket.would_retry_count += 1;
+    }
   }
 
   const avg = (values) =>
     values.length
       ? Number((values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(1))
       : null;
+
+  const rankedCounts = (map) =>
+    [...map.entries()]
+      .map(([value, count]) => ({ value, count }))
+      .sort((a, b) => b.count - a.count || a.value.localeCompare(b.value));
 
   return [...byVersion.values()]
     .map((bucket) => ({
@@ -1055,6 +1092,11 @@ function referenceRepairStats(generations) {
       attribution_correction_count: bucket.attribution_correction_count,
       validation_repair_applied_count: bucket.validation_repair_applied_count,
       editorial_review_repair_count: bucket.editorial_review_repair_count,
+      outcome_runs: bucket.outcome_runs,
+      outcome_state_counts: rankedCounts(bucket.outcome_state_counts),
+      checker_error_kind_counts: rankedCounts(bucket.checker_error_kind_counts),
+      would_block_count: bucket.would_block_count,
+      would_retry_count: bucket.would_retry_count,
       avg_initial_coverage: avg(bucket.initial_coverages),
       avg_final_coverage: avg(bucket.final_coverages)
     }))

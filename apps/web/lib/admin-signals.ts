@@ -433,6 +433,14 @@ function extractReferenceCheck(
     summaryParts.push("importance adjusted");
   }
 
+  // P4 shadow outcome, appended LAST: the "checker error:" prefix above is a
+  // stable series that pull-signals sniffs with /checker error/i.
+  const outcome = asJsonRecord(referenceCheck.outcome);
+  const outcomeState = outcome ? stringValue(outcome.state) : null;
+  if (outcomeState) {
+    summaryParts.push(`outcome: ${outcomeState}`);
+  }
+
   return {
     summary: summaryParts.join(" | "),
     detailJson: referenceCheck as Prisma.JsonValue
