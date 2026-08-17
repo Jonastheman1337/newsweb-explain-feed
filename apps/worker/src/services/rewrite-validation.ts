@@ -155,6 +155,104 @@ const JARGON_GUARDRAILS: Array<{
   }
 ];
 
+// P4 marker-leak detector (shadow-first). Seeded by message 675713, whose
+// published-challenger body leaked raw model scaffolding into visible
+// Norwegian copy. Patterns deliberately tolerate glued tokens (the real leak
+// read "numerusformassistant to=system?"), and only category + pattern id
+// ever reach issue messages or logs — never the matched text.
+export type MarkerLeakCategory =
+  | "role_marker"
+  | "reasoning_spill"
+  | "instruction_echo"
+  | "serialization_fragment"
+  | "foreign_script_spam";
+
+export type MarkerLeakMatch = { category: MarkerLeakCategory; id: string };
+
+const MARKER_LEAK_GUARDRAILS: Array<{
+  category: MarkerLeakCategory;
+  id: string;
+  pattern: RegExp;
+}> = [
+  // No leading \b: leaks arrive glued to preceding text. "assistant" alone
+  // never fires (Norwegian is "assistent"; English quotes lack the =).
+  { category: "role_marker", id: "assistant_to_role", pattern: /assistant\s+to=\w+/i },
+  {
+    category: "role_marker",
+    id: "chatml_token",
+    pattern: /<\|(?:im_start|im_end|assistant|system|user|end)\|>/i
+  },
+  {
+    category: "role_marker",
+    id: "assistant_channel",
+    pattern: /assistant(?:final|analysis|commentary)/i
+  },
+  // Case-sensitive: English planning voice inside Norwegian copy.
+  {
+    category: "reasoning_spill",
+    id: "we_need_meta",
+    pattern:
+      /\b(?:We|I)\s+(?:need|should|must)\b[^.!?]{0,80}\b(?:JSON|schema|prompt|respond|answer|identify|malformed)\b/
+  },
+  {
+    category: "reasoning_spill",
+    id: "last_assistant_answer",
+    pattern: /\b(?:last|previous)\s+assistant\s+(?:answer|message|response)\b/i
+  },
+  {
+    category: "instruction_echo",
+    id: "ensure_field_max",
+    pattern: /\bEnsure\s+(?:title|lead|body)\s+max\s+\d+\b/i
+  },
+  {
+    category: "instruction_echo",
+    id: "field_word_budget",
+    pattern: /\b(?:title|lead|body)\s*(?:max|<=)\s*\d+\s*(?:words?|ord)?\s*:/i
+  },
+  {
+    category: "serialization_fragment",
+    id: "schema_key_kv",
+    pattern: /"?(?:confidence|importance|source_spans|key_facts|company_sentence)"\s*:\s*"/
+  },
+  {
+    category: "serialization_fragment",
+    id: "confidence_level_kv",
+    pattern: /confidence"?\s*:\s*"?(?:high|medium|low)\b/i
+  },
+  // 4+ so a short quoted CJK brand name does not trip on its own.
+  {
+    category: "foreign_script_spam",
+    id: "cjk_run",
+    pattern: /[一-鿿㐀-䶿]{4,}/
+  },
+  {
+    category: "foreign_script_spam",
+    id: "hangul_run",
+    pattern: /[가-힯]{2,}/
+  },
+  {
+    category: "foreign_script_spam",
+    id: "fullwidth_bracket",
+    pattern: /[【】]/
+  }
+];
+
+export function detectMarkerLeaks(visibleText: string): MarkerLeakMatch[] {
+  return MARKER_LEAK_GUARDRAILS.filter((guardrail) =>
+    guardrail.pattern.test(visibleText)
+  ).map((guardrail) => ({ category: guardrail.category, id: guardrail.id }));
+}
+
+// The release surface for the marker detector. Promotion = flip to
+// { code: "MARKER_LEAK", severity: "blocking" } + refresh fixture
+// expectations in the same commit. Deliberately NOT routed through the
+// high-risk repair ladder: a marker leak means the generation went off the
+// rails, so enforcement is an immediate block (owner decision 2026-08-17).
+export const markerLeakEnforcement: {
+  code: "MARKER_LEAK_SHADOW" | "MARKER_LEAK";
+  severity: RewriteValidationSeverity;
+} = { code: "MARKER_LEAK_SHADOW", severity: "warning" };
+
 const CURRENCY_MARKER_GROUPS: Array<{
   label: string;
   patterns: RegExp[];
@@ -664,6 +762,18 @@ export function validateRewriteOutput(
       "VISIBLE_META_SOURCE_LANGUAGE",
       "blocking",
       "Visible article text refers to PDF/attachments, analyzed material, or missing source data; move limitations to source_limitations."
+    );
+  }
+
+  const markerLeaks = detectMarkerLeaks(visibleText);
+  if (markerLeaks.length > 0) {
+    addIssue(
+      issues,
+      markerLeakEnforcement.code,
+      markerLeakEnforcement.severity,
+      `Visible article text contains internal marker leakage: ${markerLeaks
+        .map((match) => `${match.category}(${match.id})`)
+        .join(", ")}.`
     );
   }
 

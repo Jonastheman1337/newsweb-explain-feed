@@ -11,7 +11,9 @@ import {
   countSentences,
   countSummarySentences,
   collectQuoteTelemetry,
+  detectMarkerLeaks,
   ensureReportSourceLimitation,
+  markerLeakEnforcement,
   validateRewriteOutput
 } from "./rewrite-validation.js";
 
@@ -1051,5 +1053,110 @@ describe("validateRewriteOutput number assessments", () => {
     });
 
     expect(withKillSwitch).toEqual(validateRewriteOutput(rewrite, payload));
+  });
+});
+
+// Verbatim leaked body sentence from message 675713 (regular_v6_draft
+// challenger output) — the seed case for the marker-leak detector.
+const LEAKED_675713_BODY =
+  'Selskapet skal frakte restmassene med jernbane til Østlandet, der de skal brukes i landbruket og i produksjon av jord.】【：】【"】【confidence":"high"}大香蕉伊人assistant출장샵】【。】【"】【numerusformassistant to=system? 天天彩票提现 天天中彩票qq. We need identify issue final malformed? It has weird delimiter and quote at confidence due generation. Need respond? The last assistant answer is to user but malformed JSON. We need likely correct it, but no new prompt. Need answer perhaps corrected valid JSON. Ensure title max 8: Cambi-enhet(1) får2 Bergen-kontrakt3 over4 2005 millioner6. Good. Source span quote altered ellips';
+
+describe("detectMarkerLeaks", () => {
+  it("detects every leak category in the verbatim 675713 body", () => {
+    const matches = detectMarkerLeaks(LEAKED_675713_BODY);
+    const categories = new Set(matches.map((match) => match.category));
+    expect(categories).toEqual(
+      new Set([
+        "role_marker",
+        "reasoning_spill",
+        "instruction_echo",
+        "serialization_fragment",
+        "foreign_script_spam"
+      ])
+    );
+    expect(matches.map((match) => match.id)).toContain("assistant_to_role");
+  });
+
+  it("ignores benign Norwegian assistant words", () => {
+    for (const text of [
+      "Assistenten til styret la frem tallene.",
+      "Hun er ansatt som assistent i selskapet.",
+      "Førsteassistent Nilsen overtar rollen."
+    ]) {
+      expect(detectMarkerLeaks(text)).toEqual([]);
+    }
+  });
+
+  it("ignores quoted English source text with a plain assistant mention", () => {
+    expect(
+      detectMarkerLeaks(
+        "«He worked as an executive assistant to the CEO before the merger», heter det i meldingen."
+      )
+    ).toEqual([]);
+  });
+
+  it("calibrates CJK detection to runs, not short quoted names", () => {
+    expect(
+      detectMarkerLeaks("Selskapet samarbeider med 华为 om utbyggingen.")
+    ).toEqual([]);
+    expect(
+      detectMarkerLeaks("Avtalen omtales som 天天彩票提现 i vedlegget.")
+    ).toEqual([
+      { category: "foreign_script_spam", id: "cjk_run" }
+    ]);
+  });
+
+  it("detects obfuscated role-marker forms", () => {
+    expect(detectMarkerLeaks("<|im_start|>assistant")).toEqual([
+      { category: "role_marker", id: "chatml_token" }
+    ]);
+    expect(detectMarkerLeaks("tekstassistantfinal svar")).toEqual([
+      { category: "role_marker", id: "assistant_channel" }
+    ]);
+    expect(detectMarkerLeaks("assistant   to=user")).toEqual([
+      { category: "role_marker", id: "assistant_to_role" }
+    ]);
+  });
+});
+
+describe("marker leak shadow issue", () => {
+  it("adds the shadow warning with redacted identifiers only", () => {
+    const payload = createPayload();
+    const rewrite = createRewrite({
+      body: [
+        "Omsetningen i kvartalet var 100.",
+        LEAKED_675713_BODY,
+        "Meldingen oppgir ingen ny guiding."
+      ]
+    });
+
+    const result = validateRewriteOutput(rewrite, payload);
+    const issue = result.issues.find(
+      (item) => item.code === markerLeakEnforcement.code
+    );
+    expect(issue).toBeDefined();
+    expect(issue?.severity).toBe("warning");
+    expect(issue?.message).toContain("role_marker(assistant_to_role)");
+    // Redaction: the leaked text itself never reaches the message.
+    expect(issue?.message).not.toContain('confidence":"high');
+    expect(issue?.message).not.toContain("Ensure title max 8");
+    // Shadow: the run is not blocked by the marker issue.
+    expect(
+      result.blockingErrors.some((error) =>
+        error.includes("marker leakage")
+      )
+    ).toBe(false);
+  });
+
+  it("scans only visible text, not source_spans", () => {
+    const payload = createPayload();
+    const rewrite = createRewrite({
+      source_spans: ['primary: confidence":"high"} assistant to=system']
+    });
+
+    const result = validateRewriteOutput(rewrite, payload);
+    expect(
+      result.issues.some((item) => item.code === markerLeakEnforcement.code)
+    ).toBe(false);
   });
 });
