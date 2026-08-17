@@ -76,11 +76,14 @@ import {
   buildReferenceCheckPrompt,
   buildCorrectionInstruction,
   buildCoverageReport,
+  classifyCheckerErrorKind,
   emptyReferenceCoverageReport,
   assessReferenceCheckGate,
   referenceCheckJsonSchema,
   referenceCheckResultSchema,
+  type ReferenceCheckerErrorEntry,
   type ReferenceCheckGateResult,
+  type ReferenceCheckResult,
   type ReferenceCoverageReport
 } from "./services/reference-check.js";
 import {
@@ -1339,7 +1342,19 @@ async function callModelReferenceCheck(
     promptCacheMode: promptCacheModeForFlow("reference-check")
   });
 
-  const parsed = referenceCheckResultSchema.parse(JSON.parse(result.content));
+  let parsed: ReferenceCheckResult;
+  try {
+    parsed = referenceCheckResultSchema.parse(JSON.parse(result.content));
+  } catch (error) {
+    // The model call itself succeeded; carry its telemetry on the parse
+    // error so collectFailedModelCall records the spent tokens.
+    if (error instanceof Error && result.modelCall) {
+      const carrier = error as ModelCallFailureCarrier;
+      carrier.modelCall = result.modelCall;
+      carrier.promptChars = result.promptChars;
+    }
+    throw error;
+  }
   return {
     coverage: buildCoverageReport(draftSentences, parsed, {
       visibleArticleSentenceCount: visibleDraftSentences.length
@@ -1479,6 +1494,7 @@ async function applyReferenceCheckRepair<TPayload extends PromptPayload>({
   rewrite: RewriteOutput;
   promptChars: number;
   checkerError: string | null;
+  checkerErrors: ReferenceCheckerErrorEntry[];
   correctionAttempts: number;
   initialCoverage: ReferenceCoverageReport | null;
   finalCoverage: ReferenceCoverageReport | null;
@@ -1490,6 +1506,11 @@ async function applyReferenceCheckRepair<TPayload extends PromptPayload>({
   let initialCoverage: ReferenceCoverageReport | null = null;
   let finalCoverage: ReferenceCoverageReport | null = null;
   const repairHistory: ReferenceRepairHistoryEntry[] = [];
+  // Classified failures, call-local stages: a checker failure is numbered as
+  // the check that never completed (repairHistory.length + 1); a repair-
+  // rewrite failure belongs to the pass of the check that triggered it
+  // (repairHistory.length). Flow-level accumulation re-offsets stages.
+  const checkerErrors: ReferenceCheckerErrorEntry[] = [];
 
   while (true) {
     let referenceCheck: Awaited<ReturnType<typeof callModelReferenceCheck>>;
@@ -1500,10 +1521,16 @@ async function applyReferenceCheckRepair<TPayload extends PromptPayload>({
       );
     } catch (error) {
       promptChars += collectFailedModelCall(error, modelCalls);
+      checkerErrors.push({
+        stage: repairHistory.length + 1,
+        kind: classifyCheckerErrorKind(error),
+        message: error instanceof Error ? error.message : String(error)
+      });
       return {
         rewrite: currentRewrite,
         promptChars,
         checkerError: error instanceof Error ? error.message : String(error),
+        checkerErrors,
         correctionAttempts,
         initialCoverage,
         finalCoverage,
@@ -1552,6 +1579,7 @@ async function applyReferenceCheckRepair<TPayload extends PromptPayload>({
         rewrite: currentRewrite,
         promptChars,
         checkerError: null,
+        checkerErrors,
         correctionAttempts,
         initialCoverage,
         finalCoverage,
@@ -1567,6 +1595,7 @@ async function applyReferenceCheckRepair<TPayload extends PromptPayload>({
         rewrite: currentRewrite,
         promptChars,
         checkerError: null,
+        checkerErrors,
         correctionAttempts,
         initialCoverage,
         finalCoverage,
@@ -1594,10 +1623,16 @@ async function applyReferenceCheckRepair<TPayload extends PromptPayload>({
       correctionAttempts += 1;
     } catch (error) {
       promptChars += collectFailedModelCall(error, modelCalls);
+      checkerErrors.push({
+        stage: repairHistory.length,
+        kind: "repair_rewrite_failed",
+        message: error instanceof Error ? error.message : String(error)
+      });
       return {
         rewrite: currentRewrite,
         promptChars,
         checkerError: error instanceof Error ? error.message : String(error),
+        checkerErrors,
         correctionAttempts,
         initialCoverage,
         finalCoverage,
