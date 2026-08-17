@@ -207,7 +207,14 @@ endings never matter):
   `build-safety-fixtures --update-expected` (offline) and review the diff —
   that diff is the release record. The `numeric_unresolved` cases (five after
   the 675221 and 679626 adjudications) must keep `UNEXPECTED_NUMBERS`
-  forever; the gate enforces this. Validation-class payloads are seeded as
+  forever; the gate enforces this. Since the P4 shadow phase (2026-08-17),
+  `checker_error_published` replays the checker outcome model over the stored
+  `referenceCheck` (classified error kinds, coverage evidence must never
+  degrade to `none`) and `marker_leak` replays `detectMarkerLeaks` over the
+  stored output (must always detect a `role_marker`); both refresh through
+  the same `--update-expected` path from stored case data alone — the
+  gitignored legacy A/B artifact is only needed for reseeding, never for
+  refresh. Validation-class payloads are seeded as
   the payload production validated against (report flows get the
   `reportReferencePayload` join, checked against the persisted
   `validationSourceChars` tripwire); rows that cannot be reconstructed are

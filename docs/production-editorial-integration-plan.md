@@ -566,6 +566,73 @@ P1 may be implemented after E0 independently of P2–P4, but it must have its ow
 
 **Editorial/user decision:** Choose the user-visible disposition for checker-unavailable cases and whether marker matches trigger one repair attempt or immediate block.
 
+#### P4 amendment — 2026-08-17 (shadow phase implemented)
+
+**Owner decisions (2026-08-17):** checker-unavailable with no valid coverage
+promotes to `needs_retry` (transient errors self-heal on the existing retry
+machinery); marker matches promote to an **immediate block**, not the
+high-risk repair ladder. Both protections landed shadow-first on branch
+`p4-checker-marker`, merged in its own release window after the P2 numeric
+enablement window closed.
+
+**What landed:**
+
+- `resolveReferenceCheckOutcome` (`apps/worker/src/services/reference-check.ts`):
+  five outcome states (`pass`, `repaired_pass`, `residual_unsupported`,
+  `unavailable_error`, `malformed_result`), classified checker-error entries
+  accumulated per repair pass (the legacy single string overwrote across
+  stages, masking evidence both directions), and a gate that always evaluates
+  the last successfully completed coverage — evidence is never erased by a
+  later checker error. Repair-rewrite failures are no longer mislabeled as
+  checker errors (structural phase tagging at both catch sites).
+- Enforcement surface `defaultReferenceCheckEnforcement` (same code-constant
+  release model as `defaultEnabledDerivationRules`): both flags `false` =
+  today's behavior byte-identically; the flows persist an additive trailing
+  `referenceCheck.outcome` block with `shadow.wouldBlock`/`shadow.wouldRetry`
+  and the active enforcement snapshot. `forceNeedsRetry` plumbing is wired and
+  inert. Shared absorption/persistence builders
+  (`reference-check-outcome.ts`) replaced the triplicated flow code; golden
+  tests pin the legacy JSON shape and key order.
+- Marker-leak detector (`rewrite-validation.ts`): deterministic
+  `MARKER_LEAK_GUARDRAILS` (role markers incl. glued forms, English reasoning
+  spill, instruction echo, serialization fragments, foreign-script spam),
+  visible text only, category+pattern-id redaction. Shadow issue code
+  `MARKER_LEAK_SHADOW` (warning); release surface `markerLeakEnforcement`.
+- Fixture classes `checker_error_published` and `marker_leak` flipped from
+  `integrity_only` to replayable behaviors with hard never-flips invariants.
+  Release record of the flip: 675348 replays `residual_unsupported` with
+  `wouldBlock: true` — a published run enforcement would have blocked; 677082
+  `pass`, 677571/679311 `repaired_pass`; all four preserve coverage evidence.
+  675713 trips all five marker categories.
+- Signals: `referenceRepairStats` gains `outcome_state_counts`,
+  `checker_error_kind_counts`, `would_block_count`, `would_retry_count`; the
+  admin reference-check summary appends `outcome: <state>` last (the
+  `checker error:` prefix series stays stable).
+
+**Gate-count reconciliation:** the "eleven checker-error cases" in the gates
+above is the pre-curation window count (eleven errors, ten published — see
+the E1 finding); the four seeded fixtures are the replayable
+retained-unsupported publications (675348, 677082, 677571, 679311). The
+classifier tests cover the four stored error strings; no further fixtures are
+owed.
+
+**Promotion runbook (each flip its own release window, fixture refresh in the
+same commit, never with a cache flip):**
+
+1. Watch the shadow window via `signals:pull`: `would_block_count` /
+   `would_retry_count` and `MARKER_LEAK_SHADOW` issue counts. A marker false
+   positive returns the detector to pattern review, not promotion.
+2. Checker enforcement: flip `defaultReferenceCheckEnforcement` to
+   `{ blockOnResidualUnsupported: true, retryOnUnavailable: true }` +
+   `build-safety-fixtures --update-expected`. Checker blocking cannot be
+   weakened afterwards without explicit editorial approval.
+3. Marker enforcement: flip `markerLeakEnforcement` to
+   `{ code: "MARKER_LEAK", severity: "blocking" }` + refresh, gated on the
+   shadow false-positive record.
+4. Emergency kill-switch envs for the enforced modes ship with the promotion
+   release, not before. User-visible disposition copy for `needs_retry`
+   checker-unavailable cases is still an open editorial item.
+
 ### R1 — Reasoning-effort and verbosity experiments
 
 **Classification:** Research only until separately approved.
