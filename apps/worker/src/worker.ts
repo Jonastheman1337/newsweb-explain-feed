@@ -73,6 +73,7 @@ import {
   type EditorialRevisionReview
 } from "./services/editorial-review.js";
 import {
+  applyReferenceCheckEnforcement,
   buildReferenceCheckPrompt,
   buildCorrectionInstruction,
   buildCoverageReport,
@@ -91,6 +92,7 @@ import {
   createReferenceRepairAccumulator,
   referenceCheckFailureJson,
   referenceCheckValidationJson,
+  resolveAccumulatedReferenceCheckOutcome,
   type ReferenceRepairHistoryEntry
 } from "./services/reference-check-outcome.js";
 import {
@@ -2234,14 +2236,16 @@ async function processReportRewrite(
       highRiskValidationWarningIssues(validationResult)
     );
     validationResult = promoteHighRiskValidationWarnings(validationResult);
-    const referenceGate = assessReferenceCheckGate(
-      referenceRepairState.checkerError
-        ? null
-        : referenceRepairState.finalCoverage ??
-            referenceRepairState.initialCoverage
-    );
+    const referenceOutcome =
+      resolveAccumulatedReferenceCheckOutcome(referenceRepairState);
+    const { gate: referenceGate, forceNeedsRetry: referenceForceNeedsRetry } =
+      applyReferenceCheckEnforcement(referenceOutcome, {
+        legacyCheckerError: referenceRepairState.checkerError
+      });
     const validation = applyReferenceCheckGate(validationResult, referenceGate);
-    const rewriteStatus = statusForValidation(validation);
+    const rewriteStatus = referenceForceNeedsRetry
+      ? "needs_retry"
+      : statusForValidation(validation);
     const persistedRewriteJson = rewriteJsonForValidation(rewrite, validation);
 
     await upsertRewrite({
@@ -2291,7 +2295,8 @@ async function processReportRewrite(
             attributionRiskCount,
             importanceAdjusted,
             importanceAdjustReason
-          }
+          },
+          referenceOutcome
         ),
         hiddenDraft: hiddenDraft
           ? {
@@ -2631,14 +2636,16 @@ async function processYearlyReportRewrite(
       highRiskValidationWarningIssues(validationResult)
     );
     validationResult = promoteHighRiskValidationWarnings(validationResult);
-    const referenceGate = assessReferenceCheckGate(
-      referenceRepairState.checkerError
-        ? null
-        : referenceRepairState.finalCoverage ??
-            referenceRepairState.initialCoverage
-    );
+    const referenceOutcome =
+      resolveAccumulatedReferenceCheckOutcome(referenceRepairState);
+    const { gate: referenceGate, forceNeedsRetry: referenceForceNeedsRetry } =
+      applyReferenceCheckEnforcement(referenceOutcome, {
+        legacyCheckerError: referenceRepairState.checkerError
+      });
     const validation = applyReferenceCheckGate(validationResult, referenceGate);
-    const rewriteStatus = statusForValidation(validation);
+    const rewriteStatus = referenceForceNeedsRetry
+      ? "needs_retry"
+      : statusForValidation(validation);
     const persistedRewriteJson = rewriteJsonForValidation(rewrite, validation);
 
     await upsertRewrite({
@@ -2685,7 +2692,8 @@ async function processYearlyReportRewrite(
             attributionRiskCount,
             importanceAdjusted,
             importanceAdjustReason
-          }
+          },
+          referenceOutcome
         ),
         hiddenDraft: hiddenDraft
           ? {
@@ -3957,14 +3965,18 @@ const rewriteWorker = new Worker<RewriteJobData>(
           highRiskValidationWarningIssues(validationResult)
         );
         validationResult = promoteHighRiskValidationWarnings(validationResult);
-        const referenceGate = assessReferenceCheckGate(
-          referenceRepairState.checkerError
-            ? null
-            : referenceRepairState.finalCoverage ??
-                referenceRepairState.initialCoverage
-        );
+        const referenceOutcome =
+          resolveAccumulatedReferenceCheckOutcome(referenceRepairState);
+        const {
+          gate: referenceGate,
+          forceNeedsRetry: referenceForceNeedsRetry
+        } = applyReferenceCheckEnforcement(referenceOutcome, {
+          legacyCheckerError: referenceRepairState.checkerError
+        });
         const validation = applyReferenceCheckGate(validationResult, referenceGate);
-        const rewriteStatus = statusForValidation(validation);
+        const rewriteStatus = referenceForceNeedsRetry
+          ? "needs_retry"
+          : statusForValidation(validation);
         const persistedRewriteJson = rewriteJsonForValidation(rewrite, validation);
 
         await upsertRewrite({
@@ -4003,7 +4015,8 @@ const rewriteWorker = new Worker<RewriteJobData>(
                 attributionRiskCount,
                 importanceAdjusted,
                 importanceAdjustReason
-              }
+              },
+              referenceOutcome
             ),
             hiddenDraft: hiddenDraft
               ? {
@@ -4050,12 +4063,16 @@ const rewriteWorker = new Worker<RewriteJobData>(
               sourceBodyChars: payload.sourceBodyChars,
               promptChars,
               styleSanitization,
-              referenceCheck: referenceCheckFailureJson(referenceRepairState, {
-                attributionCorrectionApplied,
-                attributionRiskCount,
-                importanceAdjusted,
-                importanceAdjustReason
-              })
+              referenceCheck: referenceCheckFailureJson(
+                referenceRepairState,
+                {
+                  attributionCorrectionApplied,
+                  attributionRiskCount,
+                  importanceAdjusted,
+                  importanceAdjustReason
+                },
+                resolveAccumulatedReferenceCheckOutcome(referenceRepairState)
+              )
             } as Prisma.InputJsonValue
           });
           throw new Error(`rewrite pipeline failed for ${messageId}: ${errorText}`);
@@ -4084,12 +4101,16 @@ const rewriteWorker = new Worker<RewriteJobData>(
             sourceBodyChars: payload.sourceBodyChars,
             promptChars,
             styleSanitization,
-            referenceCheck: referenceCheckFailureJson(referenceRepairState, {
-              attributionCorrectionApplied,
-              attributionRiskCount,
-              importanceAdjusted,
-              importanceAdjustReason
-            })
+            referenceCheck: referenceCheckFailureJson(
+              referenceRepairState,
+              {
+                attributionCorrectionApplied,
+                attributionRiskCount,
+                importanceAdjusted,
+                importanceAdjustReason
+              },
+              resolveAccumulatedReferenceCheckOutcome(referenceRepairState)
+            )
           } as Prisma.InputJsonValue
         });
         logFinalRewriteFailure(messageId, "REWRITE_FAILED_FINAL", errorText);

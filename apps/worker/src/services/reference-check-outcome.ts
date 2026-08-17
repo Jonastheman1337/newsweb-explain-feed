@@ -1,7 +1,11 @@
-import type {
-  ReferenceCheckerErrorEntry,
-  ReferenceCheckGateResult,
-  ReferenceCoverageReport
+import {
+  defaultReferenceCheckEnforcement,
+  resolveReferenceCheckOutcome,
+  type ReferenceCheckEnforcementConfig,
+  type ReferenceCheckerErrorEntry,
+  type ReferenceCheckGateResult,
+  type ReferenceCheckOutcome,
+  type ReferenceCoverageReport
 } from "./reference-check.js";
 
 export type ReferenceRepairHistoryEntry = {
@@ -86,6 +90,41 @@ export function absorbReferenceRepairResult(
   state.absorbedStages += 1;
 }
 
+export function resolveAccumulatedReferenceCheckOutcome(
+  state: ReferenceRepairAccumulator
+): ReferenceCheckOutcome {
+  return resolveReferenceCheckOutcome({
+    checkerErrors: state.checkerErrors,
+    initialCoverage: state.initialCoverage,
+    finalCoverage: state.finalCoverage,
+    correctionAttempts: state.correctionAttempts
+  });
+}
+
+// The persisted shadow record. Additive-only: it is appended as the LAST key
+// of the existing referenceCheck literals so every legacy key keeps its
+// position; the enforcement snapshot records which config was active when
+// the run persisted, so the shadow window is self-describing.
+export function referenceCheckOutcomeJson(
+  outcome: ReferenceCheckOutcome,
+  enforcement: ReferenceCheckEnforcementConfig = defaultReferenceCheckEnforcement
+): Record<string, unknown> {
+  return {
+    state: outcome.state,
+    evaluatedCoverage: outcome.evaluatedCoverage,
+    degraded: outcome.degraded,
+    checkerErrors: outcome.checkerErrors,
+    shadow: {
+      wouldBlock: outcome.wouldBlock,
+      wouldRetry: outcome.wouldRetry,
+      enforcement: {
+        blockOnResidualUnsupported: enforcement.blockOnResidualUnsupported,
+        retryOnUnavailable: enforcement.retryOnUnavailable
+      }
+    }
+  };
+}
+
 export function referenceCoverageJson(
   coverage: ReferenceCoverageReport | null
 ): Record<string, unknown> | null {
@@ -124,7 +163,8 @@ export type ReferenceCheckFlowAudit = {
 export function referenceCheckValidationJson(
   state: ReferenceRepairAccumulator,
   gate: ReferenceCheckGateResult,
-  flow: ReferenceCheckFlowAudit
+  flow: ReferenceCheckFlowAudit,
+  outcome?: ReferenceCheckOutcome
 ): Record<string, unknown> {
   const { initialCoverage, finalCoverage } = state;
   return {
@@ -171,7 +211,8 @@ export function referenceCheckValidationJson(
       sentence: item.sentence,
       interpretation: item.interpretation,
       sourceEvidence: item.sourceEvidence
-    }))
+    })),
+    ...(outcome ? { outcome: referenceCheckOutcomeJson(outcome) } : {})
   };
 }
 
@@ -180,7 +221,8 @@ export function referenceCheckValidationJson(
 // purpose — frozen as-is.
 export function referenceCheckFailureJson(
   state: ReferenceRepairAccumulator,
-  flow: ReferenceCheckFlowAudit
+  flow: ReferenceCheckFlowAudit,
+  outcome?: ReferenceCheckOutcome
 ): Record<string, unknown> {
   const { initialCoverage, finalCoverage } = state;
   return {
@@ -196,6 +238,7 @@ export function referenceCheckFailureJson(
     initialCoveragePercent: initialCoverage?.coveragePercent ?? null,
     finalCoveragePercent: finalCoverage?.coveragePercent ?? null,
     initialCoverage: referenceCoverageJson(initialCoverage),
-    finalCoverage: referenceCoverageJson(finalCoverage)
+    finalCoverage: referenceCoverageJson(finalCoverage),
+    ...(outcome ? { outcome: referenceCheckOutcomeJson(outcome) } : {})
   };
 }
