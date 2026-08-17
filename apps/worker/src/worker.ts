@@ -87,6 +87,13 @@ import {
   type ReferenceCoverageReport
 } from "./services/reference-check.js";
 import {
+  absorbReferenceRepairResult,
+  createReferenceRepairAccumulator,
+  referenceCheckFailureJson,
+  referenceCheckValidationJson,
+  type ReferenceRepairHistoryEntry
+} from "./services/reference-check-outcome.js";
+import {
   ensureReportSourceLimitation,
   validateRewriteOutput,
   type ReportExtractionValidationContext,
@@ -611,31 +618,6 @@ function generationInputJson(
     reasoningEffortOverride: reasoningEffortOverride ?? null,
     modelCalls
   });
-}
-
-function referenceCoverageJson(
-  coverage: ReferenceCoverageReport | null
-): Prisma.InputJsonValue | null {
-  if (!coverage) return null;
-  return {
-    totalSentences: coverage.totalSentences,
-    visibleArticleSentenceCount: coverage.visibleArticleSentenceCount,
-    groundedSentences: coverage.groundedSentences,
-    coveragePercent: coverage.coveragePercent,
-    sentenceReviews: coverage.items.map((item) => ({
-      index: item.index,
-      sentence: item.sentence,
-      grounded: item.grounded,
-      interpretation: item.interpretation,
-      sourceEvidence: item.sourceEvidence
-    })),
-    unsupportedSentences: coverage.unsupportedSentences.map((item) => ({
-      index: item.index,
-      sentence: item.sentence,
-      interpretation: item.interpretation,
-      sourceEvidence: item.sourceEvidence
-    }))
-  } as unknown as Prisma.InputJsonValue;
 }
 
 function validateRewriteWithRevisionCompliance(
@@ -1448,21 +1430,6 @@ async function callModelYearlyReportRewrite(
   };
 }
 
-type ReferenceRepairHistoryEntry = {
-  checkNumber: number;
-  correctionAttempt: number;
-  coveragePercent: number;
-  unsupportedSentenceCount: number;
-  highRiskUnsupportedSentenceCount: number;
-  blocking: boolean;
-  blockingReason: string | null;
-  unsupportedSentences: Array<{
-    index: number;
-    sentence: string;
-    interpretation: string;
-  }>;
-};
-
 async function applyReferenceCheckRepair<TPayload extends PromptPayload>({
   referencePayload,
   rewritePayload,
@@ -2020,12 +1987,7 @@ async function processReportRewrite(
   const maxAttempts = job.opts.attempts ?? 1;
   const finalAttempt = job.attemptsMade + 1 >= maxAttempts;
   let promptChars = revisionOptions.promptChars ?? 0;
-  let checkerError: string | null = null;
-  let correctionApplied = false;
-  let referenceCorrectionAttempts = 0;
-  let referenceRepairHistory: ReferenceRepairHistoryEntry[] = [];
-  let initialCoverage: ReferenceCoverageReport | null = null;
-  let finalCoverage: ReferenceCoverageReport | null = null;
+  const referenceRepairState = createReferenceRepairAccumulator();
   let hiddenDraft: RewriteOutput | null = null;
   let importanceAdjusted = false;
   let importanceAdjustReason: string | null = null;
@@ -2092,15 +2054,7 @@ async function processReportRewrite(
     });
     rewrite = referenceRepair.rewrite;
     promptChars += referenceRepair.promptChars;
-    checkerError = referenceRepair.checkerError;
-    correctionApplied = referenceRepair.correctionAttempts > 0;
-    referenceCorrectionAttempts += referenceRepair.correctionAttempts;
-    referenceRepairHistory = [
-      ...referenceRepairHistory,
-      ...referenceRepair.repairHistory
-    ];
-    initialCoverage = referenceRepair.initialCoverage;
-    finalCoverage = referenceRepair.finalCoverage;
+    absorbReferenceRepairResult(referenceRepairState, referenceRepair);
 
     await setGenerationPhaseAndNotify(
       revisionOptions.generationRunId,
@@ -2168,24 +2122,13 @@ async function processReportRewrite(
         rewrite,
         revisionInstructionForPrompt,
         correctionReasoningEffort: reportReasoningEffort,
-        existingCorrectionAttempts: referenceCorrectionAttempts,
+        existingCorrectionAttempts: referenceRepairState.correctionAttempts,
         modelCalls,
         callRewrite: callModelReportRewrite
       });
       rewrite = finalReferenceRepair.rewrite;
       promptChars += finalReferenceRepair.promptChars;
-      checkerError = finalReferenceRepair.checkerError;
-      correctionApplied =
-        correctionApplied || finalReferenceRepair.correctionAttempts > 0;
-      referenceCorrectionAttempts += finalReferenceRepair.correctionAttempts;
-      referenceRepairHistory = [
-        ...referenceRepairHistory,
-        ...finalReferenceRepair.repairHistory
-      ];
-      finalCoverage =
-        finalReferenceRepair.finalCoverage ??
-        finalReferenceRepair.initialCoverage ??
-        finalCoverage;
+      absorbReferenceRepairResult(referenceRepairState, finalReferenceRepair);
     }
 
     rewrite = ensureReportSourceLimitation(
@@ -2259,25 +2202,16 @@ async function processReportRewrite(
         rewrite,
         revisionInstructionForPrompt,
         correctionReasoningEffort: reportReasoningEffort,
-        existingCorrectionAttempts: referenceCorrectionAttempts,
+        existingCorrectionAttempts: referenceRepairState.correctionAttempts,
         modelCalls,
         callRewrite: callModelReportRewrite
       });
       rewrite = repairedReferenceRepair.rewrite;
       promptChars += repairedReferenceRepair.promptChars;
-      checkerError = repairedReferenceRepair.checkerError;
-      correctionApplied =
-        correctionApplied || repairedReferenceRepair.correctionAttempts > 0;
-      referenceCorrectionAttempts +=
-        repairedReferenceRepair.correctionAttempts;
-      referenceRepairHistory = [
-        ...referenceRepairHistory,
-        ...repairedReferenceRepair.repairHistory
-      ];
-      finalCoverage =
-        repairedReferenceRepair.finalCoverage ??
-        repairedReferenceRepair.initialCoverage ??
-        finalCoverage;
+      absorbReferenceRepairResult(
+        referenceRepairState,
+        repairedReferenceRepair
+      );
 
       rewrite = ensureReportSourceLimitation(
         rewrite,
@@ -2301,7 +2235,10 @@ async function processReportRewrite(
     );
     validationResult = promoteHighRiskValidationWarnings(validationResult);
     const referenceGate = assessReferenceCheckGate(
-      checkerError ? null : finalCoverage ?? initialCoverage
+      referenceRepairState.checkerError
+        ? null
+        : referenceRepairState.finalCoverage ??
+            referenceRepairState.initialCoverage
     );
     const validation = applyReferenceCheckGate(validationResult, referenceGate);
     const rewriteStatus = statusForValidation(validation);
@@ -2346,53 +2283,16 @@ async function processReportRewrite(
         styleSanitization,
         editorialReview,
         validationRepair,
-        referenceCheck: {
-          enabled: true,
-          checkerError,
-          correctionApplied,
-          correctionAttempts: referenceCorrectionAttempts,
-          repairHistory: referenceRepairHistory,
-          attributionCorrectionApplied,
-          attributionRiskCount,
-          initialCoveragePercent: initialCoverage?.coveragePercent ?? null,
-          finalCoveragePercent:
-            finalCoverage?.coveragePercent ??
-            initialCoverage?.coveragePercent ??
-            null,
-          importanceAdjusted,
-          importanceAdjustReason,
-          blocking: referenceGate.blocking,
-          blockingReason: referenceGate.reason,
-          highRiskUnsupportedSentenceCount:
-            referenceGate.highRiskUnsupportedSentences.length,
-          initialCoverage: referenceCoverageJson(initialCoverage),
-          finalCoverage: referenceCoverageJson(finalCoverage ?? initialCoverage),
-          totalSentences:
-            finalCoverage?.totalSentences ?? initialCoverage?.totalSentences ?? 0,
-          unsupportedSentenceCount:
-            finalCoverage?.unsupportedSentences.length ??
-            initialCoverage?.unsupportedSentences.length ??
-            0,
-          sentenceReviews: (
-            finalCoverage?.items ?? initialCoverage?.items ?? []
-          ).map((item) => ({
-            index: item.index,
-            sentence: item.sentence,
-            grounded: item.grounded,
-            interpretation: item.interpretation,
-            sourceEvidence: item.sourceEvidence
-          })),
-          unsupportedSentences: (
-            finalCoverage?.unsupportedSentences ??
-            initialCoverage?.unsupportedSentences ??
-            []
-          ).map((item) => ({
-            index: item.index,
-            sentence: item.sentence,
-            interpretation: item.interpretation,
-            sourceEvidence: item.sourceEvidence
-          }))
-        },
+        referenceCheck: referenceCheckValidationJson(
+          referenceRepairState,
+          referenceGate,
+          {
+            attributionCorrectionApplied,
+            attributionRiskCount,
+            importanceAdjusted,
+            importanceAdjustReason
+          }
+        ),
         hiddenDraft: hiddenDraft
           ? {
               title: hiddenDraft.title,
@@ -2510,12 +2410,7 @@ async function processYearlyReportRewrite(
   const maxAttempts = job.opts.attempts ?? 1;
   const finalAttempt = job.attemptsMade + 1 >= maxAttempts;
   let promptChars = revisionOptions.promptChars ?? 0;
-  let checkerError: string | null = null;
-  let correctionApplied = false;
-  let referenceCorrectionAttempts = 0;
-  let referenceRepairHistory: ReferenceRepairHistoryEntry[] = [];
-  let initialCoverage: ReferenceCoverageReport | null = null;
-  let finalCoverage: ReferenceCoverageReport | null = null;
+  const referenceRepairState = createReferenceRepairAccumulator();
   let hiddenDraft: RewriteOutput | null = null;
   let importanceAdjusted = false;
   let importanceAdjustReason: string | null = null;
@@ -2574,15 +2469,7 @@ async function processYearlyReportRewrite(
     });
     rewrite = referenceRepair.rewrite;
     promptChars += referenceRepair.promptChars;
-    checkerError = referenceRepair.checkerError;
-    correctionApplied = referenceRepair.correctionAttempts > 0;
-    referenceCorrectionAttempts += referenceRepair.correctionAttempts;
-    referenceRepairHistory = [
-      ...referenceRepairHistory,
-      ...referenceRepair.repairHistory
-    ];
-    initialCoverage = referenceRepair.initialCoverage;
-    finalCoverage = referenceRepair.finalCoverage;
+    absorbReferenceRepairResult(referenceRepairState, referenceRepair);
 
     await setGenerationPhaseAndNotify(
       revisionOptions.generationRunId,
@@ -2650,24 +2537,13 @@ async function processYearlyReportRewrite(
         rewrite,
         revisionInstructionForPrompt,
         correctionReasoningEffort: reportReasoningEffort,
-        existingCorrectionAttempts: referenceCorrectionAttempts,
+        existingCorrectionAttempts: referenceRepairState.correctionAttempts,
         modelCalls,
         callRewrite: callModelYearlyReportRewrite
       });
       rewrite = finalReferenceRepair.rewrite;
       promptChars += finalReferenceRepair.promptChars;
-      checkerError = finalReferenceRepair.checkerError;
-      correctionApplied =
-        correctionApplied || finalReferenceRepair.correctionAttempts > 0;
-      referenceCorrectionAttempts += finalReferenceRepair.correctionAttempts;
-      referenceRepairHistory = [
-        ...referenceRepairHistory,
-        ...finalReferenceRepair.repairHistory
-      ];
-      finalCoverage =
-        finalReferenceRepair.finalCoverage ??
-        finalReferenceRepair.initialCoverage ??
-        finalCoverage;
+      absorbReferenceRepairResult(referenceRepairState, finalReferenceRepair);
     }
 
     rewrite = ensureReportSourceLimitation(rewrite, payload);
@@ -2732,25 +2608,16 @@ async function processYearlyReportRewrite(
         rewrite,
         revisionInstructionForPrompt,
         correctionReasoningEffort: reportReasoningEffort,
-        existingCorrectionAttempts: referenceCorrectionAttempts,
+        existingCorrectionAttempts: referenceRepairState.correctionAttempts,
         modelCalls,
         callRewrite: callModelYearlyReportRewrite
       });
       rewrite = repairedReferenceRepair.rewrite;
       promptChars += repairedReferenceRepair.promptChars;
-      checkerError = repairedReferenceRepair.checkerError;
-      correctionApplied =
-        correctionApplied || repairedReferenceRepair.correctionAttempts > 0;
-      referenceCorrectionAttempts +=
-        repairedReferenceRepair.correctionAttempts;
-      referenceRepairHistory = [
-        ...referenceRepairHistory,
-        ...repairedReferenceRepair.repairHistory
-      ];
-      finalCoverage =
-        repairedReferenceRepair.finalCoverage ??
-        repairedReferenceRepair.initialCoverage ??
-        finalCoverage;
+      absorbReferenceRepairResult(
+        referenceRepairState,
+        repairedReferenceRepair
+      );
 
       rewrite = ensureReportSourceLimitation(rewrite, payload);
       validationResult = validateRewriteWithRevisionCompliance(rewrite, payload, {
@@ -2765,7 +2632,10 @@ async function processYearlyReportRewrite(
     );
     validationResult = promoteHighRiskValidationWarnings(validationResult);
     const referenceGate = assessReferenceCheckGate(
-      checkerError ? null : finalCoverage ?? initialCoverage
+      referenceRepairState.checkerError
+        ? null
+        : referenceRepairState.finalCoverage ??
+            referenceRepairState.initialCoverage
     );
     const validation = applyReferenceCheckGate(validationResult, referenceGate);
     const rewriteStatus = statusForValidation(validation);
@@ -2807,53 +2677,16 @@ async function processYearlyReportRewrite(
         styleSanitization,
         editorialReview,
         validationRepair,
-        referenceCheck: {
-          enabled: true,
-          checkerError,
-          correctionApplied,
-          correctionAttempts: referenceCorrectionAttempts,
-          repairHistory: referenceRepairHistory,
-          attributionCorrectionApplied,
-          attributionRiskCount,
-          initialCoveragePercent: initialCoverage?.coveragePercent ?? null,
-          finalCoveragePercent:
-            finalCoverage?.coveragePercent ??
-            initialCoverage?.coveragePercent ??
-            null,
-          importanceAdjusted,
-          importanceAdjustReason,
-          blocking: referenceGate.blocking,
-          blockingReason: referenceGate.reason,
-          highRiskUnsupportedSentenceCount:
-            referenceGate.highRiskUnsupportedSentences.length,
-          initialCoverage: referenceCoverageJson(initialCoverage),
-          finalCoverage: referenceCoverageJson(finalCoverage ?? initialCoverage),
-          totalSentences:
-            finalCoverage?.totalSentences ?? initialCoverage?.totalSentences ?? 0,
-          unsupportedSentenceCount:
-            finalCoverage?.unsupportedSentences.length ??
-            initialCoverage?.unsupportedSentences.length ??
-            0,
-          sentenceReviews: (
-            finalCoverage?.items ?? initialCoverage?.items ?? []
-          ).map((item) => ({
-            index: item.index,
-            sentence: item.sentence,
-            grounded: item.grounded,
-            interpretation: item.interpretation,
-            sourceEvidence: item.sourceEvidence
-          })),
-          unsupportedSentences: (
-            finalCoverage?.unsupportedSentences ??
-            initialCoverage?.unsupportedSentences ??
-            []
-          ).map((item) => ({
-            index: item.index,
-            sentence: item.sentence,
-            interpretation: item.interpretation,
-            sourceEvidence: item.sourceEvidence
-          }))
-        },
+        referenceCheck: referenceCheckValidationJson(
+          referenceRepairState,
+          referenceGate,
+          {
+            attributionCorrectionApplied,
+            attributionRiskCount,
+            importanceAdjusted,
+            importanceAdjustReason
+          }
+        ),
         hiddenDraft: hiddenDraft
           ? {
               title: hiddenDraft.title,
@@ -3893,12 +3726,7 @@ const rewriteWorker = new Worker<RewriteJobData>(
       const maxAttempts = job.opts.attempts ?? 1;
       const finalAttempt = job.attemptsMade + 1 >= maxAttempts;
       let promptChars = preRewritePromptChars;
-      let checkerError: string | null = null;
-      let correctionApplied = false;
-      let referenceCorrectionAttempts = 0;
-      let referenceRepairHistory: ReferenceRepairHistoryEntry[] = [];
-      let initialCoverage: ReferenceCoverageReport | null = null;
-      let finalCoverage: ReferenceCoverageReport | null = null;
+      const referenceRepairState = createReferenceRepairAccumulator();
       let hiddenDraft: RewriteOutput | null = null;
       let importanceAdjusted = false;
       let importanceAdjustReason: string | null = null;
@@ -3971,15 +3799,7 @@ const rewriteWorker = new Worker<RewriteJobData>(
         });
         rewrite = referenceRepair.rewrite;
         promptChars += referenceRepair.promptChars;
-        checkerError = referenceRepair.checkerError;
-        correctionApplied = referenceRepair.correctionAttempts > 0;
-        referenceCorrectionAttempts += referenceRepair.correctionAttempts;
-        referenceRepairHistory = [
-          ...referenceRepairHistory,
-          ...referenceRepair.repairHistory
-        ];
-        initialCoverage = referenceRepair.initialCoverage;
-        finalCoverage = referenceRepair.finalCoverage;
+        absorbReferenceRepairResult(referenceRepairState, referenceRepair);
 
         await setGenerationPhaseAndNotify(generationRunId, messageId, "finalizing");
         const attributionRisks = findAttributionRisks(rewrite);
@@ -4040,24 +3860,16 @@ const rewriteWorker = new Worker<RewriteJobData>(
             rewrite,
             revisionInstructionForPrompt,
             correctionReasoningEffort,
-            existingCorrectionAttempts: referenceCorrectionAttempts,
+            existingCorrectionAttempts: referenceRepairState.correctionAttempts,
             modelCalls,
             callRewrite: callModelRewrite
           });
           rewrite = finalReferenceRepair.rewrite;
           promptChars += finalReferenceRepair.promptChars;
-          checkerError = finalReferenceRepair.checkerError;
-          correctionApplied =
-            correctionApplied || finalReferenceRepair.correctionAttempts > 0;
-          referenceCorrectionAttempts += finalReferenceRepair.correctionAttempts;
-          referenceRepairHistory = [
-            ...referenceRepairHistory,
-            ...finalReferenceRepair.repairHistory
-          ];
-          finalCoverage =
-            finalReferenceRepair.finalCoverage ??
-            finalReferenceRepair.initialCoverage ??
-            finalCoverage;
+          absorbReferenceRepairResult(
+            referenceRepairState,
+            finalReferenceRepair
+          );
         }
 
         rewrite = ensureReportSourceLimitation(rewrite, payload);
@@ -4122,25 +3934,16 @@ const rewriteWorker = new Worker<RewriteJobData>(
             rewrite,
             revisionInstructionForPrompt,
             correctionReasoningEffort,
-            existingCorrectionAttempts: referenceCorrectionAttempts,
+            existingCorrectionAttempts: referenceRepairState.correctionAttempts,
             modelCalls,
             callRewrite: callModelRewrite
           });
           rewrite = repairedReferenceRepair.rewrite;
           promptChars += repairedReferenceRepair.promptChars;
-          checkerError = repairedReferenceRepair.checkerError;
-          correctionApplied =
-            correctionApplied || repairedReferenceRepair.correctionAttempts > 0;
-          referenceCorrectionAttempts +=
-            repairedReferenceRepair.correctionAttempts;
-          referenceRepairHistory = [
-            ...referenceRepairHistory,
-            ...repairedReferenceRepair.repairHistory
-          ];
-          finalCoverage =
-            repairedReferenceRepair.finalCoverage ??
-            repairedReferenceRepair.initialCoverage ??
-            finalCoverage;
+          absorbReferenceRepairResult(
+            referenceRepairState,
+            repairedReferenceRepair
+          );
 
           rewrite = ensureReportSourceLimitation(rewrite, payload);
           validationResult = validateRewriteWithRevisionCompliance(rewrite, payload, {
@@ -4155,7 +3958,10 @@ const rewriteWorker = new Worker<RewriteJobData>(
         );
         validationResult = promoteHighRiskValidationWarnings(validationResult);
         const referenceGate = assessReferenceCheckGate(
-          checkerError ? null : finalCoverage ?? initialCoverage
+          referenceRepairState.checkerError
+            ? null
+            : referenceRepairState.finalCoverage ??
+                referenceRepairState.initialCoverage
         );
         const validation = applyReferenceCheckGate(validationResult, referenceGate);
         const rewriteStatus = statusForValidation(validation);
@@ -4189,53 +3995,16 @@ const rewriteWorker = new Worker<RewriteJobData>(
             styleSanitization,
             editorialReview,
             validationRepair,
-            referenceCheck: {
-              enabled: true,
-              checkerError,
-              correctionApplied,
-              correctionAttempts: referenceCorrectionAttempts,
-              repairHistory: referenceRepairHistory,
-              attributionCorrectionApplied,
-              attributionRiskCount,
-              initialCoveragePercent: initialCoverage?.coveragePercent ?? null,
-              finalCoveragePercent:
-                finalCoverage?.coveragePercent ??
-                initialCoverage?.coveragePercent ??
-                null,
-              importanceAdjusted,
-              importanceAdjustReason,
-              blocking: referenceGate.blocking,
-              blockingReason: referenceGate.reason,
-              highRiskUnsupportedSentenceCount:
-                referenceGate.highRiskUnsupportedSentences.length,
-              initialCoverage: referenceCoverageJson(initialCoverage),
-              finalCoverage: referenceCoverageJson(finalCoverage ?? initialCoverage),
-              totalSentences:
-                finalCoverage?.totalSentences ?? initialCoverage?.totalSentences ?? 0,
-              unsupportedSentenceCount:
-                finalCoverage?.unsupportedSentences.length ??
-                initialCoverage?.unsupportedSentences.length ??
-                0,
-              sentenceReviews: (finalCoverage?.items ?? initialCoverage?.items ?? []).map(
-                (item) => ({
-                  index: item.index,
-                  sentence: item.sentence,
-                  grounded: item.grounded,
-                  interpretation: item.interpretation,
-                  sourceEvidence: item.sourceEvidence
-                })
-              ),
-              unsupportedSentences: (
-                finalCoverage?.unsupportedSentences ??
-                initialCoverage?.unsupportedSentences ??
-                []
-              ).map((item) => ({
-                index: item.index,
-                sentence: item.sentence,
-                interpretation: item.interpretation,
-                sourceEvidence: item.sourceEvidence
-              }))
-            },
+            referenceCheck: referenceCheckValidationJson(
+              referenceRepairState,
+              referenceGate,
+              {
+                attributionCorrectionApplied,
+                attributionRiskCount,
+                importanceAdjusted,
+                importanceAdjustReason
+              }
+            ),
             hiddenDraft: hiddenDraft
               ? {
                   title: hiddenDraft.title,
@@ -4281,21 +4050,12 @@ const rewriteWorker = new Worker<RewriteJobData>(
               sourceBodyChars: payload.sourceBodyChars,
               promptChars,
               styleSanitization,
-              referenceCheck: {
-                enabled: true,
-                checkerError,
-                correctionApplied,
-                correctionAttempts: referenceCorrectionAttempts,
-                repairHistory: referenceRepairHistory,
+              referenceCheck: referenceCheckFailureJson(referenceRepairState, {
                 attributionCorrectionApplied,
                 attributionRiskCount,
                 importanceAdjusted,
-                importanceAdjustReason,
-                initialCoveragePercent: initialCoverage?.coveragePercent ?? null,
-                finalCoveragePercent: finalCoverage?.coveragePercent ?? null,
-                initialCoverage: referenceCoverageJson(initialCoverage),
-                finalCoverage: referenceCoverageJson(finalCoverage)
-              }
+                importanceAdjustReason
+              })
             } as Prisma.InputJsonValue
           });
           throw new Error(`rewrite pipeline failed for ${messageId}: ${errorText}`);
@@ -4324,21 +4084,12 @@ const rewriteWorker = new Worker<RewriteJobData>(
             sourceBodyChars: payload.sourceBodyChars,
             promptChars,
             styleSanitization,
-            referenceCheck: {
-              enabled: true,
-              checkerError,
-              correctionApplied,
-              correctionAttempts: referenceCorrectionAttempts,
-              repairHistory: referenceRepairHistory,
+            referenceCheck: referenceCheckFailureJson(referenceRepairState, {
               attributionCorrectionApplied,
               attributionRiskCount,
               importanceAdjusted,
-              importanceAdjustReason,
-              initialCoveragePercent: initialCoverage?.coveragePercent ?? null,
-              finalCoveragePercent: finalCoverage?.coveragePercent ?? null,
-              initialCoverage: referenceCoverageJson(initialCoverage),
-              finalCoverage: referenceCoverageJson(finalCoverage)
-            }
+              importanceAdjustReason
+            })
           } as Prisma.InputJsonValue
         });
         logFinalRewriteFailure(messageId, "REWRITE_FAILED_FINAL", errorText);
