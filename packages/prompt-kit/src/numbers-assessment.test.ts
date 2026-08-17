@@ -241,7 +241,10 @@ describe("derivation slot", () => {
       "source_cell_subrun",
       "verbal_minus_match"
     ]);
-    expect([...defaultEnabledDerivationRules]).toEqual([]);
+    expect([...defaultEnabledDerivationRules]).toEqual([
+      "source_cell_subrun",
+      "verbal_minus_match"
+    ]);
   });
 
   it("returns identical assessments with an explicit empty enabled set", () => {
@@ -291,8 +294,27 @@ describe("source_cell_subrun rule", () => {
     source_spans: ["primary: Resultat etter skatt 297 689 186 914"]
   });
 
-  it("shadows a span-quoted cell sub-run while disabled by default", () => {
+  it("derives the sub-run by default since the 2026-08-17 enablement", () => {
     const assessments = assessNumbers(spanQuotingRewrite, tableSource);
+    expect(assessments).toContainEqual({
+      display: "297 689 186 914",
+      disposition: "derived",
+      ruleId: "source_cell_subrun",
+      count: 1,
+      provenance: {
+        source_run: "297 689 186 914 484 438 328 548 847 619",
+        group_offset: 0,
+        group_count: 4
+      }
+    });
+    expect(findUnexpectedNumbers(spanQuotingRewrite, tableSource)).not.toContain(
+      "297 689 186 914"
+    );
+  });
+
+  it("shadows the sub-run when the rule is disabled via kill switch", () => {
+    const disabled = { enabledDerivationRules: [] as const };
+    const assessments = assessNumbers(spanQuotingRewrite, tableSource, disabled);
     expect(assessments).toContainEqual({
       display: "297 689 186 914",
       disposition: "unexpected",
@@ -301,9 +323,9 @@ describe("source_cell_subrun rule", () => {
       candidateRuleId: "source_cell_subrun"
     });
     // The warning still fires: shadow candidates do not change behavior.
-    expect(findUnexpectedNumbers(spanQuotingRewrite, tableSource)).toContain(
-      "297 689 186 914"
-    );
+    expect(
+      findUnexpectedNumbers(spanQuotingRewrite, tableSource, disabled)
+    ).toContain("297 689 186 914");
   });
 
   it("derives the sub-run with provenance when enabled", () => {
@@ -381,8 +403,23 @@ describe("verbal_minus_match rule", () => {
     lead: "Resultatet snudde til minus 161 tusen kroner, fra pluss 12.562 tusen kroner."
   });
 
-  it("shadows the unsigned magnitude while disabled by default", () => {
+  it("derives the magnitude by default since the 2026-08-17 enablement", () => {
     const assessments = assessNumbers(verbalRewrite, signedSource);
+    expect(assessments).toContainEqual({
+      display: "161",
+      disposition: "derived",
+      ruleId: "verbal_minus_match",
+      count: 1,
+      provenance: { verbal_sign: "minus", source_display: "-161" }
+    });
+    expect(findUnexpectedNumbers(verbalRewrite, signedSource)).not.toContain(
+      "161"
+    );
+  });
+
+  it("shadows the unsigned magnitude when the rule is disabled via kill switch", () => {
+    const disabled = { enabledDerivationRules: [] as const };
+    const assessments = assessNumbers(verbalRewrite, signedSource, disabled);
     expect(assessments).toContainEqual({
       display: "161",
       disposition: "unexpected",
@@ -390,7 +427,9 @@ describe("verbal_minus_match rule", () => {
       count: 1,
       candidateRuleId: "verbal_minus_match"
     });
-    expect(findUnexpectedNumbers(verbalRewrite, signedSource)).toContain("161");
+    expect(findUnexpectedNumbers(verbalRewrite, signedSource, disabled)).toContain(
+      "161"
+    );
   });
 
   it("derives the magnitude with sign provenance when enabled", () => {

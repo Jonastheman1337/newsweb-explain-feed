@@ -1039,7 +1039,7 @@ export type NumberDerivationRuleId = (typeof numberDerivationRuleIds)[number];
 // Enabling a rule = append here + refresh fixture expectations in the same
 // commit; that fixture diff is the release record.
 export const defaultEnabledDerivationRules: readonly NumberDerivationRuleId[] =
-  [];
+  ["source_cell_subrun", "verbal_minus_match"];
 
 export type NumberAssessmentDisposition = "matched" | "derived" | "unexpected";
 
