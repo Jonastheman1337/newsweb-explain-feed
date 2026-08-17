@@ -460,3 +460,189 @@ export function buildCorrectionInstruction(
     unsupportedList.join("\n\n")
   ].join("\n");
 }
+
+// P4 checker outcome model. The legacy path collapses every checker failure
+// into one string and evaluates the gate on `null`, which reads as a clean
+// pass — the fail-open that published runs with unsupported references. The
+// outcome model classifies failures, accumulates them per repair pass, and
+// always evaluates the gate on the last successfully completed coverage
+// result, so gate evidence is never erased by a later checker error.
+
+export type ReferenceCheckerErrorKind =
+  | "checker_transport"
+  | "checker_empty_output"
+  | "checker_parse"
+  | "checker_schema"
+  | "repair_rewrite_failed"
+  | "unknown";
+
+export type ReferenceCheckerErrorEntry = {
+  // 1-based repair-pass number within the generation run, across stages.
+  stage: number;
+  kind: ReferenceCheckerErrorKind;
+  message: string;
+};
+
+export type ReferenceCheckOutcomeState =
+  | "pass"
+  | "repaired_pass"
+  | "residual_unsupported"
+  | "unavailable_error"
+  | "malformed_result";
+
+export type ReferenceCheckOutcome = {
+  state: ReferenceCheckOutcomeState;
+  evaluatedCoverage: "final" | "initial" | "none";
+  degraded: boolean;
+  checkerErrors: ReferenceCheckerErrorEntry[];
+  gate: ReferenceCheckGateResult;
+  correctionAttempts: number;
+  wouldBlock: boolean;
+  wouldRetry: boolean;
+};
+
+export function classifyCheckerErrorKind(
+  error: unknown
+): ReferenceCheckerErrorKind {
+  if (error instanceof z.ZodError) {
+    return "checker_schema";
+  }
+  if (error instanceof SyntaxError) {
+    return "checker_parse";
+  }
+  const message = error instanceof Error ? error.message : String(error);
+  if (
+    /returned no output_text|response incomplete \(max_output_tokens\)/.test(
+      message
+    )
+  ) {
+    return "checker_empty_output";
+  }
+  if (/OpenAI request failed/.test(message)) {
+    return "checker_transport";
+  }
+  return "unknown";
+}
+
+// Message-only classification for stored legacy `checkerError` strings, used
+// by fixture replay. The embedded schema name recovers the phase: repair
+// rewrites fail "for rewrite_output", checker calls "for
+// reference_check_result". Bare JSON parse messages carry no schema name and
+// can only come from the checker-content parse.
+export function classifyLegacyCheckerErrorMessage(message: string): {
+  kind: ReferenceCheckerErrorKind;
+  phase: "checker" | "repair_rewrite" | "unknown";
+} {
+  if (/\bfor rewrite_output\b/.test(message)) {
+    return { kind: "repair_rewrite_failed", phase: "repair_rewrite" };
+  }
+  if (
+    /in JSON at position|Unexpected end of JSON input|Unexpected token/.test(
+      message
+    )
+  ) {
+    return { kind: "checker_parse", phase: "checker" };
+  }
+  if (/\bfor reference_check_result\b/.test(message)) {
+    if (
+      /returned no output_text|response incomplete \(max_output_tokens\)/.test(
+        message
+      )
+    ) {
+      return { kind: "checker_empty_output", phase: "checker" };
+    }
+    if (/OpenAI request failed/.test(message)) {
+      return { kind: "checker_transport", phase: "checker" };
+    }
+    return { kind: "unknown", phase: "checker" };
+  }
+  return { kind: "unknown", phase: "unknown" };
+}
+
+export function resolveReferenceCheckOutcome(input: {
+  checkerErrors: ReferenceCheckerErrorEntry[];
+  initialCoverage: ReferenceCoverageReport | null;
+  finalCoverage: ReferenceCoverageReport | null;
+  correctionAttempts: number;
+}): ReferenceCheckOutcome {
+  const evaluated = input.finalCoverage ?? input.initialCoverage;
+  const evaluatedCoverage: ReferenceCheckOutcome["evaluatedCoverage"] =
+    input.finalCoverage ? "final" : input.initialCoverage ? "initial" : "none";
+  const degraded = input.checkerErrors.length > 0;
+  const gate = assessReferenceCheckGate(evaluated);
+
+  let state: ReferenceCheckOutcomeState;
+  if (evaluated) {
+    state = gate.blocking
+      ? "residual_unsupported"
+      : input.correctionAttempts > 0
+        ? "repaired_pass"
+        : "pass";
+  } else {
+    // A repair-rewrite failure cannot be the reason coverage is missing (a
+    // checker success always precedes a repair call), so classify on the
+    // last checker-stage failure.
+    const lastCheckerFailure = [...input.checkerErrors]
+      .reverse()
+      .find((entry) => entry.kind !== "repair_rewrite_failed");
+    state =
+      lastCheckerFailure?.kind === "checker_parse" ||
+      lastCheckerFailure?.kind === "checker_schema"
+        ? "malformed_result"
+        : "unavailable_error";
+  }
+
+  return {
+    state,
+    evaluatedCoverage,
+    degraded,
+    checkerErrors: input.checkerErrors,
+    gate,
+    correctionAttempts: input.correctionAttempts,
+    wouldBlock: gate.blocking,
+    wouldRetry: degraded && evaluatedCoverage === "none"
+  };
+}
+
+export type ReferenceCheckEnforcementConfig = {
+  // Degraded run with evaluated coverage: enforce the coverage gate instead
+  // of the legacy vacuous pass.
+  blockOnResidualUnsupported: boolean;
+  // Degraded run with no valid coverage at all: force status needs_retry so
+  // the next attempt re-runs the checker instead of publishing unchecked.
+  retryOnUnavailable: boolean;
+};
+
+// The production default. CI safety gates replay the outcome functions bare,
+// so this constant — not env — is what the release flip changes. Promotion =
+// flip a field to true + refresh fixture expectations in the same commit;
+// that fixture diff is the release record.
+export const defaultReferenceCheckEnforcement: ReferenceCheckEnforcementConfig =
+  {
+    blockOnResidualUnsupported: false,
+    retryOnUnavailable: false
+  };
+
+// Under the shadow defaults this reproduces today's enforced behavior
+// byte-identically: the legacy overwrite-semantics `checkerError` decides
+// whether the gate saw `null` (vacuous pass) or the evaluated coverage.
+export function applyReferenceCheckEnforcement(
+  outcome: ReferenceCheckOutcome,
+  options: { legacyCheckerError: string | null },
+  enforcement: ReferenceCheckEnforcementConfig = defaultReferenceCheckEnforcement
+): { gate: ReferenceCheckGateResult; forceNeedsRetry: boolean } {
+  const vacuousGate: ReferenceCheckGateResult = {
+    blocking: false,
+    reason: null,
+    highRiskUnsupportedSentences: []
+  };
+  const gate = enforcement.blockOnResidualUnsupported
+    ? outcome.gate
+    : options.legacyCheckerError
+      ? vacuousGate
+      : outcome.gate;
+  return {
+    gate,
+    forceNeedsRetry: enforcement.retryOnUnavailable && outcome.wouldRetry
+  };
+}

@@ -1,12 +1,19 @@
 import type { RewriteOutput } from "@newsweb/shared";
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 import {
+  applyReferenceCheckEnforcement,
   assessReferenceCheckGate,
   buildCorrectionInstruction,
   buildCoverageReport,
   buildReferenceCheckPrompt,
+  classifyCheckerErrorKind,
+  classifyLegacyCheckerErrorMessage,
   collectDraftSentences,
+  defaultReferenceCheckEnforcement,
+  resolveReferenceCheckOutcome,
   splitIntoSentences,
+  type ReferenceCheckerErrorEntry,
   type ReferenceCheckResult
 } from "./reference-check.js";
 
@@ -354,5 +361,286 @@ describe("buildCorrectionInstruction", () => {
     expect(instruction).toContain(
       "Sitater og personuttalelser som har dekning i kilden, skal beholdes."
     );
+  });
+});
+
+function cleanCoverageReport() {
+  return buildCoverageReport(
+    ["Selskapet er notert i Oslo."],
+    {
+      sentences: [
+        {
+          index: 0,
+          sentence: "Selskapet er notert i Oslo.",
+          grounded: true,
+          interpretation: "Dekket.",
+          sourceEvidence: "notert i Oslo"
+        }
+      ]
+    },
+    { visibleArticleSentenceCount: 0 }
+  );
+}
+
+function blockingCoverageReport() {
+  return buildCoverageReport(
+    ["Selskapet fikk et resultat på 100 millioner kroner."],
+    {
+      sentences: [
+        {
+          index: 0,
+          sentence: "Selskapet fikk et resultat på 100 millioner kroner.",
+          grounded: false,
+          interpretation: "Tallet finnes ikke i kilden.",
+          sourceEvidence: ""
+        }
+      ]
+    },
+    { visibleArticleSentenceCount: 0 }
+  );
+}
+
+const transportEntry: ReferenceCheckerErrorEntry = {
+  stage: 1,
+  kind: "checker_transport",
+  message:
+    "OpenAI request failed for reference_check_result: Request was aborted."
+};
+
+const parseEntry: ReferenceCheckerErrorEntry = {
+  stage: 1,
+  kind: "checker_parse",
+  message: "Expected ',' or '}' after property value in JSON at position 2310"
+};
+
+describe("resolveReferenceCheckOutcome", () => {
+  it("resolves pass, repaired_pass and residual_unsupported from clean inputs", () => {
+    const clean = cleanCoverageReport();
+    expect(
+      resolveReferenceCheckOutcome({
+        checkerErrors: [],
+        initialCoverage: clean,
+        finalCoverage: clean,
+        correctionAttempts: 0
+      }).state
+    ).toBe("pass");
+    expect(
+      resolveReferenceCheckOutcome({
+        checkerErrors: [],
+        initialCoverage: blockingCoverageReport(),
+        finalCoverage: clean,
+        correctionAttempts: 2
+      }).state
+    ).toBe("repaired_pass");
+    const residual = resolveReferenceCheckOutcome({
+      checkerErrors: [],
+      initialCoverage: blockingCoverageReport(),
+      finalCoverage: blockingCoverageReport(),
+      correctionAttempts: 3
+    });
+    expect(residual.state).toBe("residual_unsupported");
+    expect(residual.wouldBlock).toBe(true);
+    expect(residual.degraded).toBe(false);
+  });
+
+  it("evaluates the gate on final coverage even when a checker error occurred", () => {
+    const outcome = resolveReferenceCheckOutcome({
+      checkerErrors: [{ ...transportEntry, stage: 2 }],
+      initialCoverage: blockingCoverageReport(),
+      finalCoverage: blockingCoverageReport(),
+      correctionAttempts: 1
+    });
+    expect(outcome.evaluatedCoverage).toBe("final");
+    expect(outcome.degraded).toBe(true);
+    expect(outcome.state).toBe("residual_unsupported");
+    expect(outcome.gate.blocking).toBe(true);
+    expect(outcome.wouldBlock).toBe(true);
+    expect(outcome.wouldRetry).toBe(false);
+  });
+
+  it("falls back to initial coverage when no final coverage exists", () => {
+    const outcome = resolveReferenceCheckOutcome({
+      checkerErrors: [{ ...transportEntry, stage: 2 }],
+      initialCoverage: cleanCoverageReport(),
+      finalCoverage: null,
+      correctionAttempts: 0
+    });
+    expect(outcome.evaluatedCoverage).toBe("initial");
+    expect(outcome.state).toBe("pass");
+    expect(outcome.degraded).toBe(true);
+  });
+
+  it("resolves unavailable_error when transport failure leaves no coverage", () => {
+    const outcome = resolveReferenceCheckOutcome({
+      checkerErrors: [transportEntry],
+      initialCoverage: null,
+      finalCoverage: null,
+      correctionAttempts: 0
+    });
+    expect(outcome.state).toBe("unavailable_error");
+    expect(outcome.evaluatedCoverage).toBe("none");
+    expect(outcome.wouldRetry).toBe(true);
+    expect(outcome.wouldBlock).toBe(false);
+  });
+
+  it("resolves malformed_result when a parse failure leaves no coverage", () => {
+    const outcome = resolveReferenceCheckOutcome({
+      checkerErrors: [parseEntry],
+      initialCoverage: null,
+      finalCoverage: null,
+      correctionAttempts: 0
+    });
+    expect(outcome.state).toBe("malformed_result");
+    expect(outcome.wouldRetry).toBe(true);
+  });
+
+  it("keeps a stage-1 blocking result visible through a later checker error", () => {
+    // Legacy overwrite semantics masked this: a stage-2 error nulled the gate
+    // and the stage-1 block published.
+    const outcome = resolveReferenceCheckOutcome({
+      checkerErrors: [{ ...transportEntry, stage: 2 }],
+      initialCoverage: blockingCoverageReport(),
+      finalCoverage: blockingCoverageReport(),
+      correctionAttempts: 0
+    });
+    expect(outcome.state).toBe("residual_unsupported");
+    expect(outcome.checkerErrors).toHaveLength(1);
+  });
+
+  it("retains a stage-1 error through a later successful check", () => {
+    // Legacy overwrite semantics silently reset checkerError to null here.
+    const outcome = resolveReferenceCheckOutcome({
+      checkerErrors: [transportEntry],
+      initialCoverage: cleanCoverageReport(),
+      finalCoverage: cleanCoverageReport(),
+      correctionAttempts: 0
+    });
+    expect(outcome.degraded).toBe(true);
+    expect(outcome.checkerErrors).toEqual([transportEntry]);
+    expect(outcome.state).toBe("pass");
+  });
+});
+
+describe("classifyCheckerErrorKind", () => {
+  it("classifies runtime error shapes", () => {
+    expect(
+      classifyCheckerErrorKind(z.string().safeParse(1).error)
+    ).toBe("checker_schema");
+    let syntaxError: unknown;
+    try {
+      JSON.parse("{");
+    } catch (error) {
+      syntaxError = error;
+    }
+    expect(classifyCheckerErrorKind(syntaxError)).toBe("checker_parse");
+    expect(
+      classifyCheckerErrorKind(
+        new Error(
+          "OpenAI returned no output_text for reference_check_result after 2 attempts"
+        )
+      )
+    ).toBe("checker_empty_output");
+    expect(
+      classifyCheckerErrorKind(
+        new Error(
+          "OpenAI response incomplete (max_output_tokens) for reference_check_result"
+        )
+      )
+    ).toBe("checker_empty_output");
+    expect(
+      classifyCheckerErrorKind(
+        new Error(
+          "OpenAI request failed for reference_check_result: Request was aborted."
+        )
+      )
+    ).toBe("checker_transport");
+    expect(classifyCheckerErrorKind(new Error("boom"))).toBe("unknown");
+  });
+});
+
+describe("classifyLegacyCheckerErrorMessage", () => {
+  it("classifies the four production fixture error strings", () => {
+    expect(
+      classifyLegacyCheckerErrorMessage(
+        "OpenAI returned no output_text for rewrite_output after 2 attempts | request | emptyResponses=..."
+      )
+    ).toEqual({ kind: "repair_rewrite_failed", phase: "repair_rewrite" });
+    expect(
+      classifyLegacyCheckerErrorMessage(
+        "OpenAI request failed for rewrite_output: Request was aborted."
+      )
+    ).toEqual({ kind: "repair_rewrite_failed", phase: "repair_rewrite" });
+    expect(
+      classifyLegacyCheckerErrorMessage(
+        "Expected ',' or '}' after property value in JSON at position 2310 (line 1 column 2311)"
+      )
+    ).toEqual({ kind: "checker_parse", phase: "checker" });
+    expect(
+      classifyLegacyCheckerErrorMessage(
+        "OpenAI request failed for reference_check_result: Request was aborted."
+      )
+    ).toEqual({ kind: "checker_transport", phase: "checker" });
+  });
+});
+
+describe("applyReferenceCheckEnforcement", () => {
+  it("reproduces the legacy vacuous pass for every degraded input under shadow defaults", () => {
+    const outcome = resolveReferenceCheckOutcome({
+      checkerErrors: [transportEntry],
+      initialCoverage: blockingCoverageReport(),
+      finalCoverage: blockingCoverageReport(),
+      correctionAttempts: 1
+    });
+    const enforced = applyReferenceCheckEnforcement(outcome, {
+      legacyCheckerError: transportEntry.message
+    });
+    expect(enforced.gate.blocking).toBe(false);
+    expect(enforced.gate.reason).toBeNull();
+    expect(enforced.forceNeedsRetry).toBe(false);
+  });
+
+  it("evaluates the real gate for non-degraded runs under shadow defaults", () => {
+    const outcome = resolveReferenceCheckOutcome({
+      checkerErrors: [],
+      initialCoverage: blockingCoverageReport(),
+      finalCoverage: blockingCoverageReport(),
+      correctionAttempts: 3
+    });
+    const enforced = applyReferenceCheckEnforcement(
+      outcome,
+      { legacyCheckerError: null },
+      defaultReferenceCheckEnforcement
+    );
+    expect(enforced.gate.blocking).toBe(true);
+  });
+
+  it("enforces coverage evidence and retry when promoted", () => {
+    const degradedBlocking = resolveReferenceCheckOutcome({
+      checkerErrors: [transportEntry],
+      initialCoverage: blockingCoverageReport(),
+      finalCoverage: blockingCoverageReport(),
+      correctionAttempts: 1
+    });
+    const enforcedBlocking = applyReferenceCheckEnforcement(
+      degradedBlocking,
+      { legacyCheckerError: transportEntry.message },
+      { blockOnResidualUnsupported: true, retryOnUnavailable: true }
+    );
+    expect(enforcedBlocking.gate.blocking).toBe(true);
+    expect(enforcedBlocking.forceNeedsRetry).toBe(false);
+
+    const unavailable = resolveReferenceCheckOutcome({
+      checkerErrors: [transportEntry],
+      initialCoverage: null,
+      finalCoverage: null,
+      correctionAttempts: 0
+    });
+    const enforcedRetry = applyReferenceCheckEnforcement(
+      unavailable,
+      { legacyCheckerError: transportEntry.message },
+      { blockOnResidualUnsupported: true, retryOnUnavailable: true }
+    );
+    expect(enforcedRetry.forceNeedsRetry).toBe(true);
+    expect(enforcedRetry.gate.blocking).toBe(false);
   });
 });
