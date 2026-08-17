@@ -313,7 +313,17 @@
         "class": "checker_error_published",
         "reportRef": "final report 2026-06-02_2026-08-13"
       },
-      "expected": {},
+      "expected": {
+        "checkerOutcome": {
+          "state": "residual_unsupported",
+          "evaluatedCoverage": "final",
+          "wouldBlock": true,
+          "wouldRetry": false,
+          "checkerErrorKinds": [
+            "repair_rewrite_failed"
+          ]
+        }
+      },
       "provenance": {
         "window": {
           "from": "2026-06-02",
@@ -667,7 +677,17 @@
         "class": "checker_error_published",
         "reportRef": "final report 2026-06-02_2026-08-13"
       },
-      "expected": {},
+      "expected": {
+        "checkerOutcome": {
+          "state": "pass",
+          "evaluatedCoverage": "final",
+          "wouldBlock": false,
+          "wouldRetry": false,
+          "checkerErrorKinds": [
+            "repair_rewrite_failed"
+          ]
+        }
+      },
       "provenance": {
         "window": {
           "from": "2026-06-02",
@@ -956,7 +976,17 @@
         "class": "checker_error_published",
         "reportRef": "final report 2026-06-02_2026-08-13"
       },
-      "expected": {},
+      "expected": {
+        "checkerOutcome": {
+          "state": "repaired_pass",
+          "evaluatedCoverage": "final",
+          "wouldBlock": false,
+          "wouldRetry": false,
+          "checkerErrorKinds": [
+            "checker_parse"
+          ]
+        }
+      },
       "provenance": {
         "window": {
           "from": "2026-06-02",
@@ -1315,7 +1345,17 @@
         "class": "checker_error_published",
         "reportRef": "final report 2026-06-02_2026-08-13"
       },
-      "expected": {},
+      "expected": {
+        "checkerOutcome": {
+          "state": "repaired_pass",
+          "evaluatedCoverage": "final",
+          "wouldBlock": false,
+          "wouldRetry": false,
+          "checkerErrorKinds": [
+            "checker_transport"
+          ]
+        }
+      },
       "provenance": {
         "window": {
           "from": "2026-06-02",

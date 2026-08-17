@@ -334,7 +334,30 @@
         "note": "challenger (regular_v6_draft) output from legacy A/B run editorial_eval_2026-08-12T20-52-31-183Z",
         "reportRef": "final report 2026-06-02_2026-08-13"
       },
-      "expected": {},
+      "expected": {
+        "marker": {
+          "categories": [
+            "foreign_script_spam",
+            "instruction_echo",
+            "reasoning_spill",
+            "role_marker",
+            "serialization_fragment"
+          ],
+          "patternIds": [
+            "assistant_to_role",
+            "cjk_run",
+            "confidence_level_kv",
+            "ensure_field_max",
+            "field_word_budget",
+            "fullwidth_bracket",
+            "hangul_run",
+            "last_assistant_answer",
+            "schema_key_kv",
+            "we_need_meta"
+          ],
+          "wouldBlock": true
+        }
+      },
       "provenance": {
         "window": {
           "from": "2026-06-02",

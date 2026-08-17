@@ -3,6 +3,8 @@ import { sha256CanonicalJson } from "./editorial-eval-artifact.js";
 import {
   loadSafetyFixtureFile,
   loadSafetyFixtureManifest,
+  replayCheckerOutcomeExpectation,
+  replayMarkerExpectation,
   replayTriageExpectation,
   replayValidationExpectation,
   safetyClassBehavior,
@@ -67,6 +69,18 @@ describe.runIf(manifest !== null)("editorial safety gates", () => {
             expect(item.expected.triage).toBeDefined();
             expect(replayTriageExpectation(item)).toEqual(item.expected.triage);
           });
+        } else if (behavior === "checker_outcome") {
+          it(`case ${item.messageId} keeps its expected checker outcome`, () => {
+            expect(item.expected.checkerOutcome).toBeDefined();
+            expect(replayCheckerOutcomeExpectation(item)).toEqual(
+              item.expected.checkerOutcome
+            );
+          });
+        } else if (behavior === "marker") {
+          it(`case ${item.messageId} keeps its expected marker detection`, () => {
+            expect(item.expected.marker).toBeDefined();
+            expect(replayMarkerExpectation(item)).toEqual(item.expected.marker);
+          });
         } else {
           it(`case ${item.messageId} retains stored evidence`, () => {
             expect(item.sourcePayload.messageId).toBe(item.messageId);
@@ -79,6 +93,30 @@ describe.runIf(manifest !== null)("editorial safety gates", () => {
         it("never flips: unresolved numeric cases must keep UNEXPECTED_NUMBERS", () => {
           for (const item of file.cases) {
             expect(item.expected.validation?.hasUnexpectedNumbers).toBe(true);
+          }
+        });
+      }
+
+      if (file.class === "checker_error_published") {
+        it("never flips: checker-error cases keep classified errors and coverage evidence", () => {
+          for (const item of file.cases) {
+            expect(
+              item.expected.checkerOutcome?.checkerErrorKinds.length
+            ).toBeGreaterThan(0);
+            // The published fail-opens all carried real coverage that the
+            // legacy gate discarded; the outcome model must keep evaluating it.
+            expect(item.expected.checkerOutcome?.evaluatedCoverage).not.toBe(
+              "none"
+            );
+          }
+        });
+      }
+
+      if (file.class === "marker_leak") {
+        it("never flips: marker-leak cases must always detect a role marker", () => {
+          for (const item of file.cases) {
+            expect(item.expected.marker?.categories).toContain("role_marker");
+            expect(item.expected.marker?.wouldBlock).toBe(true);
           }
         });
       }

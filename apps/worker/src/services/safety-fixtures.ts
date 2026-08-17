@@ -4,7 +4,18 @@ import { fileURLToPath } from "node:url";
 import type { PromptPayload } from "@newsweb/prompt-kit";
 import type { RewriteOutput } from "@newsweb/shared";
 import { getDeterministicTriageSkip } from "./newsworthiness-triage.js";
-import { validateRewriteOutput } from "./rewrite-validation.js";
+import {
+  classifyLegacyCheckerErrorMessage,
+  resolveReferenceCheckOutcome,
+  type ReferenceCheckerErrorEntry,
+  type ReferenceCheckOutcomeState,
+  type ReferenceCoverageReport
+} from "./reference-check.js";
+import {
+  detectMarkerLeaks,
+  validateRewriteOutput,
+  visibleArticleText
+} from "./rewrite-validation.js";
 
 export const safetyGateClasses = [
   "numeric_false_block",
@@ -19,18 +30,19 @@ export const safetyGateClasses = [
 export type SafetyGateClass = (typeof safetyGateClasses)[number];
 
 // What the CI gate replays per class. Integrity-only classes freeze data and
-// stored dispositions until P4 ships deterministic detectors for them.
+// stored dispositions until a deterministic detector ships for them; P4
+// flipped checker_error_published and marker_leak to replayable behaviors.
 export const safetyClassBehavior = {
   numeric_false_block: "validation",
   numeric_unresolved: "validation",
-  checker_error_published: "integrity_only",
-  marker_leak: "integrity_only",
+  checker_error_published: "checker_outcome",
+  marker_leak: "marker",
   loaded_language: "integrity_only",
   routine_not_news: "triage",
   false_skip: "triage"
 } as const satisfies Record<
   SafetyGateClass,
-  "validation" | "triage" | "integrity_only"
+  "validation" | "triage" | "integrity_only" | "checker_outcome" | "marker"
 >;
 
 export type SafetyValidationExpectation = {
@@ -43,9 +55,25 @@ export type SafetyTriageExpectation = {
   deterministicSkipKind: string | null;
 };
 
+export type SafetyCheckerOutcomeExpectation = {
+  state: ReferenceCheckOutcomeState;
+  evaluatedCoverage: "final" | "initial" | "none";
+  wouldBlock: boolean;
+  wouldRetry: boolean;
+  checkerErrorKinds: string[];
+};
+
+export type SafetyMarkerExpectation = {
+  categories: string[];
+  patternIds: string[];
+  wouldBlock: boolean;
+};
+
 export type SafetyCaseExpected = {
   validation?: SafetyValidationExpectation;
   triage?: SafetyTriageExpectation;
+  checkerOutcome?: SafetyCheckerOutcomeExpectation;
+  marker?: SafetyMarkerExpectation;
 };
 
 export type SafetyCase = {
@@ -148,6 +176,97 @@ export function replayTriageExpectation(
   return { deterministicSkipKind: skip?.kind ?? null };
 }
 
+// Rebuilds a ReferenceCoverageReport from the persisted
+// validationJson.referenceCheck coverage blob (referenceCoverageJson shape:
+// sentenceReviews carry the grounded flags; unsupported set is derived from
+// them, matching buildCoverageReport semantics).
+function coverageReportFromStored(
+  raw: unknown
+): ReferenceCoverageReport | null {
+  if (!raw || typeof raw !== "object") return null;
+  const blob = raw as Record<string, unknown>;
+  const reviews = Array.isArray(blob.sentenceReviews)
+    ? blob.sentenceReviews
+    : [];
+  const items = reviews
+    .filter(
+      (item): item is Record<string, unknown> =>
+        !!item && typeof item === "object"
+    )
+    .map((item) => ({
+      index: Number(item.index ?? 0),
+      sentence: String(item.sentence ?? ""),
+      grounded: Boolean(item.grounded),
+      interpretation: String(item.interpretation ?? ""),
+      sourceEvidence: String(item.sourceEvidence ?? "")
+    }));
+  return {
+    totalSentences: Number(blob.totalSentences ?? items.length),
+    visibleArticleSentenceCount: Number(blob.visibleArticleSentenceCount ?? 0),
+    groundedSentences: Number(blob.groundedSentences ?? 0),
+    coveragePercent: Number(blob.coveragePercent ?? 0),
+    items,
+    unsupportedSentences: items.filter((item) => !item.grounded)
+  };
+}
+
+export function replayCheckerOutcomeExpectation(
+  item: Pick<SafetyCase, "storedValidation">
+): SafetyCheckerOutcomeExpectation | null {
+  const stored = item.storedValidation as Record<string, unknown> | null;
+  const nestedValidation =
+    stored && typeof stored.validation === "object"
+      ? (stored.validation as Record<string, unknown>)
+      : null;
+  const referenceCheck =
+    stored && typeof stored === "object"
+      ? ((stored.referenceCheck ?? nestedValidation?.referenceCheck) as
+          | Record<string, unknown>
+          | undefined)
+      : undefined;
+  if (!referenceCheck || typeof referenceCheck !== "object") return null;
+  const message =
+    typeof referenceCheck.checkerError === "string"
+      ? referenceCheck.checkerError
+      : null;
+  const checkerErrors: ReferenceCheckerErrorEntry[] = message
+    ? [
+        {
+          stage: 1,
+          kind: classifyLegacyCheckerErrorMessage(message).kind,
+          message
+        }
+      ]
+    : [];
+  const outcome = resolveReferenceCheckOutcome({
+    checkerErrors,
+    initialCoverage: coverageReportFromStored(referenceCheck.initialCoverage),
+    finalCoverage: coverageReportFromStored(referenceCheck.finalCoverage),
+    correctionAttempts: Number(referenceCheck.correctionAttempts ?? 0)
+  });
+  return {
+    state: outcome.state,
+    evaluatedCoverage: outcome.evaluatedCoverage,
+    wouldBlock: outcome.wouldBlock,
+    wouldRetry: outcome.wouldRetry,
+    checkerErrorKinds: [
+      ...new Set(checkerErrors.map((entry) => entry.kind))
+    ].sort()
+  };
+}
+
+export function replayMarkerExpectation(
+  item: Pick<SafetyCase, "storedOutput">
+): SafetyMarkerExpectation | null {
+  if (!item.storedOutput) return null;
+  const matches = detectMarkerLeaks(visibleArticleText(item.storedOutput));
+  return {
+    categories: [...new Set(matches.map((match) => match.category))].sort(),
+    patternIds: [...new Set(matches.map((match) => match.id))].sort(),
+    wouldBlock: matches.length > 0
+  };
+}
+
 export function replayExpected(item: SafetyCase): SafetyCaseExpected {
   const behavior = safetyClassBehavior[item.labels.class];
   if (behavior === "validation") {
@@ -156,6 +275,14 @@ export function replayExpected(item: SafetyCase): SafetyCaseExpected {
   }
   if (behavior === "triage") {
     return { triage: replayTriageExpectation(item) };
+  }
+  if (behavior === "checker_outcome") {
+    const checkerOutcome = replayCheckerOutcomeExpectation(item);
+    return checkerOutcome ? { checkerOutcome } : {};
+  }
+  if (behavior === "marker") {
+    const marker = replayMarkerExpectation(item);
+    return marker ? { marker } : {};
   }
   return {};
 }
