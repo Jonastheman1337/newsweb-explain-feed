@@ -98,8 +98,12 @@ const DOCUMENT_ONLY_PATTERNS = [
   /\bq[1-4]\s+(?:fy)?\d{4}\s+(?:report|presentation)\b/i,
   /\b(?:årsrapport|kvartalsrapport|delårsrapport|halvårsrapport)\b/i,
   /\b(?:prospectus|prospekt|form\s+6-k|presentation)\b/i,
-  /\b(?:has been|is|er)\s+(?:released|published|publisert|offentliggjort)\b/i,
-  /\b(?:can be viewed|available|tilgjengelig|kan leses)\b/i,
+  // The lookahead excludes the MAR footer "Meldingen er offentliggjort av
+  // <person>" — 675253 (a CEO departure) was skipped solely on that footer.
+  /\b(?:has been|is|er)\s+(?:released|published|publisert|offentliggjort)\b(?!\s+(?:av|by)\b)/i,
+  // Availability must be anchored to a document noun in the same sentence —
+  // 678418 (field-trial results) was skipped solely on a bare "available".
+  /\b(?:report|rapport|presentation|presentasjon|prospectus|prospekt|form\s+6-k|attachment|vedlegg|webcast|audiocast|webinar|recording|opptak)\b[^.!?]{0,80}\b(?:can be viewed|available|tilgjengelig|kan leses)\b/i,
   /\b(?:clicking the link|link at the end|se vedlegg|see attached)\b/i
 ];
 
@@ -111,7 +115,13 @@ const SUBSTANTIVE_FACT_PATTERNS = [
   /\b(?:emisjon|rights issue|private placement|capital raise|kapitalinnhenting)\b/i,
   /\b(?:acquisition|oppkjøp|merger|fusjon|sale of|salg av)\b/i,
   /\b(?:resign|resignation|fratrer|går av|ceo|cfo|chair)\b/i,
-  /\b(?:nok|usd|eur|dollar|kroner|euro|million|millioner|milliard|billion)\b/i
+  /\b(?:nok|usd|eur|dollar|kroner|euro|million|millioner|milliard|billion)\b/i,
+  // Norwegian executive-change wording ("ønsker å fratre", "konsernsjef").
+  /\b(?:fratre(?:r|den)?|konsernsjef)\b/i,
+  // Percentage results and symbol-form currency amounts (field-trial and
+  // trading-update notices carry substance as "29.8%" / "$18/box").
+  /\d(?:[.,]\d+)?\s?(?:%|prosent(?:poeng)?|percent|per cent)/i,
+  /[$€£]\s?\d/
 ];
 
 const PROSPECTUS_PUBLICATION_PATTERNS = [
@@ -184,6 +194,19 @@ const ROUTINE_BOND_PATTERNS = [
   /\bvurderer utstedelse av .*obligasjonslån\b/i,
   /\b(?:successful )?issue of .*bond\b/i,
   /\bcontemplates? (?:the )?issuance of .*bond\b/i
+];
+
+// Vetoes for small-routine-bond: a tap under an existing bond, or distress
+// language (waiver, coupon deferral, liquidity), is never a routine
+// issuance — 679225 (Nordic Mining liquidity update) was skipped as one.
+const ROUTINE_BOND_EXCLUSION_PATTERNS = [
+  /\btap issue\b/i,
+  /\btap[- ]?utstedelse\b/i,
+  /\bexisting\b[^.!?]{0,60}\bbonds?\b/i,
+  /\b(?:waiver|standstill|going concern|default(?:ed|s)?)\b/i,
+  /\bdefer(?:ral|red|ring|s)?\b/i,
+  /\bliquidity (?:shortfall|injection)\b/i,
+  /\brestructur/i
 ];
 
 const BILLION_NOK = 1_000_000_000;
@@ -299,6 +322,9 @@ const triageClassDefinitions: readonly TriageClassDefinition[] = [
     reason:
       "Rutinemessig obligasjonsutstedelse under én milliard kroner uten sterkere nyhetspoeng.",
     match: (views) => {
+      if (hasAnyPattern(views.text, ROUTINE_BOND_EXCLUSION_PATTERNS)) {
+        return false;
+      }
       const nokAmount = maxNokAmount(views.text);
       return (
         nokAmount != null &&

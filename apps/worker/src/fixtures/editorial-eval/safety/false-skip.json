@@ -145,7 +145,7 @@
       },
       "expected": {
         "triage": {
-          "deterministicSkipKind": "document-only"
+          "deterministicSkipKind": null
         }
       },
       "provenance": {
@@ -698,7 +698,7 @@
       },
       "expected": {
         "triage": {
-          "deterministicSkipKind": "document-only"
+          "deterministicSkipKind": null
         }
       },
       "provenance": {
@@ -751,7 +751,7 @@
       },
       "expected": {
         "triage": {
-          "deterministicSkipKind": "small-routine-bond"
+          "deterministicSkipKind": null
         }
       },
       "provenance": {

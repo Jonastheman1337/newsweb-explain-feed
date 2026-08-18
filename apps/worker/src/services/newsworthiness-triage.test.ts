@@ -125,6 +125,58 @@ describe("triage class registry", () => {
   });
 });
 
+describe("false-skip narrowing (P3, production cases)", () => {
+  it("keeps 675253: a CEO departure is not document-only despite the MAR footer", () => {
+    const result = getDeterministicTriageSkip(
+      "Per Axel Koch varsler planlagt fratreden som konsernsjef i Polaris Media",
+      "Per Axel Koch har informert styret i Polaris Media ASA om at han ønsker å fratre stillingen som konsernsjef i løpet av 2027. Styret har startet arbeidet med å finne hans etterfølger. Meldingen er offentliggjort av Robert Berg i henhold til MAR.",
+      ["INNSIDEINFORMASJON"],
+      false
+    );
+    expect(result).toBeNull();
+  });
+
+  it("keeps 678418: field-trial results with percentages are not document-only", () => {
+    const result = getDeterministicTriageSkip(
+      "Desert Control Field Trials Demonstrate Significant Yield and Water Efficiency Gains",
+      "The trials showed a 29.8% increase in yield and a 33% improvement in water efficiency, with production costs of $18/box and savings of $1,800 per acre. The whitepaper from the first trial is available at https://example.com.",
+      ["IKKE-INFORMASJONSPLIKTIGE PRESSEMELDINGER"],
+      false
+    );
+    expect(result).toBeNull();
+  });
+
+  it("keeps 679225: a tap issue under an existing bond with distress language is not a routine bond", () => {
+    const result = getDeterministicTriageSkip(
+      "Nordic Mining ASA - Update on Production Ramp-Up, Liquidity and Regulatory Status",
+      "The company is in dialogue with bondholders regarding a waiver and a deferral of the NOK 46.4 million coupon payment, and contemplates a tap issue of up to USD 10-15 million under the existing senior secured bond. Liquidity extends to 4 September.",
+      ["INNSIDEINFORMASJON"],
+      false
+    );
+    expect(result).toBeNull();
+  });
+
+  it("still skips a plain routine bond issuance without exclusion terms", () => {
+    const result = getDeterministicTriageSkip(
+      "Vellykket utstedelse av obligasjonslån",
+      "Selskapet har gjennomført en vellykket utstedelse av obligasjonslån på NOK 500 millioner kroner.",
+      ["ANNEN INFORMASJONSPLIKTIG REGULATORISK INFORMASJON"],
+      false
+    );
+    expect(result?.kind).toBe("small-routine-bond");
+  });
+
+  it("still skips document publication with a document-anchored availability line", () => {
+    const result = getDeterministicTriageSkip(
+      "EAM: EAM Solar AS - 2025 Annual Report",
+      "EAM Solar AS has published its annual report for 2025. The report is attached and available on the company's website.",
+      ["ANNEN INFORMASJONSPLIKTIG REGULATORISK INFORMASJON"],
+      true
+    );
+    expect(result?.kind).toBe("document-only");
+  });
+});
+
 describe("getDeterministicTriageSkip", () => {
   it("skips document-only report publication notices", () => {
     const result = getDeterministicTriageSkip(
