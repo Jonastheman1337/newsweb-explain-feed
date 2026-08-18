@@ -643,13 +643,17 @@ export type ReferenceCheckEnforcementConfig = {
 };
 
 // The production default. CI safety gates replay the outcome functions bare,
-// so this constant — not env — is what the release flip changes. Promotion =
-// flip a field to true + refresh fixture expectations in the same commit;
-// that fixture diff is the release record.
+// so this constant — not env — is what the release flip changes; the
+// REFERENCE_CHECK_ENFORCEMENT env is the emergency kill-switch only.
+// Promoted 2026-08-18 (owner decision): degraded runs with blocking coverage
+// evidence block, and checker-unavailable runs retry, instead of the legacy
+// fail-open. Evidence: the four adjudicated checker_error_published fixtures
+// (675348 pinned as residual_unsupported/wouldBlock) — checker errors are too
+// rare for a shadow window to add signal beyond the corpus record.
 export const defaultReferenceCheckEnforcement: ReferenceCheckEnforcementConfig =
   {
-    blockOnResidualUnsupported: false,
-    retryOnUnavailable: false
+    blockOnResidualUnsupported: true,
+    retryOnUnavailable: true
   };
 
 // Under the shadow defaults this reproduces today's enforced behavior

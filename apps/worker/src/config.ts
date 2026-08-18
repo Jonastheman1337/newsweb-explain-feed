@@ -69,6 +69,45 @@ const numericAcceptanceRulesEnvSchema = z
   })
   .optional();
 
+const referenceCheckEnforcementFlags = [
+  "block_on_residual_unsupported",
+  "retry_on_unavailable"
+] as const;
+
+// Emergency kill-switch override for the checker enforcement enabled in code
+// (defaultReferenceCheckEnforcement in services/reference-check.ts). Same
+// semantics as NUMERIC_ACCEPTANCE_RULES: UNSET = code default; SET — even
+// the empty string — is the exact enabled flag set ("" = full legacy
+// fail-open behavior). Rollback needs an env change only, no deploy.
+const referenceCheckEnforcementEnvSchema = z
+  .string()
+  .transform((value, ctx) => {
+    const entries = [
+      ...new Set(
+        value
+          .split(",")
+          .map((entry) => entry.trim())
+          .filter((entry) => entry.length > 0)
+      )
+    ];
+    const known = new Set<string>(referenceCheckEnforcementFlags);
+    const unknown = entries.filter((entry) => !known.has(entry));
+    if (unknown.length > 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Unknown reference-check enforcement flag(s): ${unknown.join(", ")} (known: ${referenceCheckEnforcementFlags.join(", ")})`
+      });
+      return z.NEVER;
+    }
+    return {
+      blockOnResidualUnsupported: entries.includes(
+        "block_on_residual_unsupported"
+      ),
+      retryOnUnavailable: entries.includes("retry_on_unavailable")
+    };
+  })
+  .optional();
+
 const configSchema = z
   .object({
     NODE_ENV: z
@@ -101,6 +140,7 @@ const configSchema = z
     OPENAI_PROMPT_CACHE_MODE_REWRITE_YEARLY: promptCacheModeEnvSchema.optional(),
     OPENAI_PROMPT_CACHE_MODE_PDF_CONTEXT: promptCacheModeEnvSchema.optional(),
     NUMERIC_ACCEPTANCE_RULES: numericAcceptanceRulesEnvSchema,
+    REFERENCE_CHECK_ENFORCEMENT: referenceCheckEnforcementEnvSchema,
     NEWSWEB_POLLING_ENABLED: booleanEnvSchema,
     POLL_INTERVAL_MS: z.coerce.number().int().min(5000).default(5000),
     LATEST_BOOTSTRAP_COUNT: z.coerce.number().int().min(0).max(50).default(30)

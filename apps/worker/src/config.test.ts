@@ -197,6 +197,60 @@ describe("parseWorkerConfig", () => {
     ).toThrow(/Unknown numeric acceptance rule id/);
   });
 
+  it("leaves REFERENCE_CHECK_ENFORCEMENT undefined when unset (code default applies)", () => {
+    const config = parseWorkerConfig({
+      NODE_ENV: "development",
+      DATABASE_URL:
+        "postgresql://newsweb:newsweb@localhost:5432/newsweb_explain?schema=public",
+      REDIS_URL: "redis://localhost:6379",
+      OPENAI_API_KEY: "sk-openai-test-key"
+    });
+    expect(config.REFERENCE_CHECK_ENFORCEMENT).toBeUndefined();
+  });
+
+  it("parses empty REFERENCE_CHECK_ENFORCEMENT as the full legacy kill switch", () => {
+    const config = parseWorkerConfig({
+      NODE_ENV: "development",
+      DATABASE_URL:
+        "postgresql://newsweb:newsweb@localhost:5432/newsweb_explain?schema=public",
+      REDIS_URL: "redis://localhost:6379",
+      OPENAI_API_KEY: "sk-openai-test-key",
+      REFERENCE_CHECK_ENFORCEMENT: ""
+    });
+    expect(config.REFERENCE_CHECK_ENFORCEMENT).toEqual({
+      blockOnResidualUnsupported: false,
+      retryOnUnavailable: false
+    });
+  });
+
+  it("parses a partial REFERENCE_CHECK_ENFORCEMENT flag set", () => {
+    const config = parseWorkerConfig({
+      NODE_ENV: "development",
+      DATABASE_URL:
+        "postgresql://newsweb:newsweb@localhost:5432/newsweb_explain?schema=public",
+      REDIS_URL: "redis://localhost:6379",
+      OPENAI_API_KEY: "sk-openai-test-key",
+      REFERENCE_CHECK_ENFORCEMENT: "retry_on_unavailable"
+    });
+    expect(config.REFERENCE_CHECK_ENFORCEMENT).toEqual({
+      blockOnResidualUnsupported: false,
+      retryOnUnavailable: true
+    });
+  });
+
+  it("rejects unknown REFERENCE_CHECK_ENFORCEMENT flags at boot", () => {
+    expect(() =>
+      parseWorkerConfig({
+        NODE_ENV: "development",
+        DATABASE_URL:
+          "postgresql://newsweb:newsweb@localhost:5432/newsweb_explain?schema=public",
+        REDIS_URL: "redis://localhost:6379",
+        OPENAI_API_KEY: "sk-openai-test-key",
+        REFERENCE_CHECK_ENFORCEMENT: "no_such_flag"
+      })
+    ).toThrow(/Unknown reference-check enforcement flag/);
+  });
+
   it("rejects reasoning efforts unsupported by the selected model family", () => {
     expect(() =>
       parseWorkerConfig({

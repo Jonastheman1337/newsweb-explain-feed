@@ -626,35 +626,53 @@ describe("classifyLegacyCheckerErrorMessage", () => {
   });
 });
 
+const shadowEnforcement = {
+  blockOnResidualUnsupported: false,
+  retryOnUnavailable: false
+} as const;
+
 describe("applyReferenceCheckEnforcement", () => {
-  it("reproduces the legacy vacuous pass for every degraded input under shadow defaults", () => {
+  it("pins the promoted production default", () => {
+    // Flipping these fields is a deliberate release act (2026-08-18 for the
+    // checker enforcement); rollback is the REFERENCE_CHECK_ENFORCEMENT env.
+    expect(defaultReferenceCheckEnforcement).toEqual({
+      blockOnResidualUnsupported: true,
+      retryOnUnavailable: true
+    });
+  });
+
+  it("reproduces the legacy vacuous pass for degraded input under the shadow config", () => {
     const outcome = resolveReferenceCheckOutcome({
       checkerErrors: [transportEntry],
       initialCoverage: blockingCoverageReport(),
       finalCoverage: blockingCoverageReport(),
       correctionAttempts: 1
     });
-    const enforced = applyReferenceCheckEnforcement(outcome, {
-      legacyCheckerError: transportEntry.message
-    });
+    const enforced = applyReferenceCheckEnforcement(
+      outcome,
+      { legacyCheckerError: transportEntry.message },
+      shadowEnforcement
+    );
     expect(enforced.gate.blocking).toBe(false);
     expect(enforced.gate.reason).toBeNull();
     expect(enforced.forceNeedsRetry).toBe(false);
   });
 
-  it("evaluates the real gate for non-degraded runs under shadow defaults", () => {
+  it("evaluates the real gate for non-degraded runs under any config", () => {
     const outcome = resolveReferenceCheckOutcome({
       checkerErrors: [],
       initialCoverage: blockingCoverageReport(),
       finalCoverage: blockingCoverageReport(),
       correctionAttempts: 3
     });
-    const enforced = applyReferenceCheckEnforcement(
-      outcome,
-      { legacyCheckerError: null },
-      defaultReferenceCheckEnforcement
-    );
-    expect(enforced.gate.blocking).toBe(true);
+    for (const enforcement of [shadowEnforcement, defaultReferenceCheckEnforcement]) {
+      const enforced = applyReferenceCheckEnforcement(
+        outcome,
+        { legacyCheckerError: null },
+        enforcement
+      );
+      expect(enforced.gate.blocking).toBe(true);
+    }
   });
 
   it("enforces coverage evidence and retry when promoted", () => {

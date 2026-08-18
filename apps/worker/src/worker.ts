@@ -74,6 +74,7 @@ import {
 } from "./services/editorial-review.js";
 import {
   applyReferenceCheckEnforcement,
+  defaultReferenceCheckEnforcement,
   buildReferenceCheckPrompt,
   buildCorrectionInstruction,
   buildCoverageReport,
@@ -203,6 +204,16 @@ if (config.NUMERIC_ACCEPTANCE_RULES) {
         "added to defaultEnabledDerivationRules with refreshed fixture expectations."
     );
   }
+}
+
+const activeReferenceCheckEnforcement =
+  config.REFERENCE_CHECK_ENFORCEMENT ?? defaultReferenceCheckEnforcement;
+if (config.REFERENCE_CHECK_ENFORCEMENT) {
+  console.warn(
+    `REFERENCE_CHECK_ENFORCEMENT overrides the code default: block_on_residual_unsupported=${activeReferenceCheckEnforcement.blockOnResidualUnsupported}, ` +
+      `retry_on_unavailable=${activeReferenceCheckEnforcement.retryOnUnavailable}. ` +
+      "This is the emergency kill-switch; the durable state lives in defaultReferenceCheckEnforcement."
+  );
 }
 
 function modelForReasoningEffort(effort: OpenAIReasoningEffort): string {
@@ -2245,9 +2256,11 @@ async function processReportRewrite(
     const referenceOutcome =
       resolveAccumulatedReferenceCheckOutcome(referenceRepairState);
     const { gate: referenceGate, forceNeedsRetry: referenceForceNeedsRetry } =
-      applyReferenceCheckEnforcement(referenceOutcome, {
-        legacyCheckerError: referenceRepairState.checkerError
-      });
+      applyReferenceCheckEnforcement(
+        referenceOutcome,
+        { legacyCheckerError: referenceRepairState.checkerError },
+        activeReferenceCheckEnforcement
+      );
     if (referenceForceNeedsRetry) {
       // Promotion-only path (retryOnUnavailable). Throwing routes through the
       // existing catch/retry machinery: BullMQ re-attempts, finalAttempt
@@ -2310,7 +2323,8 @@ async function processReportRewrite(
             importanceAdjusted,
             importanceAdjustReason
           },
-          referenceOutcome
+          referenceOutcome,
+          activeReferenceCheckEnforcement
         ),
         hiddenDraft: hiddenDraft
           ? {
@@ -2653,9 +2667,11 @@ async function processYearlyReportRewrite(
     const referenceOutcome =
       resolveAccumulatedReferenceCheckOutcome(referenceRepairState);
     const { gate: referenceGate, forceNeedsRetry: referenceForceNeedsRetry } =
-      applyReferenceCheckEnforcement(referenceOutcome, {
-        legacyCheckerError: referenceRepairState.checkerError
-      });
+      applyReferenceCheckEnforcement(
+        referenceOutcome,
+        { legacyCheckerError: referenceRepairState.checkerError },
+        activeReferenceCheckEnforcement
+      );
     if (referenceForceNeedsRetry) {
       // Promotion-only path (retryOnUnavailable). Throwing routes through the
       // existing catch/retry machinery: BullMQ re-attempts, finalAttempt
@@ -2715,7 +2731,8 @@ async function processYearlyReportRewrite(
             importanceAdjusted,
             importanceAdjustReason
           },
-          referenceOutcome
+          referenceOutcome,
+          activeReferenceCheckEnforcement
         ),
         hiddenDraft: hiddenDraft
           ? {
@@ -3992,9 +4009,11 @@ const rewriteWorker = new Worker<RewriteJobData>(
         const {
           gate: referenceGate,
           forceNeedsRetry: referenceForceNeedsRetry
-        } = applyReferenceCheckEnforcement(referenceOutcome, {
-          legacyCheckerError: referenceRepairState.checkerError
-        });
+        } = applyReferenceCheckEnforcement(
+          referenceOutcome,
+          { legacyCheckerError: referenceRepairState.checkerError },
+          activeReferenceCheckEnforcement
+        );
         if (referenceForceNeedsRetry) {
           // Promotion-only path (retryOnUnavailable); see the report flow.
           throw new Error(
@@ -4043,7 +4062,8 @@ const rewriteWorker = new Worker<RewriteJobData>(
                 importanceAdjusted,
                 importanceAdjustReason
               },
-              referenceOutcome
+              referenceOutcome,
+              activeReferenceCheckEnforcement
             ),
             hiddenDraft: hiddenDraft
               ? {
@@ -4098,7 +4118,8 @@ const rewriteWorker = new Worker<RewriteJobData>(
                   importanceAdjusted,
                   importanceAdjustReason
                 },
-                maybeAccumulatedReferenceCheckOutcome(referenceRepairState)
+                maybeAccumulatedReferenceCheckOutcome(referenceRepairState),
+                activeReferenceCheckEnforcement
               )
             } as Prisma.InputJsonValue
           });
@@ -4136,7 +4157,8 @@ const rewriteWorker = new Worker<RewriteJobData>(
                 importanceAdjusted,
                 importanceAdjustReason
               },
-              maybeAccumulatedReferenceCheckOutcome(referenceRepairState)
+              maybeAccumulatedReferenceCheckOutcome(referenceRepairState),
+              activeReferenceCheckEnforcement
             )
           } as Prisma.InputJsonValue
         });

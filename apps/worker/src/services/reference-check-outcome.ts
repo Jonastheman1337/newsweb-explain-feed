@@ -177,7 +177,8 @@ export function referenceCheckValidationJson(
   state: ReferenceRepairAccumulator,
   gate: ReferenceCheckGateResult,
   flow: ReferenceCheckFlowAudit,
-  outcome?: ReferenceCheckOutcome
+  outcome?: ReferenceCheckOutcome,
+  enforcement?: ReferenceCheckEnforcementConfig
 ): Record<string, unknown> {
   const { initialCoverage, finalCoverage } = state;
   return {
@@ -225,7 +226,9 @@ export function referenceCheckValidationJson(
       interpretation: item.interpretation,
       sourceEvidence: item.sourceEvidence
     })),
-    ...(outcome ? { outcome: referenceCheckOutcomeJson(outcome) } : {})
+    ...(outcome
+      ? { outcome: referenceCheckOutcomeJson(outcome, enforcement) }
+      : {})
   };
 }
 
@@ -235,7 +238,8 @@ export function referenceCheckValidationJson(
 export function referenceCheckFailureJson(
   state: ReferenceRepairAccumulator,
   flow: ReferenceCheckFlowAudit,
-  outcome?: ReferenceCheckOutcome
+  outcome?: ReferenceCheckOutcome,
+  enforcement?: ReferenceCheckEnforcementConfig
 ): Record<string, unknown> {
   const { initialCoverage, finalCoverage } = state;
   return {
@@ -252,6 +256,8 @@ export function referenceCheckFailureJson(
     finalCoveragePercent: finalCoverage?.coveragePercent ?? null,
     initialCoverage: referenceCoverageJson(initialCoverage),
     finalCoverage: referenceCoverageJson(finalCoverage),
-    ...(outcome ? { outcome: referenceCheckOutcomeJson(outcome) } : {})
+    ...(outcome
+      ? { outcome: referenceCheckOutcomeJson(outcome, enforcement) }
+      : {})
   };
 }
