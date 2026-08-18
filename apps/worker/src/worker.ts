@@ -106,6 +106,7 @@ import {
 import {
   TRIAGE_PROMPT,
   buildTriageUserPrompt,
+  defaultEnabledTriageClasses,
   getDeterministicTriageSkip,
   parseTriageResponse
 } from "./services/newsworthiness-triage.js";
@@ -214,6 +215,26 @@ if (config.REFERENCE_CHECK_ENFORCEMENT) {
       `retry_on_unavailable=${activeReferenceCheckEnforcement.retryOnUnavailable}. ` +
       "This is the emergency kill-switch; the durable state lives in defaultReferenceCheckEnforcement."
   );
+}
+
+const activeTriageEnabledClasses =
+  config.TRIAGE_SKIP_CLASSES ?? defaultEnabledTriageClasses;
+if (config.TRIAGE_SKIP_CLASSES) {
+  const extraTriageClasses = config.TRIAGE_SKIP_CLASSES.filter(
+    (classId) => !defaultEnabledTriageClasses.includes(classId)
+  );
+  if (extraTriageClasses.length > 0) {
+    console.warn(
+      `TRIAGE_SKIP_CLASSES enables triage classes beyond the code default: ${extraTriageClasses.join(", ")}. ` +
+        "CI safety gates replay the code default only; these classes stay unverified by gates until they are " +
+        "added to defaultEnabledTriageClasses with refreshed fixture expectations."
+    );
+  } else {
+    console.warn(
+      `TRIAGE_SKIP_CLASSES overrides the code default: enabled=[${config.TRIAGE_SKIP_CLASSES.join(", ")}]. ` +
+        "This is the emergency kill-switch; the durable state lives in defaultEnabledTriageClasses."
+    );
+  }
 }
 
 function modelForReasoningEffort(effort: OpenAIReasoningEffort): string {
@@ -3680,7 +3701,8 @@ const rewriteWorker = new Worker<RewriteJobData>(
           categories,
           source.hasAttachments,
           source.issuerName,
-          source.bodyText
+          source.bodyText,
+          { enabledClasses: activeTriageEnabledClasses }
         );
         if (deterministicSkip) {
           console.log(

@@ -3,8 +3,11 @@ import { describe, expect, it } from "vitest";
 import {
   TRIAGE_PROMPT,
   buildTriageUserPrompt,
+  defaultEnabledTriageClasses,
+  evaluateTriageClasses,
   getDeterministicTriageSkip,
-  parseTriageResponse
+  parseTriageResponse,
+  triageClassIds
 } from "./newsworthiness-triage.js";
 
 describe("needsNewsworthinessTriage", () => {
@@ -78,6 +81,47 @@ describe("buildTriageUserPrompt", () => {
     );
 
     expect(prompt).toContain("Har vedlegg: ja");
+  });
+});
+
+describe("triage class registry", () => {
+  it("pins registry ids, order and the default enabled set", () => {
+    // Updating these expectations is a deliberate release act: enabling a
+    // class must come with refreshed fixture expectations (see the plan doc).
+    expect([...triageClassIds]).toEqual([
+      "document-only",
+      "routine-prospectus",
+      "routine-reminder",
+      "public-sector-results",
+      "small-routine-bond"
+    ]);
+    expect([...defaultEnabledTriageClasses]).toEqual([...triageClassIds]);
+  });
+
+  it("returns no enabled skip when every class is disabled, but reports candidates", () => {
+    const evaluation = evaluateTriageClasses(
+      "28-2026 5th Planet Games A/S - Interim Report Q1 2026",
+      "COPENHAGEN, May 21, 2026: The interim report for Q1 2026 has been released today. The full report can be viewed by clicking the link at the end of this document.",
+      ["IKKE-INFORMASJONSPLIKTIGE PRESSEMELDINGER"],
+      false,
+      undefined,
+      undefined,
+      { enabledClasses: [] }
+    );
+    expect(evaluation.enabledSkip).toBeNull();
+    expect(evaluation.candidateClassIds).toEqual(["document-only"]);
+    expect(evaluation.shadowSkipClassIds).toEqual(["document-only"]);
+  });
+
+  it("carries classId and reasonCode on enabled skips", () => {
+    const skip = getDeterministicTriageSkip(
+      "28-2026 5th Planet Games A/S - Interim Report Q1 2026",
+      "COPENHAGEN, May 21, 2026: The interim report for Q1 2026 has been released today. The full report can be viewed by clicking the link at the end of this document.",
+      ["IKKE-INFORMASJONSPLIKTIGE PRESSEMELDINGER"],
+      false
+    );
+    expect(skip?.classId).toBe("document-only");
+    expect(skip?.reasonCode).toBe("TRIAGE_DOCUMENT_ONLY");
   });
 });
 

@@ -46,14 +46,45 @@ export type TriageResult = {
   reason: string;
 };
 
+// P3 registry: class ids ARE the persisted `kind` strings, so pre-registry
+// rows, fixtures, and tests keep their values. Registry order is the frozen
+// evaluation order (first match wins), mirroring the original fixed rule
+// sequence. Append new ids at the END; never reorder.
+export const triageClassIds = [
+  "document-only",
+  "routine-prospectus",
+  "routine-reminder",
+  "public-sector-results",
+  "small-routine-bond"
+] as const;
+
+export type TriageClassId = (typeof triageClassIds)[number];
+
+export type TriageReasonCode =
+  | "TRIAGE_DOCUMENT_ONLY"
+  | "TRIAGE_ROUTINE_PROSPECTUS"
+  | "TRIAGE_ROUTINE_REMINDER"
+  | "TRIAGE_PUBLIC_SECTOR_RESULTS"
+  | "TRIAGE_SMALL_ROUTINE_BOND";
+
 export type DeterministicTriageSkip = TriageResult & {
-  kind:
-    | "document-only"
-    | "routine-prospectus"
-    | "routine-reminder"
-    | "public-sector-results"
-    | "small-routine-bond";
+  kind: TriageClassId;
+  classId: TriageClassId;
+  reasonCode: TriageReasonCode;
 };
+
+// The production default. CI safety gates replay getDeterministicTriageSkip
+// bare, so this constant — not env — is what release flips change; the
+// TRIAGE_SKIP_CLASSES env is the emergency kill-switch only. Enabling a
+// class = append its id here + build-safety-fixtures --update-expected in
+// the same commit; that fixture diff is the release record.
+export const defaultEnabledTriageClasses: readonly TriageClassId[] = [
+  "document-only",
+  "routine-prospectus",
+  "routine-reminder",
+  "public-sector-results",
+  "small-routine-bond"
+];
 
 export type TriageCallFn = (
   title: string,
@@ -205,89 +236,158 @@ function maxNokAmount(text: string): number | null {
   return matches.length ? Math.max(...matches) : null;
 }
 
-export function getDeterministicTriageSkip(
+type TriageTextViews = {
+  title: string;
+  bodyText: string;
+  text: string;
+  sourceOnlyText: string;
+  marketEventText: string;
+};
+
+type TriageClassDefinition = {
+  id: TriageClassId;
+  reasonCode: TriageReasonCode;
+  reason: string;
+  match: (views: TriageTextViews) => boolean;
+};
+
+// Registry order must mirror triageClassIds; each match body is the original
+// rule logic verbatim.
+const triageClassDefinitions: readonly TriageClassDefinition[] = [
+  {
+    id: "document-only",
+    reasonCode: "TRIAGE_DOCUMENT_ONLY",
+    reason:
+      "Tilgjengelig tekst sier bare at et dokument/presentasjon er publisert, uten konkrete tall, hendelser eller konsekvenser.",
+    match: (views) =>
+      hasAnyPattern(views.text, DOCUMENT_ONLY_PATTERNS) &&
+      !hasAnyPattern(views.bodyText, SUBSTANTIVE_FACT_PATTERNS)
+  },
+  {
+    id: "routine-prospectus",
+    reasonCode: "TRIAGE_ROUTINE_PROSPECTUS",
+    reason:
+      "Routine prospectus approval/publication for an already announced offering.",
+    match: (views) =>
+      hasAnyPattern(views.sourceOnlyText, PROSPECTUS_PUBLICATION_PATTERNS) &&
+      hasAnyPattern(views.sourceOnlyText, PROSPECTUS_OFFERING_CONTEXT_PATTERNS) &&
+      hasAnyPattern(views.sourceOnlyText, PROSPECTUS_ALREADY_ANNOUNCED_PATTERNS) &&
+      !hasAnyPattern(views.sourceOnlyText, PROSPECTUS_MATERIAL_OUTCOME_PATTERNS)
+  },
+  {
+    id: "routine-reminder",
+    reasonCode: "TRIAGE_ROUTINE_REMINDER",
+    reason:
+      "Tilgjengelig tekst er en rutinemessig påminnelse om tegningsperiode/frister uten nytt utfall eller nye vilkår.",
+    match: (views) =>
+      hasAnyPattern(views.text, ROUTINE_REMINDER_PATTERNS) &&
+      !hasAnyPattern(views.text, REMINDER_OUTCOME_PATTERNS)
+  },
+  {
+    id: "public-sector-results",
+    reasonCode: "TRIAGE_PUBLIC_SECTOR_RESULTS",
+    reason:
+      "Rutinemessig kommune-/offentlig resultatsak uten konkret kapitalmarkedshendelse eller substansielle tall.",
+    match: (views) =>
+      hasAnyPattern(views.text, PUBLIC_SECTOR_RESULT_PATTERNS) &&
+      hasAnyPattern(views.text, RESULT_REPORT_PATTERNS) &&
+      !hasAnyPattern(views.marketEventText, PUBLIC_SECTOR_MARKET_EVENT_PATTERNS)
+  },
+  {
+    id: "small-routine-bond",
+    reasonCode: "TRIAGE_SMALL_ROUTINE_BOND",
+    reason:
+      "Rutinemessig obligasjonsutstedelse under én milliard kroner uten sterkere nyhetspoeng.",
+    match: (views) => {
+      const nokAmount = maxNokAmount(views.text);
+      return (
+        nokAmount != null &&
+        nokAmount < BILLION_NOK &&
+        hasAnyPattern(views.text, ROUTINE_BOND_PATTERNS)
+      );
+    }
+  }
+];
+
+function buildTriageTextViews(
+  title: string,
+  bodyText: string,
+  issuerName?: string,
+  sourceBodyText?: string
+): TriageTextViews {
+  return {
+    title,
+    bodyText,
+    text: [title, issuerName, bodyText].filter(Boolean).join("\n").trim(),
+    sourceOnlyText: [title, issuerName, sourceBodyText ?? bodyText]
+      .filter(Boolean)
+      .join("\n")
+      .trim(),
+    marketEventText: [title, sourceBodyText ?? bodyText]
+      .filter(Boolean)
+      .join("\n")
+      .trim()
+  };
+}
+
+export type TriageShadowEvaluation = {
+  enabledSkip: DeterministicTriageSkip | null;
+  // Every registered class that matches, registry order, enabled or not.
+  candidateClassIds: TriageClassId[];
+  // Candidates NOT in the enabled set — the shadow signal for enablement.
+  shadowSkipClassIds: TriageClassId[];
+};
+
+export function evaluateTriageClasses(
   title: string,
   bodyText: string,
   _categories: string[],
   _hasAttachments?: boolean,
   issuerName?: string,
-  sourceBodyText?: string
+  sourceBodyText?: string,
+  options?: { enabledClasses?: readonly TriageClassId[] }
+): TriageShadowEvaluation {
+  const views = buildTriageTextViews(title, bodyText, issuerName, sourceBodyText);
+  const enabled = new Set(options?.enabledClasses ?? defaultEnabledTriageClasses);
+  const candidates = triageClassDefinitions.filter((definition) =>
+    definition.match(views)
+  );
+  const firstEnabled = candidates.find((definition) => enabled.has(definition.id));
+  return {
+    enabledSkip: firstEnabled
+      ? {
+          newsworthy: false,
+          kind: firstEnabled.id,
+          classId: firstEnabled.id,
+          reasonCode: firstEnabled.reasonCode,
+          reason: firstEnabled.reason
+        }
+      : null,
+    candidateClassIds: candidates.map((definition) => definition.id),
+    shadowSkipClassIds: candidates
+      .filter((definition) => !enabled.has(definition.id))
+      .map((definition) => definition.id)
+  };
+}
+
+export function getDeterministicTriageSkip(
+  title: string,
+  bodyText: string,
+  categories: string[],
+  hasAttachments?: boolean,
+  issuerName?: string,
+  sourceBodyText?: string,
+  options?: { enabledClasses?: readonly TriageClassId[] }
 ): DeterministicTriageSkip | null {
-  const text = [title, issuerName, bodyText].filter(Boolean).join("\n").trim();
-  const sourceOnlyText = [title, issuerName, sourceBodyText ?? bodyText]
-    .filter(Boolean)
-    .join("\n")
-    .trim();
-  const marketEventText = [title, sourceBodyText ?? bodyText]
-    .filter(Boolean)
-    .join("\n")
-    .trim();
-  const hasDocumentOnlySignal = hasAnyPattern(text, DOCUMENT_ONLY_PATTERNS);
-  const hasSubstantiveFacts = hasAnyPattern(bodyText, SUBSTANTIVE_FACT_PATTERNS);
-
-  if (hasDocumentOnlySignal && !hasSubstantiveFacts) {
-    return {
-      newsworthy: false,
-      kind: "document-only",
-      reason:
-        "Tilgjengelig tekst sier bare at et dokument/presentasjon er publisert, uten konkrete tall, hendelser eller konsekvenser."
-    };
-  }
-
-  if (
-    hasAnyPattern(sourceOnlyText, PROSPECTUS_PUBLICATION_PATTERNS) &&
-    hasAnyPattern(sourceOnlyText, PROSPECTUS_OFFERING_CONTEXT_PATTERNS) &&
-    hasAnyPattern(sourceOnlyText, PROSPECTUS_ALREADY_ANNOUNCED_PATTERNS) &&
-    !hasAnyPattern(sourceOnlyText, PROSPECTUS_MATERIAL_OUTCOME_PATTERNS)
-  ) {
-    return {
-      newsworthy: false,
-      kind: "routine-prospectus",
-      reason:
-        "Routine prospectus approval/publication for an already announced offering."
-    };
-  }
-
-  if (
-    hasAnyPattern(text, ROUTINE_REMINDER_PATTERNS) &&
-    !hasAnyPattern(text, REMINDER_OUTCOME_PATTERNS)
-  ) {
-    return {
-      newsworthy: false,
-      kind: "routine-reminder",
-      reason:
-        "Tilgjengelig tekst er en rutinemessig påminnelse om tegningsperiode/frister uten nytt utfall eller nye vilkår."
-    };
-  }
-
-  if (
-    hasAnyPattern(text, PUBLIC_SECTOR_RESULT_PATTERNS) &&
-    hasAnyPattern(text, RESULT_REPORT_PATTERNS) &&
-    !hasAnyPattern(marketEventText, PUBLIC_SECTOR_MARKET_EVENT_PATTERNS)
-  ) {
-    return {
-      newsworthy: false,
-      kind: "public-sector-results",
-      reason:
-        "Rutinemessig kommune-/offentlig resultatsak uten konkret kapitalmarkedshendelse eller substansielle tall."
-    };
-  }
-
-  const nokAmount = maxNokAmount(text);
-  if (
-    nokAmount != null &&
-    nokAmount < BILLION_NOK &&
-    hasAnyPattern(text, ROUTINE_BOND_PATTERNS)
-  ) {
-    return {
-      newsworthy: false,
-      kind: "small-routine-bond",
-      reason:
-        "Rutinemessig obligasjonsutstedelse under én milliard kroner uten sterkere nyhetspoeng."
-    };
-  }
-
-  return null;
+  return evaluateTriageClasses(
+    title,
+    bodyText,
+    categories,
+    hasAttachments,
+    issuerName,
+    sourceBodyText,
+    options
+  ).enabledSkip;
 }
 
 export function buildTriageUserPrompt(
