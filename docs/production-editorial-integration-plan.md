@@ -532,6 +532,66 @@ P1 may be implemented after E0 independently of P2–P4, but it must have its ow
 
 **Editorial/user decision:** Approve each suppression class, its exclusions, shadow duration/sample, and acceptable false-skip threshold.
 
+#### P3 amendment — 2026-08-18 (narrowing + shadow phase implemented)
+
+**Owner decisions (2026-08-18):** wave-1 suppression classes =
+routine-results-invitation + routine-treasury-reopening +
+routine-prospectus-distribution, all shadow-first, enforced later one class
+per release window; the three live false skips are fixed by narrowing the
+existing rules rather than per-case adjudication. The `routine_not_news`
+corpus remains UNCURATED (seeded from all feedback, including positive
+feedback) — owner curation via `--not-news-ids` is still owed before that
+class gets an invariant or the shadow classes' recall can be trusted beyond
+their seeds.
+
+**What landed (branch `p3-routine-triage`):**
+
+- The five deterministic kinds became a registered class table
+  (`triageClassIds`, ids === persisted kind strings, frozen evaluation
+  order) with reason codes; `defaultEnabledTriageClasses` is the release
+  surface and `TRIAGE_SKIP_CLASSES` the emergency kill-switch env (unset =
+  code default; set, even `""`, = exact enabled set — one confirmed false
+  skip disables its class same-day, no deploy).
+- **Narrowing (the behavior change, release record = fixture diff):**
+  675253 (CEO departure skipped solely on the MAR footer "Meldingen er
+  offentliggjort av …"), 678418 (field-trial results skipped solely on a
+  bare "available"), 679225 (distressed tap under an existing bond treated
+  as routine issuance) all replay proceed. Edits: MAR-footer lookahead,
+  document-noun-anchored availability, Norwegian executive-change + percent
+  + currency-symbol substantive facts, routine-bond exclusion bank
+  (tap/existing/waiver/deferral/liquidity/restructuring). Pure narrowing —
+  can only convert skips to proceeds.
+- **Shadow classes** registered, not enabled, seeded and verified on the
+  corpus: exactly 679283+679630 (invitation), 679620 (treasury), 675463
+  (prospectus-distribution) match; zero shadow candidates on all sixteen
+  false-skip cases — enforced forever by the new `false_skip` never-flips
+  invariant (kind null AND `shadowSkipClassIds` empty). Per-class exclusion
+  banks, never global (the treasury class must tolerate "Coupon: 0 %"; the
+  prospectus class needs an offering-anchored outcome bank because bare
+  "results" matches forward-looking-statements legalese; the title anchor
+  keeps subscription-period reminders out).
+- **Shadow persistence** (regular flow; report/yearly divert before
+  triage): skips persist `triageClassId`/`triageReasonCode` + a trailing
+  `triage` block (enabled-set snapshot, `shadowSkipClassIds`); the proceed
+  path — previously unpersisted — now records the same block plus
+  `bypassedSkipClassId` on manual reprocesses. Shadow neutrality: additive
+  JSON only, no issue, no status change.
+- **Signals:** `triageByPromptVersion` (skipsByReasonCode incl. legacy-kind
+  mapping, shadow_candidate_counts, bypassed_skip_counts) and
+  `falseSkipSignalsByReasonCode` (skip → manual-reprocess join per message,
+  attributed to the skip class, with later_published_count).
+
+**Amended rollout (replaces gate 1's offline replay):** production DB export
+is sealed, so shadow-in-production over live traffic replaces the offline
+window replay — same evidence, same zero publication effect. Promotion
+runbook: watch `shadow_candidate_counts` + `falseSkipSignalsByReasonCode`;
+editors review every shadow match (gate 2) before a class is enabled by
+appending its id to `defaultEnabledTriageClasses` +
+`build-safety-fixtures --update-expected` in the same commit, one class per
+release window; rollback per gate 5 via the constant or
+`TRIAGE_SKIP_CLASSES`. `importance.ts` deliberately untouched — `uviktig`
+remains supporting evidence only.
+
 ### P4 — Checker-error and role-marker safety gates
 
 **Classification:** Production safety correction.
