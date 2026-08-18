@@ -93,9 +93,19 @@ describe("triage class registry", () => {
       "routine-prospectus",
       "routine-reminder",
       "public-sector-results",
+      "small-routine-bond",
+      "routine-results-invitation",
+      "routine-treasury-reopening",
+      "routine-prospectus-distribution"
+    ]);
+    // The three P3 classes stay shadow until their windows clear.
+    expect([...defaultEnabledTriageClasses]).toEqual([
+      "document-only",
+      "routine-prospectus",
+      "routine-reminder",
+      "public-sector-results",
       "small-routine-bond"
     ]);
-    expect([...defaultEnabledTriageClasses]).toEqual([...triageClassIds]);
   });
 
   it("returns no enabled skip when every class is disabled, but reports candidates", () => {
@@ -174,6 +184,103 @@ describe("false-skip narrowing (P3, production cases)", () => {
       true
     );
     expect(result?.kind).toBe("document-only");
+  });
+});
+
+describe("P3 shadow classes (registered, not enabled)", () => {
+  function shadowIds(title: string, body: string): string[] {
+    return evaluateTriageClasses(title, body, [], false).shadowSkipClassIds;
+  }
+
+  it("flags a routine results-presentation invitation in shadow only", () => {
+    const evaluation = evaluateTriageClasses(
+      "B2 Impact ASA: Invitation to presentation of Q2 2026 results",
+      "B2 Impact ASA invites you to the presentation of the company Q2 2026 results on Thursday 20 August. The presentation will be held as a webcast. Presenters: Kari Eian Krogstad - CEO.",
+      [],
+      false
+    );
+    expect(evaluation.shadowSkipClassIds).toEqual([
+      "routine-results-invitation"
+    ]);
+    expect(evaluation.enabledSkip).toBeNull();
+  });
+
+  it("does not flag an invitation whose text carries the results themselves", () => {
+    expect(
+      shadowIds(
+        "Invitation to presentation of Q2 2026 results",
+        "Revenue increased to NOK 470 million in the quarter. The presentation will be held as a webcast."
+      )
+    ).toEqual([]);
+  });
+
+  it("does not flag an invitation with the report attached", () => {
+    expect(
+      shadowIds(
+        "Invitation to presentation of Q2 2026 results",
+        "The interim presentation is attached. The webcast will be live on Thursday."
+      )
+    ).toEqual([]);
+  });
+
+  it("flags a routine treasury reopening in shadow only", () => {
+    expect(
+      shadowIds(
+        "Reopening of Treasury bill NTB 03/2027",
+        "Norges Bank announces a reopening of the Treasury bill NTB 03/2027. Auction date: 20 August 2026. The auction result will be announced shortly after the auction closes."
+      )
+    ).toEqual(["routine-treasury-reopening"]);
+  });
+
+  it("does not flag treasury auction results or cancellations", () => {
+    expect(
+      shadowIds(
+        "Reopening of Treasury bill NTB 03/2027 - auction result",
+        "Norges Bank: the auction of the Treasury bill was allotted at an effective yield of 4.42 percent with bid-to-cover of 2.1."
+      )
+    ).toEqual([]);
+    expect(
+      shadowIds(
+        "Reopening of Treasury bill NTB 03/2027 cancelled",
+        "Norges Bank announces that the auction of the Treasury bill reopening is cancelled."
+      )
+    ).toEqual([]);
+  });
+
+  it("flags a routine prospectus publication for an already announced offering in shadow only", () => {
+    expect(
+      shadowIds(
+        "Morrow Bank AB publishes prospectus for the Rights Issue",
+        "The company announced that the Board had resolved to carry out the rights issue. The Financial Supervisory Authority has approved the prospectus, and the prospectus is available on the company website. The subscription period runs from 9 June."
+      )
+    ).toEqual(["routine-prospectus-distribution"]);
+  });
+
+  it("does not flag prospectus notices with offering outcomes or subscription reminders", () => {
+    expect(
+      shadowIds(
+        "Publishes prospectus for the Rights Issue",
+        "The rights issue was fully subscribed with gross proceeds of NOK 200 million. The prospectus is available on the company website following the previously announced rights issue."
+      )
+    ).toEqual([]);
+    expect(
+      shadowIds(
+        "Prospectus approved - last day of subscription period",
+        "Reference is made to the previously announced rights issue. Today is the last day of the subscription period. The prospectus is available on the company website."
+      )
+    ).toEqual([]);
+  });
+
+  it("does not flag a subscription-period reminder without a prospectus title", () => {
+    // 679280/679281 shape: the title has no prospectus token, so the
+    // title anchor keeps the class off even though the body restates
+    // prospectus availability.
+    expect(
+      shadowIds(
+        "Last day of the subscription period in the Rights Issue",
+        "Reference is made to the previously announced rights issue. The prospectus is available on the company website."
+      )
+    ).toEqual([]);
   });
 });
 

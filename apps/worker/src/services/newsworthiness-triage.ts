@@ -55,7 +55,10 @@ export const triageClassIds = [
   "routine-prospectus",
   "routine-reminder",
   "public-sector-results",
-  "small-routine-bond"
+  "small-routine-bond",
+  "routine-results-invitation",
+  "routine-treasury-reopening",
+  "routine-prospectus-distribution"
 ] as const;
 
 export type TriageClassId = (typeof triageClassIds)[number];
@@ -65,7 +68,10 @@ export type TriageReasonCode =
   | "TRIAGE_ROUTINE_PROSPECTUS"
   | "TRIAGE_ROUTINE_REMINDER"
   | "TRIAGE_PUBLIC_SECTOR_RESULTS"
-  | "TRIAGE_SMALL_ROUTINE_BOND";
+  | "TRIAGE_SMALL_ROUTINE_BOND"
+  | "TRIAGE_ROUTINE_RESULTS_INVITATION"
+  | "TRIAGE_ROUTINE_TREASURY_REOPENING"
+  | "TRIAGE_ROUTINE_PROSPECTUS_DISTRIBUTION";
 
 export type DeterministicTriageSkip = TriageResult & {
   kind: TriageClassId;
@@ -209,6 +215,80 @@ const ROUTINE_BOND_EXCLUSION_PATTERNS = [
   /\brestructur/i
 ];
 
+// P3 shadow classes (owner-approved 2026-08-18): registered but NOT in
+// defaultEnabledTriageClasses until their shadow window clears. Exclusion
+// banks are per-class, never global — e.g. the treasury class must tolerate
+// "Coupon: 0 %" and "2 000 MNOK" that other classes treat as substance.
+
+// Exclusion bank for routine-results-invitation: the substantive-fact bank
+// minus bare executive titles — presenter contact blocks ("Kari Krogstad -
+// CEO") are boilerplate on invitations, but resignations still disqualify.
+const INVITATION_FACT_PATTERNS = [
+  /\b(?:revenue|revenues|inntekter|omsetning)\b/i,
+  /\b(?:resultat|profit|loss|earnings|ebit|ebitda|operating income|driftsresultat)\b/i,
+  /\b(?:guidance|guiding|utsikter|outlook|utbytte|dividend)\b/i,
+  /\b(?:contract|kontrakt|agreement|avtale|order|ordre)\b/i,
+  /\b(?:emisjon|rights issue|private placement|capital raise|kapitalinnhenting)\b/i,
+  /\b(?:acquisition|oppkjøp|merger|fusjon|sale of|salg av)\b/i,
+  /\b(?:resign|resignation|fratre(?:r|den)?|går av)\b/i,
+  /\b(?:nok|usd|eur|dollar|kroner|euro|million|millioner|milliard|billion)\b/i,
+  /\d(?:[.,]\d+)?\s?(?:%|prosent(?:poeng)?|percent|per cent)/i,
+  /[$€£]\s?\d/
+];
+
+const RESULTS_INVITATION_INVITE_PATTERN =
+  /\b(?:invitation to|invites? (?:you )?to|invitasjon til|inviterer til)\b/i;
+const RESULTS_INVITATION_RESULTS_PATTERN =
+  /\b(?:results?|resultat(?:er|ene)?|kvartalstall)\b/i;
+const RESULTS_INVITATION_PERIOD_PATTERN =
+  /\b(?:q[1-4]\b|[1-4]\.\s?(?:kvartal|tertial)|(?:first|second|third|fourth)\s+(?:quarter|half)|halvårs?|kvartal|half[- ]?year|interim)\b/i;
+const RESULTS_INVITATION_EVENT_PATTERN =
+  /\b(?:presentation|presentasjon|webcast|audiocast|webinar|conference call|live)\b/i;
+// Report attached = the results themselves are published; keep visible.
+const RESULTS_INVITATION_ATTACHED_PATTERN =
+  /\b(?:is|are|er)\s+(?:attached|vedlagt)\b/i;
+
+const TREASURY_REOPENING_PATTERN =
+  /\b(?:reopening|gjenåpning)\b[^.!?]{0,80}\b(?:treasury|government bond|statskasse|statsobligasjon|NTB|NST|NGB)/i;
+const TREASURY_AUCTION_PATTERN = /\b(?:auction|auksjon)/i;
+const TREASURY_SOVEREIGN_PATTERN = /\b(?:norges bank|debtnorway)/i;
+const TREASURY_REOPENING_EXCLUSION_PATTERNS = [
+  /\b(?:cancelled|canceled|kansellert|avlyst|postponed|utsatt)\b/i,
+  // Auction RESULTS stay visible — figure-anchored, because the reopening
+  // notice itself legitimately says the result will be announced later.
+  /\b(?:bid-to-cover|effective yield|allotment|allotted|tildelt)\b/i
+];
+
+// Title-anchored: subscription-period reminders that restate prospectus
+// availability in the body must not qualify (679280/679281).
+const PROSPECTUS_DISTRIBUTION_TITLE_PATTERNS = [
+  /\b(?:publishes?|publication|approval|approves?|godkjent|godkjennelse|offentliggjøring|publisering)\b[^.!?]{0,60}\b(?:prospectus|prospekt(?:et)?)\b/i,
+  /\b(?:prospectus|prospekt(?:et)?)\b[^.!?]{0,60}\b(?:published|publisert|approved|godkjent|available|tilgjengelig)\b/i
+];
+const PROSPECTUS_DISTRIBUTION_PRIOR_PATTERNS = [
+  ...PROSPECTUS_ALREADY_ANNOUNCED_PATTERNS,
+  /\bannounced (?:that|a|the)\b/i
+];
+const PROSPECTUS_DISTRIBUTION_AVAILABILITY_PATTERN =
+  /\b(?:prospectus|prospekt)\b[\s\S]{0,200}?\b(?:available|tilgjengelig|website|hjemmeside)\b/i;
+// Offering-anchored outcome bank — deliberately NOT the reused
+// PROSPECTUS_MATERIAL_OUTCOME_PATTERNS, whose bare "results" matches
+// forward-looking-statements legalese ("future results of operations").
+const PROSPECTUS_DISTRIBUTION_OUTCOME_PATTERNS = [
+  /\b(?:result|results|utfall|resultat(?:et)?)\s+(?:of|av)\s+(?:the\s+)?(?:rights issue|offering|subscription|emisjon)/i,
+  /\b(?:fully subscribed|oversubscribed|overtegnet|fulltegnet|allocated|allocation|tildel)/i,
+  /\b(?:gross|net)\s+proceeds\b/i,
+  /\b(?:has been|was|er)\s+(?:completed|gjennomført|fullført)\b/i
+];
+// Subscription-period-specific — a broad "last day" veto would false-veto on
+// timetable rows like "Last day of trading".
+const PROSPECTUS_DISTRIBUTION_REMINDER_PATTERNS = [
+  /\blast day of (?:the )?subscription period\b/i,
+  /\bexpires? today\b/i,
+  /\butløper i dag\b/i,
+  /\bsiste tegningsdag\b/i
+];
+
 const BILLION_NOK = 1_000_000_000;
 
 function hasAnyPattern(text: string, patterns: RegExp[]): boolean {
@@ -332,6 +412,49 @@ const triageClassDefinitions: readonly TriageClassDefinition[] = [
         hasAnyPattern(views.text, ROUTINE_BOND_PATTERNS)
       );
     }
+  },
+  {
+    id: "routine-results-invitation",
+    reasonCode: "TRIAGE_ROUTINE_RESULTS_INVITATION",
+    reason:
+      "Rutinemessig invitasjon til resultatpresentasjon uten publiserte tall i tilgjengelig tekst.",
+    match: (views) =>
+      RESULTS_INVITATION_INVITE_PATTERN.test(views.text) &&
+      RESULTS_INVITATION_RESULTS_PATTERN.test(views.text) &&
+      RESULTS_INVITATION_PERIOD_PATTERN.test(views.text) &&
+      RESULTS_INVITATION_EVENT_PATTERN.test(views.text) &&
+      !RESULTS_INVITATION_ATTACHED_PATTERN.test(views.text) &&
+      !hasAnyPattern(views.bodyText, INVITATION_FACT_PATTERNS)
+  },
+  {
+    id: "routine-treasury-reopening",
+    reasonCode: "TRIAGE_ROUTINE_TREASURY_REOPENING",
+    reason:
+      "Rutinemessig gjenåpning/auksjon av statspapir uten resultat eller avvik.",
+    match: (views) =>
+      TREASURY_REOPENING_PATTERN.test(views.text) &&
+      TREASURY_AUCTION_PATTERN.test(views.text) &&
+      TREASURY_SOVEREIGN_PATTERN.test(views.text) &&
+      !hasAnyPattern(views.text, TREASURY_REOPENING_EXCLUSION_PATTERNS)
+  },
+  {
+    id: "routine-prospectus-distribution",
+    reasonCode: "TRIAGE_ROUTINE_PROSPECTUS_DISTRIBUTION",
+    reason:
+      "Rutinemessig publisering/godkjenning av prospekt for et allerede annonsert tilbud, uten nytt utfall.",
+    match: (views) =>
+      hasAnyPattern(views.title, PROSPECTUS_DISTRIBUTION_TITLE_PATTERNS) &&
+      hasAnyPattern(views.sourceOnlyText, PROSPECTUS_OFFERING_CONTEXT_PATTERNS) &&
+      hasAnyPattern(views.sourceOnlyText, PROSPECTUS_DISTRIBUTION_PRIOR_PATTERNS) &&
+      PROSPECTUS_DISTRIBUTION_AVAILABILITY_PATTERN.test(views.sourceOnlyText) &&
+      !hasAnyPattern(
+        views.sourceOnlyText,
+        PROSPECTUS_DISTRIBUTION_OUTCOME_PATTERNS
+      ) &&
+      !hasAnyPattern(
+        views.sourceOnlyText,
+        PROSPECTUS_DISTRIBUTION_REMINDER_PATTERNS
+      )
   }
 ];
 

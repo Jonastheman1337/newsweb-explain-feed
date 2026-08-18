@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { PromptPayload } from "@newsweb/prompt-kit";
 import type { RewriteOutput } from "@newsweb/shared";
-import { getDeterministicTriageSkip } from "./newsworthiness-triage.js";
+import { evaluateTriageClasses } from "./newsworthiness-triage.js";
 import {
   classifyLegacyCheckerErrorMessage,
   resolveReferenceCheckOutcome,
@@ -53,6 +53,9 @@ export type SafetyValidationExpectation = {
 
 export type SafetyTriageExpectation = {
   deterministicSkipKind: string | null;
+  // Registered classes that match but are not in the enabled default —
+  // the shadow signal, registry order.
+  shadowSkipClassIds: string[];
 };
 
 export type SafetyCheckerOutcomeExpectation = {
@@ -162,8 +165,9 @@ export function replayTriageExpectation(
   item: Pick<SafetyCase, "sourcePayload">
 ): SafetyTriageExpectation {
   const payload = item.sourcePayload;
-  // Mirrors the worker's deterministic pre-triage call exactly.
-  const skip = getDeterministicTriageSkip(
+  // Mirrors the worker's deterministic pre-triage call exactly, bare (no
+  // options), so CI replays the code-default enabled set like production.
+  const evaluation = evaluateTriageClasses(
     payload.title,
     [payload.bodyText, payload.pdfSupplementText ?? ""]
       .filter(Boolean)
@@ -173,7 +177,10 @@ export function replayTriageExpectation(
     payload.issuerName,
     payload.bodyText
   );
-  return { deterministicSkipKind: skip?.kind ?? null };
+  return {
+    deterministicSkipKind: evaluation.enabledSkip?.kind ?? null,
+    shadowSkipClassIds: [...evaluation.shadowSkipClassIds]
+  };
 }
 
 // Rebuilds a ReferenceCoverageReport from the persisted

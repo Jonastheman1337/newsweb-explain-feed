@@ -46,7 +46,8 @@
       },
       "expected": {
         "triage": {
-          "deterministicSkipKind": null
+          "deterministicSkipKind": null,
+          "shadowSkipClassIds": []
         }
       },
       "provenance": {
@@ -95,7 +96,8 @@
       },
       "expected": {
         "triage": {
-          "deterministicSkipKind": null
+          "deterministicSkipKind": null,
+          "shadowSkipClassIds": []
         }
       },
       "provenance": {
@@ -145,7 +147,8 @@
       },
       "expected": {
         "triage": {
-          "deterministicSkipKind": null
+          "deterministicSkipKind": null,
+          "shadowSkipClassIds": []
         }
       },
       "provenance": {
@@ -197,7 +200,8 @@
       },
       "expected": {
         "triage": {
-          "deterministicSkipKind": null
+          "deterministicSkipKind": null,
+          "shadowSkipClassIds": []
         }
       },
       "provenance": {
@@ -246,7 +250,8 @@
       },
       "expected": {
         "triage": {
-          "deterministicSkipKind": null
+          "deterministicSkipKind": null,
+          "shadowSkipClassIds": []
         }
       },
       "provenance": {
@@ -295,7 +300,8 @@
       },
       "expected": {
         "triage": {
-          "deterministicSkipKind": null
+          "deterministicSkipKind": null,
+          "shadowSkipClassIds": []
         }
       },
       "provenance": {
@@ -343,7 +349,8 @@
       },
       "expected": {
         "triage": {
-          "deterministicSkipKind": null
+          "deterministicSkipKind": null,
+          "shadowSkipClassIds": []
         }
       },
       "provenance": {
@@ -395,7 +402,8 @@
       },
       "expected": {
         "triage": {
-          "deterministicSkipKind": null
+          "deterministicSkipKind": null,
+          "shadowSkipClassIds": []
         }
       },
       "provenance": {
@@ -447,7 +455,8 @@
       },
       "expected": {
         "triage": {
-          "deterministicSkipKind": null
+          "deterministicSkipKind": null,
+          "shadowSkipClassIds": []
         }
       },
       "provenance": {
@@ -496,7 +505,8 @@
       },
       "expected": {
         "triage": {
-          "deterministicSkipKind": null
+          "deterministicSkipKind": null,
+          "shadowSkipClassIds": []
         }
       },
       "provenance": {
@@ -545,7 +555,8 @@
       },
       "expected": {
         "triage": {
-          "deterministicSkipKind": null
+          "deterministicSkipKind": null,
+          "shadowSkipClassIds": []
         }
       },
       "provenance": {
@@ -597,7 +608,8 @@
       },
       "expected": {
         "triage": {
-          "deterministicSkipKind": null
+          "deterministicSkipKind": null,
+          "shadowSkipClassIds": []
         }
       },
       "provenance": {
@@ -645,7 +657,8 @@
       },
       "expected": {
         "triage": {
-          "deterministicSkipKind": null
+          "deterministicSkipKind": null,
+          "shadowSkipClassIds": []
         }
       },
       "provenance": {
@@ -698,7 +711,8 @@
       },
       "expected": {
         "triage": {
-          "deterministicSkipKind": null
+          "deterministicSkipKind": null,
+          "shadowSkipClassIds": []
         }
       },
       "provenance": {
@@ -751,7 +765,8 @@
       },
       "expected": {
         "triage": {
-          "deterministicSkipKind": null
+          "deterministicSkipKind": null,
+          "shadowSkipClassIds": []
         }
       },
       "provenance": {
@@ -799,7 +814,8 @@
       },
       "expected": {
         "triage": {
-          "deterministicSkipKind": null
+          "deterministicSkipKind": null,
+          "shadowSkipClassIds": []
         }
       },
       "provenance": {
