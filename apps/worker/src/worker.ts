@@ -107,7 +107,7 @@ import {
   TRIAGE_PROMPT,
   buildTriageUserPrompt,
   defaultEnabledTriageClasses,
-  getDeterministicTriageSkip,
+  evaluateTriageClasses,
   parseTriageResponse
 } from "./services/newsworthiness-triage.js";
 import {
@@ -3692,18 +3692,21 @@ const rewriteWorker = new Worker<RewriteJobData>(
         }
       }
 
-      // Deterministic low-value triage before model calls.
+      // Deterministic low-value triage before model calls. Evaluated outside
+      // the manual-reprocess guard so a bypassed skip is itself recorded —
+      // that is the reason-coded false-skip join.
       await setGenerationPhaseAndNotify(generationRunId, messageId, "analyzing_content");
+      const triageEvaluation = evaluateTriageClasses(
+        source.title,
+        [source.bodyText, payload.pdfSupplementText ?? ""].filter(Boolean).join("\n\n"),
+        categories,
+        source.hasAttachments,
+        source.issuerName,
+        source.bodyText,
+        { enabledClasses: activeTriageEnabledClasses }
+      );
       if (job.data.reason !== "manual-reprocess") {
-        const deterministicSkip = getDeterministicTriageSkip(
-          source.title,
-          [source.bodyText, payload.pdfSupplementText ?? ""].filter(Boolean).join("\n\n"),
-          categories,
-          source.hasAttachments,
-          source.issuerName,
-          source.bodyText,
-          { enabledClasses: activeTriageEnabledClasses }
-        );
+        const deterministicSkip = triageEvaluation.enabledSkip;
         if (deterministicSkip) {
           console.log(
             `[triage] deterministic skip ${messageId} (${source.issuerSign}): ${deterministicSkip.reason}`
@@ -3723,7 +3726,9 @@ const rewriteWorker = new Worker<RewriteJobData>(
               skippedReason: "DETERMINISTIC_TRIAGE_SKIP",
               triageKind: deterministicSkip.kind,
               triageReason: deterministicSkip.reason,
-              categories
+              categories,
+              triageClassId: deterministicSkip.classId,
+              triageReasonCode: deterministicSkip.reasonCode
             } as Prisma.InputJsonValue,
             status: "skipped",
             validationJson: {
@@ -3732,7 +3737,11 @@ const rewriteWorker = new Worker<RewriteJobData>(
               errors: [],
               sourceBodyChars: payload.sourceBodyChars,
               promptChars: preRewritePromptChars,
-              triageResult: deterministicSkip
+              triageResult: deterministicSkip,
+              triage: {
+                enabledClasses: [...activeTriageEnabledClasses],
+                shadowSkipClassIds: triageEvaluation.shadowSkipClassIds
+              }
             } as Prisma.InputJsonValue
           });
 
@@ -4094,7 +4103,14 @@ const rewriteWorker = new Worker<RewriteJobData>(
                   body: hiddenDraft.body,
                   company_sentence: hiddenDraft.company_sentence
                 }
-              : null
+              : null,
+            triage: {
+              enabledClasses: [...activeTriageEnabledClasses],
+              // Non-null only on manual-reprocess runs, where the enabled
+              // skip is bypassed by design — the false-skip join signal.
+              bypassedSkipClassId: triageEvaluation.enabledSkip?.classId ?? null,
+              shadowSkipClassIds: triageEvaluation.shadowSkipClassIds
+            }
           } as Prisma.InputJsonValue
         });
 
