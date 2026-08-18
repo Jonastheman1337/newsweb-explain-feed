@@ -467,6 +467,100 @@ function groupEventsByMessage(events) {
     .slice(0, 50);
 }
 
+// Pre-P3 skip rows carry only the hyphenated triageKind.
+const LEGACY_TRIAGE_REASON_CODES = {
+  "document-only": "TRIAGE_DOCUMENT_ONLY",
+  "routine-prospectus": "TRIAGE_ROUTINE_PROSPECTUS",
+  "routine-reminder": "TRIAGE_ROUTINE_REMINDER",
+  "public-sector-results": "TRIAGE_PUBLIC_SECTOR_RESULTS",
+  "small-routine-bond": "TRIAGE_SMALL_ROUTINE_BOND"
+};
+
+function triageSkipReasonCode(output) {
+  if (!output || typeof output !== "object") return null;
+  if (output.skippedReason === "DETERMINISTIC_TRIAGE_SKIP") {
+    return (
+      output.triageReasonCode ??
+      LEGACY_TRIAGE_REASON_CODES[output.triageKind] ??
+      "(unknown-deterministic)"
+    );
+  }
+  if (typeof output.skippedReason === "string") return output.skippedReason;
+  return null;
+}
+
+// P3 triage telemetry: skip counts by reason code, shadow candidates from
+// the validation_json.triage block (post-P3 rows only), and bypassed skips
+// on manual reprocesses.
+function triageStats(generations) {
+  const byVersion = new Map();
+  for (const row of generations) {
+    const output = parseJsonField(row.output_json);
+    const validation = parseJsonField(row.validation_json);
+    const triage =
+      validation &&
+      typeof validation === "object" &&
+      validation.triage &&
+      typeof validation.triage === "object"
+        ? validation.triage
+        : null;
+    const reasonCode = triageSkipReasonCode(output);
+    if (!triage && !reasonCode) continue;
+    const version = promptVersionBucket(row);
+    let bucket = byVersion.get(version);
+    if (!bucket) {
+      bucket = {
+        prompt_version: version,
+        runs_with_triage_field: 0,
+        skip_reason_counts: new Map(),
+        shadow_candidate_counts: new Map(),
+        bypassed_skip_counts: new Map()
+      };
+      byVersion.set(version, bucket);
+    }
+    if (reasonCode) {
+      bucket.skip_reason_counts.set(
+        reasonCode,
+        (bucket.skip_reason_counts.get(reasonCode) ?? 0) + 1
+      );
+    }
+    if (triage) {
+      bucket.runs_with_triage_field += 1;
+      const shadowIds = Array.isArray(triage.shadowSkipClassIds)
+        ? triage.shadowSkipClassIds
+        : [];
+      for (const classId of shadowIds) {
+        const key = String(classId);
+        bucket.shadow_candidate_counts.set(
+          key,
+          (bucket.shadow_candidate_counts.get(key) ?? 0) + 1
+        );
+      }
+      if (typeof triage.bypassedSkipClassId === "string") {
+        bucket.bypassed_skip_counts.set(
+          triage.bypassedSkipClassId,
+          (bucket.bypassed_skip_counts.get(triage.bypassedSkipClassId) ?? 0) + 1
+        );
+      }
+    }
+  }
+
+  const ranked = (map) =>
+    [...map.entries()]
+      .map(([value, count]) => ({ value, count }))
+      .sort((a, b) => b.count - a.count || a.value.localeCompare(b.value));
+
+  return [...byVersion.values()]
+    .map((bucket) => ({
+      prompt_version: bucket.prompt_version,
+      runs_with_triage_field: bucket.runs_with_triage_field,
+      skipsByReasonCode: ranked(bucket.skip_reason_counts),
+      shadow_candidate_counts: ranked(bucket.shadow_candidate_counts),
+      bypassed_skip_counts: ranked(bucket.bypassed_skip_counts)
+    }))
+    .sort((a, b) => a.prompt_version.localeCompare(b.prompt_version));
+}
+
 function groupGenerationOutcomes(generationRows) {
   const groups = new Map();
   for (const row of generationRows) {
@@ -485,6 +579,13 @@ function groupGenerationOutcomes(generationRows) {
     .map((entry) => {
       const rows = entry.rows.sort((a, b) => a.requested_at.localeCompare(b.requested_at));
       const final = rows.at(-1);
+      const skipReasonCodes = [
+        ...new Set(
+          rows
+            .map((row) => triageSkipReasonCode(parseJsonField(row.output_json)))
+            .filter(Boolean)
+        )
+      ];
       return {
         message_id: entry.message_id,
         notice: entry.notice,
@@ -493,6 +594,7 @@ function groupGenerationOutcomes(generationRows) {
         had_error: rows.some((row) => row.error_group || row.error_text),
         had_checker_error: rows.some((row) => /checker error/i.test(row.reference_check_summary ?? "")),
         had_manual_reprocess: rows.some((row) => row.reason === "manual-reprocess"),
+        skip_reason_codes: skipReasonCodes,
         statuses: rows.map((row) => {
           const suffixes = [
             row.error_group ? `/${row.error_group}` : "",
@@ -1586,6 +1688,26 @@ export function analyze(data, timeZone) {
       row.had_manual_reprocess
   );
 
+  // Reason-coded false-skip signal: a skip followed by a manual reprocess,
+  // attributed to the skip class that produced it.
+  const falseSkipCounts = new Map();
+  for (const group of generationOutcomes) {
+    if (!group.had_manual_reprocess) continue;
+    for (const code of group.skip_reason_codes ?? []) {
+      const entry = falseSkipCounts.get(code) ?? {
+        reason_code: code,
+        count: 0,
+        later_published_count: 0
+      };
+      entry.count += 1;
+      if (group.final_status === "published") entry.later_published_count += 1;
+      falseSkipCounts.set(code, entry);
+    }
+  }
+  const falseSkipSignalsByReasonCode = [...falseSkipCounts.values()].sort(
+    (a, b) => b.count - a.count || a.reason_code.localeCompare(b.reason_code)
+  );
+
   return {
     counts: Object.fromEntries(DEFAULT_TABS.map((tab) => [tab, data[tab]?.length ?? 0])),
     daily: {
@@ -1612,6 +1734,7 @@ export function analyze(data, timeZone) {
       validationIssues: validationIssueStats(generations),
       numericAssessmentsByPromptVersion: numericAssessmentStats(generations),
       markerLeaksByPromptVersion: markerLeakStats(generations),
+      triageByPromptVersion: triageStats(generations),
       referenceRepairByPromptVersion: referenceRepairStats(generations),
       modelCallsByPromptVersion: modelCallStats(generations),
       openAIUsageAndCost: openAICostStats(generations),
@@ -1676,6 +1799,7 @@ export function analyze(data, timeZone) {
         reference_check_summary: row.reference_check_summary
       })),
     generationOutcomes,
+    falseSkipSignalsByReasonCode,
     problematicGenerations
   };
 }
@@ -1761,6 +1885,8 @@ async function main() {
           artifact.summary.qualityPipeline.numericAssessmentsByPromptVersion
             .byPromptVersion,
         markerLeaks: artifact.summary.qualityPipeline.markerLeaksByPromptVersion,
+        triage: artifact.summary.qualityPipeline.triageByPromptVersion,
+        falseSkipSignals: artifact.summary.falseSkipSignalsByReasonCode,
         referenceRepair: artifact.summary.qualityPipeline.referenceRepairByPromptVersion,
         modelCalls: artifact.summary.qualityPipeline.modelCallsByPromptVersion,
         openAIUsageAndCost: artifact.summary.qualityPipeline.openAIUsageAndCost,
