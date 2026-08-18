@@ -586,6 +586,25 @@ function groupGenerationOutcomes(generationRows) {
             .filter(Boolean)
         )
       ];
+      // False-skip attribution: deterministic TRIAGE_* codes only, and only
+      // from skips that happened BEFORE the first manual reprocess — a
+      // later skip or an unrelated CATEGORY/AI skip is not a rollback signal.
+      const firstReprocess = rows.find(
+        (row) => row.reason === "manual-reprocess"
+      );
+      const deterministicSkipCodesBeforeReprocess = [
+        ...new Set(
+          rows
+            .filter(
+              (row) =>
+                row.status === "skipped" &&
+                (!firstReprocess ||
+                  row.requested_at.localeCompare(firstReprocess.requested_at) < 0)
+            )
+            .map((row) => triageSkipReasonCode(parseJsonField(row.output_json)))
+            .filter((code) => code && code.startsWith("TRIAGE_"))
+        )
+      ];
       return {
         message_id: entry.message_id,
         notice: entry.notice,
@@ -595,6 +614,8 @@ function groupGenerationOutcomes(generationRows) {
         had_checker_error: rows.some((row) => /checker error/i.test(row.reference_check_summary ?? "")),
         had_manual_reprocess: rows.some((row) => row.reason === "manual-reprocess"),
         skip_reason_codes: skipReasonCodes,
+        deterministic_skip_codes_before_reprocess:
+          deterministicSkipCodesBeforeReprocess,
         statuses: rows.map((row) => {
           const suffixes = [
             row.error_group ? `/${row.error_group}` : "",
@@ -1693,7 +1714,7 @@ export function analyze(data, timeZone) {
   const falseSkipCounts = new Map();
   for (const group of generationOutcomes) {
     if (!group.had_manual_reprocess) continue;
-    for (const code of group.skip_reason_codes ?? []) {
+    for (const code of group.deterministic_skip_codes_before_reprocess ?? []) {
       const entry = falseSkipCounts.get(code) ?? {
         reason_code: code,
         count: 0,

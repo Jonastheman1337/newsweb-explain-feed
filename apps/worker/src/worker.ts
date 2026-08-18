@@ -3705,6 +3705,20 @@ const rewriteWorker = new Worker<RewriteJobData>(
         source.bodyText,
         { enabledClasses: activeTriageEnabledClasses }
       );
+      // Shadow candidates are measured against the CODE DEFAULT, not the
+      // env-active set: a kill-switch window must not flood the shadow
+      // telemetry with the temporarily disabled default class.
+      const triageShadowSkipClassIds =
+        triageEvaluation.candidateClassIds.filter(
+          (classId) => !defaultEnabledTriageClasses.includes(classId)
+        );
+      const triageTelemetryJson = {
+        enabledClasses: [...activeTriageEnabledClasses],
+        // Non-null only when an enabled skip was bypassed (manual reprocess)
+        // or the run persisted despite a matching enabled class.
+        bypassedSkipClassId: triageEvaluation.enabledSkip?.classId ?? null,
+        shadowSkipClassIds: triageShadowSkipClassIds
+      };
       if (job.data.reason !== "manual-reprocess") {
         const deterministicSkip = triageEvaluation.enabledSkip;
         if (deterministicSkip) {
@@ -3740,7 +3754,7 @@ const rewriteWorker = new Worker<RewriteJobData>(
               triageResult: deterministicSkip,
               triage: {
                 enabledClasses: [...activeTriageEnabledClasses],
-                shadowSkipClassIds: triageEvaluation.shadowSkipClassIds
+                shadowSkipClassIds: triageShadowSkipClassIds
               }
             } as Prisma.InputJsonValue
           });
@@ -3789,7 +3803,11 @@ const rewriteWorker = new Worker<RewriteJobData>(
               errors: [],
               sourceBodyChars: payload.sourceBodyChars,
               promptChars: preRewritePromptChars,
-              triageResult: { newsworthy: false, reason: triage.reason }
+              triageResult: { newsworthy: false, reason: triage.reason },
+              // Model-skipped rows carry the shadow evaluation too: shadow
+              // classes explicitly target notices the model also skips, so
+              // omitting it here would hide most of their real match volume.
+              triage: triageTelemetryJson
             } as Prisma.InputJsonValue
           });
 
@@ -4104,13 +4122,7 @@ const rewriteWorker = new Worker<RewriteJobData>(
                   company_sentence: hiddenDraft.company_sentence
                 }
               : null,
-            triage: {
-              enabledClasses: [...activeTriageEnabledClasses],
-              // Non-null only on manual-reprocess runs, where the enabled
-              // skip is bypassed by design — the false-skip join signal.
-              bypassedSkipClassId: triageEvaluation.enabledSkip?.classId ?? null,
-              shadowSkipClassIds: triageEvaluation.shadowSkipClassIds
-            }
+            triage: triageTelemetryJson
           } as Prisma.InputJsonValue
         });
 

@@ -102,32 +102,48 @@ export type TriageCallFn = (
 const DOCUMENT_ONLY_PATTERNS = [
   /\b(interim|quarterly|annual|financial)\s+report\b/i,
   /\bq[1-4]\s+(?:fy)?\d{4}\s+(?:report|presentation)\b/i,
-  /\b(?:årsrapport|kvartalsrapport|delårsrapport|halvårsrapport)\b/i,
+  // Unicode lookbehind instead of \b: JS ASCII \b never fires before
+  // å-initial words, so "Årsrapporten" was invisible to this bank.
+  /(?<![\p{L}\p{N}])(?:årsrapport|kvartalsrapport|delårsrapport|halvårsrapport)\w*/iu,
   /\b(?:prospectus|prospekt|form\s+6-k|presentation)\b/i,
-  // The lookahead excludes the MAR footer "Meldingen er offentliggjort av
-  // <person>" — 675253 (a CEO departure) was skipped solely on that footer.
-  /\b(?:has been|is|er)\s+(?:released|published|publisert|offentliggjort)\b(?!\s+(?:av|by)\b)/i,
+  // The lookahead excludes statutory MAR/vphl footers in all their common
+  // phrasings ("offentliggjort av <person>", "i henhold til MAR",
+  // "pursuant to", "i samsvar med") — 675253 (a CEO departure) was skipped
+  // solely on such a footer.
+  /\b(?:has been|is|er)\s+(?:released|published|publisert|offentliggjort)\b(?!\s+(?:av|by|i\s+henhold\s+til|i\s+samsvar\s+med|pursuant\s+to|in\s+accordance\s+with)\b)/i,
   // Availability must be anchored to a document noun in the same sentence —
   // 678418 (field-trial results) was skipped solely on a bare "available".
-  /\b(?:report|rapport|presentation|presentasjon|prospectus|prospekt|form\s+6-k|attachment|vedlegg|webcast|audiocast|webinar|recording|opptak)\b[^.!?]{0,80}\b(?:can be viewed|available|tilgjengelig|kan leses)\b/i,
+  // Suffix-tolerant for Norwegian definite forms ("Årsrapporten",
+  // "prospektet"); the gap tolerates URL dots but not sentence enders !?.
+  /(?<![\p{L}\p{N}])(?:report|rapport\w*|årsrapport\w*|kvartalsrapport\w*|delårsrapport\w*|halvårsrapport\w*|presentation|presentasjon\w*|prospectus|prospekt\w*|form\s+6-k|attachment|vedlegg\w*|webcast|audiocast|webinar|recording|opptak\w*)[^!?]{0,100}?\b(?:can be viewed|available|tilgjengelig|kan leses)\b/iu,
   /\b(?:clicking the link|link at the end|se vedlegg|see attached)\b/i
 ];
 
-const SUBSTANTIVE_FACT_PATTERNS = [
+// Split so routine-results-invitation can compose "substance minus bare
+// executive titles" without a hand-fork drifting from this bank.
+const SUBSTANTIVE_FACT_CORE_PATTERNS = [
   /\b(?:revenue|revenues|inntekter|omsetning)\b/i,
   /\b(?:resultat|profit|loss|earnings|ebit|ebitda|operating income|driftsresultat)\b/i,
   /\b(?:guidance|guiding|utsikter|outlook|utbytte|dividend)\b/i,
   /\b(?:contract|kontrakt|agreement|avtale|order|ordre)\b/i,
   /\b(?:emisjon|rights issue|private placement|capital raise|kapitalinnhenting)\b/i,
   /\b(?:acquisition|oppkjøp|merger|fusjon|sale of|salg av)\b/i,
-  /\b(?:resign|resignation|fratrer|går av|ceo|cfo|chair)\b/i,
   /\b(?:nok|usd|eur|dollar|kroner|euro|million|millioner|milliard|billion)\b/i,
-  // Norwegian executive-change wording ("ønsker å fratre", "konsernsjef").
-  /\b(?:fratre(?:r|den)?|konsernsjef)\b/i,
   // Percentage results and symbol-form currency amounts (field-trial and
   // trading-update notices carry substance as "29.8%" / "$18/box").
   /\d(?:[.,]\d+)?\s?(?:%|prosent(?:poeng)?|percent|per cent)/i,
   /[$€£]\s?\d/
+];
+
+const EXECUTIVE_CHANGE_PATTERN =
+  /\b(?:resign|resignation|fratre(?:r|den)?|går av)\b/i;
+
+const EXECUTIVE_TITLE_PATTERN = /\b(?:ceo|cfo|chair|konsernsjef)\b/i;
+
+const SUBSTANTIVE_FACT_PATTERNS = [
+  ...SUBSTANTIVE_FACT_CORE_PATTERNS,
+  EXECUTIVE_CHANGE_PATTERN,
+  EXECUTIVE_TITLE_PATTERN
 ];
 
 const PROSPECTUS_PUBLICATION_PATTERNS = [
@@ -205,14 +221,25 @@ const ROUTINE_BOND_PATTERNS = [
 // Vetoes for small-routine-bond: a tap under an existing bond, or distress
 // language (waiver, coupon deferral, liquidity), is never a routine
 // issuance — 679225 (Nordic Mining liquidity update) was skipped as one.
+// Bilingual on purpose: the bond patterns themselves match Norwegian
+// notices, so English-only vetoes would leave the Norwegian variants of the
+// same distress signals skippable.
 const ROUTINE_BOND_EXCLUSION_PATTERNS = [
   /\btap issue\b/i,
   /\btap[- ]?utstedelse\b/i,
+  /\btilleggsutstedelse\b/i,
   /\bexisting\b[^.!?]{0,60}\bbonds?\b/i,
+  /\beksisterende\b[^.!?]{0,60}\bobligasjon/i,
   /\b(?:waiver|standstill|going concern|default(?:ed|s)?)\b/i,
+  /\bmislighold/i,
+  /\bfrafall\b/i,
   /\bdefer(?:ral|red|ring|s)?\b/i,
+  /\bbetalingsutsettelse/i,
+  /\butsettelse av\b[^.!?]{0,40}\b(?:rente|kupong|betaling)/i,
   /\bliquidity (?:shortfall|injection)\b/i,
-  /\brestructur/i
+  /\blikviditet(?:ssituasjon|sutfordring|skrise)/i,
+  /\brestructur/i,
+  /\brestrukturer/i
 ];
 
 // P3 shadow classes (owner-approved 2026-08-18): registered but NOT in
@@ -220,20 +247,14 @@ const ROUTINE_BOND_EXCLUSION_PATTERNS = [
 // banks are per-class, never global — e.g. the treasury class must tolerate
 // "Coupon: 0 %" and "2 000 MNOK" that other classes treat as substance.
 
-// Exclusion bank for routine-results-invitation: the substantive-fact bank
-// minus bare executive titles — presenter contact blocks ("Kari Krogstad -
-// CEO") are boilerplate on invitations, but resignations still disqualify.
+// Exclusion bank for routine-results-invitation: the substantive-fact CORE
+// plus executive changes, but NOT bare executive titles — presenter contact
+// blocks ("Kari Krogstad - CEO") are boilerplate on invitations, while
+// resignations still disqualify. Composed so new substance patterns added
+// to the core automatically apply here too.
 const INVITATION_FACT_PATTERNS = [
-  /\b(?:revenue|revenues|inntekter|omsetning)\b/i,
-  /\b(?:resultat|profit|loss|earnings|ebit|ebitda|operating income|driftsresultat)\b/i,
-  /\b(?:guidance|guiding|utsikter|outlook|utbytte|dividend)\b/i,
-  /\b(?:contract|kontrakt|agreement|avtale|order|ordre)\b/i,
-  /\b(?:emisjon|rights issue|private placement|capital raise|kapitalinnhenting)\b/i,
-  /\b(?:acquisition|oppkjøp|merger|fusjon|sale of|salg av)\b/i,
-  /\b(?:resign|resignation|fratre(?:r|den)?|går av)\b/i,
-  /\b(?:nok|usd|eur|dollar|kroner|euro|million|millioner|milliard|billion)\b/i,
-  /\d(?:[.,]\d+)?\s?(?:%|prosent(?:poeng)?|percent|per cent)/i,
-  /[$€£]\s?\d/
+  ...SUBSTANTIVE_FACT_CORE_PATTERNS,
+  EXECUTIVE_CHANGE_PATTERN
 ];
 
 const RESULTS_INVITATION_INVITE_PATTERN =
@@ -248,8 +269,10 @@ const RESULTS_INVITATION_EVENT_PATTERN =
 const RESULTS_INVITATION_ATTACHED_PATTERN =
   /\b(?:is|are|er)\s+(?:attached|vedlagt)\b/i;
 
+// The gap excludes \n so title tokens cannot anchor to body text (e.g. an
+// (NTB) news-agency byline); the acronyms carry a trailing \b.
 const TREASURY_REOPENING_PATTERN =
-  /\b(?:reopening|gjenåpning)\b[^.!?]{0,80}\b(?:treasury|government bond|statskasse|statsobligasjon|NTB|NST|NGB)/i;
+  /(?<![\p{L}\p{N}])(?:reopening|gjenåpning)\b[^.!?\n]{0,80}\b(?:treasury|government bond|statskasse\w*|statsobligasjon\w*|(?:NTB|NST|NGB)\b)/iu;
 const TREASURY_AUCTION_PATTERN = /\b(?:auction|auksjon)/i;
 const TREASURY_SOVEREIGN_PATTERN = /\b(?:norges bank|debtnorway)/i;
 const TREASURY_REOPENING_EXCLUSION_PATTERNS = [
@@ -457,6 +480,20 @@ const triageClassDefinitions: readonly TriageClassDefinition[] = [
       )
   }
 ];
+
+// The id tuple and the definition table encode the same frozen order; a
+// mismatch would silently change persisted kinds on multi-match notices or
+// leave a config-validatable id inert, so it fails at module load.
+if (
+  triageClassDefinitions.length !== triageClassIds.length ||
+  triageClassDefinitions.some(
+    (definition, index) => definition.id !== triageClassIds[index]
+  )
+) {
+  throw new Error(
+    "triageClassDefinitions must mirror triageClassIds exactly, in order"
+  );
+}
 
 function buildTriageTextViews(
   title: string,

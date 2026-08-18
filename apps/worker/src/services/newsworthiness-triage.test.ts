@@ -166,6 +166,42 @@ describe("false-skip narrowing (P3, production cases)", () => {
     expect(result).toBeNull();
   });
 
+  it("keeps Norwegian distressed bond notices (review finding: English-only vetoes)", () => {
+    const result = getDeterministicTriageSkip(
+      "Utstedelse av obligasjonslån",
+      "Selskapet har gjennomført en utstedelse av obligasjonslån på NOK 300 millioner som ledd i restruktureringen av gjelden etter mislighold.",
+      ["ANNEN INFORMASJONSPLIKTIG REGULATORISK INFORMASJON"],
+      false
+    );
+    expect(result).toBeNull();
+  });
+
+  it("does not skip on statutory footer variants alone (review finding: MAR phrasings)", () => {
+    for (const footer of [
+      "Denne informasjonen er offentliggjort i henhold til MAR artikkel 17.",
+      "This information is published pursuant to MAR.",
+      "Informasjonen er offentliggjort i samsvar med verdipapirhandelloven."
+    ]) {
+      const result = getDeterministicTriageSkip(
+        "Selskapet har mottatt stevning",
+        `Selskapet har mottatt stevning fra en tidligere samarbeidspartner. Styret bestrider kravet. ${footer}`,
+        ["INNSIDEINFORMASJON"],
+        false
+      );
+      expect(result).toBeNull();
+    }
+  });
+
+  it("still skips Norwegian definite-form document availability (review finding: over-narrowing)", () => {
+    const result = getDeterministicTriageSkip(
+      "Selskapet ASA: Årsrapport 2025",
+      "Årsrapporten for 2025 er tilgjengelig på selskapets hjemmeside www.selskap.no.",
+      ["ANNEN INFORMASJONSPLIKTIG REGULATORISK INFORMASJON"],
+      true
+    );
+    expect(result?.kind).toBe("document-only");
+  });
+
   it("still skips a plain routine bond issuance without exclusion terms", () => {
     const result = getDeterministicTriageSkip(
       "Vellykket utstedelse av obligasjonslån",
