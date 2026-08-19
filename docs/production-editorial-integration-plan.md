@@ -243,6 +243,29 @@ release window per the enablement model above → next-day signals check
 `verbal_minus_match` in a later window. Never share a window with a P1 cache
 flip.
 
+**verbal_minus_composed (registered in shadow 2026-08-19, corpus-demanded by
+case 680021):** `verbal_minus_match` flips the sign on the exact source key
+only, so negative derived figures — "minus 161,7 millioner" against a
+thousand-scaled table row "-161 690" — never compose with the
+separator/scaling rules and stay unexpected; the repair loop's
+`UNEXPECTED_NUMBERS` instruction ("fjern tall som ikke finnes i kilden") then
+deletes the figure and a numberless story publishes. The rule re-runs the
+frozen legacy chain with a sign-flipped token behind the same verbal-minus
+gate and accepts on any legacy match, naming the underlying rule in
+provenance (`via_rule`). Exact flips keep attributing to `verbal_minus_match`
+(registry order, first match wins), so the enabled rules' telemetry mix is
+untouched while composed shadows. Force-enabled corpus replay
+(`replay-numbers-composed-2026-08-19.json`): 3 candidate clears attributed to
+the rule, derived/candidate cross-check clean, and one HARD WARNING —
+unresolved 679552 would clear. Adjudicated recoverable: its "minus 312,5
+millioner euro" derives exactly from the EUR-thousand table row
+"Profit/(loss) before tax -312,453" (−312 453k = −312,5m), the same failure
+class as 680021; the case stays seeded as unresolved until the enablement
+window, when the owner confirms the move (unresolved 5 → 4, precedent
+679626). Enablement follows the standard model: live `shadow_candidates` for
+`verbal_minus_composed` → flip the default in its own release window with
+refreshed fixture expectations.
+
 ## Outcome
 
 Integrate the verified production findings into Autoweb without using the confounded A/B comparison as promotion evidence. Repair evaluation integrity first, then introduce production safety and efficiency changes behind shadowable controls, and keep prompt/model experiments isolated until they can be evaluated one variable at a time.

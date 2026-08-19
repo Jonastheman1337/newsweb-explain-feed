@@ -239,7 +239,8 @@ describe("derivation slot", () => {
     // come with refreshed fixture expectations (see the plan doc).
     expect([...numberDerivationRuleIds]).toEqual([
       "source_cell_subrun",
-      "verbal_minus_match"
+      "verbal_minus_match",
+      "verbal_minus_composed"
     ]);
     expect([...defaultEnabledDerivationRules]).toEqual([
       "source_cell_subrun",
@@ -471,6 +472,147 @@ describe("verbal_minus_match rule", () => {
     );
     expect(assessments).toContainEqual({
       display: "161",
+      disposition: "unexpected",
+      ruleId: null,
+      count: 1
+    });
+  });
+});
+
+describe("verbal_minus_composed rule", () => {
+  // Case 680021 shape: the source table carries thousand-scaled negatives
+  // ("-161 690" under an explicit thousands header) while the rewrite states
+  // the derived magnitude with a verbal sign ("minus 161,7 millioner").
+  // verbal_minus_match flips the sign on the exact key only, so these stayed
+  // unexpected and the repair loop deleted the figure.
+  const scaledSource = [
+    "Consolidated statement of income",
+    "(in NOK thousands)",
+    "Resultat etter skatt -161 690 12 562"
+  ].join("\n");
+  const scaledRewrite = createRewrite({
+    lead: "Resultatet etter skatt ble minus 161,7 millioner kroner."
+  });
+  const composedEnabled = {
+    enabledDerivationRules: [
+      ...defaultEnabledDerivationRules,
+      "verbal_minus_composed"
+    ] as const
+  };
+
+  it("shadows the negative scaled-table figure by default", () => {
+    const assessments = assessNumbers(scaledRewrite, scaledSource);
+    expect(assessments).toContainEqual({
+      display: "161,7",
+      disposition: "unexpected",
+      ruleId: null,
+      count: 1,
+      candidateRuleId: "verbal_minus_composed"
+    });
+    expect(findUnexpectedNumbers(scaledRewrite, scaledSource)).toContain(
+      "161,7"
+    );
+  });
+
+  it("derives the scaled-table figure when enabled, naming the via rule", () => {
+    const assessments = assessNumbers(
+      scaledRewrite,
+      scaledSource,
+      composedEnabled
+    );
+    expect(assessments).toContainEqual({
+      display: "161,7",
+      disposition: "derived",
+      ruleId: "verbal_minus_composed",
+      count: 1,
+      provenance: {
+        verbal_sign: "minus",
+        via_rule: "scaled_million_report_table"
+      }
+    });
+    expect(
+      findUnexpectedNumbers(scaledRewrite, scaledSource, composedEnabled)
+    ).not.toContain("161,7");
+  });
+
+  it("composes with scaled unit amounts and forwards their provenance", () => {
+    const assessments = assessNumbers(
+      createRewrite({
+        lead: "Årsresultatet ble minus 1,5 milliarder kroner."
+      }),
+      "The company reported an annual net result of NOK -1 500 000 000.",
+      composedEnabled
+    );
+    expect(assessments).toContainEqual({
+      display: "1,5",
+      disposition: "derived",
+      ruleId: "verbal_minus_composed",
+      count: 1,
+      provenance: {
+        verbal_sign: "minus",
+        via_rule: "scaled_unit_amount",
+        unit: "nok",
+        scale: "billion"
+      }
+    });
+  });
+
+  it("composes with thousands-separator equivalents", () => {
+    const assessments = assessNumbers(
+      createRewrite({ lead: "Resultatet ble minus 12.562 tusen kroner." }),
+      "Selskapet fikk et resultat på -12562 tusen kroner.",
+      composedEnabled
+    );
+    expect(assessments).toContainEqual({
+      display: "12.562",
+      disposition: "derived",
+      ruleId: "verbal_minus_composed",
+      count: 1,
+      provenance: {
+        verbal_sign: "minus",
+        via_rule: "thousands_separator_equivalent"
+      }
+    });
+  });
+
+  it("leaves exact sign flips attributed to verbal_minus_match", () => {
+    const assessments = assessNumbers(
+      createRewrite({ lead: "Resultatet etter skatt ble minus 161 690." }),
+      scaledSource,
+      composedEnabled
+    );
+    expect(assessments).toContainEqual({
+      display: "161 690",
+      disposition: "derived",
+      ruleId: "verbal_minus_match",
+      count: 1,
+      provenance: { verbal_sign: "minus", source_display: "-161 690" }
+    });
+  });
+
+  it("emits no candidate without the verbal minus", () => {
+    const assessments = assessNumbers(
+      createRewrite({
+        lead: "Resultatet etter skatt ble 161,7 millioner kroner."
+      }),
+      scaledSource
+    );
+    expect(assessments).toContainEqual({
+      display: "161,7",
+      disposition: "unexpected",
+      ruleId: null,
+      count: 1
+    });
+  });
+
+  it("leaves underivable verbal-minus magnitudes plainly unexpected", () => {
+    const assessments = assessNumbers(
+      createRewrite({ lead: "Resultatet ble minus 999,9 millioner kroner." }),
+      scaledSource,
+      composedEnabled
+    );
+    expect(assessments).toContainEqual({
+      display: "999,9",
       disposition: "unexpected",
       ruleId: null,
       count: 1

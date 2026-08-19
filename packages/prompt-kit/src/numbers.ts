@@ -1026,9 +1026,21 @@ export type NumberAssessmentRuleId =
 // "-161"; the unsigned rewrite token then fails key matching on sign alone.
 // The rule accepts an unsigned token immediately preceded by the word
 // "minus" when the sign-flipped key exists in the source index.
+//
+// verbal_minus_composed (2026-08-19, corpus-demanded): case 680021 showed
+// verbal_minus_match flips the sign on the EXACT source key only, so
+// negative DERIVED figures — "minus 161,7 millioner" against a
+// thousand-scaled table row "-161 690" — stay unexpected; the repair loop
+// then deletes the figure and a numberless story publishes. The rule
+// re-runs the frozen legacy chain with a sign-flipped token when an
+// unsigned token immediately follows the word "minus", and accepts on any
+// legacy match, naming the underlying rule in provenance (via_rule).
+// Exact-key flips keep attributing to verbal_minus_match (earlier in the
+// registry, first match wins).
 export const numberDerivationRuleIds = [
   "source_cell_subrun",
-  "verbal_minus_match"
+  "verbal_minus_match",
+  "verbal_minus_composed"
 ] as const;
 
 export type NumberDerivationRuleId = (typeof numberDerivationRuleIds)[number];
@@ -1038,6 +1050,8 @@ export type NumberDerivationRuleId = (typeof numberDerivationRuleIds)[number];
 // override (NUMERIC_ACCEPTANCE_RULES) is an emergency kill-switch only.
 // Enabling a rule = append here + refresh fixture expectations in the same
 // commit; that fixture diff is the release record.
+// verbal_minus_composed is registered in shadow only: enablement waits for
+// live shadow-candidate telemetry, in its own release window.
 export const defaultEnabledDerivationRules: readonly NumberDerivationRuleId[] =
   ["source_cell_subrun", "verbal_minus_match"];
 
@@ -1109,6 +1123,11 @@ function sourceSpansRegion(
 
 const NUMBER_GROUP_SEPARATOR_PATTERN = /[\s ]+/;
 
+function verbalMinusPrecedes(rewriteText: string, index: number): boolean {
+  const before = rewriteText.slice(Math.max(0, index - 10), index);
+  return /\bminus\s+$/i.test(before);
+}
+
 // Registry order must mirror numberDerivationRuleIds; first match wins.
 const numberDerivationRules: readonly NumberDerivationRule[] = [
   {
@@ -1161,11 +1180,9 @@ const numberDerivationRules: readonly NumberDerivationRule[] = [
     id: "verbal_minus_match",
     match: (context) => {
       if (!context.parsed.key.startsWith("+|")) return null;
-      const before = context.rewriteText.slice(
-        Math.max(0, context.token.index - 10),
-        context.token.index
-      );
-      if (!/\bminus\s+$/i.test(before)) return null;
+      if (!verbalMinusPrecedes(context.rewriteText, context.token.index)) {
+        return null;
+      }
       const flippedKey = `-|${context.parsed.key.slice(2)}`;
       if (!context.sourceIndex.exactKeys.has(flippedKey)) return null;
       const sourceMatch = context
@@ -1175,6 +1192,47 @@ const numberDerivationRules: readonly NumberDerivationRule[] = [
         provenance: {
           verbal_sign: "minus",
           ...(sourceMatch ? { source_display: sourceMatch.display } : {})
+        }
+      };
+    }
+  },
+  {
+    id: "verbal_minus_composed",
+    match: (context) => {
+      if (!context.parsed.key.startsWith("+|")) return null;
+      if (!verbalMinusPrecedes(context.rewriteText, context.token.index)) {
+        return null;
+      }
+      const flipped: ParsedNumberToken = {
+        display: `-${context.parsed.display}`,
+        key: `-|${context.parsed.key.slice(2)}`,
+        value: -context.parsed.value,
+        hasPercent: context.parsed.hasPercent
+      };
+      // Re-running the full frozen chain makes this rule mean "the signed
+      // form of this token would have been accepted". Only the
+      // sign-sensitive mechanisms (separator equivalents, scaled report
+      // tables, scaled unit amounts, percent ranges) can newly match here:
+      // exact flips are claimed by verbal_minus_match above, and trade
+      // arithmetic compares magnitudes so it already failed for this token.
+      const flippedAssessment = assessRewriteToken(
+        flipped,
+        context.token,
+        context.rewriteText,
+        context.sourceIndex,
+        context.sourceText
+      );
+      if (
+        flippedAssessment.disposition !== "matched" ||
+        flippedAssessment.ruleId == null
+      ) {
+        return null;
+      }
+      return {
+        provenance: {
+          verbal_sign: "minus",
+          via_rule: flippedAssessment.ruleId,
+          ...(flippedAssessment.provenance ?? {})
         }
       };
     }
