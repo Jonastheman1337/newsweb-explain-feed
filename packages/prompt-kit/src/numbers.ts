@@ -1050,10 +1050,12 @@ export type NumberDerivationRuleId = (typeof numberDerivationRuleIds)[number];
 // override (NUMERIC_ACCEPTANCE_RULES) is an emergency kill-switch only.
 // Enabling a rule = append here + refresh fixture expectations in the same
 // commit; that fixture diff is the release record.
-// verbal_minus_composed is registered in shadow only: enablement waits for
-// live shadow-candidate telemetry, in its own release window.
+// verbal_minus_composed enabled 2026-08-19 on corpus-replay evidence
+// (replay-numbers-composed-2026-08-19.json: 3 clears, all adjudicated
+// genuine) under the replay-as-gate promotion model — see the plan doc.
+// Rollback: NUMERIC_ACCEPTANCE_RULES=source_cell_subrun,verbal_minus_match.
 export const defaultEnabledDerivationRules: readonly NumberDerivationRuleId[] =
-  ["source_cell_subrun", "verbal_minus_match"];
+  ["source_cell_subrun", "verbal_minus_match", "verbal_minus_composed"];
 
 export type NumberAssessmentDisposition = "matched" | "derived" | "unexpected";
 

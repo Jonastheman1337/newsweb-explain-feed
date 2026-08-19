@@ -244,7 +244,8 @@ describe("derivation slot", () => {
     ]);
     expect([...defaultEnabledDerivationRules]).toEqual([
       "source_cell_subrun",
-      "verbal_minus_match"
+      "verbal_minus_match",
+      "verbal_minus_composed"
     ]);
   });
 
@@ -494,14 +495,17 @@ describe("verbal_minus_composed rule", () => {
     lead: "Resultatet etter skatt ble minus 161,7 millioner kroner."
   });
   const composedEnabled = {
-    enabledDerivationRules: [
-      ...defaultEnabledDerivationRules,
-      "verbal_minus_composed"
-    ] as const
+    enabledDerivationRules: [...defaultEnabledDerivationRules] as const
   };
 
-  it("shadows the negative scaled-table figure by default", () => {
-    const assessments = assessNumbers(scaledRewrite, scaledSource);
+  it("shadows the negative scaled-table figure under the kill switch", () => {
+    const disabled = {
+      enabledDerivationRules: [
+        "source_cell_subrun",
+        "verbal_minus_match"
+      ] as const
+    };
+    const assessments = assessNumbers(scaledRewrite, scaledSource, disabled);
     expect(assessments).toContainEqual({
       display: "161,7",
       disposition: "unexpected",
@@ -509,17 +513,13 @@ describe("verbal_minus_composed rule", () => {
       count: 1,
       candidateRuleId: "verbal_minus_composed"
     });
-    expect(findUnexpectedNumbers(scaledRewrite, scaledSource)).toContain(
-      "161,7"
-    );
+    expect(
+      findUnexpectedNumbers(scaledRewrite, scaledSource, disabled)
+    ).toContain("161,7");
   });
 
-  it("derives the scaled-table figure when enabled, naming the via rule", () => {
-    const assessments = assessNumbers(
-      scaledRewrite,
-      scaledSource,
-      composedEnabled
-    );
+  it("derives the scaled-table figure by default, naming the via rule", () => {
+    const assessments = assessNumbers(scaledRewrite, scaledSource);
     expect(assessments).toContainEqual({
       display: "161,7",
       disposition: "derived",
@@ -530,9 +530,9 @@ describe("verbal_minus_composed rule", () => {
         via_rule: "scaled_million_report_table"
       }
     });
-    expect(
-      findUnexpectedNumbers(scaledRewrite, scaledSource, composedEnabled)
-    ).not.toContain("161,7");
+    expect(findUnexpectedNumbers(scaledRewrite, scaledSource)).not.toContain(
+      "161,7"
+    );
   });
 
   it("composes with scaled unit amounts and forwards their provenance", () => {

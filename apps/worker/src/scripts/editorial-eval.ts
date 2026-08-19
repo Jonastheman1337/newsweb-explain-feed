@@ -581,15 +581,15 @@ async function lockCasesCommand(options: Map<string, string>): Promise<void> {
 // with ten known false blocks — and its visible article numbers already pass.
 // The report's "unresolved" label was a reference-coverage artifact, the same
 // instrument that had misclassified 675221.
-// 679552 is adjudicated recoverable as of 2026-08-19 (verbal_minus_composed
-// replay): the rewrite's "minus 312,5 millioner euro" derives exactly from
-// the EUR-thousand table row "Profit/(loss) before tax -312,453" — a correct
-// sign-flipped scaled-table match, the 680021 failure class. It stays listed
-// until the rule's enablement window, when the owner confirms the move and
-// the fixture reseed records it (precedent: 679626 above).
+// 679552 was reclassified out on 2026-08-19 (owner-approved,
+// verbal_minus_composed enablement): its "minus 312,5 millioner euro"
+// derives exactly from the EUR-thousand table row "Profit/(loss) before tax
+// -312,453" — a correct sign-flipped scaled-table match, the 680021 failure
+// class. Moved to numeric_false_block with the rule's enablement (unresolved
+// 5 → 4, precedent 679626 above).
 const SAFETY_SEED_MESSAGE_IDS: Partial<Record<SafetyGateClass, number[]>> = {
   checker_error_published: [679311, 677571, 677082, 675348],
-  numeric_unresolved: [679552, 679469, 678266, 676662, 676354]
+  numeric_unresolved: [679469, 678266, 676662, 676354]
 };
 
 // The marker leak and loaded-language evidence exists only in the rejected
