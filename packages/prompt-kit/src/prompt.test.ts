@@ -68,7 +68,7 @@ const sampleYearlyPayload: YearlyReportPromptPayload = {
 
 describe("OpenAI prompt contract", () => {
   it("bumps the prompt version for the editorial guardrail update", () => {
-    expect(PROMPT_VERSION).toBe("v5.9.1");
+    expect(PROMPT_VERSION).toBe("v5.9.2");
   });
 
   it("uses materiality and mechanism-first regular notice framing by default", () => {
@@ -370,6 +370,16 @@ describe("createReportRevisionUserPrompt", () => {
     expect(result).toContain("driftsresultat (ebit)");
     expect(result).toContain("ebitda");
     expect(result).toContain("første kvartal' to ganger");
+  });
+
+  it("forbids the body opening from restating the lead", () => {
+    const result = createReportDeveloperPrompt();
+
+    expect(result).toContain("Lead skal bære ETT hovedtall eller én hovedutvikling");
+    expect(result).toContain("2-5 avsnitt som bygger videre på lead");
+    expect(result).toContain("Ikke gjenta tall eller utvikling som allerede står i lead");
+    expect(result).toContain("Kulepunktene dekker tallene som IKKE står i lead");
+    expect(result).not.toContain("Samtidig falt omsetningen kraftig, viser meldingen");
   });
 
   it("forbids report bullet preambles in the examples and instructions", () => {
