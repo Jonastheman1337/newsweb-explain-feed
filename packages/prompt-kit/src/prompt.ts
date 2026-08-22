@@ -17,7 +17,7 @@ import {
   EDITORIAL_WRITING_STYLE
 } from "./shared-editorial.js";
 
-export const PROMPT_VERSION = "v5.9.1";
+export const PROMPT_VERSION = "v5.9.2";
 
 export type OutputMode = "notice" | "extended_notice";
 
