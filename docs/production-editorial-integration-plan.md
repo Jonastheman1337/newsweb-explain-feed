@@ -243,6 +243,50 @@ release window per the enablement model above → next-day signals check
 `verbal_minus_match` in a later window. Never share a window with a P1 cache
 flip.
 
+**verbal_minus_composed (registered and enabled 2026-08-19, corpus-demanded
+by case 680021):** `verbal_minus_match` flips the sign on the exact source
+key only, so negative derived figures — "minus 161,7 millioner" against a
+thousand-scaled table row "-161 690" — never compose with the
+separator/scaling rules and stay unexpected; the repair loop's
+`UNEXPECTED_NUMBERS` instruction ("fjern tall som ikke finnes i kilden") then
+deletes the figure and a numberless story publishes. The rule re-runs the
+frozen legacy chain with a sign-flipped token behind the same verbal-minus
+gate and accepts on any legacy match, naming the underlying rule in
+provenance (`via_rule`). Exact flips keep attributing to `verbal_minus_match`
+(registry order, first match wins), so the pre-existing rules' telemetry mix
+is untouched. Promotion evidence (replay-as-gate, see below —
+`replay-numbers-composed-2026-08-19.json`): 3 candidate clears, each
+adjudicated genuine against its source (678471 "minus 2,114 milliarder SEK"
+= table "-2 114" MSEK; 678523 "minus 1.358 tusen euro" = table "-1 358";
+679552 below), derived/candidate cross-check clean, zero of the remaining
+unresolved four. The replay's HARD WARNING on 679552 was adjudicated
+recoverable: its "minus 312,5 millioner euro" derives exactly from the
+EUR-thousand table row "Profit/(loss) before tax -312,453" (−312 453k =
+−312,5m), the same failure class as 680021 — reclassified to
+numeric_false_block (unresolved 5 → 4, precedent 679626). The fixture diff
+is the release record: 679552 is its only expected-block change. Rollback is
+the kill switch: `NUMERIC_ACCEPTANCE_RULES=source_cell_subrun,verbal_minus_match`.
+Next-day signals check: `derived:verbal_minus_composed` present, unexpected
+rate down, no new-figure complaints on loss-making P&L stories.
+
+**Promotion policy from 2026-08-19 (owner decision): replay-as-gate for
+deterministic validators.** For pure functions of stored inputs (numeric
+acceptance rules, triage classes, marker patterns), the offline corpus
+replay is strictly stronger evidence per notice than a live shadow window —
+it shows the exact accept/block flips on real production traffic instead of
+waiting for similar notices to recur. Such changes may therefore register
+and enable in the same release when (a) the force-enabled replay's flips are
+individually adjudicated against their sources, (b) the derived/candidate
+cross-check is clean, (c) a no-deploy kill switch covers rollback, and (d) a
+next-day signals check is named in advance. The shadow phase is reserved for
+changes whose failure mode is silent in telemetry (e.g. triage
+false-skips — suppressed real news produces no artifact to notice) or whose
+corpus demand is too thin to adjudicate. Two standing caveats: the replay
+corpus must be re-exported periodically (it needs the sealed prod DB — owner
+runs the export; promoting against a stale corpus weakens the gate), and the
+one-change-per-release-window rule stays — it is about attribution, not
+speed. Never share a window with a P1 cache flip.
+
 ## Outcome
 
 Integrate the verified production findings into Autoweb without using the confounded A/B comparison as promotion evidence. Repair evaluation integrity first, then introduce production safety and efficiency changes behind shadowable controls, and keep prompt/model experiments isolated until they can be evaluated one variable at a time.

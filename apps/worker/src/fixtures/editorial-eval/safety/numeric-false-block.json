@@ -18367,6 +18367,562 @@
         },
         "status": "failed"
       }
+    },
+    {
+      "messageId": 679552,
+      "generationRunId": "cmsr1ujj704oark17asml8o7v",
+      "promptVersion": "v5.9.1",
+      "sourcePayload": {
+        "messageId": 679552,
+        "title": "Axactor ASA announces second quarter and first half year financial results",
+        "issuerName": "Axactor ASA",
+        "issuerSign": "ACR",
+        "publishedAt": "2026-08-13T05:00:00.000Z",
+        "categories": [
+          "HALVÅRSRAPPORT"
+        ],
+        "markets": [
+          "XOSL"
+        ],
+        "bodyText": "(Oslo, 13 August 2026) Axactor ASA announces second quarter and first half year financial results.\n\nAxactor has during the second quarter completed all milestones of its transformational project announced in April: \n- Successfully completed EUR ~215 million equity issue\n- Established co-investment partnership with Fortress\n- Completed seed portfolio sale, raising EUR 100 million in proceeds\n- Bond placement of EUR 100 million at significantly improved margins compared to prior bond issues\n\n“We are happy to announce that our transformational project is on schedule. All milestones have been delivered in due time, and we acquired the first portfolios in the new co-investment structure in July. The pricing for our latest bond placement indicates that our new deleveraging strategy is paying off”, says CEO Johnny Tsolis.\n\nThe pre-announced book value assessment has been finalized in the quarter with revised assumptions for the future collection estimates implemented, supported by improved and more data driven model. The review resulted in negative revaluations of EUR 320 million, which is ~10% lower than Fortress’ pricing assumption in relation to the private placement. Axactor expects future collection to be in line with collection curves and hence no further revaluation will be needed.\n\n\nKey figures Q2 2026 (Q2 2025 in brackets)*\n- Gross revenue of EUR 78m (EUR 81m) \n- Total revenue of EUR -258m (EUR 64m) \n- EBITDA of EUR -290m (EUR 33m) \n- Cash EBITDA of EUR 46m (EUR 50m) \n- Net profit after tax of EUR -315m (EUR 7m)\n- NPL investments of EUR 19m (EUR 27m)\n\nKey figures H1 2026 (H1 2025 in brackets)*\n- Gross revenue of EUR 153m (EUR 158m) \n- Total revenue of EUR -205m (EUR 129m)\n- EBITDA of EUR -268m (EUR 65m) \n- Cash EBITDA of EUR 91m (EUR 97m) \n- Net profit after tax of EUR -313m (EUR 17m)\n- NPL investments of EUR 55m (EUR 32m)\n\n\n“With the equity raise completed and the co-investment vehicle established, we expect significantly lower cost of funding and increased investment capacity, supporting substantial shareholder distribution capacity going forward”, adds CEO Johnny Tsolis.\n\n\nPresentation\n10:00 am CEST, 13 August 2026: The results will be presented in a global investor webcast with a live Q&A session. A recording of the webcast will be made available after the live stream is concluded on axactor.com. \n\nWebcast participation will be possible via the following. Please note that you need to register before you will be provided with streaming access or phone number, access code and pin.\n\nWebcast:\n- https://events.q4inc.com/attendee/713190319\nPhone: \n- https://events.q4inc.com/analyst/713190319?pwd=6XC4rsok\n\n\nFor additional information, please contact: \nJohnny Tsolis, CEO \nTel: +47 913 35 461 \nE-mail: johnny.tsolis@axactor.com \n\nNina Mortensen, CFO\nMobile: +47 975 24 236\nE-mail: nina.mortensen@axactor.com\n\n\nTo learn more about Axactor, visit www.axactor.com \n\n\n*EBITDA and other alternative performance measures (APMs) are defined and reconciled to the IFRS financial statements as a part of the APM section of the financial report. \n\n\nThis information is considered to be inside information pursuant to the EU Market Abuse Regulation and is subject to the disclosure requirements pursuant to Section 5-12 the Norwegian Securities Trading Act. This stock exchange announcement was published by Eilif Drageseth, Deputy CFO at Axactor ASA, on 13 August 2026 at 07:00 CEST.\n\nKEY METRICS (BEST-EFFORT EXTRACTION - VERIFY AGAINST PAGE TEXT):\n- revenue | page 15\n  label: Note\n  values: 5\n  row: Note 5 Revenue\n- revenue | page 16\n  label: Interest revenue from purchased loan portfolios\n  values: 5, 6 51,159 49,809 101,230 99,554 199,301\n  row: Interest revenue from purchased loan portfolios 5, 6 51,159 49,809 101,230 99,554 199,301\n- operating profit/EBIT | page 16\n  label: Operating profit /(loss)\n  values: -292,332 30,551 | -272,306 60,851 125,248\n  row: Operating profit /(loss) -292,332 30,551 -272,306 60,851 125,248\n- earnings before tax | page 16\n  label: Profit/(loss) before tax\n  values: -312,453 8,892 | -310,624 22,345 47,408\n  row: Profit/(loss) before tax -312,453 8,892 -310,624 22,345 47,408\n\n---\n\nPRIMARY SOURCE (CONSOLIDATED INCOME STATEMENT / FINANCIAL TABLES):\n\n[PDF page 15]\n/ Interim condensed consolidated financial statements\nInterim condensed consolidated statement of profit or loss 16\nInterim condensed consolidated statement of comprehensive income 17\nInterim condensed consolidated statement of financial position 18\nInterim condensed consolidated statement of cash flows 19\nInterim condensed consolidated statement of changes in equity 20\nNotes to the interim condensed consolidated financial statements 21\nNote 1 Reporting entity and accounting policies\n21\nNote 2 Financial risks\n21\nNote 3 Operating segments\n23\nNote 4 Financial items\n26\nNote 5 Revenue\n27\nNote 6 Purchased loan portfolios\n29\nNote 7 Interest-bearing loans and borrowings\n32\nNote 8 Leases\n35\nNote 9 Issued shares and share capital\n36\nAxactor – Second quarter 2026 Axactor – Second quarter 2026\n15 15 Highlights Key figures Operations Financials APM Glossary Highlights Key figures Operations Financials APM Glossary Financials Financials | Interim condensed consolidated financial statements Financials | Interim condensed consolidated financial statements\n\n[PDF page 16]\nInterim condensed consolidated statement of profit or loss\nFor the quarter end Year to date\nEUR thousand Note 30 Jun 2026 30 Jun 2025 30 Jun 2026 30 Jun 2025 Full year 2025\nInterest revenue from purchased loan portfolios 5, 6 51,159 49,809 101,230 99,554 199,301\nNet gain/(loss) purchased loan portfolios\n5, 6 -325,079 -1,880 -338,497 -3,653 -9,213\nRevenue from sale of repossessed assets\n5 238 557 1,052 2,422 3,662\nOther operating revenue 15,671 15,300 31,596 30,469 64,643\nTotal revenue\n3, 5 -258,011 63,786 -204,619 128,791 258,393\nCost of repossessed assets sold, incl\nimpairment\n5 -130 -309 -678 -2,166 -3,208\nPersonnel expenses -16,362 -15,880 -33,246 -32,375 -64,612\nOther operating expenses -15,319 -15,093 -29,035 -29,387 -57,752\nTotal operating expenses -31,810 -31,283 -62,960 -63,928 -125,572\nEBITDA -289,822 32,504 -267,578 64,862 132,821\nDepreciation and amortization -2,510 -1,952 -4,728 -4,011 -7,572\nOperating profit /(loss) -292,332 30,551 -272,306 60,851 125,248\nFinancial revenue\n4 1,531 413 2,608 2,005 3,462\nFinancial expenses\n4 -21,652 -22,073 -40,925 -40,511 -81,302\nNet financial items -20,121 -21,660 -38,317 -38,507 -77,840\nProfit/(loss) before tax -312,453 8,892 -310,624 22,345 47,408\nIncome tax expense -2,068 -1,998 -2,562 -5,361 -11,378\nNet profit/(loss) after tax -314,521 6,894 -313,185 16,983 36,030\nFor the quarter end Year to date\nEUR thousand Note 30 Jun 2026 30 Jun 2025 30 Jun 2026 30 Jun 2025 Full year 2025\nAttributable to:\nNon-controlling interests:\nNet profit/(loss) after tax - - - - -\nShareholders of the parent company:\nNet profit/(loss) after tax -314,521 6,894 -313,185 16,983 36,030\nEarnings per share:\nBasic -0.701 0.023 -0.834 0.056 0.119\nDiluted -0.688 0.023 -0.846 0.056 0.119\nAxactor – Second quarter 2026 Axactor – Second quarter 2026\n16 16 Highlights Key figures Operations Financials APM Glossary Highlights Key figures Operations Financials APM Glossary Financials Financials | Interim condensed consolidated financial statements Financials | Interim condensed consolidated financial statements\n\n[PDF page 41]\nAbbreviations\n3PC Third-party collection\nAGM Annual general meeting\nAPM Alternative performance measures\nARM Accounts receivable management\nB2B Business to business\nB2C Business to consumer\nBoD Board of Directors\nBS Consolidated statement of financial position (balance sheet)\nBV Book value\nCF Consolidated statement of cash flows\nCGU Cash generating unit\nCM Contribution margin\nD&A Depreciation and amortization\nDopex Direct operating expenses\nEBIT Operating profit/Earnings before interest and tax\nEBITDA Earnings before interest, tax, depreciation and amortization\nECL Expected credit loss\nEGM Extraordinary general meeting\nEPS Earnings per share\nERC Estimated remaining collections\nESG Environmental, social and governance\nESOP Employee stock ownership plan\nFSA The financial supervisory authority\nFTE Full time equivalent\nGHG Greenhouse gas emissions\nHQ Headquarters\nIFRS International financial reporting standards\nLTV Loan to value\nNCI Non-controlling interests\nNPL Non-performing loan\nOB Outstanding balance, the total amount Axactor can collect on claims under management, including\noutstanding principal, interest and fees\nOCI Consolidated statement of other comprehensive income\nP&L Consolidated statement of profit or loss\nPCI Purchased credit impaired\nPPA Purchase price allocations\nREO Real estate owned\nROE Return on equity\nSDG Sustainable development goal\nSG&A Selling, general & administrative\nSPV Special purpose vehicle\nVIU Value in use\nVPS Verdipapirsentralen/Norwegian central securities depository\nWACC Weighted average cost of capital\nWAEP Weighted average exercise price\nAxactor – Second quarter 2026 Axactor – Second quarter 2026\n41 41 Highlights Key figures Operations Financials APM Glossary Highlights Key figures Operations Financials APM Glossary Glossary Glossary Glossary\n\n---\n\nSECONDARY CONTEXT (CEO/MANAGEMENT/OUTLOOK/KEY EVENTS):\n\n[PDF page 13]\naccrued interest amounted to EUR 623.4 million at the end of the\nfirst half year (883.0).\nAxactor is in compliance with all loan covenants as per the end of\nthe first half of 2026.\nFinancial targets\nIn connection with the announcement of the equity raise in the\nsecond quarter, Axactor also announced new financial targets for\n2027 and onwards:\n1. Annual NPL investments of EUR 200-400 million and 10%\naverage 3PC growth annually\n2. Annual return on equity exceeding 15%\n3. Leverage ratio as defined in the bond covenants in the range\nof 2.25x-2.75x\n4. Minimum annual distribution of 50% of adjusted net profit\nOutlook\nAxactor is confident that collection performance will rise\nimmediately after the curve revisions in the second quarter, and\nbe aligned with the updated curves going forward. The reduced\nbook values will also lead to a lower amortization than previously\nprojected, partly compensating for the lower gross revenue\nexpectations.\nNew portfolio investments are expected to pick up as Axactor\nnow has a significantly improved investment capacity. The higher\ninvestment capacity comes partly from the equity raise in the\nsecond quarter, but also from the creation of a new co-investment\nvehicle which is jointly subscribed by Axactor and Fortress.\nAxactor holds a controlling stake in the vehicle and will thus fully\nconsolidate it into its financial statements. It is expected that the\nmajority of future investments will be made through this new\nvehicle.\nCapital light servicing will also benefit from both the co-investment\nvehicle and the seed portfolio sale, as Axactor retains exclusive\nservicing rights for both vehicles. Axactor has initiated a review\nof its segment reporting to better reflect the impact of this capital\nlight revenue stream, and expects to report according to this new\nsegment structure from the third quarter 2026 onwards. Traditional\n3PC servicing continues to grow, with Norway and Germany\nbeing the main drivers. Axactor receives excellent feedback from\nclients and focuses on delivering high-quality services tailored\nto demanding clients. The pipeline for such new clients remains\nstrong across geographies and further growth is expected for the\nsegment going forward.\nThe funding cost will be reduced significantly in the wake of the\ndeleveraging in the second quarter. Furthermore, the ACR06 bond\nissue in the quarter illustrates the impact on the effective funding\ncost after the equity raise. ACR06 has a margin over EURIBOR3M of\n390bps compared to the previous bond issue, ACR05, which carries\na coupon of EURIBOR3M + 750bps. Axactor will over time replace\nboth its older bond loans with new and significantly cheaper funding,\nstarting with the ACR04 bond in September 2026.\nAxactor – Second quarter 2026 Axactor – Second quarter 2026\n13 13 Highlights Key figures Operations Financials APM Glossary Highlights Key figures Operations Financials APM Glossary Financials Financials Financials\n\n[PDF page 14]\n/ Responsibility statement from the Board and the CEO\nWe confirm that, to the best of our knowledge, that the condensed set of interim consolidated financial statements for the first half of 2026 has\nbeen prepared in accordance with IAS 34 Interim Financial Reporting and gives a true and fair view of the assets, liabilities, financial position\nand profit or loss for the Group and the company taken as whole.\nWe also confirm that, to the best of our knowledge, that the half-yearly report gives a fair overview of important events that have occurred\nduring the first six months of the financial year and their impact on the half-yearly financial report, any significant related party transactions,\nand a description of the principal risks and uncertainties for the remaining six months of the financial year.\nOslo, 12 August 2026\nTerje Mjøs\nChair\nBrita Eilertsen\nBoard member\nAnette Willumsen\nBoard member\nPeder Strand\nBoard member\nEirik W. Rogstad\nBoard member\nLeslee Cowen\nBoard member\nChristopher Linkas\nBoard member\nJohnny Tsolis\nCEO\nAxactor – Second quarter 2026 Axactor – Second quarter 2026\n14 14 Highlights Key figures Operations Financials APM Glossary Highlights Key figures Operations Financials APM Glossary Financials Financials Financials\n\n[PDF page 36]\nNote 9 Issued shares and share capital\nIssued shares and share capital\nNumber of shares Share capital (EUR)\nOn 31 Dec 2024 302,145,464 158,368,902\nOn 31 Dec 2025 302,145,464 158,368,902\nShare capital reduction, Jun - -72,536,195\nNew share issues, Jun 466,063,829 108,000,144\nNew share issues, Jun 37,465,009 8,405,503\nOn 30 Jun 2026 805,674,302 202,238,355\nShares owned by the Board and Group executive management on 30 Jun 2026\nName Shareholding Share %\nLatino Invest AS/Johnny Tsolis\n1\n2,170,000 0.3%\nTerje Mjøs, through Awe Invest AS\n2\n1,750,000 0.2%\nKarl Mamelund\n3\n382,947 < 0.1%\nVibeke Ly\n3\n333,140 < 0.1%\nArnt Andre Dullum\n3\n200,000 < 0.1%\nNina Mortensen\n3\n221,310 < 0.1%\nBrita Eilertsen\n2\n41,192 < 0.1%\n1\nCEO/related to the CEO of Axactor ASA\n2\nMember of the Board/controlled by member of the Board\n3\nMember of the Group executive management\n20 largest shareholders on 30 Jun 2026\nName Shareholding Share %\nGeveran Trading Company LTd 272,148,436 33.8%\nBrown Brothers Harriman & Co. 235,703,836 29.3%\nSkandinaviska Enskilda Banken AB 32,314,106 4.0%\nSB1 Markets AS 24,483,573 3.0%\nDNB Markets Aksjehandel/-Analyse 15,500,000 1.9%\nStavern Helse og Forvaltning AS 8,000,000 1.0%\nBorea Høyrente Spesialfond 7,610,217 0.9%\nSonga Capital AS 7,000,000 0.9%\nFolketrygdfondet 6,000,000 0.7%\nSiljan Industrier AS 5,864,648 0.7%\nSkandinaviska Enskilda Banken AB (Luxembourg) 5,279,467 0.7%\nNordnet Livsforsikring AS 5,277,653 0.7%\nSpectatio Finans AS 5,021,178 0.6%\nStiftelsen Kistefos-Museets Driftsfond 5,000,000 0.6%\nVerdipapirfondet DNB SMB 4,571,643 0.6%\nJ.P. MORGAN SE 4,454,162 0.6%\nNordnet Bank AB 3,861,663 0.5%\nVerdipapirfondet Delphi Norge 3,136,396 0.4%\nSpesialfondet Borea Kreditt 2,536,739 0.3%\nDNB BANK ASA 2,277,434 0.3%\nTotal 20 largest shareholders 656,041,151 81.4%\nOther shareholders 149,633,151 18.6%\nTotal number of shares 805,674,302 100%\nTotal number of shareholders 7,132\nAxactor – Second quarter 2026 Axactor – Second quarter 2026\n36 36 Highlights Key figures Operations Financials APM Glossary Highlights Key figures Operations Financials APM Glossary Financials Financials | Interim condensed consolidated financial statements Financials | Interim condensed consolidated financial statements",
+        "hasAttachments": true,
+        "sourceBodyChars": 15710,
+        "outputMode": "notice",
+        "maxVisibleArticleChars": 1000,
+        "supplementalMaterials": []
+      },
+      "storedOutput": {
+        "title": "Axactor skriver ned verdier med 320 millioner euro",
+        "lead": "Axactor går fra overskudd til tap i andre kvartal, ifølge kvartalsrapporten. Selskapet opplyser også om negative verdiendringer på 320 millioner euro.",
+        "body": [
+          "• Omsetningen, driftsresultatet og resultatet før skatt snur fra pluss til minus sammenlignet med samme kvartal i fjor.",
+          "Axactor har samtidig hentet rundt 215 millioner euro i egenkapital, solgt en startportefølje for 100 millioner euro og utstedt obligasjoner for 100 millioner euro.",
+          "– Alle milepælene i endringsprosjektet er levert, og vi kjøpte de første porteføljene i den nye medinvesteringsstrukturen i juli, sier konsernsjef Johnny Tsolis."
+        ],
+        "company_sentence": "Axactor kjøper og følger opp misligholdte lån.",
+        "key_facts": [
+          "Negative verdiendringer på 320 millioner euro",
+          "Resultatet snur fra overskudd til tap i andre kvartal",
+          "Hentet rundt 215 millioner euro i egenkapital",
+          "Solgte en startportefølje for 100 millioner euro"
+        ],
+        "negative_or_surprising": [
+          "Resultatet før skatt snudde til minus 312,5 millioner euro, fra pluss 8,9 millioner euro året før."
+        ],
+        "excluded_hype": [],
+        "source_limitations": [
+          "Kun et utdrag av rapporten er analysert"
+        ],
+        "confidence": "high",
+        "importance": "viktig",
+        "source_spans": [
+          "primary: Profit/(loss) before tax -312,453 8,892",
+          "primary: The review resulted in negative revaluations of EUR 320 million",
+          "primary: Successfully completed EUR ~215 million equity issue",
+          "primary: Completed seed portfolio sale, raising EUR 100 million in proceeds",
+          "primary: CEO Johnny Tsolis: “All milestones have been delivered in due time, and we acquired the first portfolios in the new co-investment structure in July.”"
+        ]
+      },
+      "storedValidation": {
+        "valid": false,
+        "errors": [
+          "Unexpected numbers: 312,5",
+          "Reference check found unsupported high-risk factual claims. High-risk unsupported sentences: 1."
+        ],
+        "issues": [
+          {
+            "code": "UNEXPECTED_NUMBERS",
+            "message": "Unexpected numbers: 312,5",
+            "severity": "blocking"
+          },
+          {
+            "code": "REFERENCE_CHECK_UNSUPPORTED_FACTS",
+            "message": "Reference check found unsupported high-risk factual claims. High-risk unsupported sentences: 1.",
+            "severity": "blocking"
+          }
+        ],
+        "warnings": [],
+        "errorCode": "BLOCKING_VALIDATION_ERRORS",
+        "hiddenDraft": {
+          "body": [
+            "• Omsetningen snur til minus 258 millioner euro, fra 64 millioner euro i samme kvartal i fjor.",
+            "• Driftsresultatet (ebit) snur til minus 292 millioner euro, fra pluss 31 millioner euro.",
+            "• Resultatet før skatt snur til minus 312 millioner euro, fra pluss 8,9 millioner euro.",
+            "Axactor har samtidig hentet rundt 215 millioner euro i egenkapital, solgt en låneportefølje for 100 millioner euro og utstedt obligasjoner for 100 millioner euro. Antall aksjer økte til 806 millioner ved utgangen av juni, fra 302 millioner ved årsslutt.",
+            "– Alle milepælene i endringsprosjektet er levert, og vi kjøpte de første porteføljene i den nye medinvesteringsstrukturen i juli, sier konsernsjef Johnny Tsolis."
+          ],
+          "lead": "Inkassoselskapet Axactor går fra overskudd til et tap før skatt på 312 millioner euro i andre kvartal. Årsaken er en nedskrivning på 320 millioner euro av verdien på kjøpte misligholdte lån, opplyser selskapet.",
+          "title": "Axactor skriver ned verdier med 320 millioner euro",
+          "company_sentence": "Axactor er et inkassoselskap som kjøper og krever inn misligholdte lån."
+        },
+        "promptChars": 443147,
+        "blockingErrors": [
+          "Unexpected numbers: 312,5",
+          "Reference check found unsupported high-risk factual claims. High-risk unsupported sentences: 1."
+        ],
+        "quoteTelemetry": {
+          "draftContainsInlineGuillemets": false,
+          "draftContainsStandaloneDashQuote": true,
+          "draftContainsNamedPersonAttribution": true,
+          "draftSourceSpansMentionQuoteSpeaker": true,
+          "sourceContainsNamedQuoteLikePattern": true
+        },
+        "referenceCheck": {
+          "enabled": true,
+          "blocking": true,
+          "checkerError": null,
+          "finalCoverage": {
+            "totalSentences": 6,
+            "coveragePercent": 83,
+            "sentenceReviews": [
+              {
+                "index": 0,
+                "grounded": true,
+                "sentence": "Axactor går fra overskudd til tap i andre kvartal, ifølge kvartalsrapporten.",
+                "interpretation": "Nettoresultatet etter skatt var positivt i Q2 2025 og negativt i Q2 2026.",
+                "sourceEvidence": "Net profit after tax of EUR -315m (EUR 7m)"
+              },
+              {
+                "index": 1,
+                "grounded": true,
+                "sentence": "Selskapet opplyser også om negative verdiendringer på 320 millioner euro.",
+                "interpretation": "Selskapet opplyser eksplisitt at gjennomgangen ga negative revalueringer på 320 millioner euro.",
+                "sourceEvidence": "The review resulted in negative revaluations of EUR 320 million"
+              },
+              {
+                "index": 2,
+                "grounded": true,
+                "sentence": "• Omsetningen, driftsresultatet og resultatet før skatt snur fra pluss til minus sammenlignet med samme kvartal i fjor.",
+                "interpretation": "Alle de tre postene er positive i Q2 2025 og negative i Q2 2026.",
+                "sourceEvidence": "Total revenue -258,011 / 63,786; Operating profit /(loss) -292,332 / 30,551; Profit/(loss) before tax -312,453 / 8,892"
+              },
+              {
+                "index": 3,
+                "grounded": true,
+                "sentence": "Axactor har samtidig hentet rundt 215 millioner euro i egenkapital, solgt en startportefølje for 100 millioner euro og utstedt obligasjoner for 100 millioner euro.",
+                "interpretation": "Alle beløpene og transaksjonene er eksplisitt oppgitt.",
+                "sourceEvidence": "Successfully completed EUR ~215 million equity issue; Completed seed portfolio sale, raising EUR 100 million in proceeds; Bond placement of EUR 100 million"
+              },
+              {
+                "index": 4,
+                "grounded": true,
+                "sentence": "– Alle milepælene i endringsprosjektet er levert, og vi kjøpte de første porteføljene i den nye medinvesteringsstrukturen i juli, sier konsernsjef Johnny Tsolis.",
+                "interpretation": "Dette er en naturlig norsk gjengivelse av CEO-sitatet, med uendret innhold og avsender.",
+                "sourceEvidence": "All milestones have been delivered in due time, and we acquired the first portfolios in the new co-investment structure in July. (...) says CEO Johnny Tsolis."
+              },
+              {
+                "index": 5,
+                "grounded": false,
+                "sentence": "Axactor kjøper og følger opp misligholdte lån.",
+                "interpretation": "Teksten omtaler porteføljeinvesteringer og servicing, men dekker ikke eksplisitt denne generelle beskrivelsen av selskapets virksomhet.",
+                "sourceEvidence": ""
+              }
+            ],
+            "groundedSentences": 5,
+            "unsupportedSentences": [
+              {
+                "index": 5,
+                "sentence": "Axactor kjøper og følger opp misligholdte lån.",
+                "interpretation": "Teksten omtaler porteføljeinvesteringer og servicing, men dekker ikke eksplisitt denne generelle beskrivelsen av selskapets virksomhet.",
+                "sourceEvidence": ""
+              }
+            ],
+            "visibleArticleSentenceCount": 5
+          },
+          "repairHistory": [
+            {
+              "blocking": true,
+              "checkNumber": 1,
+              "blockingReason": "Reference check found unsupported high-risk factual claims.",
+              "coveragePercent": 67,
+              "correctionAttempt": 0,
+              "unsupportedSentences": [
+                {
+                  "index": 0,
+                  "sentence": "Inkassoselskapet Axactor går fra overskudd til et tap før skatt på 312 millioner euro i andre kvartal.",
+                  "interpretation": "Tallene for resultat før skatt er dekket, men referansen omtaler ikke eksplisitt Axactor som et inkassoselskap."
+                },
+                {
+                  "index": 1,
+                  "sentence": "Årsaken er en nedskrivning på 320 millioner euro av verdien på kjøpte misligholdte lån, opplyser selskapet.",
+                  "interpretation": "Referansen oppgir negative revalueringer på 320 millioner euro, men sier ikke eksplisitt at dette er årsaken til resultatet før skatt."
+                },
+                {
+                  "index": 8,
+                  "sentence": "Axactor er et inkassoselskap som kjøper og krever inn misligholdte lån.",
+                  "interpretation": "Referansen beskriver kjøpte låneporteføljer og 3PC, men fastslår ikke eksplisitt denne virksomhetsbeskrivelsen av Axactor."
+                }
+              ],
+              "unsupportedSentenceCount": 3,
+              "highRiskUnsupportedSentenceCount": 3
+            },
+            {
+              "blocking": true,
+              "checkNumber": 2,
+              "blockingReason": "Reference check found unsupported high-risk factual claims.",
+              "coveragePercent": 89,
+              "correctionAttempt": 1,
+              "unsupportedSentences": [
+                {
+                  "index": 5,
+                  "sentence": "Axactor har samtidig hentet rundt 215 millioner euro i egenkapital, solgt en låneportefølje for 100 millioner euro og utstedt obligasjoner for 100 millioner euro.",
+                  "interpretation": "Egenkapitalinnhentingen og obligasjonsutstedelsen er dekket, men referansen sier bare «seed portfolio sale» med 100 millioner euro i proveny, ikke eksplisitt at det var en låneportefølje solgt for 100 millioner euro."
+                }
+              ],
+              "unsupportedSentenceCount": 1,
+              "highRiskUnsupportedSentenceCount": 1
+            },
+            {
+              "blocking": false,
+              "checkNumber": 3,
+              "blockingReason": null,
+              "coveragePercent": 100,
+              "correctionAttempt": 2,
+              "unsupportedSentences": [],
+              "unsupportedSentenceCount": 0,
+              "highRiskUnsupportedSentenceCount": 0
+            },
+            {
+              "blocking": true,
+              "checkNumber": 1,
+              "blockingReason": "Reference check found unsupported high-risk factual claims.",
+              "coveragePercent": 80,
+              "correctionAttempt": 2,
+              "unsupportedSentences": [
+                {
+                  "index": 0,
+                  "sentence": "Axactor går fra overskudd til tap i andre kvartal etter negative verdiendringer på 320 millioner euro i kjøpte låneporteføljer, ifølge kvartalsrapporten.",
+                  "interpretation": "Kvartalstallene viser overgang fra overskudd til tap, og kilden oppgir negative revalueringer på EUR 320 millioner. Den sier imidlertid ikke eksplisitt at tapet kom som følge av disse verdiendringene i kjøpte låneporteføljer."
+                }
+              ],
+              "unsupportedSentenceCount": 1,
+              "highRiskUnsupportedSentenceCount": 1
+            },
+            {
+              "blocking": true,
+              "checkNumber": 2,
+              "blockingReason": "Reference check found unsupported high-risk factual claims.",
+              "coveragePercent": 83,
+              "correctionAttempt": 3,
+              "unsupportedSentences": [
+                {
+                  "index": 5,
+                  "sentence": "Axactor kjøper og følger opp misligholdte lån.",
+                  "interpretation": "Teksten omtaler porteføljeinvesteringer og servicing, men dekker ikke eksplisitt denne generelle beskrivelsen av selskapets virksomhet."
+                }
+              ],
+              "unsupportedSentenceCount": 1,
+              "highRiskUnsupportedSentenceCount": 1
+            }
+          ],
+          "blockingReason": "Reference check found unsupported high-risk factual claims.",
+          "totalSentences": 6,
+          "initialCoverage": {
+            "totalSentences": 9,
+            "coveragePercent": 67,
+            "sentenceReviews": [
+              {
+                "index": 0,
+                "grounded": false,
+                "sentence": "Inkassoselskapet Axactor går fra overskudd til et tap før skatt på 312 millioner euro i andre kvartal.",
+                "interpretation": "Tallene for resultat før skatt er dekket, men referansen omtaler ikke eksplisitt Axactor som et inkassoselskap.",
+                "sourceEvidence": "Profit/(loss) before tax -312,453 ... 8,892"
+              },
+              {
+                "index": 1,
+                "grounded": false,
+                "sentence": "Årsaken er en nedskrivning på 320 millioner euro av verdien på kjøpte misligholdte lån, opplyser selskapet.",
+                "interpretation": "Referansen oppgir negative revalueringer på 320 millioner euro, men sier ikke eksplisitt at dette er årsaken til resultatet før skatt.",
+                "sourceEvidence": "The review resulted in negative revaluations of EUR 320 million"
+              },
+              {
+                "index": 2,
+                "grounded": true,
+                "sentence": "• Omsetningen snur til minus 258 millioner euro, fra 64 millioner euro i samme kvartal i fjor.",
+                "interpretation": "Totalinntektene i andre kvartal 2026 og 2025 fremgår eksplisitt.",
+                "sourceEvidence": "Total revenue ... -258,011 63,786"
+              },
+              {
+                "index": 3,
+                "grounded": true,
+                "sentence": "• Driftsresultatet (ebit) snur til minus 292 millioner euro, fra pluss 31 millioner euro.",
+                "interpretation": "Driftsresultatet for begge kvartalene fremgår eksplisitt.",
+                "sourceEvidence": "Operating profit /(loss) -292,332 30,551"
+              },
+              {
+                "index": 4,
+                "grounded": true,
+                "sentence": "• Resultatet før skatt snur til minus 312 millioner euro, fra pluss 8,9 millioner euro.",
+                "interpretation": "Resultat før skatt for begge kvartalene fremgår eksplisitt.",
+                "sourceEvidence": "Profit/(loss) before tax -312,453 8,892"
+              },
+              {
+                "index": 5,
+                "grounded": true,
+                "sentence": "Axactor har samtidig hentet rundt 215 millioner euro i egenkapital, solgt en låneportefølje for 100 millioner euro og utstedt obligasjoner for 100 millioner euro.",
+                "interpretation": "Egenkapitalemisjonen, salget av seed-porteføljen og obligasjonsplasseringen med de oppgitte beløpene er eksplisitt oppgitt.",
+                "sourceEvidence": "Successfully completed EUR ~215 million equity issue ... seed portfolio sale, raising EUR 100 million in proceeds ... Bond placement of EUR 100 million"
+              },
+              {
+                "index": 6,
+                "grounded": true,
+                "sentence": "Antall aksjer økte til 806 millioner ved utgangen av juni, fra 302 millioner ved årsslutt.",
+                "interpretation": "Antall aksjer per 30. juni 2026 og 31. desember 2025 er eksplisitt oppgitt; tallene er avrundet i setningen.",
+                "sourceEvidence": "On 31 Dec 2025 302,145,464 ... On 30 Jun 2026 805,674,302"
+              },
+              {
+                "index": 7,
+                "grounded": true,
+                "sentence": "– Alle milepælene i endringsprosjektet er levert, og vi kjøpte de første porteføljene i den nye medinvesteringsstrukturen i juli, sier konsernsjef Johnny Tsolis.",
+                "interpretation": "Dette er en naturlig norsk gjengivelse av CEO-sitatet i referansen.",
+                "sourceEvidence": "All milestones have been delivered in due time, and we acquired the first portfolios in the new co-investment structure in July. ... says CEO Johnny Tsolis."
+              },
+              {
+                "index": 8,
+                "grounded": false,
+                "sentence": "Axactor er et inkassoselskap som kjøper og krever inn misligholdte lån.",
+                "interpretation": "Referansen beskriver kjøpte låneporteføljer og 3PC, men fastslår ikke eksplisitt denne virksomhetsbeskrivelsen av Axactor.",
+                "sourceEvidence": ""
+              }
+            ],
+            "groundedSentences": 6,
+            "unsupportedSentences": [
+              {
+                "index": 0,
+                "sentence": "Inkassoselskapet Axactor går fra overskudd til et tap før skatt på 312 millioner euro i andre kvartal.",
+                "interpretation": "Tallene for resultat før skatt er dekket, men referansen omtaler ikke eksplisitt Axactor som et inkassoselskap.",
+                "sourceEvidence": "Profit/(loss) before tax -312,453 ... 8,892"
+              },
+              {
+                "index": 1,
+                "sentence": "Årsaken er en nedskrivning på 320 millioner euro av verdien på kjøpte misligholdte lån, opplyser selskapet.",
+                "interpretation": "Referansen oppgir negative revalueringer på 320 millioner euro, men sier ikke eksplisitt at dette er årsaken til resultatet før skatt.",
+                "sourceEvidence": "The review resulted in negative revaluations of EUR 320 million"
+              },
+              {
+                "index": 8,
+                "sentence": "Axactor er et inkassoselskap som kjøper og krever inn misligholdte lån.",
+                "interpretation": "Referansen beskriver kjøpte låneporteføljer og 3PC, men fastslår ikke eksplisitt denne virksomhetsbeskrivelsen av Axactor.",
+                "sourceEvidence": ""
+              }
+            ],
+            "visibleArticleSentenceCount": 8
+          },
+          "sentenceReviews": [
+            {
+              "index": 0,
+              "grounded": true,
+              "sentence": "Axactor går fra overskudd til tap i andre kvartal, ifølge kvartalsrapporten.",
+              "interpretation": "Nettoresultatet etter skatt var positivt i Q2 2025 og negativt i Q2 2026.",
+              "sourceEvidence": "Net profit after tax of EUR -315m (EUR 7m)"
+            },
+            {
+              "index": 1,
+              "grounded": true,
+              "sentence": "Selskapet opplyser også om negative verdiendringer på 320 millioner euro.",
+              "interpretation": "Selskapet opplyser eksplisitt at gjennomgangen ga negative revalueringer på 320 millioner euro.",
+              "sourceEvidence": "The review resulted in negative revaluations of EUR 320 million"
+            },
+            {
+              "index": 2,
+              "grounded": true,
+              "sentence": "• Omsetningen, driftsresultatet og resultatet før skatt snur fra pluss til minus sammenlignet med samme kvartal i fjor.",
+              "interpretation": "Alle de tre postene er positive i Q2 2025 og negative i Q2 2026.",
+              "sourceEvidence": "Total revenue -258,011 / 63,786; Operating profit /(loss) -292,332 / 30,551; Profit/(loss) before tax -312,453 / 8,892"
+            },
+            {
+              "index": 3,
+              "grounded": true,
+              "sentence": "Axactor har samtidig hentet rundt 215 millioner euro i egenkapital, solgt en startportefølje for 100 millioner euro og utstedt obligasjoner for 100 millioner euro.",
+              "interpretation": "Alle beløpene og transaksjonene er eksplisitt oppgitt.",
+              "sourceEvidence": "Successfully completed EUR ~215 million equity issue; Completed seed portfolio sale, raising EUR 100 million in proceeds; Bond placement of EUR 100 million"
+            },
+            {
+              "index": 4,
+              "grounded": true,
+              "sentence": "– Alle milepælene i endringsprosjektet er levert, og vi kjøpte de første porteføljene i den nye medinvesteringsstrukturen i juli, sier konsernsjef Johnny Tsolis.",
+              "interpretation": "Dette er en naturlig norsk gjengivelse av CEO-sitatet, med uendret innhold og avsender.",
+              "sourceEvidence": "All milestones have been delivered in due time, and we acquired the first portfolios in the new co-investment structure in July. (...) says CEO Johnny Tsolis."
+            },
+            {
+              "index": 5,
+              "grounded": false,
+              "sentence": "Axactor kjøper og følger opp misligholdte lån.",
+              "interpretation": "Teksten omtaler porteføljeinvesteringer og servicing, men dekker ikke eksplisitt denne generelle beskrivelsen av selskapets virksomhet.",
+              "sourceEvidence": ""
+            }
+          ],
+          "correctionApplied": true,
+          "correctionAttempts": 3,
+          "importanceAdjusted": false,
+          "attributionRiskCount": 0,
+          "finalCoveragePercent": 83,
+          "unsupportedSentences": [
+            {
+              "index": 5,
+              "sentence": "Axactor kjøper og følger opp misligholdte lån.",
+              "interpretation": "Teksten omtaler porteføljeinvesteringer og servicing, men dekker ikke eksplisitt denne generelle beskrivelsen av selskapets virksomhet.",
+              "sourceEvidence": ""
+            }
+          ],
+          "importanceAdjustReason": null,
+          "initialCoveragePercent": 67,
+          "unsupportedSentenceCount": 1,
+          "attributionCorrectionApplied": false,
+          "highRiskUnsupportedSentenceCount": 1
+        },
+        "editorialReview": null,
+        "sourceBodyChars": 3419,
+        "reportExtraction": {
+          "pageCount": 42,
+          "diagnostics": {
+            "fallbackUsed": false,
+            "requestedTopicTerms": [],
+            "totalExtractedChars": 97953,
+            "incomeStatementFound": true,
+            "requestedPageNumbers": []
+          },
+          "attachmentId": 330870,
+          "contextChars": 12289,
+          "selectedPages": [
+            {
+              "score": 8,
+              "reasons": [
+                "outlook_or_events"
+              ],
+              "textChars": 2939,
+              "pageNumber": 13
+            },
+            {
+              "score": 9,
+              "reasons": [
+                "outlook_or_events"
+              ],
+              "textChars": 1254,
+              "pageNumber": 14
+            },
+            {
+              "score": 84,
+              "reasons": [
+                "income_statement"
+              ],
+              "textChars": 1065,
+              "pageNumber": 15
+            },
+            {
+              "score": 60,
+              "reasons": [
+                "income_statement"
+              ],
+              "textChars": 2060,
+              "pageNumber": 16
+            },
+            {
+              "score": 9,
+              "reasons": [
+                "outlook_or_events"
+              ],
+              "textChars": 2234,
+              "pageNumber": 36
+            },
+            {
+              "score": 45,
+              "reasons": [
+                "income_statement"
+              ],
+              "textChars": 1803,
+              "pageNumber": 41
+            }
+          ],
+          "attachmentName": "Quarterly Report - Q2 - 2026.pdf",
+          "extractedChars": 97953,
+          "metricCandidates": [
+            {
+              "label": "Note",
+              "metric": "revenue",
+              "values": [
+                "5"
+              ],
+              "rowText": "Note 5 Revenue",
+              "pageNumber": 15
+            },
+            {
+              "label": "Interest revenue from purchased loan portfolios",
+              "metric": "revenue",
+              "values": [
+                "5, 6 51,159 49,809 101,230 99,554 199,301"
+              ],
+              "rowText": "Interest revenue from purchased loan portfolios 5, 6 51,159 49,809 101,230 99,554 199,301",
+              "pageNumber": 16
+            },
+            {
+              "label": "Operating profit /(loss)",
+              "metric": "operating_result",
+              "values": [
+                "-292,332 30,551",
+                "-272,306 60,851 125,248"
+              ],
+              "rowText": "Operating profit /(loss) -292,332 30,551 -272,306 60,851 125,248",
+              "pageNumber": 16
+            },
+            {
+              "label": "Profit/(loss) before tax",
+              "metric": "earnings_before_tax",
+              "values": [
+                "-312,453 8,892",
+                "-310,624 22,345 47,408"
+              ],
+              "rowText": "Profit/(loss) before tax -312,453 8,892 -310,624 22,345 47,408",
+              "pageNumber": 16
+            }
+          ],
+          "validationSourceChars": 15710
+        },
+        "validationRepair": {
+          "error": null,
+          "applied": true,
+          "issueCodes": [
+            "UNEXPECTED_NUMBERS"
+          ],
+          "finalWarnings": [
+            "Unexpected numbers: 312,5"
+          ],
+          "initialWarnings": [
+            "Unexpected numbers: 312, 258, 292, 806, 302"
+          ]
+        },
+        "styleSanitization": {
+          "changed": false,
+          "removedAsaSuffix": 0,
+          "expandedMarketCodes": 0,
+          "replacedPercentSigns": 0,
+          "removedRegisteredMarks": 0,
+          "normalizedBillionPhrases": 0,
+          "replacedFiscalYearAbbrev": 0,
+          "normalizedAccountingAcronyms": 0,
+          "normalizedExactBillionAmounts": 0
+        },
+        "revisionInstructionCompliance": null
+      },
+      "labels": {
+        "class": "numeric_false_block",
+        "note": "Reclassified from numeric_unresolved 2026-08-19 at verbal_minus_composed enablement: 'minus 312,5 millioner euro' derives from EUR-thousand row 'Profit/(loss) before tax -312,453' (replay-numbers-composed-2026-08-19).",
+        "reportRef": "final report 2026-06-02_2026-08-13"
+      },
+      "expected": {
+        "validation": {
+          "issueCodes": [],
+          "hasUnexpectedNumbers": false,
+          "blocking": false
+        }
+      },
+      "provenance": {
+        "window": {
+          "from": "2026-06-02",
+          "to": "2026-08-13"
+        },
+        "status": "failed"
+      }
     }
   ]
 }
