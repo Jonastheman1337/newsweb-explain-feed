@@ -3,8 +3,11 @@ import { describe, expect, it } from "vitest";
 import {
   TRIAGE_PROMPT,
   buildTriageUserPrompt,
+  defaultEnabledTriageClasses,
+  evaluateTriageClasses,
   getDeterministicTriageSkip,
-  parseTriageResponse
+  parseTriageResponse,
+  triageClassIds
 } from "./newsworthiness-triage.js";
 
 describe("needsNewsworthinessTriage", () => {
@@ -78,6 +81,242 @@ describe("buildTriageUserPrompt", () => {
     );
 
     expect(prompt).toContain("Har vedlegg: ja");
+  });
+});
+
+describe("triage class registry", () => {
+  it("pins registry ids, order and the default enabled set", () => {
+    // Updating these expectations is a deliberate release act: enabling a
+    // class must come with refreshed fixture expectations (see the plan doc).
+    expect([...triageClassIds]).toEqual([
+      "document-only",
+      "routine-prospectus",
+      "routine-reminder",
+      "public-sector-results",
+      "small-routine-bond",
+      "routine-results-invitation",
+      "routine-treasury-reopening",
+      "routine-prospectus-distribution"
+    ]);
+    // The three P3 classes stay shadow until their windows clear.
+    expect([...defaultEnabledTriageClasses]).toEqual([
+      "document-only",
+      "routine-prospectus",
+      "routine-reminder",
+      "public-sector-results",
+      "small-routine-bond"
+    ]);
+  });
+
+  it("returns no enabled skip when every class is disabled, but reports candidates", () => {
+    const evaluation = evaluateTriageClasses(
+      "28-2026 5th Planet Games A/S - Interim Report Q1 2026",
+      "COPENHAGEN, May 21, 2026: The interim report for Q1 2026 has been released today. The full report can be viewed by clicking the link at the end of this document.",
+      ["IKKE-INFORMASJONSPLIKTIGE PRESSEMELDINGER"],
+      false,
+      undefined,
+      undefined,
+      { enabledClasses: [] }
+    );
+    expect(evaluation.enabledSkip).toBeNull();
+    expect(evaluation.candidateClassIds).toEqual(["document-only"]);
+    expect(evaluation.shadowSkipClassIds).toEqual(["document-only"]);
+  });
+
+  it("carries classId and reasonCode on enabled skips", () => {
+    const skip = getDeterministicTriageSkip(
+      "28-2026 5th Planet Games A/S - Interim Report Q1 2026",
+      "COPENHAGEN, May 21, 2026: The interim report for Q1 2026 has been released today. The full report can be viewed by clicking the link at the end of this document.",
+      ["IKKE-INFORMASJONSPLIKTIGE PRESSEMELDINGER"],
+      false
+    );
+    expect(skip?.classId).toBe("document-only");
+    expect(skip?.reasonCode).toBe("TRIAGE_DOCUMENT_ONLY");
+  });
+});
+
+describe("false-skip narrowing (P3, production cases)", () => {
+  it("keeps 675253: a CEO departure is not document-only despite the MAR footer", () => {
+    const result = getDeterministicTriageSkip(
+      "Per Axel Koch varsler planlagt fratreden som konsernsjef i Polaris Media",
+      "Per Axel Koch har informert styret i Polaris Media ASA om at han ønsker å fratre stillingen som konsernsjef i løpet av 2027. Styret har startet arbeidet med å finne hans etterfølger. Meldingen er offentliggjort av Robert Berg i henhold til MAR.",
+      ["INNSIDEINFORMASJON"],
+      false
+    );
+    expect(result).toBeNull();
+  });
+
+  it("keeps 678418: field-trial results with percentages are not document-only", () => {
+    const result = getDeterministicTriageSkip(
+      "Desert Control Field Trials Demonstrate Significant Yield and Water Efficiency Gains",
+      "The trials showed a 29.8% increase in yield and a 33% improvement in water efficiency, with production costs of $18/box and savings of $1,800 per acre. The whitepaper from the first trial is available at https://example.com.",
+      ["IKKE-INFORMASJONSPLIKTIGE PRESSEMELDINGER"],
+      false
+    );
+    expect(result).toBeNull();
+  });
+
+  it("keeps 679225: a tap issue under an existing bond with distress language is not a routine bond", () => {
+    const result = getDeterministicTriageSkip(
+      "Nordic Mining ASA - Update on Production Ramp-Up, Liquidity and Regulatory Status",
+      "The company is in dialogue with bondholders regarding a waiver and a deferral of the NOK 46.4 million coupon payment, and contemplates a tap issue of up to USD 10-15 million under the existing senior secured bond. Liquidity extends to 4 September.",
+      ["INNSIDEINFORMASJON"],
+      false
+    );
+    expect(result).toBeNull();
+  });
+
+  it("keeps Norwegian distressed bond notices (review finding: English-only vetoes)", () => {
+    const result = getDeterministicTriageSkip(
+      "Utstedelse av obligasjonslån",
+      "Selskapet har gjennomført en utstedelse av obligasjonslån på NOK 300 millioner som ledd i restruktureringen av gjelden etter mislighold.",
+      ["ANNEN INFORMASJONSPLIKTIG REGULATORISK INFORMASJON"],
+      false
+    );
+    expect(result).toBeNull();
+  });
+
+  it("does not skip on statutory footer variants alone (review finding: MAR phrasings)", () => {
+    for (const footer of [
+      "Denne informasjonen er offentliggjort i henhold til MAR artikkel 17.",
+      "This information is published pursuant to MAR.",
+      "Informasjonen er offentliggjort i samsvar med verdipapirhandelloven."
+    ]) {
+      const result = getDeterministicTriageSkip(
+        "Selskapet har mottatt stevning",
+        `Selskapet har mottatt stevning fra en tidligere samarbeidspartner. Styret bestrider kravet. ${footer}`,
+        ["INNSIDEINFORMASJON"],
+        false
+      );
+      expect(result).toBeNull();
+    }
+  });
+
+  it("still skips Norwegian definite-form document availability (review finding: over-narrowing)", () => {
+    const result = getDeterministicTriageSkip(
+      "Selskapet ASA: Årsrapport 2025",
+      "Årsrapporten for 2025 er tilgjengelig på selskapets hjemmeside www.selskap.no.",
+      ["ANNEN INFORMASJONSPLIKTIG REGULATORISK INFORMASJON"],
+      true
+    );
+    expect(result?.kind).toBe("document-only");
+  });
+
+  it("still skips a plain routine bond issuance without exclusion terms", () => {
+    const result = getDeterministicTriageSkip(
+      "Vellykket utstedelse av obligasjonslån",
+      "Selskapet har gjennomført en vellykket utstedelse av obligasjonslån på NOK 500 millioner kroner.",
+      ["ANNEN INFORMASJONSPLIKTIG REGULATORISK INFORMASJON"],
+      false
+    );
+    expect(result?.kind).toBe("small-routine-bond");
+  });
+
+  it("still skips document publication with a document-anchored availability line", () => {
+    const result = getDeterministicTriageSkip(
+      "EAM: EAM Solar AS - 2025 Annual Report",
+      "EAM Solar AS has published its annual report for 2025. The report is attached and available on the company's website.",
+      ["ANNEN INFORMASJONSPLIKTIG REGULATORISK INFORMASJON"],
+      true
+    );
+    expect(result?.kind).toBe("document-only");
+  });
+});
+
+describe("P3 shadow classes (registered, not enabled)", () => {
+  function shadowIds(title: string, body: string): string[] {
+    return evaluateTriageClasses(title, body, [], false).shadowSkipClassIds;
+  }
+
+  it("flags a routine results-presentation invitation in shadow only", () => {
+    const evaluation = evaluateTriageClasses(
+      "B2 Impact ASA: Invitation to presentation of Q2 2026 results",
+      "B2 Impact ASA invites you to the presentation of the company Q2 2026 results on Thursday 20 August. The presentation will be held as a webcast. Presenters: Kari Eian Krogstad - CEO.",
+      [],
+      false
+    );
+    expect(evaluation.shadowSkipClassIds).toEqual([
+      "routine-results-invitation"
+    ]);
+    expect(evaluation.enabledSkip).toBeNull();
+  });
+
+  it("does not flag an invitation whose text carries the results themselves", () => {
+    expect(
+      shadowIds(
+        "Invitation to presentation of Q2 2026 results",
+        "Revenue increased to NOK 470 million in the quarter. The presentation will be held as a webcast."
+      )
+    ).toEqual([]);
+  });
+
+  it("does not flag an invitation with the report attached", () => {
+    expect(
+      shadowIds(
+        "Invitation to presentation of Q2 2026 results",
+        "The interim presentation is attached. The webcast will be live on Thursday."
+      )
+    ).toEqual([]);
+  });
+
+  it("flags a routine treasury reopening in shadow only", () => {
+    expect(
+      shadowIds(
+        "Reopening of Treasury bill NTB 03/2027",
+        "Norges Bank announces a reopening of the Treasury bill NTB 03/2027. Auction date: 20 August 2026. The auction result will be announced shortly after the auction closes."
+      )
+    ).toEqual(["routine-treasury-reopening"]);
+  });
+
+  it("does not flag treasury auction results or cancellations", () => {
+    expect(
+      shadowIds(
+        "Reopening of Treasury bill NTB 03/2027 - auction result",
+        "Norges Bank: the auction of the Treasury bill was allotted at an effective yield of 4.42 percent with bid-to-cover of 2.1."
+      )
+    ).toEqual([]);
+    expect(
+      shadowIds(
+        "Reopening of Treasury bill NTB 03/2027 cancelled",
+        "Norges Bank announces that the auction of the Treasury bill reopening is cancelled."
+      )
+    ).toEqual([]);
+  });
+
+  it("flags a routine prospectus publication for an already announced offering in shadow only", () => {
+    expect(
+      shadowIds(
+        "Morrow Bank AB publishes prospectus for the Rights Issue",
+        "The company announced that the Board had resolved to carry out the rights issue. The Financial Supervisory Authority has approved the prospectus, and the prospectus is available on the company website. The subscription period runs from 9 June."
+      )
+    ).toEqual(["routine-prospectus-distribution"]);
+  });
+
+  it("does not flag prospectus notices with offering outcomes or subscription reminders", () => {
+    expect(
+      shadowIds(
+        "Publishes prospectus for the Rights Issue",
+        "The rights issue was fully subscribed with gross proceeds of NOK 200 million. The prospectus is available on the company website following the previously announced rights issue."
+      )
+    ).toEqual([]);
+    expect(
+      shadowIds(
+        "Prospectus approved - last day of subscription period",
+        "Reference is made to the previously announced rights issue. Today is the last day of the subscription period. The prospectus is available on the company website."
+      )
+    ).toEqual([]);
+  });
+
+  it("does not flag a subscription-period reminder without a prospectus title", () => {
+    // 679280/679281 shape: the title has no prospectus token, so the
+    // title anchor keeps the class off even though the body restates
+    // prospectus availability.
+    expect(
+      shadowIds(
+        "Last day of the subscription period in the Rights Issue",
+        "Reference is made to the previously announced rights issue. The prospectus is available on the company website."
+      )
+    ).toEqual([]);
   });
 });
 

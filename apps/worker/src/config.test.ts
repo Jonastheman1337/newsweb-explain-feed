@@ -238,6 +238,29 @@ describe("parseWorkerConfig", () => {
     });
   });
 
+  it("parses TRIAGE_SKIP_CLASSES like the other kill switches", () => {
+    const base = {
+      NODE_ENV: "development",
+      DATABASE_URL:
+        "postgresql://newsweb:newsweb@localhost:5432/newsweb_explain?schema=public",
+      REDIS_URL: "redis://localhost:6379",
+      OPENAI_API_KEY: "sk-openai-test-key"
+    };
+    expect(parseWorkerConfig(base).TRIAGE_SKIP_CLASSES).toBeUndefined();
+    expect(
+      parseWorkerConfig({ ...base, TRIAGE_SKIP_CLASSES: "" }).TRIAGE_SKIP_CLASSES
+    ).toEqual([]);
+    expect(
+      parseWorkerConfig({
+        ...base,
+        TRIAGE_SKIP_CLASSES: "document-only, small-routine-bond"
+      }).TRIAGE_SKIP_CLASSES
+    ).toEqual(["document-only", "small-routine-bond"]);
+    expect(() =>
+      parseWorkerConfig({ ...base, TRIAGE_SKIP_CLASSES: "no_such_class" })
+    ).toThrow(/Unknown triage skip class id/);
+  });
+
   it("rejects unknown REFERENCE_CHECK_ENFORCEMENT flags at boot", () => {
     expect(() =>
       parseWorkerConfig({

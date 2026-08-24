@@ -94,6 +94,18 @@ describe.runIf(manifest !== null)("editorial safety gates", () => {
         }
       }
 
+      if (file.class === "false_skip") {
+        it("never flips: adjudicated false skips replay proceed with zero shadow candidates", () => {
+          // A shadow class matching a known false skip is a FUTURE false
+          // skip — new suppression classes must design their exclusions
+          // around this corpus before they can be enabled.
+          for (const item of file.cases) {
+            expect(item.expected.triage?.deterministicSkipKind).toBeNull();
+            expect(item.expected.triage?.shadowSkipClassIds).toEqual([]);
+          }
+        });
+      }
+
       if (file.class === "numeric_unresolved") {
         it("never flips: unresolved numeric cases must keep UNEXPECTED_NUMBERS", () => {
           for (const item of file.cases) {

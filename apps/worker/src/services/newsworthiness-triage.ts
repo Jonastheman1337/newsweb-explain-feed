@@ -46,14 +46,51 @@ export type TriageResult = {
   reason: string;
 };
 
+// P3 registry: class ids ARE the persisted `kind` strings, so pre-registry
+// rows, fixtures, and tests keep their values. Registry order is the frozen
+// evaluation order (first match wins), mirroring the original fixed rule
+// sequence. Append new ids at the END; never reorder.
+export const triageClassIds = [
+  "document-only",
+  "routine-prospectus",
+  "routine-reminder",
+  "public-sector-results",
+  "small-routine-bond",
+  "routine-results-invitation",
+  "routine-treasury-reopening",
+  "routine-prospectus-distribution"
+] as const;
+
+export type TriageClassId = (typeof triageClassIds)[number];
+
+export type TriageReasonCode =
+  | "TRIAGE_DOCUMENT_ONLY"
+  | "TRIAGE_ROUTINE_PROSPECTUS"
+  | "TRIAGE_ROUTINE_REMINDER"
+  | "TRIAGE_PUBLIC_SECTOR_RESULTS"
+  | "TRIAGE_SMALL_ROUTINE_BOND"
+  | "TRIAGE_ROUTINE_RESULTS_INVITATION"
+  | "TRIAGE_ROUTINE_TREASURY_REOPENING"
+  | "TRIAGE_ROUTINE_PROSPECTUS_DISTRIBUTION";
+
 export type DeterministicTriageSkip = TriageResult & {
-  kind:
-    | "document-only"
-    | "routine-prospectus"
-    | "routine-reminder"
-    | "public-sector-results"
-    | "small-routine-bond";
+  kind: TriageClassId;
+  classId: TriageClassId;
+  reasonCode: TriageReasonCode;
 };
+
+// The production default. CI safety gates replay getDeterministicTriageSkip
+// bare, so this constant — not env — is what release flips change; the
+// TRIAGE_SKIP_CLASSES env is the emergency kill-switch only. Enabling a
+// class = append its id here + build-safety-fixtures --update-expected in
+// the same commit; that fixture diff is the release record.
+export const defaultEnabledTriageClasses: readonly TriageClassId[] = [
+  "document-only",
+  "routine-prospectus",
+  "routine-reminder",
+  "public-sector-results",
+  "small-routine-bond"
+];
 
 export type TriageCallFn = (
   title: string,
@@ -65,22 +102,48 @@ export type TriageCallFn = (
 const DOCUMENT_ONLY_PATTERNS = [
   /\b(interim|quarterly|annual|financial)\s+report\b/i,
   /\bq[1-4]\s+(?:fy)?\d{4}\s+(?:report|presentation)\b/i,
-  /\b(?:årsrapport|kvartalsrapport|delårsrapport|halvårsrapport)\b/i,
+  // Unicode lookbehind instead of \b: JS ASCII \b never fires before
+  // å-initial words, so "Årsrapporten" was invisible to this bank.
+  /(?<![\p{L}\p{N}])(?:årsrapport|kvartalsrapport|delårsrapport|halvårsrapport)\w*/iu,
   /\b(?:prospectus|prospekt|form\s+6-k|presentation)\b/i,
-  /\b(?:has been|is|er)\s+(?:released|published|publisert|offentliggjort)\b/i,
-  /\b(?:can be viewed|available|tilgjengelig|kan leses)\b/i,
+  // The lookahead excludes statutory MAR/vphl footers in all their common
+  // phrasings ("offentliggjort av <person>", "i henhold til MAR",
+  // "pursuant to", "i samsvar med") — 675253 (a CEO departure) was skipped
+  // solely on such a footer.
+  /\b(?:has been|is|er)\s+(?:released|published|publisert|offentliggjort)\b(?!\s+(?:av|by|i\s+henhold\s+til|i\s+samsvar\s+med|pursuant\s+to|in\s+accordance\s+with)\b)/i,
+  // Availability must be anchored to a document noun in the same sentence —
+  // 678418 (field-trial results) was skipped solely on a bare "available".
+  // Suffix-tolerant for Norwegian definite forms ("Årsrapporten",
+  // "prospektet"); the gap tolerates URL dots but not sentence enders !?.
+  /(?<![\p{L}\p{N}])(?:report|rapport\w*|årsrapport\w*|kvartalsrapport\w*|delårsrapport\w*|halvårsrapport\w*|presentation|presentasjon\w*|prospectus|prospekt\w*|form\s+6-k|attachment|vedlegg\w*|webcast|audiocast|webinar|recording|opptak\w*)[^!?]{0,100}?\b(?:can be viewed|available|tilgjengelig|kan leses)\b/iu,
   /\b(?:clicking the link|link at the end|se vedlegg|see attached)\b/i
 ];
 
-const SUBSTANTIVE_FACT_PATTERNS = [
+// Split so routine-results-invitation can compose "substance minus bare
+// executive titles" without a hand-fork drifting from this bank.
+const SUBSTANTIVE_FACT_CORE_PATTERNS = [
   /\b(?:revenue|revenues|inntekter|omsetning)\b/i,
   /\b(?:resultat|profit|loss|earnings|ebit|ebitda|operating income|driftsresultat)\b/i,
   /\b(?:guidance|guiding|utsikter|outlook|utbytte|dividend)\b/i,
   /\b(?:contract|kontrakt|agreement|avtale|order|ordre)\b/i,
   /\b(?:emisjon|rights issue|private placement|capital raise|kapitalinnhenting)\b/i,
   /\b(?:acquisition|oppkjøp|merger|fusjon|sale of|salg av)\b/i,
-  /\b(?:resign|resignation|fratrer|går av|ceo|cfo|chair)\b/i,
-  /\b(?:nok|usd|eur|dollar|kroner|euro|million|millioner|milliard|billion)\b/i
+  /\b(?:nok|usd|eur|dollar|kroner|euro|million|millioner|milliard|billion)\b/i,
+  // Percentage results and symbol-form currency amounts (field-trial and
+  // trading-update notices carry substance as "29.8%" / "$18/box").
+  /\d(?:[.,]\d+)?\s?(?:%|prosent(?:poeng)?|percent|per cent)/i,
+  /[$€£]\s?\d/
+];
+
+const EXECUTIVE_CHANGE_PATTERN =
+  /\b(?:resign|resignation|fratre(?:r|den)?|går av)\b/i;
+
+const EXECUTIVE_TITLE_PATTERN = /\b(?:ceo|cfo|chair|konsernsjef)\b/i;
+
+const SUBSTANTIVE_FACT_PATTERNS = [
+  ...SUBSTANTIVE_FACT_CORE_PATTERNS,
+  EXECUTIVE_CHANGE_PATTERN,
+  EXECUTIVE_TITLE_PATTERN
 ];
 
 const PROSPECTUS_PUBLICATION_PATTERNS = [
@@ -155,6 +218,100 @@ const ROUTINE_BOND_PATTERNS = [
   /\bcontemplates? (?:the )?issuance of .*bond\b/i
 ];
 
+// Vetoes for small-routine-bond: a tap under an existing bond, or distress
+// language (waiver, coupon deferral, liquidity), is never a routine
+// issuance — 679225 (Nordic Mining liquidity update) was skipped as one.
+// Bilingual on purpose: the bond patterns themselves match Norwegian
+// notices, so English-only vetoes would leave the Norwegian variants of the
+// same distress signals skippable.
+const ROUTINE_BOND_EXCLUSION_PATTERNS = [
+  /\btap issue\b/i,
+  /\btap[- ]?utstedelse\b/i,
+  /\btilleggsutstedelse\b/i,
+  /\bexisting\b[^.!?]{0,60}\bbonds?\b/i,
+  /\beksisterende\b[^.!?]{0,60}\bobligasjon/i,
+  /\b(?:waiver|standstill|going concern|default(?:ed|s)?)\b/i,
+  /\bmislighold/i,
+  /\bfrafall\b/i,
+  /\bdefer(?:ral|red|ring|s)?\b/i,
+  /\bbetalingsutsettelse/i,
+  /\butsettelse av\b[^.!?]{0,40}\b(?:rente|kupong|betaling)/i,
+  /\bliquidity (?:shortfall|injection)\b/i,
+  /\blikviditet(?:ssituasjon|sutfordring|skrise)/i,
+  /\brestructur/i,
+  /\brestrukturer/i
+];
+
+// P3 shadow classes (owner-approved 2026-08-18): registered but NOT in
+// defaultEnabledTriageClasses until their shadow window clears. Exclusion
+// banks are per-class, never global — e.g. the treasury class must tolerate
+// "Coupon: 0 %" and "2 000 MNOK" that other classes treat as substance.
+
+// Exclusion bank for routine-results-invitation: the substantive-fact CORE
+// plus executive changes, but NOT bare executive titles — presenter contact
+// blocks ("Kari Krogstad - CEO") are boilerplate on invitations, while
+// resignations still disqualify. Composed so new substance patterns added
+// to the core automatically apply here too.
+const INVITATION_FACT_PATTERNS = [
+  ...SUBSTANTIVE_FACT_CORE_PATTERNS,
+  EXECUTIVE_CHANGE_PATTERN
+];
+
+const RESULTS_INVITATION_INVITE_PATTERN =
+  /\b(?:invitation to|invites? (?:you )?to|invitasjon til|inviterer til)\b/i;
+const RESULTS_INVITATION_RESULTS_PATTERN =
+  /\b(?:results?|resultat(?:er|ene)?|kvartalstall)\b/i;
+const RESULTS_INVITATION_PERIOD_PATTERN =
+  /\b(?:q[1-4]\b|[1-4]\.\s?(?:kvartal|tertial)|(?:first|second|third|fourth)\s+(?:quarter|half)|halvårs?|kvartal|half[- ]?year|interim)\b/i;
+const RESULTS_INVITATION_EVENT_PATTERN =
+  /\b(?:presentation|presentasjon|webcast|audiocast|webinar|conference call|live)\b/i;
+// Report attached = the results themselves are published; keep visible.
+const RESULTS_INVITATION_ATTACHED_PATTERN =
+  /\b(?:is|are|er)\s+(?:attached|vedlagt)\b/i;
+
+// The gap excludes \n so title tokens cannot anchor to body text (e.g. an
+// (NTB) news-agency byline); the acronyms carry a trailing \b.
+const TREASURY_REOPENING_PATTERN =
+  /(?<![\p{L}\p{N}])(?:reopening|gjenåpning)\b[^.!?\n]{0,80}\b(?:treasury|government bond|statskasse\w*|statsobligasjon\w*|(?:NTB|NST|NGB)\b)/iu;
+const TREASURY_AUCTION_PATTERN = /\b(?:auction|auksjon)/i;
+const TREASURY_SOVEREIGN_PATTERN = /\b(?:norges bank|debtnorway)/i;
+const TREASURY_REOPENING_EXCLUSION_PATTERNS = [
+  /\b(?:cancelled|canceled|kansellert|avlyst|postponed|utsatt)\b/i,
+  // Auction RESULTS stay visible — figure-anchored, because the reopening
+  // notice itself legitimately says the result will be announced later.
+  /\b(?:bid-to-cover|effective yield|allotment|allotted|tildelt)\b/i
+];
+
+// Title-anchored: subscription-period reminders that restate prospectus
+// availability in the body must not qualify (679280/679281).
+const PROSPECTUS_DISTRIBUTION_TITLE_PATTERNS = [
+  /\b(?:publishes?|publication|approval|approves?|godkjent|godkjennelse|offentliggjøring|publisering)\b[^.!?]{0,60}\b(?:prospectus|prospekt(?:et)?)\b/i,
+  /\b(?:prospectus|prospekt(?:et)?)\b[^.!?]{0,60}\b(?:published|publisert|approved|godkjent|available|tilgjengelig)\b/i
+];
+const PROSPECTUS_DISTRIBUTION_PRIOR_PATTERNS = [
+  ...PROSPECTUS_ALREADY_ANNOUNCED_PATTERNS,
+  /\bannounced (?:that|a|the)\b/i
+];
+const PROSPECTUS_DISTRIBUTION_AVAILABILITY_PATTERN =
+  /\b(?:prospectus|prospekt)\b[\s\S]{0,200}?\b(?:available|tilgjengelig|website|hjemmeside)\b/i;
+// Offering-anchored outcome bank — deliberately NOT the reused
+// PROSPECTUS_MATERIAL_OUTCOME_PATTERNS, whose bare "results" matches
+// forward-looking-statements legalese ("future results of operations").
+const PROSPECTUS_DISTRIBUTION_OUTCOME_PATTERNS = [
+  /\b(?:result|results|utfall|resultat(?:et)?)\s+(?:of|av)\s+(?:the\s+)?(?:rights issue|offering|subscription|emisjon)/i,
+  /\b(?:fully subscribed|oversubscribed|overtegnet|fulltegnet|allocated|allocation|tildel)/i,
+  /\b(?:gross|net)\s+proceeds\b/i,
+  /\b(?:has been|was|er)\s+(?:completed|gjennomført|fullført)\b/i
+];
+// Subscription-period-specific — a broad "last day" veto would false-veto on
+// timetable rows like "Last day of trading".
+const PROSPECTUS_DISTRIBUTION_REMINDER_PATTERNS = [
+  /\blast day of (?:the )?subscription period\b/i,
+  /\bexpires? today\b/i,
+  /\butløper i dag\b/i,
+  /\bsiste tegningsdag\b/i
+];
+
 const BILLION_NOK = 1_000_000_000;
 
 function hasAnyPattern(text: string, patterns: RegExp[]): boolean {
@@ -205,89 +362,218 @@ function maxNokAmount(text: string): number | null {
   return matches.length ? Math.max(...matches) : null;
 }
 
-export function getDeterministicTriageSkip(
+type TriageTextViews = {
+  title: string;
+  bodyText: string;
+  text: string;
+  sourceOnlyText: string;
+  marketEventText: string;
+};
+
+type TriageClassDefinition = {
+  id: TriageClassId;
+  reasonCode: TriageReasonCode;
+  reason: string;
+  match: (views: TriageTextViews) => boolean;
+};
+
+// Registry order must mirror triageClassIds; each match body is the original
+// rule logic verbatim.
+const triageClassDefinitions: readonly TriageClassDefinition[] = [
+  {
+    id: "document-only",
+    reasonCode: "TRIAGE_DOCUMENT_ONLY",
+    reason:
+      "Tilgjengelig tekst sier bare at et dokument/presentasjon er publisert, uten konkrete tall, hendelser eller konsekvenser.",
+    match: (views) =>
+      hasAnyPattern(views.text, DOCUMENT_ONLY_PATTERNS) &&
+      !hasAnyPattern(views.bodyText, SUBSTANTIVE_FACT_PATTERNS)
+  },
+  {
+    id: "routine-prospectus",
+    reasonCode: "TRIAGE_ROUTINE_PROSPECTUS",
+    reason:
+      "Routine prospectus approval/publication for an already announced offering.",
+    match: (views) =>
+      hasAnyPattern(views.sourceOnlyText, PROSPECTUS_PUBLICATION_PATTERNS) &&
+      hasAnyPattern(views.sourceOnlyText, PROSPECTUS_OFFERING_CONTEXT_PATTERNS) &&
+      hasAnyPattern(views.sourceOnlyText, PROSPECTUS_ALREADY_ANNOUNCED_PATTERNS) &&
+      !hasAnyPattern(views.sourceOnlyText, PROSPECTUS_MATERIAL_OUTCOME_PATTERNS)
+  },
+  {
+    id: "routine-reminder",
+    reasonCode: "TRIAGE_ROUTINE_REMINDER",
+    reason:
+      "Tilgjengelig tekst er en rutinemessig påminnelse om tegningsperiode/frister uten nytt utfall eller nye vilkår.",
+    match: (views) =>
+      hasAnyPattern(views.text, ROUTINE_REMINDER_PATTERNS) &&
+      !hasAnyPattern(views.text, REMINDER_OUTCOME_PATTERNS)
+  },
+  {
+    id: "public-sector-results",
+    reasonCode: "TRIAGE_PUBLIC_SECTOR_RESULTS",
+    reason:
+      "Rutinemessig kommune-/offentlig resultatsak uten konkret kapitalmarkedshendelse eller substansielle tall.",
+    match: (views) =>
+      hasAnyPattern(views.text, PUBLIC_SECTOR_RESULT_PATTERNS) &&
+      hasAnyPattern(views.text, RESULT_REPORT_PATTERNS) &&
+      !hasAnyPattern(views.marketEventText, PUBLIC_SECTOR_MARKET_EVENT_PATTERNS)
+  },
+  {
+    id: "small-routine-bond",
+    reasonCode: "TRIAGE_SMALL_ROUTINE_BOND",
+    reason:
+      "Rutinemessig obligasjonsutstedelse under én milliard kroner uten sterkere nyhetspoeng.",
+    match: (views) => {
+      if (hasAnyPattern(views.text, ROUTINE_BOND_EXCLUSION_PATTERNS)) {
+        return false;
+      }
+      const nokAmount = maxNokAmount(views.text);
+      return (
+        nokAmount != null &&
+        nokAmount < BILLION_NOK &&
+        hasAnyPattern(views.text, ROUTINE_BOND_PATTERNS)
+      );
+    }
+  },
+  {
+    id: "routine-results-invitation",
+    reasonCode: "TRIAGE_ROUTINE_RESULTS_INVITATION",
+    reason:
+      "Rutinemessig invitasjon til resultatpresentasjon uten publiserte tall i tilgjengelig tekst.",
+    match: (views) =>
+      RESULTS_INVITATION_INVITE_PATTERN.test(views.text) &&
+      RESULTS_INVITATION_RESULTS_PATTERN.test(views.text) &&
+      RESULTS_INVITATION_PERIOD_PATTERN.test(views.text) &&
+      RESULTS_INVITATION_EVENT_PATTERN.test(views.text) &&
+      !RESULTS_INVITATION_ATTACHED_PATTERN.test(views.text) &&
+      !hasAnyPattern(views.bodyText, INVITATION_FACT_PATTERNS)
+  },
+  {
+    id: "routine-treasury-reopening",
+    reasonCode: "TRIAGE_ROUTINE_TREASURY_REOPENING",
+    reason:
+      "Rutinemessig gjenåpning/auksjon av statspapir uten resultat eller avvik.",
+    match: (views) =>
+      TREASURY_REOPENING_PATTERN.test(views.text) &&
+      TREASURY_AUCTION_PATTERN.test(views.text) &&
+      TREASURY_SOVEREIGN_PATTERN.test(views.text) &&
+      !hasAnyPattern(views.text, TREASURY_REOPENING_EXCLUSION_PATTERNS)
+  },
+  {
+    id: "routine-prospectus-distribution",
+    reasonCode: "TRIAGE_ROUTINE_PROSPECTUS_DISTRIBUTION",
+    reason:
+      "Rutinemessig publisering/godkjenning av prospekt for et allerede annonsert tilbud, uten nytt utfall.",
+    match: (views) =>
+      hasAnyPattern(views.title, PROSPECTUS_DISTRIBUTION_TITLE_PATTERNS) &&
+      hasAnyPattern(views.sourceOnlyText, PROSPECTUS_OFFERING_CONTEXT_PATTERNS) &&
+      hasAnyPattern(views.sourceOnlyText, PROSPECTUS_DISTRIBUTION_PRIOR_PATTERNS) &&
+      PROSPECTUS_DISTRIBUTION_AVAILABILITY_PATTERN.test(views.sourceOnlyText) &&
+      !hasAnyPattern(
+        views.sourceOnlyText,
+        PROSPECTUS_DISTRIBUTION_OUTCOME_PATTERNS
+      ) &&
+      !hasAnyPattern(
+        views.sourceOnlyText,
+        PROSPECTUS_DISTRIBUTION_REMINDER_PATTERNS
+      )
+  }
+];
+
+// The id tuple and the definition table encode the same frozen order; a
+// mismatch would silently change persisted kinds on multi-match notices or
+// leave a config-validatable id inert, so it fails at module load.
+if (
+  triageClassDefinitions.length !== triageClassIds.length ||
+  triageClassDefinitions.some(
+    (definition, index) => definition.id !== triageClassIds[index]
+  )
+) {
+  throw new Error(
+    "triageClassDefinitions must mirror triageClassIds exactly, in order"
+  );
+}
+
+function buildTriageTextViews(
+  title: string,
+  bodyText: string,
+  issuerName?: string,
+  sourceBodyText?: string
+): TriageTextViews {
+  return {
+    title,
+    bodyText,
+    text: [title, issuerName, bodyText].filter(Boolean).join("\n").trim(),
+    sourceOnlyText: [title, issuerName, sourceBodyText ?? bodyText]
+      .filter(Boolean)
+      .join("\n")
+      .trim(),
+    marketEventText: [title, sourceBodyText ?? bodyText]
+      .filter(Boolean)
+      .join("\n")
+      .trim()
+  };
+}
+
+export type TriageShadowEvaluation = {
+  enabledSkip: DeterministicTriageSkip | null;
+  // Every registered class that matches, registry order, enabled or not.
+  candidateClassIds: TriageClassId[];
+  // Candidates NOT in the enabled set — the shadow signal for enablement.
+  shadowSkipClassIds: TriageClassId[];
+};
+
+export function evaluateTriageClasses(
   title: string,
   bodyText: string,
   _categories: string[],
   _hasAttachments?: boolean,
   issuerName?: string,
-  sourceBodyText?: string
+  sourceBodyText?: string,
+  options?: { enabledClasses?: readonly TriageClassId[] }
+): TriageShadowEvaluation {
+  const views = buildTriageTextViews(title, bodyText, issuerName, sourceBodyText);
+  const enabled = new Set(options?.enabledClasses ?? defaultEnabledTriageClasses);
+  const candidates = triageClassDefinitions.filter((definition) =>
+    definition.match(views)
+  );
+  const firstEnabled = candidates.find((definition) => enabled.has(definition.id));
+  return {
+    enabledSkip: firstEnabled
+      ? {
+          newsworthy: false,
+          kind: firstEnabled.id,
+          classId: firstEnabled.id,
+          reasonCode: firstEnabled.reasonCode,
+          reason: firstEnabled.reason
+        }
+      : null,
+    candidateClassIds: candidates.map((definition) => definition.id),
+    shadowSkipClassIds: candidates
+      .filter((definition) => !enabled.has(definition.id))
+      .map((definition) => definition.id)
+  };
+}
+
+export function getDeterministicTriageSkip(
+  title: string,
+  bodyText: string,
+  categories: string[],
+  hasAttachments?: boolean,
+  issuerName?: string,
+  sourceBodyText?: string,
+  options?: { enabledClasses?: readonly TriageClassId[] }
 ): DeterministicTriageSkip | null {
-  const text = [title, issuerName, bodyText].filter(Boolean).join("\n").trim();
-  const sourceOnlyText = [title, issuerName, sourceBodyText ?? bodyText]
-    .filter(Boolean)
-    .join("\n")
-    .trim();
-  const marketEventText = [title, sourceBodyText ?? bodyText]
-    .filter(Boolean)
-    .join("\n")
-    .trim();
-  const hasDocumentOnlySignal = hasAnyPattern(text, DOCUMENT_ONLY_PATTERNS);
-  const hasSubstantiveFacts = hasAnyPattern(bodyText, SUBSTANTIVE_FACT_PATTERNS);
-
-  if (hasDocumentOnlySignal && !hasSubstantiveFacts) {
-    return {
-      newsworthy: false,
-      kind: "document-only",
-      reason:
-        "Tilgjengelig tekst sier bare at et dokument/presentasjon er publisert, uten konkrete tall, hendelser eller konsekvenser."
-    };
-  }
-
-  if (
-    hasAnyPattern(sourceOnlyText, PROSPECTUS_PUBLICATION_PATTERNS) &&
-    hasAnyPattern(sourceOnlyText, PROSPECTUS_OFFERING_CONTEXT_PATTERNS) &&
-    hasAnyPattern(sourceOnlyText, PROSPECTUS_ALREADY_ANNOUNCED_PATTERNS) &&
-    !hasAnyPattern(sourceOnlyText, PROSPECTUS_MATERIAL_OUTCOME_PATTERNS)
-  ) {
-    return {
-      newsworthy: false,
-      kind: "routine-prospectus",
-      reason:
-        "Routine prospectus approval/publication for an already announced offering."
-    };
-  }
-
-  if (
-    hasAnyPattern(text, ROUTINE_REMINDER_PATTERNS) &&
-    !hasAnyPattern(text, REMINDER_OUTCOME_PATTERNS)
-  ) {
-    return {
-      newsworthy: false,
-      kind: "routine-reminder",
-      reason:
-        "Tilgjengelig tekst er en rutinemessig påminnelse om tegningsperiode/frister uten nytt utfall eller nye vilkår."
-    };
-  }
-
-  if (
-    hasAnyPattern(text, PUBLIC_SECTOR_RESULT_PATTERNS) &&
-    hasAnyPattern(text, RESULT_REPORT_PATTERNS) &&
-    !hasAnyPattern(marketEventText, PUBLIC_SECTOR_MARKET_EVENT_PATTERNS)
-  ) {
-    return {
-      newsworthy: false,
-      kind: "public-sector-results",
-      reason:
-        "Rutinemessig kommune-/offentlig resultatsak uten konkret kapitalmarkedshendelse eller substansielle tall."
-    };
-  }
-
-  const nokAmount = maxNokAmount(text);
-  if (
-    nokAmount != null &&
-    nokAmount < BILLION_NOK &&
-    hasAnyPattern(text, ROUTINE_BOND_PATTERNS)
-  ) {
-    return {
-      newsworthy: false,
-      kind: "small-routine-bond",
-      reason:
-        "Rutinemessig obligasjonsutstedelse under én milliard kroner uten sterkere nyhetspoeng."
-    };
-  }
-
-  return null;
+  return evaluateTriageClasses(
+    title,
+    bodyText,
+    categories,
+    hasAttachments,
+    issuerName,
+    sourceBodyText,
+    options
+  ).enabledSkip;
 }
 
 export function buildTriageUserPrompt(

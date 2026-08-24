@@ -6,6 +6,10 @@ import {
   type NumberDerivationRuleId
 } from "@newsweb/prompt-kit";
 import {
+  triageClassIds,
+  type TriageClassId
+} from "./services/newsworthiness-triage.js";
+import {
   openAIPromptCacheModes,
   openAIServiceTiers,
   validateOpenAIModelReasoningEffort
@@ -66,6 +70,37 @@ const numericAcceptanceRulesEnvSchema = z
       return z.NEVER;
     }
     return entries as NumberDerivationRuleId[];
+  })
+  .optional();
+
+// Emergency kill-switch override for the deterministic triage skip classes
+// enabled in code (defaultEnabledTriageClasses in
+// services/newsworthiness-triage.ts). Same semantics as
+// NUMERIC_ACCEPTANCE_RULES: UNSET = code default; SET — even the empty
+// string — is the exact enabled set ("" = every deterministic skip off, all
+// notices proceed to model triage / rewrite). One confirmed false skip
+// disables that class here same-day, no deploy.
+const triageSkipClassesEnvSchema = z
+  .string()
+  .transform((value, ctx) => {
+    const entries = [
+      ...new Set(
+        value
+          .split(",")
+          .map((entry) => entry.trim())
+          .filter((entry) => entry.length > 0)
+      )
+    ];
+    const known = new Set<string>(triageClassIds);
+    const unknown = entries.filter((entry) => !known.has(entry));
+    if (unknown.length > 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Unknown triage skip class id(s): ${unknown.join(", ")} (known: ${triageClassIds.join(", ")})`
+      });
+      return z.NEVER;
+    }
+    return entries as TriageClassId[];
   })
   .optional();
 
@@ -141,6 +176,7 @@ const configSchema = z
     OPENAI_PROMPT_CACHE_MODE_PDF_CONTEXT: promptCacheModeEnvSchema.optional(),
     NUMERIC_ACCEPTANCE_RULES: numericAcceptanceRulesEnvSchema,
     REFERENCE_CHECK_ENFORCEMENT: referenceCheckEnforcementEnvSchema,
+    TRIAGE_SKIP_CLASSES: triageSkipClassesEnvSchema,
     NEWSWEB_POLLING_ENABLED: booleanEnvSchema,
     POLL_INTERVAL_MS: z.coerce.number().int().min(5000).default(5000),
     LATEST_BOOTSTRAP_COUNT: z.coerce.number().int().min(0).max(50).default(30)
