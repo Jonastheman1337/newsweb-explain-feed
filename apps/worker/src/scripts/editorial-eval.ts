@@ -6,6 +6,7 @@ import { config as loadDotEnv } from "dotenv";
 import {
   assessNumbers,
   createRegularPromptVariantMessages,
+  defaultEnabledDerivationRules,
   getRegularPromptVariantProfile,
   isRegularPromptVariantId,
   numberDerivationRuleIds,
@@ -86,9 +87,13 @@ import {
   validateRewriteOutput
 } from "../services/rewrite-validation.js";
 import {
+  findDigitVariantInSource,
+  hiddenDraftRewriteOutputFromRow,
   replayValidationPayloadFromRow,
+  storedRepairInitialUnexpectedNumbers,
   storedRewriteOutputFromRow,
-  storedUnexpectedNumberDisplays
+  storedUnexpectedNumberDisplays,
+  strippedNumberDisplays
 } from "../services/generation-run-replay.js";
 
 type CasesFile = {
@@ -227,6 +232,8 @@ async function main(): Promise<void> {
     await buildSafetyFixturesCommand(parsed.options, rootDir);
   } else if (parsed.command === "replay-numbers") {
     await replayNumbersCommand(parsed.options, rootDir);
+  } else if (parsed.command === "replay-stripped-numbers") {
+    await replayStrippedNumbersCommand(parsed.options, rootDir);
   } else if (parsed.command === "refresh-numeric-payloads") {
     await refreshNumericPayloadsCommand(parsed.options, rootDir);
   } else {
@@ -725,6 +732,10 @@ type ReplayCorpusJsonlRow = {
   sourcePayload?: unknown;
   outputJson?: unknown;
   validationJson?: unknown;
+  // Absent on legacy failed-run rows ("output"). "hiddenDraft" marks published
+  // number-strip rows, whose rewrite-under-test is validation_json.hiddenDraft
+  // while outputJson holds the post-strip published rewrite.
+  rewriteSource?: "output" | "hiddenDraft";
 };
 
 type ReplayNumbersRowResult = {
@@ -783,7 +794,17 @@ async function replayNumbersCommand(
 
   const latestByMessage = new Map<number, ReplayCorpusJsonlRow>();
   let malformedIds = 0;
+  let hiddenDraftRowsExcluded = 0;
   for (const row of rows) {
+    // Widened corpora interleave published number-strip rows; without this
+    // filter a later published run would shadow a failed run for the same
+    // message in the latest-per-message pool and storedRewriteOutputFromRow
+    // would replay the post-strip published rewrite. Those rows belong to
+    // replay-stripped-numbers.
+    if (row.rewriteSource === "hiddenDraft") {
+      hiddenDraftRowsExcluded += 1;
+      continue;
+    }
     const messageId = Number(row.messageId);
     if (!Number.isFinite(messageId)) {
       malformedIds += 1;
@@ -917,6 +938,8 @@ async function replayNumbersCommand(
     summary: {
       corpusRows: rows.length,
       malformedIds,
+      // Conditional so artifacts over legacy corpora stay byte-identical.
+      ...(hiddenDraftRowsExcluded > 0 ? { hiddenDraftRowsExcluded } : {}),
       pool: latestByMessage.size,
       replayed: results.length,
       skips,
@@ -933,6 +956,11 @@ async function replayNumbersCommand(
   await writeJson(outPath, artifact);
 
   console.log(`[replay-numbers] corpus ${corpusPath}`);
+  if (hiddenDraftRowsExcluded > 0) {
+    console.warn(
+      `[replay-numbers] excluded ${hiddenDraftRowsExcluded} hiddenDraft row(s); replay them with replay-stripped-numbers`
+    );
+  }
   console.log(
     `[replay-numbers] rows ${rows.length} -> pool ${latestByMessage.size} (latest per message), replayed ${results.length}, skipped ${skips.length}${
       malformedIds > 0 ? `, malformed ids ${malformedIds}` : ""
@@ -1008,6 +1036,311 @@ async function replayNumbersCommand(
     );
   }
   console.log(`[replay-numbers] artifact written to ${outPath}`);
+}
+
+type StrippedNumberResult = {
+  display: string;
+  dispositionDefault: "accepted" | "unexpected";
+  acceptedByRule: string | null;
+  candidateRuleId: string | null;
+  dispositionAllOn: "accepted" | "unexpected";
+  classification: "clears_now" | "matcher_gap" | "absent_from_source";
+  matcherGap: { variant: "digits_equal" | "digit_subrun"; sourceDisplay: string } | null;
+};
+
+type ReplayStrippedRowResult = {
+  messageId: number;
+  generationRunId: string;
+  promptVersion: string | null;
+  flow: "regular" | "report";
+  validationSourceCharsMatch: boolean | null;
+  storedInitialUnexpected: string[] | null;
+  replayedDraftUnexpected: string[];
+  fidelity: { onlyStored: string[]; onlyReplayed: string[]; rawMatch: boolean | null };
+  strippedNumbers: StrippedNumberResult[];
+  fullyExplained: boolean;
+};
+
+// Replays published number-strip rows (rewriteSource === "hiddenDraft"): the
+// pre-repair draft is re-validated against the reconstructed source, and every
+// number the repair stripped (draft vs published, key-compared) is classified
+// for adjudication. Fidelity against validationRepair.initialWarnings is
+// informational only: hydrated placeholder key_facts/source_spans cannot carry
+// the real draft's numbers, and source_cell_subrun can never fire on hydrated
+// drafts (the placeholder spans hold no digits).
+async function replayStrippedNumbersCommand(
+  options: Map<string, string>,
+  rootDir: string
+): Promise<void> {
+  const corpusPath = path.resolve(
+    rootDir,
+    options.get("corpus") ??
+      path.join("tmp", "editorial-eval", "replay-corpus-2026-06-02_2026-08-13.jsonl")
+  );
+  const corpusBase = path.basename(corpusPath);
+  const windowLabel =
+    /^replay-corpus-(.+)\.jsonl$/.exec(corpusBase)?.[1] ?? "output";
+  const outPath = path.resolve(
+    rootDir,
+    options.get("out") ??
+      path.join("tmp", "editorial-eval", `replay-stripped-${windowLabel}.json`)
+  );
+
+  let rawCorpus: string;
+  try {
+    rawCorpus = await fs.readFile(corpusPath, "utf8");
+  } catch {
+    throw new Error(
+      [
+        `Replay corpus not found: ${corpusPath}`,
+        "Regenerate it with export-replay-corpus (see docs/editorial-eval.md)",
+        "or pass --corpus <path>. Only corpora exported with the widened",
+        "published cohort contain rewriteSource=hiddenDraft rows."
+      ].join("\n")
+    );
+  }
+  const corpusSha256 = createHash("sha256").update(rawCorpus).digest("hex");
+  const rows = rawCorpus
+    .replace(/^﻿/, "")
+    .split(/\r?\n/)
+    .filter((line) => line.trim().length > 0)
+    .map((line) => JSON.parse(line) as ReplayCorpusJsonlRow)
+    .filter((row) => row.rewriteSource === "hiddenDraft");
+
+  const latestByMessage = new Map<number, ReplayCorpusJsonlRow>();
+  let malformedIds = 0;
+  for (const row of rows) {
+    const messageId = Number(row.messageId);
+    if (!Number.isFinite(messageId)) {
+      malformedIds += 1;
+      continue;
+    }
+    const previous = latestByMessage.get(messageId);
+    if (
+      !previous ||
+      String(row.requestedAt ?? "") > String(previous.requestedAt ?? "")
+    ) {
+      latestByMessage.set(messageId, row);
+    }
+  }
+
+  const allDerivationRules = [...numberDerivationRuleIds];
+  const results: ReplayStrippedRowResult[] = [];
+  const skips: Array<{ messageId: number; generationRunId: string; reason: string }> = [];
+
+  for (const [messageId, row] of latestByMessage) {
+    const draft = hiddenDraftRewriteOutputFromRow(row);
+    if (!draft) {
+      skips.push({ messageId, generationRunId: row.id, reason: "no-hidden-draft" });
+      continue;
+    }
+    const published = rewriteOutputSchema.safeParse(row.outputJson);
+    if (!published.success) {
+      skips.push({ messageId, generationRunId: row.id, reason: "no-published-output" });
+      continue;
+    }
+    const payloadResult = replayValidationPayloadFromRow(row);
+    if (!payloadResult) {
+      skips.push({ messageId, generationRunId: row.id, reason: "no-payload" });
+      continue;
+    }
+    const sourceText = buildValidationSourceText(payloadResult.payload);
+    const assessDefault = assessNumbers(draft, sourceText);
+    const assessAllOn = assessNumbers(draft, sourceText, {
+      enabledDerivationRules: allDerivationRules
+    });
+    const unexpectedDefault = new Set(unexpectedNumberDisplays(assessDefault));
+    const unexpectedAllOn = new Set(unexpectedNumberDisplays(assessAllOn));
+
+    const strippedNumbers: StrippedNumberResult[] = strippedNumberDisplays(
+      draft,
+      published.data
+    ).map((display) => {
+      const record = assessDefault.find((entry) => entry.display === display);
+      const dispositionDefault = unexpectedDefault.has(display)
+        ? ("unexpected" as const)
+        : ("accepted" as const);
+      const matcherGap =
+        dispositionDefault === "unexpected"
+          ? findDigitVariantInSource(display, sourceText)
+          : null;
+      return {
+        display,
+        dispositionDefault,
+        acceptedByRule:
+          dispositionDefault === "accepted" && record?.ruleId
+            ? String(record.ruleId)
+            : null,
+        candidateRuleId: record?.candidateRuleId
+          ? String(record.candidateRuleId)
+          : null,
+        dispositionAllOn: unexpectedAllOn.has(display)
+          ? ("unexpected" as const)
+          : ("accepted" as const),
+        classification:
+          dispositionDefault === "accepted"
+            ? ("clears_now" as const)
+            : matcherGap
+              ? ("matcher_gap" as const)
+              : ("absent_from_source" as const),
+        matcherGap
+      };
+    });
+
+    const stored = storedRepairInitialUnexpectedNumbers(row.validationJson);
+    const storedDisplays = stored ? [...stored.displays].sort() : null;
+    const replayedDraftUnexpected = unexpectedNumberDisplays(assessDefault).sort();
+    const replayedSet = new Set(replayedDraftUnexpected);
+    const storedSet = new Set(storedDisplays ?? []);
+    const fidelity = {
+      onlyStored: (storedDisplays ?? []).filter(
+        (display) => !replayedSet.has(display)
+      ),
+      onlyReplayed: storedDisplays
+        ? replayedDraftUnexpected.filter((display) => !storedSet.has(display))
+        : [],
+      rawMatch: stored
+        ? stored.raw === unexpectedNumberDisplays(assessDefault).join(", ")
+        : null
+    };
+
+    results.push({
+      messageId,
+      generationRunId: row.id,
+      promptVersion:
+        typeof row.promptVersion === "string" ? row.promptVersion : null,
+      flow: payloadResult.flow,
+      validationSourceCharsMatch: payloadResult.validationSourceCharsMatch,
+      storedInitialUnexpected: storedDisplays,
+      replayedDraftUnexpected,
+      fidelity,
+      strippedNumbers,
+      fullyExplained:
+        strippedNumbers.length > 0 &&
+        strippedNumbers.every((entry) => entry.classification === "clears_now")
+    });
+  }
+
+  results.sort((a, b) => a.messageId - b.messageId);
+  skips.sort((a, b) => a.messageId - b.messageId);
+
+  const allStripped = results.flatMap((row) =>
+    row.strippedNumbers.map((entry) => ({ row, entry }))
+  );
+  const countBy = <T>(items: T[], key: (item: T) => string): Array<{ key: string; count: number }> => {
+    const counts = new Map<string, number>();
+    for (const item of items) {
+      counts.set(key(item), (counts.get(key(item)) ?? 0) + 1);
+    }
+    return [...counts.entries()]
+      .map(([k, count]) => ({ key: k, count }))
+      .sort((a, b) => b.count - a.count || a.key.localeCompare(b.key));
+  };
+  const classificationCounts = countBy(allStripped, (item) => item.entry.classification);
+  const clearsNowByRule = countBy(
+    allStripped.filter((item) => item.entry.classification === "clears_now"),
+    (item) => item.entry.acceptedByRule ?? "not_flagged"
+  );
+  const matcherGapByVariant = countBy(
+    allStripped.filter((item) => item.entry.matcherGap),
+    (item) => item.entry.matcherGap?.variant ?? "unknown"
+  );
+  const classificationByFlow = countBy(
+    allStripped,
+    (item) => `${item.row.flow}:${item.entry.classification}`
+  );
+  const classificationByPromptVersion = countBy(
+    allStripped,
+    (item) => `${item.row.promptVersion ?? "unknown"}:${item.entry.classification}`
+  );
+  const fidelityMismatches = results.filter(
+    (row) =>
+      row.fidelity.onlyStored.length > 0 || row.fidelity.onlyReplayed.length > 0
+  );
+  const tripwireFailures = results.filter(
+    (row) => row.validationSourceCharsMatch === false
+  );
+
+  const artifact = {
+    header: {
+      corpus: path.relative(rootDir, corpusPath).replaceAll("\\", "/"),
+      corpusSha256,
+      gitHead: (await collectGitSourceState(rootDir)).headRevision,
+      derivationRuleIds: allDerivationRules,
+      defaultEnabledDerivationRules: [...defaultEnabledDerivationRules]
+    },
+    summary: {
+      corpusHiddenDraftRows: rows.length,
+      malformedIds,
+      pool: latestByMessage.size,
+      replayed: results.length,
+      skips,
+      strippedNumberCount: allStripped.length,
+      classificationCounts,
+      clearsNowByRule,
+      matcherGapByVariant,
+      classificationByFlow,
+      classificationByPromptVersion,
+      fullyExplainedRowCount: results.filter((row) => row.fullyExplained).length,
+      fidelityMismatchCount: fidelityMismatches.length,
+      tripwireFailureCount: tripwireFailures.length
+    },
+    rows: results
+  };
+  await writeJson(outPath, artifact);
+
+  console.log(`[replay-stripped] corpus ${corpusPath}`);
+  console.log(
+    `[replay-stripped] hiddenDraft rows ${rows.length} -> pool ${latestByMessage.size}, replayed ${results.length}, skipped ${skips.length}${
+      malformedIds > 0 ? `, malformed ids ${malformedIds}` : ""
+    }`
+  );
+  for (const skip of skips) {
+    console.warn(
+      `[replay-stripped] skipped ${skip.messageId} (${skip.generationRunId}): ${skip.reason}`
+    );
+  }
+  console.log(
+    `[replay-stripped] stripped numbers ${allStripped.length}: ${classificationCounts
+      .map((entry) => `${entry.key}=${entry.count}`)
+      .join(", ")}`
+  );
+  console.log(
+    `[replay-stripped] clears_now by rule: ${
+      clearsNowByRule.map((entry) => `${entry.key}=${entry.count}`).join(", ") || "(none)"
+    }`
+  );
+  console.log(
+    `[replay-stripped] matcher_gap variants: ${
+      matcherGapByVariant.map((entry) => `${entry.key}=${entry.count}`).join(", ") ||
+      "(none)"
+    }`
+  );
+  console.log(
+    `[replay-stripped] fidelity: ${fidelityMismatches.length} row(s) with stored/replayed drift (informational; hydrated drafts lack real key_facts/source_spans)`
+  );
+  if (tripwireFailures.length > 0) {
+    console.warn(
+      `[replay-stripped] tripwire failures: ${tripwireFailures
+        .map((row) => row.messageId)
+        .join(", ")}`
+    );
+  }
+  const gapItems = allStripped.filter(
+    (item) => item.entry.classification === "matcher_gap"
+  );
+  if (gapItems.length > 0) {
+    console.log("[replay-stripped] matcher_gap adjudication table:");
+    for (const item of gapItems) {
+      const sourceDisplay = item.entry.matcherGap?.sourceDisplay ?? "";
+      console.log(
+        `[replay-stripped]   ${item.row.messageId} (${item.row.generationRunId}) "${item.entry.display}" ${item.entry.matcherGap?.variant} source="${
+          sourceDisplay.length > 60 ? `${sourceDisplay.slice(0, 60)}…` : sourceDisplay
+        }"${item.entry.candidateRuleId ? ` candidate=${item.entry.candidateRuleId}` : ""}`
+      );
+    }
+  }
+  console.log(`[replay-stripped] artifact written to ${outPath}`);
 }
 
 // One-time fidelity repair for the frozen numeric fixture classes: 21 of the
@@ -2925,6 +3258,8 @@ function printUsage(): void {
     "  npm run eval:editorial -w apps/worker -- build-safety-fixtures --update-expected  (offline; re-replays validators and rewrites expected blocks)",
     "  npm run eval:editorial -w apps/worker -- replay-numbers [--corpus tmp/editorial-eval/replay-corpus-2026-06-02_2026-08-13.jsonl] [--out PATH]",
     "  (offline; replays the exported UNEXPECTED_NUMBERS corpus through the current assessment engine; paths resolve from the repo root)",
+    "  npm run eval:editorial -w apps/worker -- replay-stripped-numbers [--corpus PATH] [--out PATH]",
+    "  (offline; replays published number-strip rows (rewriteSource=hiddenDraft) and classifies each stripped number clears_now/matcher_gap/absent_from_source for adjudication)",
     "  npm run eval:editorial -w apps/worker -- refresh-numeric-payloads [--corpus PATH] [--replay-artifact PATH]",
     "  (offline one-time fidelity repair: run-matched faithful payloads for the two numeric fixture classes; requires a fresh replay-numbers artifact as cross-check)",
     "  Seeding commands need DATABASE_URL / GENERATION_LOG_DATABASE_URL in .env (Render external URLs or local prod clone). Paths resolve from apps/worker under npm -w; absolute paths are safest."
