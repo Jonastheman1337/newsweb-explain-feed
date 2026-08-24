@@ -1,4 +1,9 @@
-import type { PromptPayload, SupplementalMaterialPayload } from "@newsweb/prompt-kit";
+import {
+  collectNumberTokens,
+  parseNumberToken,
+  type PromptPayload,
+  type SupplementalMaterialPayload
+} from "@newsweb/prompt-kit";
 import { rewriteOutputSchema, type RewriteOutput } from "@newsweb/shared";
 
 // Replaying a stored generation run against the current validators requires
@@ -46,8 +51,17 @@ export function storedRewriteOutputFromRow(row: {
   if (blockedRewrite.success) return blockedRewrite.data;
 
   // Last resort: the worker keeps the rejected visible article fields in
-  // validation_json.hiddenDraft. Hydrate only the non-visible schema fields
-  // with number-free values so replay stays deterministic.
+  // validation_json.hiddenDraft.
+  return hiddenDraftRewriteOutputFromRow(row);
+}
+
+// Published number-strip rows must use this directly: their outputJson parses
+// successfully as the POST-strip published rewrite, so storedRewriteOutputFromRow
+// would never reach the hiddenDraft. Hydrates only the non-visible schema
+// fields, with number-free values so replay stays deterministic.
+export function hiddenDraftRewriteOutputFromRow(row: {
+  validationJson?: unknown;
+}): RewriteOutput | null {
   const hiddenDraft = asRecord(asRecord(row.validationJson)?.hiddenDraft);
   if (!hiddenDraft) return null;
   const replayOutput = rewriteOutputSchema.safeParse({
@@ -258,4 +272,93 @@ export function storedUnexpectedNumberDisplays(
     return { displays: raw.length > 0 ? raw.split(", ") : [], raw };
   }
   return null;
+}
+
+// Published rows persist the INITIAL draft's high-risk warnings in
+// validation_json.validationRepair.initialWarnings; validation_json.issues on
+// those rows describes the final (post-repair) rewrite and must not be used as
+// draft ground truth.
+export function storedRepairInitialUnexpectedNumbers(
+  validationJson: unknown
+): StoredUnexpectedNumbers | null {
+  const repair = asRecord(asRecord(validationJson)?.validationRepair);
+  if (!Array.isArray(repair?.initialWarnings)) return null;
+  for (const warning of repair.initialWarnings) {
+    if (
+      typeof warning !== "string" ||
+      !warning.startsWith(UNEXPECTED_NUMBERS_MESSAGE_PREFIX)
+    ) {
+      continue;
+    }
+    const raw = warning.slice(UNEXPECTED_NUMBERS_MESSAGE_PREFIX.length);
+    return { displays: raw.length > 0 ? raw.split(", ") : [], raw };
+  }
+  return null;
+}
+
+function visibleArticleText(rewrite: RewriteOutput): string {
+  return [rewrite.title, rewrite.lead, ...rewrite.body, rewrite.company_sentence]
+    .filter((part): part is string => typeof part === "string")
+    .join("\n");
+}
+
+// Numbers present in the draft's visible article text but absent from the
+// published one, compared by parsed key so pure separator restyling
+// ("1.402.704" vs "1 402 704") does not count as stripped. Returns deduped
+// sanitized displays aligned with NumberAssessment.display.
+export function strippedNumberDisplays(
+  draft: RewriteOutput,
+  published: RewriteOutput
+): string[] {
+  const publishedKeys = new Set<string>();
+  for (const token of collectNumberTokens(visibleArticleText(published))) {
+    const parsed = parseNumberToken(token);
+    if (parsed) publishedKeys.add(parsed.key);
+  }
+  const stripped = new Map<string, string>();
+  for (const token of collectNumberTokens(visibleArticleText(draft))) {
+    const parsed = parseNumberToken(token);
+    if (!parsed || publishedKeys.has(parsed.key) || stripped.has(parsed.key)) {
+      continue;
+    }
+    stripped.set(parsed.key, parsed.display);
+  }
+  return [...stripped.values()];
+}
+
+export type DigitVariantMatch = {
+  variant: "digits_equal" | "digit_subrun";
+  sourceDisplay: string;
+};
+
+// Matcher-gap scan: does the display's digit string exist in the validation
+// source under SOME separator styling the assessment engine failed to bridge?
+// Per-token only — never matches digits across token boundaries. digit_subrun
+// (the display's digits inside a longer source token, i.e. a merged table run)
+// requires >= 4 digits to bound coincidental hits.
+export function findDigitVariantInSource(
+  display: string,
+  sourceText: string
+): DigitVariantMatch | null {
+  const parsed = parseNumberToken(display);
+  const digits = (parsed?.display ?? display).replace(/\D/g, "");
+  if (!digits) return null;
+  let subrun: DigitVariantMatch | null = null;
+  for (const token of collectNumberTokens(sourceText)) {
+    const sourceParsed = parseNumberToken(token);
+    if (!sourceParsed) continue;
+    const sourceDigits = sourceParsed.display.replace(/\D/g, "");
+    if (sourceDigits === digits) {
+      return { variant: "digits_equal", sourceDisplay: sourceParsed.display };
+    }
+    if (
+      !subrun &&
+      digits.length >= 4 &&
+      sourceDigits.length > digits.length &&
+      sourceDigits.includes(digits)
+    ) {
+      subrun = { variant: "digit_subrun", sourceDisplay: sourceParsed.display };
+    }
+  }
+  return subrun;
 }

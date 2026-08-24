@@ -41,7 +41,7 @@ type NumberTokenMatch = {
   index: number;
 };
 
-type ParsedNumberToken = {
+export type ParsedNumberToken = {
   display: string;
   key: string;
   value: number;
@@ -160,7 +160,7 @@ function normalizeNumberCore(
   return `${normalizedInteger}.${fractionPart}`;
 }
 
-function parseNumberToken(token: string): ParsedNumberToken | null {
+export function parseNumberToken(token: string): ParsedNumberToken | null {
   const sanitized = sanitizeNumberToken(token);
   if (!sanitized || !/\d/.test(sanitized)) {
     return null;
@@ -206,7 +206,7 @@ function collectNumberTokenMatches(text: string): NumberTokenMatch[] {
   }));
 }
 
-function collectNumberTokens(text: string): string[] {
+export function collectNumberTokens(text: string): string[] {
   return collectNumberTokenMatches(text).map((match) => match.token);
 }
 

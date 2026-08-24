@@ -228,20 +228,38 @@ endings never matter):
 
 ## Offline numeric replay (P2 Phase B)
 
-The exported corpus `tmp/editorial-eval/replay-corpus-2026-06-02_2026-08-13.jsonl`
-(gitignored; 144 failed `UNEXPECTED_NUMBERS` rows with exact
-`sourcePayload`/`outputJson`/`validationJson`) is the offline evidence base for
-numeric derivation rules. It was produced by `tmp/export-replay-corpus.mts`
-against the production DB under a temporary IP rule; keep a copy outside
-`tmp/` — production access is sealed and the export is not expected to run
-again. No command below needs a database.
+The exported corpus (gitignored JSONL under `tmp/editorial-eval/`; keep copies
+outside `tmp/`) is the offline evidence base for numeric derivation rules. The
+frozen `replay-corpus-2026-06-02_2026-08-13.jsonl` (144 failed
+`UNEXPECTED_NUMBERS` rows, produced by the legacy `tmp/export-replay-corpus.mts`)
+is release evidence for shipped rules — never overwrite it. New exports use the
+in-repo exporter, which additionally captures the **published number-strip
+cohort** (runs whose `validationRepair` stripped numbers, `hiddenDraft`
+preserved), marked `rewriteSource: "hiddenDraft"` as the row's last key; failed
+rows keep the exact legacy shape. Replay-as-gate policy expects the corpus to be
+re-exported periodically — a stale corpus weakens the gate.
 
 ```powershell
-# Replay all 110 deduped messages through the current assessment engine
+# Export a fresh corpus (needs GENERATION_LOG_DATABASE_URL, e.g. via
+# node tmp/run-with-prod-db.mjs; refuses to overwrite an existing file):
+npx tsx apps/worker/src/scripts/export-replay-corpus.ts --from 2026-06-02 --to 2026-08-24
+
+# Replay the failed cohort through the current assessment engine
 # (all derivation rules off vs all on), write the deterministic artifact
 # tmp/editorial-eval/replay-numbers-<window>.json, print pool/fidelity/
-# per-rule clears and the unresolved table with a hard would-clear warning:
+# per-rule clears and the unresolved table with a hard would-clear warning.
+# hiddenDraft rows are excluded (they belong to replay-stripped-numbers):
 npm run eval:editorial -w apps/worker -- replay-numbers
+
+# Replay the published number-strip cohort: re-validate each pre-repair
+# hiddenDraft, diff draft vs published numbers (key-compared, so separator
+# restyling does not count), classify every stripped number
+# clears_now / matcher_gap / absent_from_source, and print the matcher_gap
+# adjudication table. Artifact: tmp/editorial-eval/replay-stripped-<window>.json.
+# Fidelity vs validationRepair.initialWarnings is informational only — hydrated
+# drafts carry placeholder key_facts/source_spans, so source_cell_subrun can
+# never fire on them:
+npm run eval:editorial -w apps/worker -- replay-stripped-numbers --corpus tmp/editorial-eval/replay-corpus-<window>.jsonl
 
 # One-time fixture fidelity repair (2026-08-14; kept for provenance): rebuild
 # the two numeric fixture classes' payloads run-matched from the corpus,
