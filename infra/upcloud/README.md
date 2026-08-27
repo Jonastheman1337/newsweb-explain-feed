@@ -149,6 +149,15 @@ infra/upcloud/scripts/deploy.sh APP_SHA
    only the apex A and `www` CNAME TTLs from 1800 to 300.
 2. Freeze editorial writes, disable Render polling at the same deployed commit,
    drain all active/waiting BullMQ work, and suspend the Render web service.
+   Keep the Render Key Value external URL in the mode-600
+   `/srv/autoweb/secrets/render-kv.env` file as `RENDER_REDIS_URL`. The assertion
+   permits only the three known poll/maintenance delayed jobs; it blocks on any
+   active, waiting, prioritized, paused, waiting-child, rewrite/publish delayed,
+   or delayed notice-ingest job:
+
+```bash
+infra/upcloud/scripts/render-queue-status.sh --assert-drained
+```
 3. Create the final Render export. If Render's export service is still failing,
    use the rehearsed direct custom-dump path. Restore it on UpCloud, run
    migrations, and compare row-count manifests.
