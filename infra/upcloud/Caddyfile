@@ -19,7 +19,7 @@ autoweb24.no {
 }
 
 www.autoweb24.no {
-	redir https://autoweb24.no{uri} permanent
+	redir https://autoweb24.no{uri} 308
 }
 
 upcloud-preview.autoweb24.no {
