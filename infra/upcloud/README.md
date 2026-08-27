@@ -98,10 +98,27 @@ infra/upcloud/scripts/source-db-manifest.sh \
   /srv/autoweb/state/source-manifest.txt
 ```
 
-5. Download a current Render logical export, transfer it to the server, and run:
+5. Download a current Render logical export and transfer it to the server. If
+   Render's export endpoint fails, capture a standard PostgreSQL custom dump
+   directly over the temporary IP-restricted TLS connection instead:
 
 ```bash
-infra/upcloud/scripts/restore-render-export.sh /srv/autoweb/tmp/EXPORT.dir.tar.gz
+infra/upcloud/scripts/capture-render-dump.sh \
+  /srv/autoweb/tmp/render-db.env \
+  /srv/autoweb/tmp/render-rehearsal.dump
+```
+
+   Verify the supplied checksum during restore. Both Render directory exports
+   and the direct custom dump are accepted:
+
+```bash
+infra/upcloud/scripts/restore-render-export.sh \
+  /srv/autoweb/tmp/EXPORT.dir.tar.gz \
+  /srv/autoweb/tmp/EXPORT.dir.tar.gz.sha256
+# Or, for the direct fallback:
+infra/upcloud/scripts/restore-render-export.sh \
+  /srv/autoweb/tmp/render-rehearsal.dump \
+  /srv/autoweb/tmp/render-rehearsal.dump.sha256
 infra/upcloud/scripts/deploy.sh APP_SHA
 ```
 
@@ -119,8 +136,9 @@ infra/upcloud/scripts/deploy.sh APP_SHA
    only the apex A and `www` CNAME TTLs from 1800 to 300.
 2. Freeze editorial writes, disable Render polling at the same deployed commit,
    drain all active/waiting BullMQ work, and suspend the Render web service.
-3. Create the final Render export. Restore it on UpCloud, run migrations, and
-   compare row-count manifests.
+3. Create the final Render export. If Render's export service is still failing,
+   use the rehearsed direct custom-dump path. Restore it on UpCloud, run
+   migrations, and compare row-count manifests.
 4. Start UpCloud with polling disabled and repeat read-only preview checks.
 5. Change only the apex A to the UpCloud IPv4 and `www` CNAME to
    `autoweb24.no`. Do not add AAAA during initial cutover.

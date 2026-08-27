@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if [[ $# -ne 2 ]]; then
-  echo "Usage: restore-render-export.sh <render-export.dir.tar.gz> <expected-sha256-or-file>" >&2
+  echo "Usage: restore-render-export.sh <render-export.dir.tar.gz-or-custom.dump> <expected-sha256-or-file>" >&2
   exit 1
 fi
 
@@ -47,19 +47,33 @@ trap cleanup EXIT
 }
 
 printf '%s  %s\n' "${actual_hash}" "${export_file}" \
-  >"${AUTOWEB_ROOT}/state/render-export-${restore_id}.sha256"
-tar -xzf "${export_file}" -C "${restore_dir}"
-dump_dir=$(find "${restore_dir}" -type f -name toc.dat -printf '%h\n' | head -n 1)
-[[ -n ${dump_dir} ]] || { echo "No pg_restore directory found in export" >&2; exit 1; }
+  >"${AUTOWEB_ROOT}/state/database-source-${restore_id}.sha256"
+
+if tar -tzf "${export_file}" >/dev/null 2>&1; then
+  source_format=render-directory-export
+  tar -xzf "${export_file}" -C "${restore_dir}"
+  dump_dir=$(find "${restore_dir}" -type f -name toc.dat -printf '%h\n' | head -n 1)
+  [[ -n ${dump_dir} ]] || { echo "No pg_restore directory found in export" >&2; exit 1; }
+  restore_mount="${dump_dir}:/restore:ro"
+  restore_path=/restore
+elif docker run --rm -i postgres:16-alpine pg_restore --list <"${export_file}" >/dev/null 2>&1; then
+  source_format=postgres-custom-dump
+  restore_mount="${export_file}:/restore/source.dump:ro"
+  restore_path=/restore/source.dump
+else
+  echo "Unsupported or invalid PostgreSQL export: ${export_file}" >&2
+  exit 1
+fi
 
 docker run --rm \
   --network autoweb-prod \
-  --volume "${dump_dir}:/restore:ro" \
+  --volume "${restore_mount}" \
   --env "PGPASSWORD=${POSTGRES_PASSWORD}" \
+  --env "RESTORE_PATH=${restore_path}" \
   postgres:16-alpine \
-  sh -ceu 'psql -h postgres -U "$1" -d "$2" -v ON_ERROR_STOP=1 -c "drop schema if exists public cascade; create schema public;"; pg_restore --no-owner --no-acl --exit-on-error -h postgres -U "$1" -d "$2" /restore' \
+  sh -ceu 'psql -h postgres -U "$1" -d "$2" -v ON_ERROR_STOP=1 -c "drop schema if exists public cascade; create schema public;"; pg_restore --no-owner --no-acl --exit-on-error -h postgres -U "$1" -d "$2" "$RESTORE_PATH"' \
   -- "${POSTGRES_USER}" "${POSTGRES_DB}"
 
 "${compose[@]}" --profile ops run --rm migrate
 "${INFRA_DIR}/scripts/db-manifest.sh" "${AUTOWEB_ROOT}/state/db-manifest-${restore_id}.txt"
-echo "Restore PASS export=${export_file}"
+echo "Restore PASS source=${export_file} format=${source_format}"
