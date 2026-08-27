@@ -53,8 +53,12 @@ fi
 printf '%s\n' "${release_sha}" >"${state_dir}/current-release"
 
 history_file="${state_dir}/release-history"
-{ printf '%s\n' "${release_sha}"; [[ -f ${history_file} ]] && cat "${history_file}"; } \
-  | awk '!seen[$0]++' >"${history_file}.tmp"
+{
+  printf '%s\n' "${release_sha}"
+  if [[ -f ${history_file} ]]; then
+    cat "${history_file}"
+  fi
+} | awk '!seen[$0]++' >"${history_file}.tmp"
 mv "${history_file}.tmp" "${history_file}"
 
 mapfile -t old_releases < <(tail -n +4 "${history_file}" || true)
