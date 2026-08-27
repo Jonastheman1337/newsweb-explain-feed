@@ -19,6 +19,7 @@ set +a
 
 LC_ALL=C docker run --rm -i \
   --env RENDER_DATABASE_URL \
+  --env PGSSLMODE=require \
   postgres:16-alpine \
   sh -ceu 'exec psql "$RENDER_DATABASE_URL" -v ON_ERROR_STOP=1 -At' <<'SQL' \
   >"${output}"
