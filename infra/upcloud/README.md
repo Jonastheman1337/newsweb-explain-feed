@@ -157,6 +157,7 @@ infra/upcloud/scripts/deploy.sh APP_SHA
 
 ```bash
 infra/upcloud/scripts/render-queue-status.sh --assert-drained
+infra/upcloud/scripts/render-write-status.sh --assert-idle
 ```
 3. Create the final Render export. If Render's export service is still failing,
    use the rehearsed direct custom-dump path. Restore it on UpCloud, run
