@@ -184,10 +184,15 @@ export function NoticeCard({ item }: NoticeCardProps) {
       <div className={showSplit ? "cardSplitGrid" : undefined}>
         <div>
           <EditableRewrite
+            key={item.rewriteId ?? `source-${item.messageId}`}
             messageId={item.messageId}
             originalTitle={item.title}
             originalBody={articleBody}
             activeVersion={item.rewriteVersion ?? undefined}
+            rewriteId={item.rewriteId ?? undefined}
+            publicationRevision={item.publicationRevision}
+            contentHash={item.contentHash ?? undefined}
+            isFinal={item.isFinal}
             className={showSplit && isImportant ? "cardImportantCol" : undefined}
             dateline={
               <div className="muted">

@@ -11,6 +11,10 @@ export const editorialTelemetrySchema = z
     editorId: z.string().min(1).max(200).optional(),
     sessionId: z.string().min(1).max(200).optional(),
     version: z.number().int().positive().optional(),
+    rewriteId: z.string().min(1).max(200).optional(),
+    publicationRevision: z.number().int().nonnegative().optional(),
+    contentHash: z.string().min(1).max(200).optional(),
+    isFinal: z.boolean().optional(),
     actionSource: z.string().min(1).max(120).optional()
   })
   .optional();
@@ -29,6 +33,7 @@ type RewriteContext = {
   version: number;
   promptVersion: string;
   model: string;
+  contentHash: string;
 };
 
 export function toJsonValue(value: unknown): Prisma.InputJsonValue {
@@ -42,34 +47,59 @@ export function hashTelemetryId(secret: string, value?: string): string | null {
 
 async function resolveRewriteContext(
   messageId: number,
-  version?: number | null
+  identity: {
+    version?: number | null;
+    rewriteId?: string;
+    contentHash?: string;
+  }
 ): Promise<RewriteContext | null> {
-  if (version != null) {
-    const exact = await prisma.rewrite.findFirst({
-      where: { messageId, version },
+  if (identity.rewriteId) {
+    const exact = await prisma.publishedRewrite.findFirst({
+      where: { id: identity.rewriteId, messageId },
       select: {
         id: true,
         version: true,
         promptVersion: true,
-        model: true
+        model: true,
+        contentHash: true
       }
     });
-    if (exact) return exact;
+    if (!exact) return null;
+    if (identity.version != null && exact.version !== identity.version) return null;
+    if (identity.contentHash && exact.contentHash !== identity.contentHash) return null;
+    return exact;
   }
 
-  return prisma.rewrite.findFirst({
-    where: {
-      messageId,
-      status: { in: ["published", "pending", "skipped", "failed"] }
-    },
-    orderBy: { generatedAt: "desc" },
+  if (identity.version != null) {
+    return prisma.publishedRewrite.findUnique({
+      where: {
+        messageId_version: { messageId, version: identity.version }
+      },
+      select: {
+        id: true,
+        version: true,
+        promptVersion: true,
+        model: true,
+        contentHash: true
+      }
+    });
+  }
+
+  const feedItem = await prisma.feedItem.findUnique({
+    where: { messageId },
     select: {
-      id: true,
-      version: true,
-      promptVersion: true,
-      model: true
+      activePublishedRewrite: {
+        select: {
+          id: true,
+          version: true,
+          promptVersion: true,
+          model: true,
+          contentHash: true
+        }
+      }
     }
   });
+  return feedItem?.activePublishedRewrite ?? null;
 }
 
 export async function createUserActionEvent(args: {
@@ -84,7 +114,14 @@ export async function createUserActionEvent(args: {
 }): Promise<{ id: string; rewriteContext: RewriteContext | null }> {
   const telemetry = editorialTelemetrySchema.parse(args.telemetry);
   const version = args.version ?? telemetry?.version ?? null;
-  const rewriteContext = await resolveRewriteContext(args.messageId, version);
+  const rewriteContext = await resolveRewriteContext(args.messageId, {
+    version,
+    rewriteId: telemetry?.rewriteId,
+    contentHash: telemetry?.contentHash
+  });
+  const renderedFinal = telemetry?.isFinal === true
+    ? Boolean(rewriteContext)
+    : (telemetry?.isFinal ?? null);
   const payload =
     args.payload && typeof args.payload === "object" && !Array.isArray(args.payload)
       ? args.payload
@@ -100,6 +137,9 @@ export async function createUserActionEvent(args: {
       editorIdHash: hashTelemetryId(args.sessionSecret, telemetry?.editorId),
       sessionIdHash: hashTelemetryId(args.sessionSecret, telemetry?.sessionId),
       rewriteId: rewriteContext?.id ?? null,
+      publicationRevision: telemetry?.publicationRevision ?? null,
+      contentHash: rewriteContext?.contentHash ?? null,
+      renderedFinal,
       promptVersion: rewriteContext?.promptVersion ?? null,
       model: rewriteContext?.model ?? null,
       action: args.action,

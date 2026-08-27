@@ -39,10 +39,22 @@ type RewriteStatusResponse = {
 type InstructionInputProps = {
   messageId: number;
   activeVersion?: number;
+  rewriteId?: string;
+  publicationRevision?: number;
+  contentHash?: string;
+  isFinal?: boolean;
   hasAttachments?: boolean;
 };
 
-export function InstructionInput({ messageId, activeVersion, hasAttachments }: InstructionInputProps) {
+export function InstructionInput({
+  messageId,
+  activeVersion,
+  rewriteId,
+  publicationRevision,
+  contentHash,
+  isFinal,
+  hasAttachments
+}: InstructionInputProps) {
   const PROGRESS_STEPS = getGenerationSteps(hasAttachments);
   const router = useRouter();
   const [text, setText] = useState("");
@@ -62,7 +74,13 @@ export function InstructionInput({ messageId, activeVersion, hasAttachments }: I
   const isRegenRef = useRef(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { buildTelemetry } = useEditorialTelemetry(messageId, activeVersion);
+  const { buildTelemetry } = useEditorialTelemetry(messageId, {
+    version: activeVersion,
+    rewriteId,
+    publicationRevision,
+    contentHash,
+    isFinal
+  });
 
   const resizeTextarea = useCallback(() => {
     const ta = textareaRef.current;

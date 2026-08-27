@@ -12,6 +12,11 @@ const baseItem: FeedItem = {
   publishedAt: "2026-05-29T06:00:00.000Z",
   visibilityStatus: "published",
   rewriteVersion: null,
+  rewriteId: null,
+  publicationRevision: 0,
+  contentHash: null,
+  finalizedAt: null,
+  isFinal: false,
   title: "Original tittel",
   issuerName: "Test ASA",
   issuerSign: "TEST",
@@ -65,6 +70,11 @@ describe("feed stream updates", () => {
     const publishedItem = {
       ...baseItem,
       rewriteVersion: 1,
+      rewriteId: "published-1",
+      publicationRevision: 1,
+      contentHash: "hash-1",
+      finalizedAt: "2026-05-29T06:01:00.000Z",
+      isFinal: true,
       title: "Publisert tittel",
       lead: "Ingress",
       body: ["Brodtekst"],
@@ -76,6 +86,24 @@ describe("feed stream updates", () => {
       processing: false,
       regenerating: true
     });
+  });
+
+  it("never lets a backend source-state event erase finalized article text", () => {
+    const publishedItem = {
+      ...baseItem,
+      rewriteVersion: 2,
+      rewriteId: "published-2",
+      publicationRevision: 2,
+      contentHash: "hash-2",
+      finalizedAt: "2026-05-29T06:02:00.000Z",
+      isFinal: true,
+      title: "Ferdig tittel",
+      lead: "Ferdig ingress",
+      body: ["Ferdig brodtekst"],
+      failed: false
+    };
+
+    expect(applyFeedUpdateState(publishedItem, "source")).toEqual(publishedItem);
   });
 
   it("parses a valid phase and drops unknown phases", () => {
@@ -101,6 +129,11 @@ describe("feed stream updates", () => {
     const publishedItem = {
       ...baseItem,
       rewriteVersion: 1,
+      rewriteId: "published-1",
+      publicationRevision: 1,
+      contentHash: "hash-1",
+      finalizedAt: "2026-05-29T06:01:00.000Z",
+      isFinal: true,
       lead: "Ingress",
       failed: false
     };

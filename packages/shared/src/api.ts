@@ -44,6 +44,11 @@ export const feedItemSchema = z.object({
   publishedAt: z.string().datetime(),
   visibilityStatus: z.string(),
   rewriteVersion: z.number().int().positive().nullable(),
+  rewriteId: z.string().nullable(),
+  publicationRevision: z.number().int().nonnegative(),
+  contentHash: z.string().nullable(),
+  finalizedAt: z.string().datetime().nullable(),
+  isFinal: z.boolean(),
   title: z.string(),
   issuerName: z.string(),
   issuerSign: z.string(),
@@ -108,14 +113,25 @@ export const noticeResponseSchema = z.object({
       })
     )
   }),
+  publication: z.object({
+    rewriteId: z.string(),
+    version: z.number().int().positive(),
+    revision: z.number().int().positive(),
+    contentHash: z.string(),
+    finalizedAt: z.string().datetime(),
+    isFinal: z.literal(true)
+  }),
   rewrite: rewriteOutputSchema,
   rewrites: z
     .array(
       z.object({
+        rewriteId: z.string(),
         version: z.number(),
         rewrite: rewriteOutputSchema,
         userInstruction: z.string().nullable(),
-        generatedAt: z.string().datetime()
+        generatedAt: z.string().datetime(),
+        contentHash: z.string(),
+        isFinal: z.literal(true)
       })
     )
     .optional()

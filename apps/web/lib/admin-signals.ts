@@ -98,6 +98,9 @@ export type EventSignal = {
   hasEditorIdHash: boolean;
   hasSessionIdHash: boolean;
   rewriteId: string | null;
+  publicationRevision: number | null;
+  contentHash: string | null;
+  renderedFinal: boolean | null;
   promptVersion: string | null;
   model: string | null;
   payloadJson: Prisma.JsonValue | null;
@@ -682,6 +685,9 @@ async function getEvents(query: SignalsQuery): Promise<{ rows: EventSignal[]; wa
         editorIdHash: true,
         sessionIdHash: true,
         rewriteId: true,
+        publicationRevision: true,
+        contentHash: true,
+        renderedFinal: true,
         promptVersion: true,
         model: true,
         action: true,
@@ -1033,6 +1039,9 @@ export async function getSignalsCsv(query: SignalsQuery): Promise<string> {
         "has_editor_id_hash",
         "has_session_id_hash",
         "rewrite_id",
+        "publication_revision",
+        "content_hash",
+        "rendered_final",
         "prompt_version",
         "model",
         "payload_json"
@@ -1049,6 +1058,9 @@ export async function getSignalsCsv(query: SignalsQuery): Promise<string> {
         row.hasEditorIdHash,
         row.hasSessionIdHash,
         row.rewriteId,
+        row.publicationRevision,
+        row.contentHash,
+        row.renderedFinal,
         row.promptVersion,
         row.model,
         jsonText(row.payloadJson)

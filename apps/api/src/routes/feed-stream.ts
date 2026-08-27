@@ -42,6 +42,7 @@ export function applyFeedUpdateState(
   phase?: GenerationPhase
 ): FeedItem {
   if (state === "source") {
+    if (item.isFinal) return item;
     return {
       ...item,
       lead: "",
@@ -60,11 +61,7 @@ export function applyFeedUpdateState(
 
   if (state === "processing") {
     if (
-      item.rewriteVersion != null &&
-      !item.notGenerated &&
-      !item.skipped &&
-      !item.failed &&
-      !item.processing
+      item.isFinal
     ) {
       return {
         ...item,
@@ -180,6 +177,15 @@ export const feedStreamRoutes: FastifyPluginAsync = async (fastify) => {
     const dbItem = await prisma.feedItem.findUnique({
       where: { messageId },
       include: {
+        activePublishedRewrite: {
+          select: {
+            id: true,
+            version: true,
+            rewriteJson: true,
+            contentHash: true,
+            finalizedAt: true
+          }
+        },
         sourceNotice: {
           include: {
             rewrites: {
@@ -187,8 +193,7 @@ export const feedStreamRoutes: FastifyPluginAsync = async (fastify) => {
               select: {
                 status: true,
                 generatedAt: true,
-                version: true,
-                rewriteJson: true
+                version: true
               }
             }
           }

@@ -1698,6 +1698,12 @@ function editPatternStats(edits) {
 export function analyze(data, timeZone) {
   const generations = data.generations ?? [];
   const events = data.events ?? [];
+  const finalizedRenderEvents = events.filter(
+    (row) => row.rendered_final === "true"
+  );
+  const exactPublicationIdentityEvents = finalizedRenderEvents.filter(
+    (row) => row.rewrite_id && row.publication_revision && row.content_hash
+  );
 
   const generationOutcomes = groupGenerationOutcomes(generations);
   const problematicGenerations = generationOutcomes.filter(
@@ -1740,6 +1746,15 @@ export function analyze(data, timeZone) {
     },
     eventActions: countBy(events, "action"),
     eventSources: countBy(events, "action_source"),
+    finalityTelemetry: {
+      renderedFinal: countBy(events, "rendered_final"),
+      finalizedRenderEventCount: finalizedRenderEvents.length,
+      exactPublicationIdentityCount: exactPublicationIdentityEvents.length,
+      exactPublicationIdentityRate: rate(
+        exactPublicationIdentityEvents.length,
+        finalizedRenderEvents.length
+      )
+    },
     titleActions: countBy(data.titles ?? [], "action"),
     generationStatuses: countBy(generations, "status"),
     generationReasons: countBy(generations, "reason"),

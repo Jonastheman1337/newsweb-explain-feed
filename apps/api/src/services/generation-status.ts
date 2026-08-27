@@ -21,7 +21,12 @@ type GenerationRunStatusRecord = {
 
 const ACTIVE_GENERATION_RUN_STATUSES = new Set(["queued", "started", "pending"]);
 
-const TERMINAL_GENERATION_RUN_STATUSES = new Set(["published", "skipped", "failed"]);
+const TERMINAL_GENERATION_RUN_STATUSES = new Set([
+  "published",
+  "skipped",
+  "failed",
+  "superseded"
+]);
 
 const TERMINAL_GENERATION_RUN_PHASES = new Set(["published", "skipped", "failed"]);
 
@@ -126,6 +131,7 @@ export function deriveGenerationPhase(args: {
   if (generationRun?.status === "published") return "published";
   if (generationRun?.status === "skipped") return "skipped";
   if (generationRun?.status === "failed") return "failed";
+  if (generationRun?.status === "superseded") return "failed";
 
   if (jobState === "active") return "reading_notice";
   if (isJobStillRunning(jobState)) return "queued";
@@ -155,6 +161,7 @@ export function buildGenerationStatusPayload(args: {
     !runActive &&
     (staleFailed ||
       generationRun?.status === "failed" ||
+      generationRun?.status === "superseded" ||
       rewrite?.status === "failed");
   const phase = staleFailed ? "failed" : deriveGenerationPhase(args);
 

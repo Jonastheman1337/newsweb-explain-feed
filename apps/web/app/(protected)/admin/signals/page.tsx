@@ -361,6 +361,10 @@ function EventsTable({ rows }: { rows: EventSignal[] }) {
             </td>
             <td className="signalsMeta">
               <div>Version: {row.version ?? "-"}</div>
+              <div>Final: {row.renderedFinal == null ? "-" : row.renderedFinal ? "yes" : "no"}</div>
+              <div>Publication rev: {row.publicationRevision ?? "-"}</div>
+              <div>Rewrite: {row.rewriteId ?? "-"}</div>
+              <div>Content hash: {row.contentHash ?? "-"}</div>
               <div>Prompt: {row.promptVersion ?? "-"}</div>
               <div>Model: {row.model ?? "-"}</div>
               <div>Editor hash: {row.hasEditorIdHash ? "yes" : "no"}</div>

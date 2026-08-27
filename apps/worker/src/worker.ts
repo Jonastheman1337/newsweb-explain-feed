@@ -26,7 +26,7 @@ import {
   logPrisma,
   prisma
 } from "@newsweb/shared/db";
-import type { Prisma, PrismaClient } from "@prisma/client";
+import { Prisma, type PrismaClient } from "@prisma/client";
 import {
   PROMPT_VERSION,
   createDeveloperPrompt,
@@ -155,6 +155,8 @@ import {
   previousSeenCandidateKeys,
   type NumericShadowGenerationRow
 } from "./services/numeric-shadow-monitor.js";
+import { finalizePublication } from "./services/publication.js";
+import { canWriteRewriteCandidate } from "./services/generation-ownership.js";
 
 const NEWSWEB_LIST_URL = "https://api3.oslo.oslobors.no/v1/newsreader/list";
 const NEWSWEB_MESSAGE_URL = "https://api3.oslo.oslobors.no/v1/newsreader/message";
@@ -368,8 +370,171 @@ async function enqueuePublish(
   await publishQueue.add(
     "publish-notice",
     { messageId, version, generationRunId },
-    { removeOnComplete: 2000, removeOnFail: 2000 }
+    {
+      attempts: 3,
+      backoff: { type: "exponential", delay: 2000 },
+      removeOnComplete: 2000,
+      removeOnFail: 2000
+    }
   );
+}
+
+async function claimGenerationSlot(
+  messageId: number,
+  generationRunId: string
+): Promise<boolean> {
+  const claimed = await prisma.feedItem.updateMany({
+    where: {
+      messageId,
+      OR: [
+        { activeGenerationRunId: null },
+        { activeGenerationRunId: generationRunId }
+      ]
+    },
+    data: { activeGenerationRunId: generationRunId }
+  });
+  return claimed.count === 1;
+}
+
+async function releaseGenerationSlot(
+  messageId: number,
+  generationRunId: string | null | undefined
+): Promise<void> {
+  if (!generationRunId) return;
+  await prisma.feedItem.updateMany({
+    where: { messageId, activeGenerationRunId: generationRunId },
+    data: { activeGenerationRunId: null }
+  });
+}
+
+async function markGenerationSuperseded(
+  generationRunId: string,
+  errorText: string
+): Promise<void> {
+  await logPrisma.generationRun.updateMany({
+    where: {
+      id: generationRunId,
+      status: { in: ["queued", "started", "pending", "needs_retry"] }
+    },
+    data: {
+      status: "superseded",
+      phase: "failed",
+      phaseUpdatedAt: new Date(),
+      errorText,
+      finishedAt: new Date()
+    }
+  });
+}
+
+async function transferGenerationOwnership(args: {
+  messageId: number;
+  version: number;
+  fromGenerationRunId: string;
+  toGenerationRunId: string;
+}): Promise<boolean> {
+  return prisma.$transaction(async (tx) => {
+    const claimed = await tx.feedItem.updateMany({
+      where: {
+        messageId: args.messageId,
+        OR: [
+          { activeGenerationRunId: null },
+          { activeGenerationRunId: args.fromGenerationRunId }
+        ]
+      },
+      data: { activeGenerationRunId: args.toGenerationRunId }
+    });
+    if (claimed.count !== 1) return false;
+
+    const candidate = await tx.rewrite.findUnique({
+      where: {
+        messageId_version: {
+          messageId: args.messageId,
+          version: args.version
+        }
+      },
+      select: { status: true, generationRunId: true }
+    });
+    if (
+      candidate &&
+      candidate.status !== "published" &&
+      candidate.generationRunId !== null &&
+      candidate.generationRunId !== args.fromGenerationRunId &&
+      candidate.generationRunId !== args.toGenerationRunId
+    ) {
+      throw new Error("REWRITE_CANDIDATE_OWNED_BY_ANOTHER_RUN");
+    }
+
+    if (candidate?.status !== "published") {
+      await tx.rewrite.updateMany({
+        where: {
+          messageId: args.messageId,
+          version: args.version,
+          status: { not: "published" },
+          OR: [
+            { generationRunId: null },
+            { generationRunId: args.fromGenerationRunId },
+            { generationRunId: args.toGenerationRunId }
+          ]
+        },
+        data: { generationRunId: args.toGenerationRunId }
+      });
+    }
+    return true;
+  });
+}
+
+async function claimRewriteCandidateOwnership(
+  messageId: number,
+  version: number,
+  generationRunId: string
+): Promise<boolean> {
+  const candidate = await prisma.rewrite.findUnique({
+    where: { messageId_version: { messageId, version } },
+    select: { status: true, generationRunId: true }
+  });
+  if (!candidate) return true;
+  if (candidate.status === "published") return false;
+  if (
+    candidate.generationRunId === null ||
+    candidate.generationRunId === generationRunId
+  ) {
+    const claimed = await prisma.rewrite.updateMany({
+      where: {
+        messageId,
+        version,
+        status: { not: "published" },
+        OR: [
+          { generationRunId: null },
+          { generationRunId }
+        ]
+      },
+      data: { generationRunId }
+    });
+    return claimed.count === 1;
+  }
+
+  const owner = await logPrisma.generationRun.findUnique({
+    where: { id: candidate.generationRunId },
+    select: { status: true, phaseUpdatedAt: true }
+  });
+  const ownerFresh =
+    owner?.phaseUpdatedAt != null &&
+    Date.now() - owner.phaseUpdatedAt.getTime() <= GENERATION_RUN_STALE_MS;
+  const ownerTerminal =
+    !owner ||
+    ["published", "skipped", "failed", "superseded"].includes(owner.status);
+  if (!ownerTerminal && ownerFresh) return false;
+
+  const reclaimed = await prisma.rewrite.updateMany({
+    where: {
+      messageId,
+      version,
+      status: { not: "published" },
+      generationRunId: candidate.generationRunId
+    },
+    data: { generationRunId }
+  });
+  return reclaimed.count === 1;
 }
 
 function buildListUrl(daysBack = 0): string {
@@ -976,7 +1141,7 @@ async function startGenerationRun(
   version: number,
   payload: PromptPayload,
   previousOutput?: RewriteOutput
-): Promise<string> {
+): Promise<string | null> {
   const phaseUpdatedAt = new Date();
   const data = {
     version,
@@ -1005,22 +1170,68 @@ async function startGenerationRun(
     startedAt: new Date()
   };
 
-  if (job.data.generationRunId) {
+  let generationRunId = job.data.generationRunId;
+  if (generationRunId) {
     await logPrisma.generationRun.update({
-      where: { id: job.data.generationRunId },
+      where: { id: generationRunId },
       data
     });
-    return job.data.generationRunId;
+  } else {
+    const jobId = job.id != null ? String(job.id) : null;
+    const retryRun = jobId
+      ? await logPrisma.generationRun.findFirst({
+          where: {
+            messageId,
+            jobId,
+            status: { in: ["queued", "started", "needs_retry", "pending"] }
+          },
+          orderBy: { requestedAt: "desc" },
+          select: { id: true }
+        })
+      : null;
+    if (retryRun) {
+      generationRunId = retryRun.id;
+      await logPrisma.generationRun.update({
+        where: { id: generationRunId },
+        data
+      });
+    } else {
+      const generationRun = await logPrisma.generationRun.create({
+        data: {
+          messageId,
+          requestedAt: new Date(),
+          ...data
+        }
+      });
+      generationRunId = generationRun.id;
+    }
   }
 
-  const generationRun = await logPrisma.generationRun.create({
-    data: {
+  if (!(await claimGenerationSlot(messageId, generationRunId))) {
+    await markGenerationSuperseded(
+      generationRunId,
+      "GENERATION_SLOT_OWNED_BY_ANOTHER_RUN"
+    );
+    return null;
+  }
+  if (
+    !(await claimRewriteCandidateOwnership(messageId, version, generationRunId))
+  ) {
+    await releaseGenerationSlot(messageId, generationRunId);
+    await markGenerationSuperseded(
+      generationRunId,
+      `REWRITE_OWNERSHIP_LOST:${messageId}:${version}`
+    );
+    return null;
+  }
+  await prisma.feedItem.updateMany({
+    where: {
       messageId,
-      requestedAt: new Date(),
-      ...data
-    }
+      nextRewriteVersion: { lte: version }
+    },
+    data: { nextRewriteVersion: version + 1 }
   });
-  return generationRun.id;
+  return generationRunId;
 }
 
 type JsonModelCallInput = {
@@ -2879,41 +3090,88 @@ async function upsertRewrite(args: {
   userInstruction?: string;
   generationRunId?: string;
   inputJson?: Prisma.InputJsonValue;
-}): Promise<void> {
+}): Promise<boolean> {
   const version = args.version ?? 1;
   const rewriteJson = toPrismaJsonValue(args.rewriteJson);
   const validationJson = toPrismaJsonValue(args.validationJson);
   const inputJson = args.inputJson ? toPrismaJsonValue(args.inputJson) : undefined;
   const rewriteModel = rewriteModelFromInputJson(inputJson);
-  await prisma.rewrite.upsert({
-    where: {
-      messageId_version: {
-        messageId: args.messageId,
-        version
+  let persisted = false;
+
+  for (let attempt = 0; attempt < 2 && !persisted; attempt += 1) {
+    const existing = await prisma.rewrite.findUnique({
+      where: {
+        messageId_version: {
+          messageId: args.messageId,
+          version
+        }
+      },
+      select: { id: true, status: true, generationRunId: true }
+    });
+
+    if (!existing) {
+      try {
+        await prisma.rewrite.create({
+          data: {
+            messageId: args.messageId,
+            version,
+            lang: "nb",
+            model: rewriteModel,
+            promptVersion: PROMPT_VERSION,
+            rewriteJson,
+            validationJson,
+            status: args.status,
+            generationRunId: args.generationRunId ?? null,
+            userInstruction: args.userInstruction ?? null
+          }
+        });
+        persisted = true;
+        break;
+      } catch (error) {
+        const raced =
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === "P2002";
+        if (!raced || attempt === 1) throw error;
+        continue;
       }
-    },
-    create: {
-      messageId: args.messageId,
-      version,
-      lang: "nb",
-      model: rewriteModel,
-      promptVersion: PROMPT_VERSION,
-      rewriteJson,
-      validationJson,
-      status: args.status,
-      userInstruction: args.userInstruction ?? null
-    },
-    update: {
-      lang: "nb",
-      model: rewriteModel,
-      promptVersion: PROMPT_VERSION,
-      rewriteJson,
-      validationJson,
-      status: args.status,
-      userInstruction: args.userInstruction ?? null,
-      generatedAt: new Date()
     }
-  });
+
+    if (!canWriteRewriteCandidate(existing, args.generationRunId)) break;
+
+    const updated = await prisma.rewrite.updateMany({
+      where: {
+        id: existing.id,
+        status: { not: "published" },
+        OR: [
+          { generationRunId: null },
+          { generationRunId: args.generationRunId ?? null }
+        ]
+      },
+      data: {
+        lang: "nb",
+        model: rewriteModel,
+        promptVersion: PROMPT_VERSION,
+        rewriteJson,
+        validationJson,
+        status: args.status,
+        generationRunId: args.generationRunId ?? null,
+        userInstruction: args.userInstruction ?? null,
+        generatedAt: new Date()
+      }
+    });
+    persisted = updated.count === 1;
+  }
+
+  if (!persisted) {
+    if (args.generationRunId) {
+      await markGenerationSuperseded(
+        args.generationRunId,
+        `REWRITE_OWNERSHIP_LOST:${args.messageId}:${version}`
+      );
+      await releaseGenerationSlot(args.messageId, args.generationRunId);
+    }
+    return false;
+  }
 
   if (args.generationRunId) {
     const phase = phaseForRewriteStatus(args.status);
@@ -2953,7 +3211,12 @@ async function upsertRewrite(args: {
         })
       );
     }
+
+    if (terminalStatus) {
+      await releaseGenerationSlot(args.messageId, args.generationRunId);
+    }
   }
+  return true;
 }
 
 const JOB_RUNS_CLEANUP_JOB_NAME = ingestJobNames.cleanup;
@@ -3202,8 +3465,14 @@ const ingestWorker = new Worker<IngestJobData>(
 
       if (bilingualSibling) {
         // Bilingual duplicate — ingest but skip AI generation (shows as grayed-out card)
-        await prisma.rewrite.create({
-          data: {
+        await prisma.rewrite.upsert({
+          where: {
+            messageId_version: {
+              messageId: job.data.messageId,
+              version: 1
+            }
+          },
+          create: {
             messageId: job.data.messageId,
             version: 1,
             lang: "nb",
@@ -3212,7 +3481,8 @@ const ingestWorker = new Worker<IngestJobData>(
             rewriteJson: {},
             validationJson: {},
             status: "skipped"
-          }
+          },
+          update: {}
         });
         await prisma.feedItem.upsert({
           where: { messageId: job.data.messageId },
@@ -3220,9 +3490,17 @@ const ingestWorker = new Worker<IngestJobData>(
             messageId: job.data.messageId,
             publishedAt: new Date(job.data.publishedTime),
             visibilityStatus: "published",
-            rankScore: 0
+            rankScore: 0,
+            nextRewriteVersion: 2
           },
           update: {}
+        });
+        await prisma.feedItem.updateMany({
+          where: {
+            messageId: job.data.messageId,
+            nextRewriteVersion: { lt: 2 }
+          },
+          data: { nextRewriteVersion: 2 }
         });
         await publishFeedUpdate(job.data.messageId, "published");
         return;
@@ -3239,26 +3517,6 @@ const ingestWorker = new Worker<IngestJobData>(
         update: {}
       });
       await publishFeedUpdate(job.data.messageId, "source");
-
-      const existingRewrite = await prisma.rewrite.findFirst({
-        where: { messageId: job.data.messageId },
-        select: { id: true }
-      });
-      if (!existingRewrite) {
-        await upsertRewrite({
-          messageId: job.data.messageId,
-          version: 1,
-          rewriteJson: {} as Prisma.InputJsonValue,
-          status: "pending",
-          validationJson: {
-            valid: false,
-            errorCode: "REWRITE_QUEUED",
-            errors: [],
-            sourceBodyChars: details.bodyText.length,
-            promptChars: 0
-          } as Prisma.InputJsonValue
-        });
-      }
 
       const phaseUpdatedAt = new Date();
       const generationRun = await logPrisma.generationRun.create({
@@ -3277,6 +3535,22 @@ const ingestWorker = new Worker<IngestJobData>(
         }
       });
 
+      if (!(await claimGenerationSlot(job.data.messageId, generationRun.id))) {
+        await markGenerationSuperseded(
+          generationRun.id,
+          "GENERATION_SLOT_OWNED_BY_ANOTHER_RUN"
+        );
+        await publishFeedUpdate(job.data.messageId, "processing");
+        return;
+      }
+      await prisma.feedItem.updateMany({
+        where: {
+          messageId: job.data.messageId,
+          nextRewriteVersion: { lt: 2 }
+        },
+        data: { nextRewriteVersion: 2 }
+      });
+
       let rewriteJob;
       try {
         rewriteJob = await rewriteQueue.add(
@@ -3284,7 +3558,8 @@ const ingestWorker = new Worker<IngestJobData>(
           {
             messageId: job.data.messageId,
             reason: "new-message",
-            generationRunId: generationRun.id
+            generationRunId: generationRun.id,
+            targetVersion: 1
           },
           {
             jobId: `rewrite-${job.data.messageId}`,
@@ -3298,6 +3573,7 @@ const ingestWorker = new Worker<IngestJobData>(
           }
         );
       } catch (error) {
+        await releaseGenerationSlot(job.data.messageId, generationRun.id);
         await logPrisma.generationRun.update({
           where: { id: generationRun.id },
           data: {
@@ -3395,11 +3671,10 @@ const rewriteWorker = new Worker<RewriteJobData>(
         (job.data.reason === "manual-reprocess" || job.data.instruction) &&
         targetVersion > 1
       ) {
-        const prevRewrite = await prisma.rewrite.findFirst({
+        const prevRewrite = await prisma.publishedRewrite.findFirst({
           where: {
             messageId,
-            version: { lt: targetVersion },
-            status: { in: ["published", "pending"] }
+            version: { lt: targetVersion }
           },
           orderBy: { version: "desc" },
           select: { rewriteJson: true }
@@ -3422,6 +3697,10 @@ const rewriteWorker = new Worker<RewriteJobData>(
         payload,
         previousOutput
       );
+      if (!generationRunId) {
+        await publishFeedUpdate(messageId, "processing");
+        return;
+      }
       const preRewriteModelCalls: ModelCallLog[] = [];
       let preRewritePromptChars = 0;
 
@@ -4251,47 +4530,91 @@ const publishWorker = new Worker<PublishJobData>(
         }
       });
 
-      const pendingRewrites = await prisma.rewrite.findMany({
-        where: {
-          messageId: source.messageId,
-          status: "pending",
-          ...(job.data.version ? { version: job.data.version } : {})
-        },
-        orderBy: { version: "desc" },
-        take: job.data.version ? undefined : 1,
-        select: { version: true }
-      });
+      const version =
+        job.data.version ??
+        (
+          await prisma.rewrite.findFirst({
+            where: {
+              messageId: source.messageId,
+              status: "pending",
+              generationRunId: job.data.generationRunId ?? null
+            },
+            orderBy: { version: "desc" },
+            select: { version: true }
+          })
+        )?.version;
 
-      const publishedVersions = pendingRewrites.map((rewrite) => rewrite.version);
-      if (publishedVersions.length > 0) {
-        await setGenerationPhase(logPrisma, job.data.generationRunId, "publishing");
-        await prisma.rewrite.updateMany({
-          where: {
-            messageId: source.messageId,
-            status: "pending",
-            version: { in: publishedVersions }
-          },
-          data: { status: "published" }
-        });
+      if (version == null) {
+        if (job.data.generationRunId) {
+          await markGenerationSuperseded(
+            job.data.generationRunId,
+            "PUBLICATION_CANDIDATE_VERSION_MISSING"
+          );
+        }
+        await releaseGenerationSlot(source.messageId, job.data.generationRunId);
+        return;
       }
 
-      if (publishedVersions.length > 0) {
+      await setGenerationPhase(logPrisma, job.data.generationRunId, "publishing");
+      const result = await finalizePublication(prisma, {
+        messageId: source.messageId,
+        version,
+        generationRunId: job.data.generationRunId
+      });
+
+      const activated =
+        result.outcome === "activated" || result.outcome === "already_active";
+      const superseded = result.outcome === "finalized_superseded";
+      const finishedAt = new Date();
+      if (job.data.generationRunId) {
+        await logPrisma.generationRun.updateMany({
+          where: {
+            id: job.data.generationRunId,
+            status: { in: ["queued", "started", "pending", "needs_retry"] }
+          },
+          data: activated
+            ? {
+                status: "published",
+                phase: "published",
+                phaseUpdatedAt: finishedAt,
+                errorText: null,
+                finishedAt
+              }
+            : {
+                status: superseded ? "superseded" : "failed",
+                phase: "failed",
+                phaseUpdatedAt: finishedAt,
+                errorText: superseded
+                  ? "PUBLICATION_SUPERSEDED_BY_NEWER_VERSION"
+                  : `PUBLICATION_NOT_ACTIVATED:${result.outcome}`,
+                finishedAt
+              }
+        });
+      } else if (activated) {
         await logPrisma.generationRun.updateMany({
           where: {
             messageId: source.messageId,
-            version: { in: publishedVersions },
+            version,
             status: "pending"
           },
           data: {
             status: "published",
             phase: "published",
-            phaseUpdatedAt: new Date(),
-            finishedAt: new Date()
+            phaseUpdatedAt: finishedAt,
+            finishedAt
           }
         });
       }
 
-      await publishFeedUpdate(source.messageId, "published");
+      await releaseGenerationSlot(source.messageId, job.data.generationRunId);
+      const active = await prisma.feedItem.findUnique({
+        where: { messageId: source.messageId },
+        select: { activePublishedRewriteId: true }
+      });
+      await publishFeedUpdate(
+        source.messageId,
+        active?.activePublishedRewriteId ? "published" : "source"
+      );
     });
   },
   {
@@ -4510,6 +4833,21 @@ async function recoverStaleNewMessageRuns(): Promise<{
       });
       recoveryRunId = recoveryRun.id;
 
+      const ownershipTransferred = await transferGenerationOwnership({
+        messageId: candidate.messageId,
+        version: targetVersion,
+        fromGenerationRunId: candidate.id,
+        toGenerationRunId: recoveryRun.id
+      });
+      if (!ownershipTransferred) {
+        await markGenerationSuperseded(
+          recoveryRun.id,
+          "GENERATION_SLOT_OWNED_BY_ANOTHER_RUN"
+        );
+        skipped += 1;
+        continue;
+      }
+
       const recoveryJob = await rewriteQueue.add(
         "rewrite-stale-recovery",
         {
@@ -4542,7 +4880,21 @@ async function recoverStaleNewMessageRuns(): Promise<{
       recovered += 1;
     } catch (error) {
       failed += 1;
+      await releaseGenerationSlot(
+        candidate.messageId,
+        recoveryRunId ?? candidate.id
+      );
       if (recoveryRunId) {
+        await prisma.rewrite
+          .updateMany({
+            where: {
+              messageId: candidate.messageId,
+              generationRunId: recoveryRunId,
+              status: { not: "published" }
+            },
+            data: { generationRunId: null }
+          })
+          .catch(() => {});
         try {
           await logPrisma.generationRun.update({
             where: { id: recoveryRunId },

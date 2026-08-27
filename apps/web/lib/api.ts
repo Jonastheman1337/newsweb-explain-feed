@@ -105,15 +105,34 @@ type NoticeSource = {
   }>;
 };
 
-type RewriteVersion = {
+export type PublicationIdentity = {
+  rewriteId: string;
+  version: number;
+  revision: number;
+  contentHash: string;
+  finalizedAt: string;
+  isFinal: true;
+};
+
+export type RewriteVersion = {
+  rewriteId: string;
   version: number;
   rewrite: RewriteOutput;
   userInstruction: string | null;
   generatedAt: string;
+  contentHash: string;
+  isFinal: true;
 };
 
 type NoticeResponse =
-  | { source: NoticeSource; rewrite: RewriteOutput; rewrites?: RewriteVersion[]; skipped?: false; processing?: false }
+  | {
+      source: NoticeSource;
+      publication: PublicationIdentity;
+      rewrite: RewriteOutput;
+      rewrites?: RewriteVersion[];
+      skipped?: false;
+      processing?: false;
+    }
   | { source: NoticeSource; skipped: true }
   | { source: NoticeSource; failed: true }
   | { source: NoticeSource; processing: true };

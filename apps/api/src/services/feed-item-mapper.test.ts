@@ -14,6 +14,7 @@ function rewrite(
     model: "test-model",
     promptVersion: "test-prompt",
     status,
+    generationRunId: `run-${version}`,
     userInstruction: null,
     generatedAt,
     validationJson: { valid: true },
@@ -33,12 +34,38 @@ function rewrite(
   };
 }
 
-function feedItem(rewrites: ReturnType<typeof rewrite>[]) {
+function publishedRewrite(version: number) {
+  const staged = rewrite(version, "published", new Date("2026-05-07T08:00:00.000Z"));
+  return {
+    id: `published-${version}`,
+    messageId: 123,
+    version,
+    generationRunId: `run-${version}`,
+    lang: staged.lang,
+    model: staged.model,
+    promptVersion: staged.promptVersion,
+    rewriteJson: staged.rewriteJson,
+    validationJson: staged.validationJson,
+    userInstruction: null,
+    contentHash: `hash-${version}`,
+    finalizedAt: new Date("2026-05-07T08:05:00.000Z")
+  };
+}
+
+function feedItem(
+  rewrites: ReturnType<typeof rewrite>[],
+  activePublishedRewrite: ReturnType<typeof publishedRewrite> | null = null
+) {
   return {
     messageId: 123,
     publishedAt: new Date("2026-05-07T08:00:00.000Z"),
     visibilityStatus: "published",
     rankScore: 0,
+    activePublishedRewriteId: activePublishedRewrite?.id ?? null,
+    publicationRevision: activePublishedRewrite ? 1 : 0,
+    nextRewriteVersion: 3,
+    activeGenerationRunId: null,
+    activePublishedRewrite,
     sourceNotice: {
       messageId: 123,
       newsId: 456,
@@ -72,11 +99,14 @@ describe("mapDbItemToFeedItem", () => {
       feedItem([
         rewrite(2, "pending", new Date("2026-05-07T08:10:00.000Z")),
         rewrite(1, "published", new Date("2026-05-07T08:00:00.000Z"))
-      ]) as never
+      ], publishedRewrite(1)) as never
     );
 
     expect(item?.processing).toBe(false);
     expect(item?.rewriteVersion).toBe(1);
+    expect(item?.rewriteId).toBe("published-1");
+    expect(item?.contentHash).toBe("hash-1");
+    expect(item?.isFinal).toBe(true);
     expect(item?.title).toBe("Publisert versjon 1");
     expect(item?.attachments).toEqual([
       {
@@ -96,6 +126,18 @@ describe("mapDbItemToFeedItem", () => {
     expect(item?.processing).toBe(true);
     expect(item?.rewriteVersion).toBe(1);
     expect(item?.notGenerated).toBe(false);
+    expect(item?.title).toBe("Original tittel");
+  });
+
+  it("does not expose a staging row without an immutable active pointer", () => {
+    const item = mapDbItemToFeedItem(
+      feedItem([
+        rewrite(1, "published", new Date("2026-05-07T08:00:00.000Z"))
+      ]) as never
+    );
+
+    expect(item?.isFinal).toBe(false);
+    expect(item?.rewriteId).toBe(null);
     expect(item?.title).toBe("Original tittel");
   });
 

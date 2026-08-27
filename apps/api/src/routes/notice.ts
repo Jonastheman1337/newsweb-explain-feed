@@ -35,6 +35,11 @@ import {
   sanitizeMaterialTitle,
   truncateMaterialText
 } from "../services/notice-materials.js";
+import {
+  ActiveGenerationConflictError,
+  releaseRewriteGenerationSlot,
+  reserveRewriteGeneration
+} from "../services/rewrite-reservation.js";
 
 const paramsSchema = z.object({
   messageId: z.coerce.number().int().positive()
@@ -89,29 +94,6 @@ type MaterialSnapshot = {
   text: string;
   textChars: number;
 };
-
-async function nextRewriteContext(messageId: number): Promise<{
-  targetVersion: number;
-  previousRewriteJson: Prisma.JsonValue | null;
-}> {
-  const maxRow = await prisma.rewrite.findFirst({
-    where: { messageId },
-    orderBy: { version: "desc" },
-    select: { version: true }
-  });
-  const previousRewrite = await prisma.rewrite.findFirst({
-    where: {
-      messageId,
-      status: { in: ["published", "pending"] }
-    },
-    orderBy: { version: "desc" },
-    select: { rewriteJson: true }
-  });
-  return {
-    targetVersion: (maxRow?.version ?? 0) + 1,
-    previousRewriteJson: previousRewrite?.rewriteJson ?? null
-  };
-}
 
 function buildSourcePayload(notice: {
   messageId: number;
@@ -235,7 +217,20 @@ export const noticeRoutes: FastifyPluginAsync = async (fastify) => {
         where: { messageId },
         include: {
           rewrites: {
+            orderBy: { version: "asc" },
+            select: {
+              status: true,
+              generatedAt: true,
+              version: true
+            }
+          },
+          publishedRewrites: {
             orderBy: { version: "asc" }
+          },
+          feedItem: {
+            include: {
+              activePublishedRewrite: true
+            }
           }
         }
       });
@@ -244,9 +239,7 @@ export const noticeRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.code(404).send({ message: "Notis ikke funnet." });
       }
 
-      const publishedRewrites = notice.rewrites.filter(
-        (r) => r.status === "published"
-      );
+      const activePublishedRewrite = notice.feedItem?.activePublishedRewrite ?? null;
 
       // Find the latest rewrite by generatedAt for backward-compat status checks
       const latestRewrite = notice.rewrites.length
@@ -255,60 +248,64 @@ export const noticeRoutes: FastifyPluginAsync = async (fastify) => {
           )
         : null;
 
-      // No rewrite, or still pending with no published fallback -> processing
-      if (
-        !latestRewrite ||
-        ((latestRewrite.status === "pending" ||
-          latestRewrite.status === "needs_retry") &&
-          publishedRewrites.length === 0)
-      ) {
+      if (!activePublishedRewrite) {
+        if (
+          !latestRewrite ||
+          latestRewrite.status === "pending" ||
+          latestRewrite.status === "needs_retry"
+        ) {
+          return reply.send({
+            source: buildSourcePayload(notice),
+            processing: true
+          });
+        }
+        if (latestRewrite.status === "failed") {
+          return reply.send({
+            source: buildSourcePayload(notice),
+            failed: true
+          });
+        }
+        if (latestRewrite.status === "skipped") {
+          return reply.send({
+            source: buildSourcePayload(notice),
+            skipped: true
+          });
+        }
+      }
+
+      if (!activePublishedRewrite || !notice.feedItem) {
         return reply.send({
           source: buildSourcePayload(notice),
           processing: true
         });
       }
 
-      // Failed rewrite with no published version -> keep source visible and retryable.
-      if (
-        latestRewrite.status === "failed" &&
-        !notice.rewrites.some((r) => r.status === "published")
-      ) {
-        return reply.send({
-          source: buildSourcePayload(notice),
-          failed: true
-        });
-      }
-
-      if (
-        latestRewrite.status === "skipped" &&
-        !notice.rewrites.some((r) => r.status === "published")
-      ) {
-        return reply.send({
-          source: buildSourcePayload(notice),
-          skipped: true
-        });
-      }
-
-      // Build rewrites array from all published versions
-      const latestPublished = publishedRewrites.length
-        ? publishedRewrites[publishedRewrites.length - 1]
-        : latestRewrite;
-
       const rewrite = rewriteOutputSchema.parse(
-        normalizeRewriteJson(latestPublished.rewriteJson)
+        normalizeRewriteJson(activePublishedRewrite.rewriteJson)
       );
 
-      const rewrites = publishedRewrites.map((r) => ({
+      const rewrites = notice.publishedRewrites.map((r) => ({
+        rewriteId: r.id,
         version: r.version,
         rewrite: rewriteOutputSchema.parse(
           normalizeRewriteJson(r.rewriteJson)
         ),
         userInstruction: r.userInstruction,
-        generatedAt: r.generatedAt.toISOString()
+        generatedAt: r.finalizedAt.toISOString(),
+        contentHash: r.contentHash,
+        isFinal: true as const
       }));
 
       const payload = {
         source: buildSourcePayload(notice),
+        publication: {
+          rewriteId: activePublishedRewrite.id,
+          version: activePublishedRewrite.version,
+          revision: Math.max(1, notice.feedItem.publicationRevision),
+          contentHash: activePublishedRewrite.contentHash,
+          finalizedAt: activePublishedRewrite.finalizedAt.toISOString(),
+          isFinal: true as const
+        },
         rewrite,
         rewrites
       };
@@ -876,26 +873,20 @@ export const noticeRoutes: FastifyPluginAsync = async (fastify) => {
         messageId,
         body?.selectedMaterialIds
       );
-      const { targetVersion, previousRewriteJson } =
-        await nextRewriteContext(messageId);
       const phaseUpdatedAt = new Date();
       const generationRun = await logPrisma.generationRun.create({
         data: {
           messageId,
-          version: targetVersion,
+          version: null,
           reason: "manual-reprocess",
           status: "queued",
           phase: "queued",
           phaseUpdatedAt,
           userInstruction: instruction ?? null,
-          ...(previousRewriteJson
-            ? { previousRewriteJson: toJsonValue(previousRewriteJson) }
-            : {}),
           inputJson: toJsonValue({
             endpoint: "/notice/:messageId/generate",
             messageId,
-            targetVersion,
-            previousRewriteJson,
+            reservation: "pending",
             instruction: instruction ?? null,
             outputMode,
             reasoningEffortOverride: reasoningEffortOverride ?? null,
@@ -904,9 +895,66 @@ export const noticeRoutes: FastifyPluginAsync = async (fastify) => {
         }
       });
 
-      let job;
+      let targetVersion: number;
+      let previousRewriteJson: Prisma.JsonValue | null;
       try {
-        job = await fastify.rewriteQueue.add(
+        const reservation = await reserveRewriteGeneration(
+          messageId,
+          generationRun.id
+        );
+        targetVersion = reservation.targetVersion;
+        previousRewriteJson = reservation.previousRewriteJson;
+      } catch (error) {
+        const conflictRunId =
+          error instanceof ActiveGenerationConflictError
+            ? error.generationRunId
+            : null;
+        await logPrisma.generationRun.update({
+          where: { id: generationRun.id },
+          data: {
+            status: conflictRunId ? "superseded" : "failed",
+            phase: "failed",
+            phaseUpdatedAt: new Date(),
+            errorText: conflictRunId
+              ? `GENERATION_ALREADY_ACTIVE:${conflictRunId}`
+              : error instanceof Error
+                ? error.message
+                : String(error),
+            finishedAt: new Date()
+          }
+        });
+        if (conflictRunId) {
+          return reply.code(409).send({
+            message: "En ny versjon genereres allerede.",
+            generationRunId: conflictRunId
+          });
+        }
+        throw error;
+      }
+
+      let queuedJobId: string | null = null;
+      try {
+        await logPrisma.generationRun.update({
+          where: { id: generationRun.id },
+          data: {
+            version: targetVersion,
+            ...(previousRewriteJson
+              ? { previousRewriteJson: toJsonValue(previousRewriteJson) }
+              : {}),
+            inputJson: toJsonValue({
+              endpoint: "/notice/:messageId/generate",
+              messageId,
+              targetVersion,
+              previousRewriteJson,
+              instruction: instruction ?? null,
+              outputMode,
+              reasoningEffortOverride: reasoningEffortOverride ?? null,
+              supplementalMaterials
+            })
+          }
+        });
+
+        const job = await fastify.rewriteQueue.add(
           "rewrite-on-demand",
           {
             messageId,
@@ -926,7 +974,9 @@ export const noticeRoutes: FastifyPluginAsync = async (fastify) => {
             removeOnFail: 2000
           }
         );
+        queuedJobId = job.id != null ? String(job.id) : null;
       } catch (error) {
+        await releaseRewriteGenerationSlot(messageId, generationRun.id);
         await logPrisma.generationRun.update({
           where: { id: generationRun.id },
           data: {
@@ -940,13 +990,20 @@ export const noticeRoutes: FastifyPluginAsync = async (fastify) => {
         throw error;
       }
 
-      await logPrisma.generationRun.update({
-        where: { id: generationRun.id },
-        data: {
-          jobId: job.id != null ? String(job.id) : null,
-          jobName: "rewrite-on-demand"
-        }
-      });
+      await logPrisma.generationRun
+        .update({
+          where: { id: generationRun.id },
+          data: {
+            jobId: queuedJobId,
+            jobName: "rewrite-on-demand"
+          }
+        })
+        .catch((error) => {
+          request.log.error(
+            { err: error, generationRunId: generationRun.id },
+            "Failed to attach queue job id to generation run"
+          );
+        });
 
       await tryCreateUserActionEvent({
         logger: request.log,
@@ -963,14 +1020,15 @@ export const noticeRoutes: FastifyPluginAsync = async (fastify) => {
           selectedMaterialIds: supplementalMaterials.map((material) => material.id),
           targetVersion,
           generationRunId: generationRun.id,
-          jobId: job.id ?? null
+          jobId: queuedJobId
         }
       });
 
       return reply.send({
         queued: true,
-        jobId: job.id ?? null,
-        version: targetVersion
+        jobId: queuedJobId,
+        version: targetVersion,
+        generationRunId: generationRun.id
       });
     }
   );

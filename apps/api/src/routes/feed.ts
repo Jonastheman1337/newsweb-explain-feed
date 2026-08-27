@@ -167,6 +167,15 @@ export const feedRoutes: FastifyPluginAsync = async (fastify) => {
         orderBy: [{ publishedAt: "desc" }, { messageId: "desc" }],
         take: query.limit + 1,
         include: {
+          activePublishedRewrite: {
+            select: {
+              id: true,
+              version: true,
+              rewriteJson: true,
+              contentHash: true,
+              finalizedAt: true
+            }
+          },
           sourceNotice: {
             include: {
               rewrites: {
@@ -178,8 +187,7 @@ export const feedRoutes: FastifyPluginAsync = async (fastify) => {
                 select: {
                   status: true,
                   generatedAt: true,
-                  version: true,
-                  rewriteJson: true
+                  version: true
                 }
               }
             }

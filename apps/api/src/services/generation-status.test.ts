@@ -148,6 +148,38 @@ describe("generation status", () => {
         newDate
       )
     ).toBe(false);
+
+    expect(
+      isGenerationRunActive(
+        {
+          id: "run-superseded",
+          status: "superseded",
+          phase: "checking_references",
+          phaseUpdatedAt: newDate
+        },
+        newDate
+      )
+    ).toBe(false);
+  });
+
+  it("reports an ownership-conflicted generation as failed", () => {
+    expect(
+      buildGenerationStatusPayload({
+        generationRun: {
+          id: "run-superseded",
+          status: "superseded",
+          phase: "failed",
+          phaseUpdatedAt: newDate
+        },
+        rewrite: null,
+        jobState: null,
+        now: newDate
+      })
+    ).toMatchObject({
+      ready: false,
+      failed: true,
+      phase: "failed"
+    });
   });
 
   it("treats runs without recent phase progress as dead", () => {

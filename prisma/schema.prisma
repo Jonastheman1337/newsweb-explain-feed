@@ -27,21 +27,21 @@ enum JobStatus {
 }
 
 model User {
-  id          String   @id @default(cuid())
-  email       String   @unique
-  createdAt   DateTime @default(now()) @map("created_at")
+  id          String    @id @default(cuid())
+  email       String    @unique
+  createdAt   DateTime  @default(now()) @map("created_at")
   lastLoginAt DateTime? @map("last_login_at")
 
   @@map("users")
 }
 
 model Invite {
-  id        String    @id @default(cuid())
-  email     String    @unique
-  tokenHash String?   @map("token_hash")
-  expiresAt DateTime? @map("expires_at")
+  id         String    @id @default(cuid())
+  email      String    @unique
+  tokenHash  String?   @map("token_hash")
+  expiresAt  DateTime? @map("expires_at")
   acceptedAt DateTime? @map("accepted_at")
-  createdAt DateTime  @default(now()) @map("created_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
 
   @@map("invites")
 }
@@ -55,22 +55,23 @@ model AppSetting {
 }
 
 model SourceNotice {
-  messageId      Int       @id @map("message_id")
-  newsId         Int       @map("news_id")
-  title          String
-  issuerName     String    @map("issuer_name")
-  issuerSign     String    @map("issuer_sign")
-  publishedAt    DateTime  @map("published_at")
-  categoriesJson Json      @map("categories_json")
-  marketsJson    Json      @map("markets_json")
-  bodyText       String    @map("body_text") @db.Text
-  hasAttachments Boolean   @map("has_attachments")
-  rawMessageJson Json      @map("raw_message_json")
-  ingestedAt     DateTime  @default(now()) @map("ingested_at")
-  rewrites       Rewrite[]
-  feedItem       FeedItem?
-  jobRuns        JobRun[]
-  materials      NoticeMaterial[]
+  messageId         Int                @id @map("message_id")
+  newsId            Int                @map("news_id")
+  title             String
+  issuerName        String             @map("issuer_name")
+  issuerSign        String             @map("issuer_sign")
+  publishedAt       DateTime           @map("published_at")
+  categoriesJson    Json               @map("categories_json")
+  marketsJson       Json               @map("markets_json")
+  bodyText          String             @map("body_text") @db.Text
+  hasAttachments    Boolean            @map("has_attachments")
+  rawMessageJson    Json               @map("raw_message_json")
+  ingestedAt        DateTime           @default(now()) @map("ingested_at")
+  rewrites          Rewrite[]
+  publishedRewrites PublishedRewrite[]
+  feedItem          FeedItem?
+  jobRuns           JobRun[]
+  materials         NoticeMaterial[]
 
   @@index([publishedAt(sort: Desc)])
   @@index([issuerSign])
@@ -112,6 +113,7 @@ model Rewrite {
   rewriteJson     Json          @map("rewrite_json")
   validationJson  Json          @map("validation_json")
   status          RewriteStatus
+  generationRunId String?       @map("generation_run_id")
   userInstruction String?       @map("user_instruction") @db.Text
   generatedAt     DateTime      @default(now()) @map("generated_at")
   sourceNotice    SourceNotice  @relation(fields: [messageId], references: [messageId], onDelete: Cascade)
@@ -121,25 +123,51 @@ model Rewrite {
   @@map("rewrites")
 }
 
+model PublishedRewrite {
+  id              String       @id @default(cuid())
+  messageId       Int          @map("message_id")
+  version         Int
+  generationRunId String?      @unique @map("generation_run_id")
+  lang            String
+  model           String
+  promptVersion   String       @map("prompt_version")
+  rewriteJson     Json         @map("rewrite_json")
+  validationJson  Json         @map("validation_json")
+  userInstruction String?      @map("user_instruction") @db.Text
+  contentHash     String       @map("content_hash")
+  finalizedAt     DateTime     @default(now()) @map("finalized_at")
+  sourceNotice    SourceNotice @relation(fields: [messageId], references: [messageId], onDelete: Cascade)
+  activeFeedItem  FeedItem?    @relation("ActivePublishedRewrite")
+
+  @@unique([messageId, version])
+  @@index([messageId, finalizedAt(sort: Desc)])
+  @@map("published_rewrites")
+}
+
 model FeedItem {
-  messageId        Int                 @id @map("message_id")
-  publishedAt      DateTime            @map("published_at")
-  visibilityStatus FeedVisibilityStatus @default(published) @map("visibility_status")
-  rankScore        Float               @default(0) @map("rank_score")
-  sourceNotice     SourceNotice        @relation(fields: [messageId], references: [messageId], onDelete: Cascade)
+  messageId                Int                  @id @map("message_id")
+  publishedAt              DateTime             @map("published_at")
+  visibilityStatus         FeedVisibilityStatus @default(published) @map("visibility_status")
+  rankScore                Float                @default(0) @map("rank_score")
+  activePublishedRewriteId String?              @unique @map("active_published_rewrite_id")
+  publicationRevision      Int                  @default(0) @map("publication_revision")
+  nextRewriteVersion       Int                  @default(1) @map("next_rewrite_version")
+  activeGenerationRunId    String?              @map("active_generation_run_id")
+  sourceNotice             SourceNotice         @relation(fields: [messageId], references: [messageId], onDelete: Cascade)
+  activePublishedRewrite   PublishedRewrite?    @relation("ActivePublishedRewrite", fields: [activePublishedRewriteId], references: [id], onDelete: SetNull)
 
   @@index([publishedAt(sort: Desc), visibilityStatus])
   @@map("feed_items")
 }
 
 model JobRun {
-  id          String      @id @default(cuid())
-  jobType     String      @map("job_type")
-  messageId   Int?        @map("message_id")
-  status      JobStatus
-  startedAt   DateTime    @default(now()) @map("started_at")
-  finishedAt  DateTime?   @map("finished_at")
-  errorText   String?     @map("error_text") @db.Text
+  id           String        @id @default(cuid())
+  jobType      String        @map("job_type")
+  messageId    Int?          @map("message_id")
+  status       JobStatus
+  startedAt    DateTime      @default(now()) @map("started_at")
+  finishedAt   DateTime?     @map("finished_at")
+  errorText    String?       @map("error_text") @db.Text
   sourceNotice SourceNotice? @relation(fields: [messageId], references: [messageId], onDelete: SetNull)
 
   @@index([jobType, startedAt(sort: Desc)])
@@ -147,27 +175,27 @@ model JobRun {
 }
 
 model GenerationRun {
-  id                  String       @id @default(cuid())
-  messageId           Int          @map("message_id")
+  id                  String    @id @default(cuid())
+  messageId           Int       @map("message_id")
   version             Int?
-  jobId               String?      @map("job_id")
-  jobName             String?      @map("job_name")
+  jobId               String?   @map("job_id")
+  jobName             String?   @map("job_name")
   reason              String
   status              String
   phase               String?
-  phaseUpdatedAt      DateTime?    @map("phase_updated_at")
-  userInstruction     String?      @map("user_instruction") @db.Text
-  inputJson           Json?        @map("input_json")
-  previousRewriteJson Json?        @map("previous_rewrite_json")
-  outputJson          Json?        @map("output_json")
-  validationJson      Json?        @map("validation_json")
+  phaseUpdatedAt      DateTime? @map("phase_updated_at")
+  userInstruction     String?   @map("user_instruction") @db.Text
+  inputJson           Json?     @map("input_json")
+  previousRewriteJson Json?     @map("previous_rewrite_json")
+  outputJson          Json?     @map("output_json")
+  validationJson      Json?     @map("validation_json")
   model               String?
-  promptVersion       String?      @map("prompt_version")
-  promptChars         Int?         @map("prompt_chars")
-  errorText           String?      @map("error_text") @db.Text
-  requestedAt         DateTime     @default(now()) @map("requested_at")
-  startedAt           DateTime?    @map("started_at")
-  finishedAt          DateTime?    @map("finished_at")
+  promptVersion       String?   @map("prompt_version")
+  promptChars         Int?      @map("prompt_chars")
+  errorText           String?   @map("error_text") @db.Text
+  requestedAt         DateTime  @default(now()) @map("requested_at")
+  startedAt           DateTime? @map("started_at")
+  finishedAt          DateTime? @map("finished_at")
 
   @@index([messageId, requestedAt(sort: Desc)])
   @@index([jobId])
@@ -176,19 +204,22 @@ model GenerationRun {
 }
 
 model UserActionEvent {
-  id            String   @id @default(cuid())
-  messageId     Int?     @map("message_id")
-  version       Int?
-  clientEventId String?  @map("client_event_id")
-  editorIdHash  String?  @map("editor_id_hash")
-  sessionIdHash String?  @map("session_id_hash")
-  rewriteId     String?  @map("rewrite_id")
-  promptVersion String?  @map("prompt_version")
-  model         String?
-  action        String
-  actionSource  String?  @map("action_source")
-  payloadJson   Json?    @map("payload_json")
-  createdAt     DateTime @default(now()) @map("created_at")
+  id                  String   @id @default(cuid())
+  messageId           Int?     @map("message_id")
+  version             Int?
+  clientEventId       String?  @map("client_event_id")
+  editorIdHash        String?  @map("editor_id_hash")
+  sessionIdHash       String?  @map("session_id_hash")
+  rewriteId           String?  @map("rewrite_id")
+  publicationRevision Int?     @map("publication_revision")
+  contentHash         String?  @map("content_hash")
+  renderedFinal       Boolean? @map("rendered_final")
+  promptVersion       String?  @map("prompt_version")
+  model               String?
+  action              String
+  actionSource        String?  @map("action_source")
+  payloadJson         Json?    @map("payload_json")
+  createdAt           DateTime @default(now()) @map("created_at")
 
   @@index([messageId, createdAt(sort: Desc)])
   @@index([action, createdAt(sort: Desc)])
@@ -200,15 +231,15 @@ model UserActionEvent {
 }
 
 model EditLog {
-  id              String   @id @default(cuid())
-  eventId         String?  @map("event_id")
-  messageId       Int      @map("message_id")
-  originalTitle   String   @map("original_title")
-  originalBody    String   @map("original_body") @db.Text
-  editedTitle     String   @map("edited_title")
-  editedBody      String   @map("edited_body") @db.Text
-  hasEdits        Boolean  @map("has_edits")
-  copiedAt        DateTime @default(now()) @map("copied_at")
+  id            String   @id @default(cuid())
+  eventId       String?  @map("event_id")
+  messageId     Int      @map("message_id")
+  originalTitle String   @map("original_title")
+  originalBody  String   @map("original_body") @db.Text
+  editedTitle   String   @map("edited_title")
+  editedBody    String   @map("edited_body") @db.Text
+  hasEdits      Boolean  @map("has_edits")
+  copiedAt      DateTime @default(now()) @map("copied_at")
 
   @@index([messageId, copiedAt(sort: Desc)])
   @@index([eventId])
@@ -229,16 +260,16 @@ model Feedback {
 }
 
 model TitleSuggestionLog {
-  id              String   @id @default(cuid())
-  eventId         String?  @map("event_id")
-  messageId       Int      @map("message_id")
-  currentTitle    String   @map("current_title")
-  suggestions     Json     @map("suggestions")
-  selectedTitle   String?  @map("selected_title")
-  action          String?
-  selectedIndex   Int?     @map("selected_index")
+  id                  String   @id @default(cuid())
+  eventId             String?  @map("event_id")
+  messageId           Int      @map("message_id")
+  currentTitle        String   @map("current_title")
+  suggestions         Json     @map("suggestions")
+  selectedTitle       String?  @map("selected_title")
+  action              String?
+  selectedIndex       Int?     @map("selected_index")
   selectedWasOriginal Boolean? @map("selected_was_original")
-  createdAt       DateTime @default(now()) @map("created_at")
+  createdAt           DateTime @default(now()) @map("created_at")
 
   @@index([messageId, createdAt(sort: Desc)])
   @@index([eventId])

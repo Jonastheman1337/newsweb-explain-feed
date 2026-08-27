@@ -1,20 +1,28 @@
 "use client";
 
 import { useEffect, type ReactNode } from "react";
-import { useEditorialTelemetry } from "../lib/editorial-telemetry";
+import {
+  useEditorialTelemetry,
+  type PublicationTelemetryIdentity
+} from "../lib/editorial-telemetry";
 
 type NoticeTelemetryProps = {
   messageId: number;
   activeVersion?: number;
+  publication?: PublicationTelemetryIdentity;
   state: "processing" | "skipped" | "failed" | "published";
 };
 
 export function NoticeTelemetry({
   messageId,
   activeVersion,
+  publication,
   state
 }: NoticeTelemetryProps) {
-  const { logEvent } = useEditorialTelemetry(messageId, activeVersion);
+  const { logEvent } = useEditorialTelemetry(
+    messageId,
+    publication ?? activeVersion
+  );
 
   useEffect(() => {
     void logEvent({
@@ -30,6 +38,7 @@ export function NoticeTelemetry({
 type SourceLinkProps = {
   messageId: number;
   activeVersion?: number;
+  publication?: PublicationTelemetryIdentity;
   href: string;
   className?: string;
   children: ReactNode;
@@ -38,11 +47,15 @@ type SourceLinkProps = {
 export function SourceLink({
   messageId,
   activeVersion,
+  publication,
   href,
   className,
   children
 }: SourceLinkProps) {
-  const { logEvent } = useEditorialTelemetry(messageId, activeVersion);
+  const { logEvent } = useEditorialTelemetry(
+    messageId,
+    publication ?? activeVersion
+  );
 
   function handleClick() {
     void logEvent({

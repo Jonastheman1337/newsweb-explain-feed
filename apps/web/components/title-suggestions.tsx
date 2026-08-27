@@ -6,6 +6,10 @@ import { useEditorialTelemetry } from "../lib/editorial-telemetry";
 type TitleSuggestionsProps = {
   messageId: number;
   activeVersion?: number;
+  rewriteId?: string;
+  publicationRevision?: number;
+  contentHash?: string;
+  isFinal?: boolean;
   currentTitle: string;
   onPreview: (title: string) => void;
   onRevert: () => void;
@@ -15,6 +19,10 @@ type TitleSuggestionsProps = {
 export function useTitleSuggestions({
   messageId,
   activeVersion,
+  rewriteId,
+  publicationRevision,
+  contentHash,
+  isFinal,
   currentTitle,
   onPreview,
   onRevert,
@@ -26,7 +34,13 @@ export function useTitleSuggestions({
   const [titles, setTitles] = useState<string[]>([]);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
-  const { buildTelemetry } = useEditorialTelemetry(messageId, activeVersion);
+  const { buildTelemetry } = useEditorialTelemetry(messageId, {
+    version: activeVersion,
+    rewriteId,
+    publicationRevision,
+    contentHash,
+    isFinal
+  });
 
   const close = useCallback(() => {
     setOpen(false);

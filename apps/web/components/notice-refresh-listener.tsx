@@ -6,9 +6,13 @@ import { useFeedStreamSubscription } from "./feed-stream-provider";
 
 type NoticeRefreshListenerProps = {
   messageId: number;
+  publicationRevision: number;
 };
 
-export function NoticeRefreshListener({ messageId }: NoticeRefreshListenerProps) {
+export function NoticeRefreshListener({
+  messageId,
+  publicationRevision
+}: NoticeRefreshListenerProps) {
   const router = useRouter();
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -32,7 +36,12 @@ export function NoticeRefreshListener({ messageId }: NoticeRefreshListenerProps)
 
   useFeedStreamSubscription({
     onItem: (item) => {
-      if (item.messageId === messageId) {
+      if (item.messageId !== messageId) return;
+      if (item.isFinal && item.publicationRevision > publicationRevision) {
+        scheduleRefresh();
+        return;
+      }
+      if (publicationRevision === 0 && (item.failed || item.skipped)) {
         scheduleRefresh();
       }
     },

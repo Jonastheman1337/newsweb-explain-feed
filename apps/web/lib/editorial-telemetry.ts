@@ -7,7 +7,19 @@ export type EditorialTelemetryPayload = {
   editorId: string;
   sessionId: string;
   version?: number;
+  rewriteId?: string;
+  publicationRevision?: number;
+  contentHash?: string;
+  isFinal?: boolean;
   actionSource?: string;
+};
+
+export type PublicationTelemetryIdentity = {
+  version?: number;
+  rewriteId?: string;
+  publicationRevision?: number;
+  contentHash?: string;
+  isFinal?: boolean;
 };
 
 function createId(): string {
@@ -27,6 +39,10 @@ function getStoredId(storage: Storage, key: string): string {
 
 export function createEditorialTelemetry(args: {
   version?: number;
+  rewriteId?: string;
+  publicationRevision?: number;
+  contentHash?: string;
+  isFinal?: boolean;
   actionSource?: string;
 } = {}): EditorialTelemetryPayload | undefined {
   if (typeof window === "undefined") return undefined;
@@ -35,21 +51,42 @@ export function createEditorialTelemetry(args: {
     editorId: getStoredId(window.localStorage, "newsweb_editor_id"),
     sessionId: getStoredId(window.sessionStorage, "newsweb_session_id"),
     ...(args.version != null ? { version: args.version } : {}),
+    ...(args.rewriteId ? { rewriteId: args.rewriteId } : {}),
+    ...(args.publicationRevision != null
+      ? { publicationRevision: args.publicationRevision }
+      : {}),
+    ...(args.contentHash ? { contentHash: args.contentHash } : {}),
+    ...(args.isFinal != null ? { isFinal: args.isFinal } : {}),
     ...(args.actionSource ? { actionSource: args.actionSource } : {})
   };
 }
 
-export function useEditorialTelemetry(messageId: number, activeVersion?: number) {
+export function useEditorialTelemetry(
+  messageId: number,
+  activeIdentity?: number | PublicationTelemetryIdentity
+) {
+  const baseIdentity: PublicationTelemetryIdentity =
+    typeof activeIdentity === "number"
+      ? { version: activeIdentity }
+      : (activeIdentity ?? {});
   const buildTelemetry = useCallback(
-    (args: {
-      version?: number;
-      actionSource?: string;
-    } = {}) =>
+    (args: PublicationTelemetryIdentity & { actionSource?: string } = {}) =>
       createEditorialTelemetry({
-        version: args.version ?? activeVersion,
+        version: args.version ?? baseIdentity.version,
+        rewriteId: args.rewriteId ?? baseIdentity.rewriteId,
+        publicationRevision:
+          args.publicationRevision ?? baseIdentity.publicationRevision,
+        contentHash: args.contentHash ?? baseIdentity.contentHash,
+        isFinal: args.isFinal ?? baseIdentity.isFinal,
         actionSource: args.actionSource
       }),
-    [activeVersion]
+    [
+      baseIdentity.contentHash,
+      baseIdentity.isFinal,
+      baseIdentity.publicationRevision,
+      baseIdentity.rewriteId,
+      baseIdentity.version
+    ]
   );
 
   const logEvent = useCallback(
@@ -57,10 +94,18 @@ export function useEditorialTelemetry(messageId: number, activeVersion?: number)
       action: string;
       payload?: unknown;
       version?: number;
+      rewriteId?: string;
+      publicationRevision?: number;
+      contentHash?: string;
+      isFinal?: boolean;
       actionSource?: string;
     }) => {
       const telemetry = buildTelemetry({
         version: args.version,
+        rewriteId: args.rewriteId,
+        publicationRevision: args.publicationRevision,
+        contentHash: args.contentHash,
+        isFinal: args.isFinal,
         actionSource: args.actionSource
       });
       await fetch(`/api/notice/${messageId}/event`, {

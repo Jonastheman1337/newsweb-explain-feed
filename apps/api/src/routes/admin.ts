@@ -1,4 +1,4 @@
-import { logPrisma, prisma } from "@newsweb/shared/db";
+import { logPrisma } from "@newsweb/shared/db";
 import type { Prisma } from "@prisma/client";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
@@ -6,33 +6,15 @@ import {
   toJsonValue,
   tryCreateUserActionEvent
 } from "../services/editorial-telemetry.js";
+import {
+  ActiveGenerationConflictError,
+  releaseRewriteGenerationSlot,
+  reserveRewriteGeneration
+} from "../services/rewrite-reservation.js";
 
 const paramsSchema = z.object({
   messageId: z.coerce.number().int().positive()
 });
-
-async function nextRewriteContext(messageId: number): Promise<{
-  targetVersion: number;
-  previousRewriteJson: Prisma.JsonValue | null;
-}> {
-  const maxRow = await prisma.rewrite.findFirst({
-    where: { messageId },
-    orderBy: { version: "desc" },
-    select: { version: true }
-  });
-  const previousRewrite = await prisma.rewrite.findFirst({
-    where: {
-      messageId,
-      status: { in: ["published", "pending"] }
-    },
-    orderBy: { version: "desc" },
-    select: { rewriteJson: true }
-  });
-  return {
-    targetVersion: (maxRow?.version ?? 0) + 1,
-    previousRewriteJson: previousRewrite?.rewriteJson ?? null
-  };
-}
 
 export const adminRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.post("/admin/reprocess/:messageId", async (request, reply) => {
@@ -42,31 +24,79 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
     }
 
     const { messageId } = paramsSchema.parse(request.params);
-    const { targetVersion, previousRewriteJson } =
-      await nextRewriteContext(messageId);
     const phaseUpdatedAt = new Date();
     const generationRun = await logPrisma.generationRun.create({
       data: {
         messageId,
-        version: targetVersion,
+        version: null,
         reason: "manual-reprocess",
         status: "queued",
         phase: "queued",
         phaseUpdatedAt,
         userInstruction: null,
-        ...(previousRewriteJson
-          ? { previousRewriteJson: toJsonValue(previousRewriteJson) }
-          : {}),
         inputJson: toJsonValue({
           endpoint: "/admin/reprocess/:messageId",
           messageId,
-          targetVersion,
-          previousRewriteJson
+          reservation: "pending"
         })
       }
     });
 
+    let targetVersion: number;
+    let previousRewriteJson: Prisma.JsonValue | null;
+    let queuedJobId: string | null = null;
     try {
+      const reservation = await reserveRewriteGeneration(
+        messageId,
+        generationRun.id
+      );
+      targetVersion = reservation.targetVersion;
+      previousRewriteJson = reservation.previousRewriteJson;
+    } catch (error) {
+      const conflictRunId =
+        error instanceof ActiveGenerationConflictError
+          ? error.generationRunId
+          : null;
+      await logPrisma.generationRun.update({
+        where: { id: generationRun.id },
+        data: {
+          status: conflictRunId ? "superseded" : "failed",
+          phase: "failed",
+          phaseUpdatedAt: new Date(),
+          errorText: conflictRunId
+            ? `GENERATION_ALREADY_ACTIVE:${conflictRunId}`
+            : error instanceof Error
+              ? error.message
+              : String(error),
+          finishedAt: new Date()
+        }
+      });
+      if (conflictRunId) {
+        return reply.code(409).send({
+          message: "Generation already active.",
+          generationRunId: conflictRunId
+        });
+      }
+      throw error;
+    }
+
+    try {
+      await logPrisma.generationRun.update({
+        where: { id: generationRun.id },
+        data: {
+          version: targetVersion,
+          ...(previousRewriteJson
+            ? { previousRewriteJson: toJsonValue(previousRewriteJson) }
+            : {}),
+          inputJson: toJsonValue({
+            endpoint: "/admin/reprocess/:messageId",
+            messageId,
+            targetVersion,
+            previousRewriteJson
+          })
+        }
+      });
+
       const job = await fastify.rewriteQueue.add(
         "rewrite-manual",
         {
@@ -86,28 +116,9 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
           removeOnFail: 2000
         }
       );
-
-      await logPrisma.generationRun.update({
-        where: { id: generationRun.id },
-        data: {
-          jobId: job.id != null ? String(job.id) : null,
-          jobName: "rewrite-manual"
-        }
-      });
-
-      await tryCreateUserActionEvent({
-        logger: request.log,
-        sessionSecret: fastify.config.SESSION_SECRET,
-        messageId,
-        version: targetVersion,
-        action: "admin_reprocess_request",
-        actionSource: "admin_api",
-        payload: {
-          generationRunId: generationRun.id,
-          jobId: job.id ?? null
-        }
-      });
+      queuedJobId = job.id != null ? String(job.id) : null;
     } catch (error) {
+      await releaseRewriteGenerationSlot(messageId, generationRun.id);
       await logPrisma.generationRun.update({
         where: { id: generationRun.id },
         data: {
@@ -121,9 +132,39 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
       throw error;
     }
 
+    await logPrisma.generationRun
+      .update({
+        where: { id: generationRun.id },
+        data: {
+          jobId: queuedJobId,
+          jobName: "rewrite-manual"
+        }
+      })
+      .catch((error) => {
+        request.log.error(
+          { err: error, generationRunId: generationRun.id },
+          "Failed to attach queue job id to generation run"
+        );
+      });
+
+    await tryCreateUserActionEvent({
+      logger: request.log,
+      sessionSecret: fastify.config.SESSION_SECRET,
+      messageId,
+      version: targetVersion,
+      action: "admin_reprocess_request",
+      actionSource: "admin_api",
+      payload: {
+        generationRunId: generationRun.id,
+        jobId: queuedJobId
+      }
+    });
+
     return reply.send({
       queued: true,
-      version: targetVersion
+      version: targetVersion,
+      generationRunId: generationRun.id,
+      jobId: queuedJobId
     });
   });
 };

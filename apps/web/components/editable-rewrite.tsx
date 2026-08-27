@@ -34,6 +34,10 @@ type EditableRewriteProps = {
   originalTitle: string;
   originalBody: string;
   activeVersion?: number;
+  rewriteId?: string;
+  publicationRevision?: number;
+  contentHash?: string;
+  isFinal?: boolean;
   dateline?: ReactNode;
   children?: ReactNode;
   extraActions?: ReactNode;
@@ -252,6 +256,10 @@ export function EditableRewrite({
   originalTitle,
   originalBody,
   activeVersion,
+  rewriteId,
+  publicationRevision,
+  contentHash,
+  isFinal,
   dateline,
   children,
   extraActions,
@@ -295,7 +303,13 @@ export function EditableRewrite({
     originalBodyHtml,
     viewMode: "draft"
   });
-  const { buildTelemetry } = useEditorialTelemetry(messageId, activeVersion);
+  const { buildTelemetry } = useEditorialTelemetry(messageId, {
+    version: activeVersion,
+    rewriteId,
+    publicationRevision,
+    contentHash,
+    isFinal
+  });
 
   function setCopyStateWithReset(state: "copied" | "failed") {
     if (copyResetTimerRef.current) {
@@ -397,6 +411,7 @@ export function EditableRewrite({
     const draft = saveRewriteDraft({
       messageId: state.messageId,
       version: state.version,
+      rewriteId,
       title: state.title,
       body: state.body,
       bodyHtml: state.bodyHtml,
@@ -703,6 +718,7 @@ export function EditableRewrite({
     const draft = getRewriteDraft({
       messageId,
       version: activeVersion,
+      rewriteId,
       originalTitle,
       originalBody,
       originalBodyHtml
@@ -827,6 +843,7 @@ export function EditableRewrite({
         getRewriteDraft({
           messageId,
           version: activeVersion,
+          rewriteId,
           originalTitle,
           originalBody,
           originalBodyHtml
@@ -864,7 +881,7 @@ export function EditableRewrite({
   }
 
   function handleResetDraft() {
-    deleteRewriteDraft({ messageId, version: activeVersion });
+    deleteRewriteDraft({ messageId, version: activeVersion, rewriteId });
     setStoredDraftValue(null);
     setViewMode("draft");
     hideToolbar();
@@ -879,6 +896,10 @@ export function EditableRewrite({
   const titleSuggestions = useTitleSuggestions({
     messageId,
     activeVersion,
+    rewriteId,
+    publicationRevision,
+    contentHash,
+    isFinal,
     currentTitle: editedTitle,
     onPreview(title) {
       if (titleRef.current) titleRef.current.textContent = title;

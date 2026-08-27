@@ -10,6 +10,7 @@ export type RewriteDraft = {
 export type RewriteDraftChangeDetail = {
   messageId: number;
   version: number;
+  rewriteId?: string;
   hasDraft: boolean;
 };
 
@@ -25,7 +26,12 @@ function getDraftStorage(): Storage | null {
   }
 }
 
-export function getRewriteDraftKey(messageId: number, version?: number | null): string | null {
+export function getRewriteDraftKey(
+  messageId: number,
+  version?: number | null,
+  rewriteId?: string | null
+): string | null {
+  if (rewriteId) return `newsweb:rewrite-draft:publication:${rewriteId}`;
   if (version == null) return null;
   return `newsweb:rewrite-draft:${messageId}:${version}`;
 }
@@ -73,11 +79,16 @@ function parseDraft(value: string | null): RewriteDraft | null {
   }
 }
 
-function emitDraftChange(messageId: number, version: number, hasDraft: boolean) {
+function emitDraftChange(
+  messageId: number,
+  version: number,
+  rewriteId: string | undefined,
+  hasDraft: boolean
+) {
   if (typeof window === "undefined") return;
   window.dispatchEvent(
     new CustomEvent<RewriteDraftChangeDetail>(REWRITE_DRAFT_CHANGE_EVENT, {
-      detail: { messageId, version, hasDraft }
+      detail: { messageId, version, rewriteId, hasDraft }
     })
   );
 }
@@ -85,6 +96,7 @@ function emitDraftChange(messageId: number, version: number, hasDraft: boolean) 
 export function getRewriteDraft(args: {
   messageId: number;
   version?: number | null;
+  rewriteId?: string | null;
   originalTitle?: string;
   originalBody?: string;
   originalBodyHtml?: string;
@@ -92,10 +104,24 @@ export function getRewriteDraft(args: {
   const storage = getDraftStorage();
   if (!storage) return null;
 
-  const key = getRewriteDraftKey(args.messageId, args.version);
+  const key = getRewriteDraftKey(args.messageId, args.version, args.rewriteId);
   if (!key) return null;
 
-  const draft = parseDraft(storage.getItem(key));
+  let storedValue = storage.getItem(key);
+  if (!storedValue && args.rewriteId && args.version != null) {
+    const legacyKey = getRewriteDraftKey(args.messageId, args.version);
+    storedValue = legacyKey ? storage.getItem(legacyKey) : null;
+    if (storedValue && legacyKey) {
+      try {
+        storage.setItem(key, storedValue);
+        storage.removeItem(legacyKey);
+      } catch {
+        // Keep reading the legacy value even if migration is unavailable.
+      }
+    }
+  }
+
+  const draft = parseDraft(storedValue);
   if (!draft) return null;
 
   if (
@@ -115,7 +141,12 @@ export function getRewriteDraft(args: {
     }
 
     storage.removeItem(key);
-    emitDraftChange(args.messageId, args.version as number, false);
+    emitDraftChange(
+      args.messageId,
+      args.version as number,
+      args.rewriteId ?? undefined,
+      false
+    );
     return null;
   }
 
@@ -125,6 +156,7 @@ export function getRewriteDraft(args: {
 export function hasRewriteDraft(args: {
   messageId: number;
   version?: number | null;
+  rewriteId?: string | null;
   originalTitle?: string;
   originalBody?: string;
 }): boolean {
@@ -134,6 +166,7 @@ export function hasRewriteDraft(args: {
 export function saveRewriteDraft(args: {
   messageId: number;
   version?: number | null;
+  rewriteId?: string | null;
   title: string;
   body: string;
   bodyHtml?: string;
@@ -144,7 +177,7 @@ export function saveRewriteDraft(args: {
   const storage = getDraftStorage();
   if (!storage) return null;
 
-  const key = getRewriteDraftKey(args.messageId, args.version);
+  const key = getRewriteDraftKey(args.messageId, args.version, args.rewriteId);
   if (!key || args.version == null) return null;
 
   if (
@@ -158,7 +191,12 @@ export function saveRewriteDraft(args: {
     })
   ) {
     storage.removeItem(key);
-    emitDraftChange(args.messageId, args.version, false);
+    emitDraftChange(
+      args.messageId,
+      args.version,
+      args.rewriteId ?? undefined,
+      false
+    );
     return null;
   }
 
@@ -173,20 +211,31 @@ export function saveRewriteDraft(args: {
   } catch {
     return null;
   }
-  emitDraftChange(args.messageId, args.version, true);
+  emitDraftChange(
+    args.messageId,
+    args.version,
+    args.rewriteId ?? undefined,
+    true
+  );
   return draft;
 }
 
 export function deleteRewriteDraft(args: {
   messageId: number;
   version?: number | null;
+  rewriteId?: string | null;
 }) {
   const storage = getDraftStorage();
   if (!storage) return;
 
-  const key = getRewriteDraftKey(args.messageId, args.version);
+  const key = getRewriteDraftKey(args.messageId, args.version, args.rewriteId);
   if (!key || args.version == null) return;
 
   storage.removeItem(key);
-  emitDraftChange(args.messageId, args.version, false);
+  emitDraftChange(
+    args.messageId,
+    args.version,
+    args.rewriteId ?? undefined,
+    false
+  );
 }

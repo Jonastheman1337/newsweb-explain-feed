@@ -75,10 +75,17 @@ export default async function NoticePage({ params, searchParams }: NoticePagePro
     noticeStatus != null &&
     !noticeStatus.ready &&
     !noticeStatus.failed;
-  const activeVersion =
-    "rewrites" in notice && notice.rewrites?.length
-      ? notice.rewrites[notice.rewrites.length - 1]?.version
-      : undefined;
+  const publication = "publication" in notice ? notice.publication : undefined;
+  const activeVersion = publication?.version;
+  const telemetryPublication = publication
+    ? {
+        version: publication.version,
+        rewriteId: publication.rewriteId,
+        publicationRevision: publication.revision,
+        contentHash: publication.contentHash,
+        isFinal: publication.isFinal
+      }
+    : undefined;
   const sourceUrl = `https://newsweb.oslobors.no/message/${notice.source.messageId}`;
   const telemetryState = isProcessing
     ? "processing"
@@ -93,6 +100,7 @@ export default async function NoticePage({ params, searchParams }: NoticePagePro
       <SourceLink
         messageId={notice.source.messageId}
         activeVersion={activeVersion}
+        publication={telemetryPublication}
         href={sourceUrl}
       >
         {notice.source.issuerName} ({notice.source.issuerSign}) |{" "}
@@ -117,9 +125,13 @@ export default async function NoticePage({ params, searchParams }: NoticePagePro
       <NoticeTelemetry
         messageId={notice.source.messageId}
         activeVersion={activeVersion}
+        publication={telemetryPublication}
         state={telemetryState}
       />
-      <NoticeRefreshListener messageId={notice.source.messageId} />
+      <NoticeRefreshListener
+        messageId={notice.source.messageId}
+        publicationRevision={publication?.revision ?? 0}
+      />
       <Link href={returnHref} className="muted" title="Tilbake til feed">
         ←
       </Link>
@@ -176,22 +188,32 @@ export default async function NoticePage({ params, searchParams }: NoticePagePro
                       messageId={notice.source.messageId}
                       dateline={dateline}
                       hasAttachments={notice.source.hasAttachments}
+                      publicationRevision={publication?.revision}
                     />
                     {regenerationIndicator}
                   </>
                 ) : (
                   <>
                     <EditableRewrite
+                      key={publication?.rewriteId}
                       messageId={notice.source.messageId}
                       originalTitle={rewrite.title}
                       originalBody={[rewrite.lead, ...rewrite.body].filter(Boolean).join("\n\n")}
                       activeVersion={activeVersion}
+                      rewriteId={publication?.rewriteId}
+                      publicationRevision={publication?.revision}
+                      contentHash={publication?.contentHash}
+                      isFinal={publication?.isFinal}
                       dateline={dateline}
                       panelTitle="AI-generert notis"
                     />
                     <InstructionInput
                       messageId={notice.source.messageId}
                       activeVersion={activeVersion}
+                      rewriteId={publication?.rewriteId}
+                      publicationRevision={publication?.revision}
+                      contentHash={publication?.contentHash}
+                      isFinal={publication?.isFinal}
                       hasAttachments={notice.source.hasAttachments}
                     />
                     {regenerationIndicator}
@@ -210,6 +232,7 @@ export default async function NoticePage({ params, searchParams }: NoticePagePro
           <SourceLink
             messageId={notice.source.messageId}
             activeVersion={activeVersion}
+            publication={telemetryPublication}
             href={sourceUrl}
           >
             {notice.source.issuerName} ({notice.source.issuerSign}) |{" "}
@@ -224,6 +247,7 @@ export default async function NoticePage({ params, searchParams }: NoticePagePro
         <SourceLink
           messageId={notice.source.messageId}
           activeVersion={activeVersion}
+          publication={telemetryPublication}
           href={sourceUrl}
           className="muted"
         >

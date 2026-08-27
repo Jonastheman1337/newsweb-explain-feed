@@ -1,15 +1,24 @@
 import { normalizeRewriteJson, rewriteOutputSchema, type FeedItem } from "@newsweb/shared";
-import type { FeedItem as PrismaFeedItem, Rewrite, SourceNotice } from "@prisma/client";
+import type {
+  FeedItem as PrismaFeedItem,
+  PublishedRewrite,
+  Rewrite,
+  SourceNotice
+} from "@prisma/client";
 import { normalizeNewswebAttachments } from "./newsweb-attachments.js";
 
 // Feed queries select only these rewrite columns; the mapper must not
 // depend on anything heavier (validation_json stays in the database).
 export type FeedRewriteRecord = Pick<
   Rewrite,
-  "status" | "generatedAt" | "version" | "rewriteJson"
+  "status" | "generatedAt" | "version"
 >;
 
 type FeedItemWithRelations = PrismaFeedItem & {
+  activePublishedRewrite: Pick<
+    PublishedRewrite,
+    "id" | "version" | "rewriteJson" | "contentHash" | "finalizedAt"
+  > | null;
   sourceNotice: SourceNotice & {
     rewrites: FeedRewriteRecord[];
   };
@@ -40,6 +49,11 @@ function sourceOnlyFeedItem(
     publishedAt: item.publishedAt.toISOString(),
     visibilityStatus: item.visibilityStatus,
     rewriteVersion: item.sourceNotice.rewrites[0]?.version ?? null,
+    rewriteId: null,
+    publicationRevision: item.publicationRevision,
+    contentHash: null,
+    finalizedAt: null,
+    isFinal: false,
     title: item.sourceNotice.title,
     issuerName: item.sourceNotice.issuerName,
     issuerSign: item.sourceNotice.issuerSign,
@@ -65,24 +79,22 @@ function sourceOnlyFeedItem(
 
 export function mapDbItemToFeedItem(item: FeedItemWithRelations): FeedItem | null {
   const latestRewrite = item.sourceNotice.rewrites[0];
-  const rewriteRecord =
-    item.sourceNotice.rewrites.find((rewrite) => rewrite.status === "published") ??
-    latestRewrite;
+  const rewriteRecord = item.activePublishedRewrite;
 
   if (!rewriteRecord) {
+    if (!latestRewrite) {
+      return sourceOnlyFeedItem(item, { notGenerated: true });
+    }
+    if (latestRewrite.status === "pending" || latestRewrite.status === "needs_retry") {
+      return sourceOnlyFeedItem(item, { processing: true });
+    }
+    if (latestRewrite.status === "failed") {
+      return sourceOnlyFeedItem(item, { failed: true });
+    }
+    if (latestRewrite.status === "skipped") {
+      return sourceOnlyFeedItem(item, { skipped: true });
+    }
     return sourceOnlyFeedItem(item, { notGenerated: true });
-  }
-
-  if (rewriteRecord.status === "pending" || rewriteRecord.status === "needs_retry") {
-    return sourceOnlyFeedItem(item, { processing: true });
-  }
-
-  if (rewriteRecord.status === "failed") {
-    return sourceOnlyFeedItem(item, { failed: true });
-  }
-
-  if (rewriteRecord.status === "skipped") {
-    return sourceOnlyFeedItem(item, { skipped: true });
   }
 
   const rewrite = rewriteOutputSchema.parse(
@@ -97,6 +109,11 @@ export function mapDbItemToFeedItem(item: FeedItemWithRelations): FeedItem | nul
     publishedAt: item.publishedAt.toISOString(),
     visibilityStatus: item.visibilityStatus,
     rewriteVersion: rewriteRecord.version,
+    rewriteId: rewriteRecord.id,
+    publicationRevision: item.publicationRevision,
+    contentHash: rewriteRecord.contentHash,
+    finalizedAt: rewriteRecord.finalizedAt.toISOString(),
+    isFinal: true,
     title: rewrite.title,
     issuerName: item.sourceNotice.issuerName,
     issuerSign: item.sourceNotice.issuerSign,

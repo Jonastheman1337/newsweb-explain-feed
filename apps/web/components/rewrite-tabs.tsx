@@ -12,10 +12,13 @@ import { EditableRewrite } from "./editable-rewrite";
 import { InstructionInput } from "./instruction-input";
 
 type RewriteVersion = {
+  rewriteId: string;
   version: number;
   rewrite: RewriteOutput;
   userInstruction: string | null;
   generatedAt: string;
+  contentHash: string;
+  isFinal: true;
 };
 
 type RewriteTabsProps = {
@@ -23,11 +26,18 @@ type RewriteTabsProps = {
   messageId: number;
   dateline: ReactNode;
   hasAttachments?: boolean;
+  publicationRevision?: number;
 };
 
-export function RewriteTabs({ rewrites, messageId, dateline, hasAttachments }: RewriteTabsProps) {
+export function RewriteTabs({
+  rewrites,
+  messageId,
+  dateline,
+  hasAttachments,
+  publicationRevision
+}: RewriteTabsProps) {
   const [activeIndex, setActiveIndex] = useState(rewrites.length - 1);
-  const [draftVersions, setDraftVersions] = useState<Set<number>>(() => new Set());
+  const [draftVersions, setDraftVersions] = useState<Set<string>>(() => new Set());
   const { logEvent } = useEditorialTelemetry(messageId);
 
   useEffect(() => {
@@ -42,13 +52,14 @@ export function RewriteTabs({ rewrites, messageId, dateline, hasAttachments }: R
             hasRewriteDraft({
               messageId,
               version: rewrite.version,
+              rewriteId: rewrite.rewriteId,
               originalTitle: rewrite.rewrite.title,
               originalBody: [rewrite.rewrite.lead, ...rewrite.rewrite.body]
                 .filter(Boolean)
                 .join("\n\n")
             })
           )
-          .map((rewrite) => rewrite.version)
+          .map((rewrite) => rewrite.rewriteId)
       )
     );
   }, [messageId, rewrites]);
@@ -62,10 +73,11 @@ export function RewriteTabs({ rewrites, messageId, dateline, hasAttachments }: R
 
       setDraftVersions((current) => {
         const next = new Set(current);
+        const draftKey = detail.rewriteId ?? String(detail.version);
         if (detail.hasDraft) {
-          next.add(detail.version);
+          next.add(draftKey);
         } else {
-          next.delete(detail.version);
+          next.delete(draftKey);
         }
         return next;
       });
@@ -87,20 +99,24 @@ export function RewriteTabs({ rewrites, messageId, dateline, hasAttachments }: R
         <div className="rewriteTabs">
           {rewrites.map((r, i) => (
             <button
-              key={r.version}
+              key={r.rewriteId}
               className={`rewriteTab${i === activeIndex ? " active" : ""}`}
               onClick={() => {
                 setActiveIndex(i);
                 void logEvent({
                   action: "rewrite_version_view",
                   version: r.version,
+                  rewriteId: r.rewriteId,
+                  publicationRevision,
+                  contentHash: r.contentHash,
+                  isFinal: true,
                   actionSource: "rewrite_tabs",
                   payload: { selectedVersion: r.version }
                 }).catch(() => { /* passive telemetry */ });
               }}
             >
               {i + 1}
-              {draftVersions.has(r.version) && (
+              {draftVersions.has(r.rewriteId) && (
                 <span className="tabDraftDot" title="Redigert utkast" aria-hidden="true" />
               )}
             </button>
@@ -108,16 +124,29 @@ export function RewriteTabs({ rewrites, messageId, dateline, hasAttachments }: R
         </div>
       )}
       <EditableRewrite
+        key={active.rewriteId}
         messageId={messageId}
         originalTitle={active.rewrite.title}
         originalBody={[active.rewrite.lead, ...active.rewrite.body]
           .filter(Boolean)
           .join("\n\n")}
         activeVersion={active.version}
+        rewriteId={active.rewriteId}
+        publicationRevision={publicationRevision}
+        contentHash={active.contentHash}
+        isFinal={active.isFinal}
         dateline={dateline}
         panelTitle="AI-generert notis"
       />
-      <InstructionInput messageId={messageId} activeVersion={active.version} hasAttachments={hasAttachments} />
+      <InstructionInput
+        messageId={messageId}
+        activeVersion={active.version}
+        rewriteId={active.rewriteId}
+        publicationRevision={publicationRevision}
+        contentHash={active.contentHash}
+        isFinal={active.isFinal}
+        hasAttachments={hasAttachments}
+      />
     </>
   );
 }
