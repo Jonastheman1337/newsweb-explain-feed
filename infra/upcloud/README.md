@@ -89,7 +89,10 @@ infra/upcloud/scripts/deploy.sh APP_SHA
 2. Add `upcloud-preview.autoweb24.no A 81.27.105.83` with TTL 300.
 3. Keep `NEWSWEB_POLLING_ENABLED=false` and disable outbound mail for the
    rehearsal copy.
-4. Put the Render external connection string in a mode-600 environment file as
+4. Keep `CADDYFILE_PATH=./Caddyfile.preview` during rehearsal. This obtains
+   only the preview certificate and avoids failed ACME attempts for the apex
+   while public DNS still points to Render.
+5. Put the Render external connection string in a mode-600 environment file as
    `RENDER_DATABASE_URL`, then capture the source row-count/timestamp manifest:
 
 ```bash
@@ -98,7 +101,7 @@ infra/upcloud/scripts/source-db-manifest.sh \
   /srv/autoweb/state/source-manifest.txt
 ```
 
-5. Download a current Render logical export and transfer it to the server. If
+6. Download a current Render logical export and transfer it to the server. If
    Render's export endpoint fails, capture a standard PostgreSQL custom dump
    directly over the temporary IP-restricted TLS connection instead:
 
@@ -122,13 +125,13 @@ infra/upcloud/scripts/restore-render-export.sh \
 infra/upcloud/scripts/deploy.sh APP_SHA
 ```
 
-6. Compare the generated database manifest with the source manifest, then test
+7. Compare the generated database manifest with the source manifest, then test
    login, feed, notice pages, SSE, attachments, admin signals, and health.
-7. Run 25 concurrent read requests and three representative generation jobs on
+8. Run 25 concurrent read requests and three representative generation jobs on
    the cloned database. Do not proceed after any OOM/restart or host memory at
    or above 80 percent. The rehearsed export-to-verified-restore path must finish
    within 35 minutes.
-8. Create one logical backup and run a restore drill before production cutover.
+9. Create one logical backup and run a restore drill before production cutover.
 
 ## 4. Cutover
 
@@ -141,7 +144,13 @@ infra/upcloud/scripts/deploy.sh APP_SHA
    migrations, and compare row-count manifests.
 4. Start UpCloud with polling disabled and repeat read-only preview checks.
 5. Change only the apex A to the UpCloud IPv4 and `www` CNAME to
-   `autoweb24.no`. Do not add AAAA during initial cutover.
+   `autoweb24.no`. Do not add AAAA during initial cutover. Immediately switch
+   Caddy to its production hostnames so certificate issuance begins against the
+   new authoritative records:
+
+```bash
+infra/upcloud/scripts/switch-caddy-mode.sh production
+```
 6. Verify public DNS, TLS, the `www` 308 redirect, login/session continuity,
    feed, attachments, admin signals, and `/api/health`.
 7. If checks fail by minute 45, restore apex `216.24.57.1` and `www`
