@@ -89,20 +89,29 @@ infra/upcloud/scripts/deploy.sh APP_SHA
 2. Add `upcloud-preview.autoweb24.no A 81.27.105.83` with TTL 300.
 3. Keep `NEWSWEB_POLLING_ENABLED=false` and disable outbound mail for the
    rehearsal copy.
-4. Download a current Render logical export, transfer it to the server, and run:
+4. Put the Render external connection string in a mode-600 environment file as
+   `RENDER_DATABASE_URL`, then capture the source row-count/timestamp manifest:
+
+```bash
+infra/upcloud/scripts/source-db-manifest.sh \
+  /srv/autoweb/tmp/render-db.env \
+  /srv/autoweb/state/source-manifest.txt
+```
+
+5. Download a current Render logical export, transfer it to the server, and run:
 
 ```bash
 infra/upcloud/scripts/restore-render-export.sh /srv/autoweb/tmp/EXPORT.dir.tar.gz
 infra/upcloud/scripts/deploy.sh APP_SHA
 ```
 
-5. Compare the generated database manifest with a source manifest, then test
+6. Compare the generated database manifest with the source manifest, then test
    login, feed, notice pages, SSE, attachments, admin signals, and health.
-6. Run 25 concurrent read requests and three representative generation jobs on
+7. Run 25 concurrent read requests and three representative generation jobs on
    the cloned database. Do not proceed after any OOM/restart or host memory at
    or above 80 percent. The rehearsed export-to-verified-restore path must finish
    within 35 minutes.
-7. Create one logical backup and run a restore drill before production cutover.
+8. Create one logical backup and run a restore drill before production cutover.
 
 ## 4. Cutover
 
