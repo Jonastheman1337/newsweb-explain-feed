@@ -152,8 +152,14 @@ infra/upcloud/scripts/deploy.sh APP_SHA
 
 ## 5. Backups, monitoring, and rollback hold
 
-Install the timers only after public TLS and SMTP alert delivery have both been
-tested:
+Install the backup and restore-drill timers before cutover. Keep the watchdog
+disabled until public TLS and SMTP alert delivery have both been tested:
+
+```bash
+sudo infra/upcloud/scripts/install-systemd.sh --without-watchdog
+```
+
+After SMTP alert delivery passes, enable the complete timer set:
 
 ```bash
 sudo infra/upcloud/scripts/install-systemd.sh
