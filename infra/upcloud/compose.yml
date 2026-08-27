@@ -1,0 +1,201 @@
+name: autoweb-prod
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+x-app-environment: &app-environment
+  NODE_ENV: production
+  DATABASE_URL: postgresql://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:-newsweb_explain}?schema=public
+  REDIS_URL: redis://redis:6379
+
+x-app-common: &app-common
+  restart: unless-stopped
+  env_file:
+    - ${AUTOWEB_APP_ENV_FILE:-/srv/autoweb/secrets/app.env}
+  networks:
+    - autoweb
+  security_opt:
+    - no-new-privileges:true
+  logging: *default-logging
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-newsweb_explain}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    command:
+      - postgres
+      - -c
+      - max_connections=50
+      - -c
+      - shared_buffers=256MB
+      - -c
+      - work_mem=8MB
+      - -c
+      - maintenance_work_mem=128MB
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - autoweb
+    shm_size: 256m
+    mem_limit: 1280m
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB:-newsweb_explain}"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    security_opt:
+      - no-new-privileges:true
+    logging: *default-logging
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --appendfsync
+      - everysec
+      - --maxmemory
+      - 384mb
+      - --maxmemory-policy
+      - noeviction
+    volumes:
+      - redis-data:/data
+    networks:
+      - autoweb
+    mem_limit: 512m
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    security_opt:
+      - no-new-privileges:true
+    logging: *default-logging
+
+  api:
+    <<: *app-common
+    image: autoweb-api:${APP_RELEASE_SHA:?APP_RELEASE_SHA is required}
+    environment:
+      <<: *app-environment
+      API_PORT: "4000"
+      NEWSWEB_POLLING_ENABLED: ${NEWSWEB_POLLING_ENABLED:-false}
+      NODE_OPTIONS: --max-old-space-size=512
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    mem_limit: 768m
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://127.0.0.1:4000/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 20s
+
+  worker:
+    <<: *app-common
+    image: autoweb-worker:${APP_RELEASE_SHA:?APP_RELEASE_SHA is required}
+    environment:
+      <<: *app-environment
+      NEWSWEB_POLLING_ENABLED: ${NEWSWEB_POLLING_ENABLED:-false}
+      NODE_OPTIONS: --max-old-space-size=2048
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    mem_limit: 3g
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'node dist/worker.js' >/dev/null"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  web:
+    <<: *app-common
+    image: autoweb-web:${APP_RELEASE_SHA:?APP_RELEASE_SHA is required}
+    environment:
+      <<: *app-environment
+      PORT: "3000"
+      API_BASE_URL: http://api:4000
+      NODE_OPTIONS: --max-old-space-size=768
+    depends_on:
+      api:
+        condition: service_healthy
+    mem_limit: 1g
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://127.0.0.1:3000/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 20s
+
+  migrate:
+    image: autoweb-api:${APP_RELEASE_SHA:?APP_RELEASE_SHA is required}
+    profiles: ["ops"]
+    env_file:
+      - ${AUTOWEB_APP_ENV_FILE:-/srv/autoweb/secrets/app.env}
+    environment:
+      <<: *app-environment
+    command: ["npm", "run", "prisma:migrate:deploy"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - autoweb
+    security_opt:
+      - no-new-privileges:true
+    logging: *default-logging
+
+  caddy:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    environment:
+      ACME_EMAIL: ${ACME_EMAIL:?ACME_EMAIL is required}
+      PREVIEW_ALLOWED_CIDRS: ${PREVIEW_ALLOWED_CIDRS:?PREVIEW_ALLOWED_CIDRS is required}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      web:
+        condition: service_healthy
+    networks:
+      - autoweb
+    mem_limit: 256m
+    security_opt:
+      - no-new-privileges:true
+    logging: *default-logging
+
+networks:
+  autoweb:
+    name: autoweb-prod
+
+volumes:
+  postgres-data:
+  redis-data:
+  caddy-data:
+  caddy-config:
