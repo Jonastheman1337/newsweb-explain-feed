@@ -76,6 +76,16 @@ placeholder sender. Preserve that runtime state for rehearsal, but do not instal
 the watchdog timers or claim alert acceptance until a real SMTP account and
 recipient have been configured and a test alert has been delivered.
 
+For Gmail, create a Google App Password after account 2FA is enabled, then enter
+it directly in the server terminal. The helper strips the optional spaces,
+requires Google's 16-character app-password format, stores it only in the
+mode-600 application environment file, sends a test message, and enables the
+watchdog only after delivery succeeds:
+
+```bash
+sudo infra/upcloud/scripts/configure-gmail-smtp.sh gmail-address@example.com
+```
+
 Build and deploy with polling disabled:
 
 ```bash
