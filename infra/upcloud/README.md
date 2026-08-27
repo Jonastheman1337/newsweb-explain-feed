@@ -174,6 +174,12 @@ infra/upcloud/scripts/switch-caddy-mode.sh production
    feed, attachments, admin signals, and `/api/health`.
 7. If checks fail by minute 45, restore apex `216.24.57.1` and `www`
    `autoweb-f4dw.onrender.com`, then resume Render.
+8. After read-only checks pass, enable polling in exactly one API/worker pair,
+   run one controlled production generation, and reopen editorial writes:
+
+```bash
+infra/upcloud/scripts/set-polling-mode.sh enabled
+```
 8. After read-only acceptance, set `NEWSWEB_POLLING_ENABLED=true`, redeploy the
    same images, verify one worker heartbeat and one controlled generation, then
    reopen writes.
