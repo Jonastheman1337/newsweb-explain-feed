@@ -633,6 +633,22 @@ export function resolveReferenceCheckOutcome(input: {
   };
 }
 
+/**
+ * True only when the current draft has usable source-coverage evidence and
+ * the reference gate found no unsupported high-risk visible claim. Numeric
+ * publication policy uses this to adjudicate conservative token-matcher
+ * misses; unavailable or stale checks never qualify.
+ */
+export function hasFreshPassingReferenceCoverage(
+  outcome: ReferenceCheckOutcome
+): boolean {
+  return (
+    outcome.evaluatedCoverage !== "none" &&
+    !outcome.evidenceStale &&
+    !outcome.gate.blocking
+  );
+}
+
 export type ReferenceCheckEnforcementConfig = {
   // Degraded run with evaluated coverage: enforce the coverage gate instead
   // of the legacy vacuous pass.

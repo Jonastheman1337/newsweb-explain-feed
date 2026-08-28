@@ -1,5 +1,6 @@
 import {
   assessNumbers,
+  assessNumbersInText,
   unexpectedNumberDisplays,
   type NumberAssessment,
   type NumberDerivationRuleId,
@@ -735,6 +736,7 @@ export function validateRewriteOutput(
   warnings: string[];
   quoteTelemetry: QuoteTelemetry;
   numberAssessments: NumberAssessment[];
+  publicationNumberAssessments: NumberAssessment[];
   markerLeaks: MarkerLeakMatch[];
 } {
   const issues: RewriteValidationIssue[] = [];
@@ -744,14 +746,25 @@ export function validateRewriteOutput(
   const maxVisibleArticleChars =
     options?.maxVisibleArticleChars ?? MAX_VISIBLE_ARTICLE_CHARS;
 
+  const numberAssessmentOptions = options?.enabledDerivationRules
+    ? { enabledDerivationRules: options.enabledDerivationRules }
+    : undefined;
+  // Keep the full-output assessment for telemetry, but only publication
+  // fields may stop publication. Hidden planning/provenance fields are model
+  // metadata and are neither rendered nor an editorial claim to the reader.
   const numberAssessments = assessNumbers(
     rewrite,
     validationSourceText,
-    options?.enabledDerivationRules
-      ? { enabledDerivationRules: options.enabledDerivationRules }
-      : undefined
+    numberAssessmentOptions
   );
-  const numberErrors = unexpectedNumberDisplays(numberAssessments);
+  const publicationNumberAssessments = assessNumbersInText(
+    visibleText,
+    validationSourceText,
+    numberAssessmentOptions
+  );
+  const numberErrors = unexpectedNumberDisplays(
+    publicationNumberAssessments
+  );
   if (numberErrors.length > MAX_ALLOWED_UNEXPECTED_NUMBERS) {
     addIssue(
       issues,
@@ -989,6 +1002,7 @@ export function validateRewriteOutput(
     warnings,
     quoteTelemetry,
     numberAssessments,
+    publicationNumberAssessments,
     markerLeaks
   };
 }

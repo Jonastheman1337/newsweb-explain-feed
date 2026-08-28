@@ -102,6 +102,88 @@ describe("assessNumbers", () => {
     wrapperMatchesAssessments(rewrite, source);
   });
 
+  it("attributes TNOK table values rounded to millions", () => {
+    const rewrite = createRewrite({
+      lead: "Tinde fikk et resultat før skatt på 31,1 millioner kroner."
+    });
+    const source = [
+      "Resultatregnskap (TNOK)",
+      "Resultat før skatt 31 134 49 612"
+    ].join("\n");
+
+    expect(assessNumbers(rewrite, source)).toContainEqual({
+      display: "31,1",
+      disposition: "matched",
+      ruleId: "scaled_million_report_table",
+      count: 1
+    });
+  });
+
+  it("attributes Norwegian tables explicitly stated in thousand kroner", () => {
+    const rewrite = createRewrite({
+      lead: "Tinde fikk et resultat før skatt på 31,1 millioner kroner."
+    });
+    const source = [
+      "Ordinært resultat - tall i tusen kroner",
+      "Resultat før skatt 31 073 49 646"
+    ].join("\n");
+
+    expect(assessNumbers(rewrite, source)).toContainEqual({
+      display: "31,1",
+      disposition: "matched",
+      ruleId: "scaled_million_report_table",
+      count: 1
+    });
+  });
+
+  it("attributes an explicitly million-scaled source rounded to an integer", () => {
+    const rewrite = createRewrite({
+      lead: "Resultatet før skatt endte på 24 millioner dollar."
+    });
+    const source = "Profit before tax USD million 23.952";
+
+    expect(assessNumbers(rewrite, source)).toContainEqual({
+      display: "24",
+      disposition: "matched",
+      ruleId: "scaled_unit_amount",
+      count: 1,
+      provenance: { unit: "usd", scale: "million" }
+    });
+  });
+
+  it("attributes integer rounding from tables headed Amounts in USD 1,000", () => {
+    const rewrite = createRewrite({
+      lead: "Resultatet før skatt endte på 24 millioner dollar."
+    });
+    const source = [
+      "Income statement (Amounts in USD 1,000)",
+      "Operating revenue 80,145 71,328",
+      "Profit before taxes 23,952 65,271"
+    ].join("\n");
+
+    expect(assessNumbers(rewrite, source)).toContainEqual({
+      display: "24",
+      disposition: "matched",
+      ruleId: "scaled_million_report_table",
+      count: 1
+    });
+  });
+
+  it("attributes MNOK values converted to billions", () => {
+    const rewrite = createRewrite({
+      lead: "Ordreinngangen var 3,61 milliarder kroner i kvartalet."
+    });
+    const source = "Order intake MNOK 3,610";
+
+    expect(assessNumbers(rewrite, source)).toContainEqual({
+      display: "3,61",
+      disposition: "matched",
+      ruleId: "scaled_unit_amount",
+      count: 1,
+      provenance: { unit: "nok", scale: "billion" }
+    });
+  });
+
   it("attributes shared percent ranges when the source only marks percent forms", () => {
     const rewrite = createRewrite({
       lead: "Photocure venter vekst paa 7 til 11 prosent i konstant valuta."

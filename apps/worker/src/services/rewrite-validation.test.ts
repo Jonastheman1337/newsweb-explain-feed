@@ -122,6 +122,39 @@ describe("validateRewriteOutput", () => {
     });
   });
 
+  it("keeps hidden unexpected numbers in telemetry without blocking publication", () => {
+    const payload = createPayload();
+    const rewrite = createRewrite({
+      key_facts: ["Intern modellnotis 999"],
+      negative_or_surprising: ["Beregnet avvik 303"],
+      source_spans: ["Intern tabellreferanse 404"]
+    });
+
+    const result = validateRewriteOutput(rewrite, payload);
+
+    expect(result.numberAssessments).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          display: "999",
+          disposition: "unexpected"
+        }),
+        expect.objectContaining({
+          display: "303",
+          disposition: "unexpected"
+        })
+      ])
+    );
+    expect(
+      result.publicationNumberAssessments.some(
+        (assessment) =>
+          assessment.display === "999" || assessment.display === "303"
+      )
+    ).toBe(false);
+    expect(
+      result.issues.some((issue) => issue.code === "UNEXPECTED_NUMBERS")
+    ).toBe(false);
+  });
+
   it("warns with all unexpected number tokens", () => {
     const payload = createPayload();
     const rewrite = createRewrite({
@@ -1015,7 +1048,7 @@ describe("validateRewriteOutput number assessments", () => {
     });
 
     const result = validateRewriteOutput(rewrite, payload);
-    const unexpected = result.numberAssessments
+    const unexpected = result.publicationNumberAssessments
       .filter((assessment) => assessment.disposition === "unexpected")
       .map((assessment) => assessment.display);
 
