@@ -11,6 +11,7 @@ import {
   classifyLegacyCheckerErrorMessage,
   collectDraftSentences,
   defaultReferenceCheckEnforcement,
+  hasFreshPassingReferenceCoverage,
   resolveReferenceCheckOutcome,
   splitIntoSentences,
   type ReferenceCheckerErrorEntry,
@@ -550,6 +551,43 @@ describe("resolveReferenceCheckOutcome", () => {
     expect(outcome.degraded).toBe(true);
     expect(outcome.checkerErrors).toEqual([transportEntry]);
     expect(outcome.state).toBe("pass");
+  });
+});
+
+describe("hasFreshPassingReferenceCoverage", () => {
+  it("accepts only current non-blocking coverage evidence", () => {
+    const passing = resolveReferenceCheckOutcome({
+      checkerErrors: [],
+      initialCoverage: cleanCoverageReport(),
+      finalCoverage: cleanCoverageReport(),
+      correctionAttempts: 0
+    });
+    const blocking = resolveReferenceCheckOutcome({
+      checkerErrors: [],
+      initialCoverage: blockingCoverageReport(),
+      finalCoverage: blockingCoverageReport(),
+      correctionAttempts: 0
+    });
+    const unavailable = resolveReferenceCheckOutcome({
+      checkerErrors: [transportEntry],
+      initialCoverage: null,
+      finalCoverage: null,
+      correctionAttempts: 0
+    });
+    const stale = resolveReferenceCheckOutcome({
+      checkerErrors: [
+        { ...transportEntry, stage: 2, afterCorrection: true }
+      ],
+      initialCoverage: blockingCoverageReport(),
+      finalCoverage: blockingCoverageReport(),
+      correctionAttempts: 1,
+      completedCheckCount: 1
+    });
+
+    expect(hasFreshPassingReferenceCoverage(passing)).toBe(true);
+    expect(hasFreshPassingReferenceCoverage(blocking)).toBe(false);
+    expect(hasFreshPassingReferenceCoverage(unavailable)).toBe(false);
+    expect(hasFreshPassingReferenceCoverage(stale)).toBe(false);
   });
 });
 

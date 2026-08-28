@@ -3360,10 +3360,8 @@
       },
       "expected": {
         "validation": {
-          "issueCodes": [
-            "UNEXPECTED_NUMBERS"
-          ],
-          "hasUnexpectedNumbers": true,
+          "issueCodes": [],
+          "hasUnexpectedNumbers": false,
           "blocking": false
         }
       },
@@ -7103,10 +7101,8 @@
       },
       "expected": {
         "validation": {
-          "issueCodes": [
-            "UNEXPECTED_NUMBERS"
-          ],
-          "hasUnexpectedNumbers": true,
+          "issueCodes": [],
+          "hasUnexpectedNumbers": false,
           "blocking": false
         }
       },
@@ -11116,10 +11112,8 @@
       },
       "expected": {
         "validation": {
-          "issueCodes": [
-            "UNEXPECTED_NUMBERS"
-          ],
-          "hasUnexpectedNumbers": true,
+          "issueCodes": [],
+          "hasUnexpectedNumbers": false,
           "blocking": false
         }
       },
@@ -11629,10 +11623,8 @@
       },
       "expected": {
         "validation": {
-          "issueCodes": [
-            "UNEXPECTED_NUMBERS"
-          ],
-          "hasUnexpectedNumbers": true,
+          "issueCodes": [],
+          "hasUnexpectedNumbers": false,
           "blocking": false
         }
       },
@@ -13741,10 +13733,9 @@
       "expected": {
         "validation": {
           "issueCodes": [
-            "MISSING_QUOTE_OPPORTUNITY",
-            "UNEXPECTED_NUMBERS"
+            "MISSING_QUOTE_OPPORTUNITY"
           ],
-          "hasUnexpectedNumbers": true,
+          "hasUnexpectedNumbers": false,
           "blocking": false
         }
       },
@@ -17851,10 +17842,8 @@
       },
       "expected": {
         "validation": {
-          "issueCodes": [
-            "UNEXPECTED_NUMBERS"
-          ],
-          "hasUnexpectedNumbers": true,
+          "issueCodes": [],
+          "hasUnexpectedNumbers": false,
           "blocking": false
         }
       },
@@ -18353,10 +18342,8 @@
       },
       "expected": {
         "validation": {
-          "issueCodes": [
-            "UNEXPECTED_NUMBERS"
-          ],
-          "hasUnexpectedNumbers": true,
+          "issueCodes": [],
+          "hasUnexpectedNumbers": false,
           "blocking": false
         }
       },

@@ -81,6 +81,7 @@ import {
   classifyCheckerErrorKind,
   emptyReferenceCoverageReport,
   assessReferenceCheckGate,
+  hasFreshPassingReferenceCoverage,
   referenceCheckJsonSchema,
   referenceCheckResultSchema,
   type ReferenceCheckerErrorEntry,
@@ -837,6 +838,9 @@ function validateRewriteWithRevisionCompliance(
   warnings: string[];
   quoteTelemetry: ReturnType<typeof validateRewriteOutput>["quoteTelemetry"];
   numberAssessments: ReturnType<typeof validateRewriteOutput>["numberAssessments"];
+  publicationNumberAssessments: ReturnType<
+    typeof validateRewriteOutput
+  >["publicationNumberAssessments"];
   markerLeaks: ReturnType<typeof validateRewriteOutput>["markerLeaks"];
   revisionCompliance: RevisionInstructionCompliance | null;
 } {
@@ -878,6 +882,7 @@ function validateRewriteWithRevisionCompliance(
     warnings,
     quoteTelemetry: validation.quoteTelemetry,
     numberAssessments: validation.numberAssessments,
+    publicationNumberAssessments: validation.publicationNumberAssessments,
     markerLeaks: validation.markerLeaks,
     revisionCompliance
   };
@@ -891,6 +896,26 @@ function validationErrorCode(validation: {
     return "BLOCKING_VALIDATION_ERRORS";
   }
   return validation.valid ? null : "NON_BLOCKING_VALIDATION_WARNINGS";
+}
+
+function numericPublicationPolicyJson(
+  validation: RewriteValidationResult,
+  referenceGroundsVisibleNumbers: boolean
+): Record<string, unknown> {
+  const unexpectedDisplays = [
+    ...new Set(
+      validation.publicationNumberAssessments
+        .filter((assessment) => assessment.disposition === "unexpected")
+        .map((assessment) => assessment.display)
+    )
+  ];
+  return {
+    scope: "title_lead_body",
+    unexpectedDisplays,
+    referenceGroundedOverrideApplied:
+      referenceGroundsVisibleNumbers &&
+      validation.issues.some((issue) => issue.code === "UNEXPECTED_NUMBERS")
+  };
 }
 
 function statusForValidation(validation: {
@@ -926,6 +951,22 @@ function rewriteJsonForValidation(
 
 type RewriteValidationResult = ReturnType<typeof validateRewriteWithRevisionCompliance>;
 
+function referenceCanAdjudicateUnexpectedNumbers(
+  rewrite: RewriteOutput,
+  validation: RewriteValidationResult,
+  outcome: ReturnType<typeof resolveAccumulatedReferenceCheckOutcome>
+): boolean {
+  if (!hasFreshPassingReferenceCoverage(outcome)) {
+    return false;
+  }
+  // The reference checker currently evaluates lead/body sentences, not the
+  // headline. A matcher miss in the title therefore remains conservative.
+  const unexpectedDisplays = validation.publicationNumberAssessments
+    .filter((assessment) => assessment.disposition === "unexpected")
+    .map((assessment) => assessment.display);
+  return !unexpectedDisplays.some((display) => rewrite.title.includes(display));
+}
+
 const HIGH_RISK_VALIDATION_WARNING_CODES = new Set([
   "UNEXPECTED_NUMBERS",
   "UNEXPECTED_CURRENCY",
@@ -955,11 +996,13 @@ function emptyValidationRepairAudit(): ValidationRepairAudit {
 }
 
 function highRiskValidationWarningIssues(
-  validation: RewriteValidationResult
+  validation: RewriteValidationResult,
+  options: { skipUnexpectedNumbers?: boolean } = {}
 ): RewriteValidationIssue[] {
   return validation.issues.filter(
     (issue) =>
       issue.severity === "warning" &&
+      !(options.skipUnexpectedNumbers && issue.code === "UNEXPECTED_NUMBERS") &&
       HIGH_RISK_VALIDATION_WARNING_CODES.has(issue.code)
   );
 }
@@ -1007,10 +1050,13 @@ function buildHighRiskValidationRepairInstruction(
 }
 
 function promoteHighRiskValidationWarnings(
-  validation: RewriteValidationResult
+  validation: RewriteValidationResult,
+  options: { keepUnexpectedNumbersAsWarning?: boolean } = {}
 ): RewriteValidationResult {
   const issues = validation.issues.map((issue) =>
     issue.severity === "warning" &&
+    !(options.keepUnexpectedNumbersAsWarning &&
+      issue.code === "UNEXPECTED_NUMBERS") &&
     HIGH_RISK_VALIDATION_WARNING_CODES.has(issue.code)
       ? { ...issue, severity: "blocking" as const }
       : issue
@@ -1040,7 +1086,8 @@ async function applyHighRiskValidationRepair<TPayload extends PromptPayload>({
   revisionInstructionForPrompt,
   reasoningEffort,
   modelCalls,
-  callRewrite
+  callRewrite,
+  skipUnexpectedNumbers = false
 }: {
   payload: TPayload;
   rewrite: RewriteOutput;
@@ -1054,12 +1101,15 @@ async function applyHighRiskValidationRepair<TPayload extends PromptPayload>({
     previousOutput?: RewriteOutput,
     reasoningEffort?: OpenAIReasoningEffort
   ) => Promise<{ rewrite: RewriteOutput; promptChars: number; modelCall: ModelCallLog }>;
+  skipUnexpectedNumbers?: boolean;
 }): Promise<{
   rewrite: RewriteOutput;
   promptChars: number;
   audit: ValidationRepairAudit;
 }> {
-  const issues = highRiskValidationWarningIssues(validation);
+  const issues = highRiskValidationWarningIssues(validation, {
+    skipUnexpectedNumbers
+  });
   const audit: ValidationRepairAudit = {
     applied: false,
     issueCodes: uniqueIssueCodes(issues),
@@ -2405,7 +2455,15 @@ async function processReportRewrite(
       revisionInstructionForPrompt,
       reasoningEffort: reportReasoningEffort,
       modelCalls,
-      callRewrite: callModelReportRewrite
+      callRewrite: callModelReportRewrite,
+      // Report rewrites already have a sentence-level source check over the
+      // selected attachment pages. Do not ask a second model call to delete a
+      // visible number that this fresh check has explicitly grounded.
+      skipUnexpectedNumbers: referenceCanAdjudicateUnexpectedNumbers(
+        rewrite,
+        validationResult,
+        resolveAccumulatedReferenceCheckOutcome(referenceRepairState)
+      )
     });
     rewrite = validationRepairResult.rewrite;
     promptChars += validationRepairResult.promptChars;
@@ -2481,12 +2539,19 @@ async function processReportRewrite(
       );
     }
 
+    const referenceOutcome =
+      resolveAccumulatedReferenceCheckOutcome(referenceRepairState);
+    const referenceGroundsVisibleNumbers = referenceCanAdjudicateUnexpectedNumbers(
+      rewrite,
+      validationResult,
+      referenceOutcome
+    );
     validationRepair.finalWarnings = validationIssueMessages(
       highRiskValidationWarningIssues(validationResult)
     );
-    validationResult = promoteHighRiskValidationWarnings(validationResult);
-    const referenceOutcome =
-      resolveAccumulatedReferenceCheckOutcome(referenceRepairState);
+    validationResult = promoteHighRiskValidationWarnings(validationResult, {
+      keepUnexpectedNumbersAsWarning: referenceGroundsVisibleNumbers
+    });
     const { gate: referenceGate, forceNeedsRetry: referenceForceNeedsRetry } =
       applyReferenceCheckEnforcement(
         referenceOutcome,
@@ -2528,6 +2593,12 @@ async function processReportRewrite(
         warnings: validation.warnings,
         quoteTelemetry: validation.quoteTelemetry,
         numberAssessments: validation.numberAssessments,
+        publicationNumberAssessments:
+          validation.publicationNumberAssessments,
+        numericPublicationPolicy: numericPublicationPolicyJson(
+          validation,
+          referenceGroundsVisibleNumbers
+        ),
         markerLeaks: validation.markerLeaks,
         revisionInstructionCompliance: validation.revisionCompliance,
         sourceBodyChars: payload.sourceBodyChars,
@@ -2939,6 +3010,12 @@ async function processYearlyReportRewrite(
         warnings: validation.warnings,
         quoteTelemetry: validation.quoteTelemetry,
         numberAssessments: validation.numberAssessments,
+        publicationNumberAssessments:
+          validation.publicationNumberAssessments,
+        numericPublicationPolicy: numericPublicationPolicyJson(
+          validation,
+          false
+        ),
         markerLeaks: validation.markerLeaks,
         revisionInstructionCompliance: validation.revisionCompliance,
         sourceBodyChars: payload.sourceBodyChars,
@@ -4374,6 +4451,12 @@ const rewriteWorker = new Worker<RewriteJobData>(
             warnings: validation.warnings,
             quoteTelemetry: validation.quoteTelemetry,
             numberAssessments: validation.numberAssessments,
+            publicationNumberAssessments:
+              validation.publicationNumberAssessments,
+            numericPublicationPolicy: numericPublicationPolicyJson(
+              validation,
+              false
+            ),
             markerLeaks: validation.markerLeaks,
             revisionInstructionCompliance: validation.revisionCompliance,
             sourceBodyChars: payload.sourceBodyChars,

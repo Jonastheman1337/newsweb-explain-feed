@@ -11,8 +11,11 @@ const NUMBER_UNIT_CONTEXT_AFTER_CHARS = 88;
 
 const CURRENCY_SCALE_CONTEXT =
   "(?:usd|u\\.s\\.\\s*dollars?|us\\s*dollars?|us\\$|dollars?|nok|eur|euro|gbp|sek|dkk|kroner)";
-const THOUSANDS_SCALE_CONTEXT = "(?:thousands?|tusen|['’]?000s?)";
+const THOUSANDS_SCALE_CONTEXT =
+  "(?:thousands?|tusen|1[,. ]?000s?|['’]?000s?)";
 const EXPLICIT_THOUSANDS_SCALE_PATTERNS = [
+  /\b(?:t(?:nok|sek|dkk)|k(?:nok|sek|dkk|usd|eur|gbp))\b|\$\s*['’]?000\b|\b(?:nok|sek|dkk|usd|eur|gbp)\s*['’]?000\b/i,
+  /\b(?:tall|beløp|verdier|regnskapstall)\b.{0,80}\b(?:i|oppgitt\s+i|presentert\s+i)\b.{0,50}\b(?:nok|sek|dkk|usd|eur|gbp|norske kroner|svenske kroner|danske kroner|dollar|euro|pund)?\s*(?:tusen|['’]?000s?)\b/i,
   new RegExp(
     `\\b(?:amounts?|figures?|values?|numbers?)\\b.{0,80}\\b(?:in|presented\\s+in|shown\\s+in|stated\\s+in|reported\\s+in|expressed\\s+in)\\b.{0,50}\\b(?:${CURRENCY_SCALE_CONTEXT}\\s*)?${THOUSANDS_SCALE_CONTEXT}\\b`,
     "i"
@@ -30,9 +33,10 @@ const EXPLICIT_THOUSANDS_SCALE_PATTERNS = [
     "i"
   )
 ];
-const REWRITE_MILLION_CONTEXT_PATTERN = /\b(?:mill\.|million(?:er)?)\b/i;
+const REWRITE_MILLION_CONTEXT_PATTERN =
+  /\b(?:mill\.|million(?:er)?|m(?:nok|sek|dkk|usd|eur|gbp)|nokm)\b/i;
 const REWRITE_BILLION_CONTEXT_PATTERN =
-  /\b(?:mrd\.?|milliard(?:er)?|billion(?:s)?)\b/i;
+  /\b(?:mrd\.?|milliard(?:er)?|billion(?:s)?|b(?:nok|sek|dkk|usd|eur|gbp))\b/i;
 const SHARED_PERCENT_RANGE_AFTER_PATTERN =
   /^\s*(?:-|–|—|til|to|and|og)\s*-?\d+(?:[,.]\d+)?\s*(?:%|prosent|percent)\b/i;
 
@@ -63,27 +67,28 @@ const SCALED_NUMBER_UNIT_PATTERNS: Array<{
 }> = [
   {
     unit: "sek",
-    pattern: /\b(?:sek|svenske kroner|swedish kronor)\b/gi
+    pattern: /\b(?:(?:t|m|b)?sek|svenske kroner|swedish kronor)\b/gi
   },
   {
     unit: "dkk",
-    pattern: /\b(?:dkk|danske kroner|danish kroner)\b/gi
+    pattern: /\b(?:(?:t|m|b)?dkk|danske kroner|danish kroner)\b/gi
   },
   {
     unit: "usd",
-    pattern: /\b(?:usd|u\.s\.\s*dollars?|us\s*dollars?|us\$|dollars?)\b|\$/gi
+    pattern:
+      /\b(?:(?:k|m|b)?usd|u\.s\.\s*dollars?|us\s*dollars?|us\$|dollars?)\b|\$/gi
   },
   {
     unit: "eur",
-    pattern: /\b(?:eur|euros?|euro)\b/gi
+    pattern: /\b(?:(?:k|m|b)?eur|euros?|euro)\b/gi
   },
   {
     unit: "gbp",
-    pattern: /\b(?:gbp|pund|pounds?)\b/gi
+    pattern: /\b(?:(?:k|m|b)?gbp|pund|pounds?)\b/gi
   },
   {
     unit: "nok",
-    pattern: /\b(?:nok|norske kroner|kroner|kr)\b/gi
+    pattern: /\b(?:(?:t|m|b)?nok|nokm|norske kroner|kroner|kr)\b/gi
   },
   {
     unit: "shares",
@@ -474,9 +479,11 @@ function scaledMillionKeysForSourceToken(
 
   const keys = new Set<string>();
   keys.add(roundedNumberKey(roundToOneDecimal(millionValue), 1));
-
   const roundedInteger = Math.round(millionValue);
-  if (Math.abs(millionValue - roundedInteger) < 1e-9) {
+  if (
+    Math.abs(millionValue) >= 10 ||
+    Math.abs(millionValue - roundedInteger) < 1e-9
+  ) {
     keys.add(roundedNumberKey(roundedInteger, 0));
   }
 
@@ -511,8 +518,15 @@ function scaledUnitKeysForSourceValue(
     );
   }
 
+  // Integer headlines are a normal presentation of explicitly unit-scaled
+  // report facts (for example USD 23.952m -> USD 24m). The toFixed keys above
+  // preserve more precise forms; this adds only standard nearest-integer
+  // rounding of the same typed amount and currency.
   const roundedInteger = Math.round(scaledValue);
-  if (Math.abs(scaledValue - roundedInteger) < 1e-9) {
+  if (
+    Math.abs(scaledValue) >= 10 ||
+    Math.abs(scaledValue - roundedInteger) < 1e-9
+  ) {
     keys.add(roundedNumberKey(roundedInteger, 0));
   }
 
@@ -1365,15 +1379,14 @@ function assessTokenWithDerivation(
   return legacy;
 }
 
-export function assessNumbers(
-  rewrite: RewriteOutput,
+function assessNumberText(
+  rewriteText: string,
   sourceText: string,
   options?: AssessNumbersOptions
 ): NumberAssessment[] {
   const enabledDerivationRules =
     options?.enabledDerivationRules ?? defaultEnabledDerivationRules;
   const sourceNumberIndex = collectSourceNumberIndex(sourceText);
-  const rewriteText = JSON.stringify(rewrite);
   const rewriteTokens = collectNumberTokenMatches(rewriteText);
   const assessments = new Map<string, NumberAssessment>();
 
@@ -1441,6 +1454,31 @@ export function assessNumbers(
   }
 
   return [...assessments.values()];
+}
+
+/**
+ * Assess number tokens in an explicit text surface. Publication validation
+ * uses this entry point so hidden model metadata cannot influence either the
+ * blocking set or the local context used to explain a visible number.
+ */
+export function assessNumbersInText(
+  text: string,
+  sourceText: string,
+  options?: AssessNumbersOptions
+): NumberAssessment[] {
+  return assessNumberText(text, sourceText, options);
+}
+
+/**
+ * Full-output assessment retained for telemetry and backwards compatibility.
+ * This intentionally includes structured, non-publication fields.
+ */
+export function assessNumbers(
+  rewrite: RewriteOutput,
+  sourceText: string,
+  options?: AssessNumbersOptions
+): NumberAssessment[] {
+  return assessNumberText(JSON.stringify(rewrite), sourceText, options);
 }
 
 export function unexpectedNumberDisplays(
