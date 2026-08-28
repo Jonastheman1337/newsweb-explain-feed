@@ -685,6 +685,69 @@ describe("validateRewriteOutput", () => {
     );
   });
 
+  it.each([
+    ["TNOK", "norske kroner", "NOK/kroner"],
+    ["kUSD", "dollar", "USD/dollar"],
+    ["TEUR", "euro", "EUR/euro"],
+    ["MGBP", "pund", "GBP/pund"],
+    ["TSEK", "svenske kroner", "SEK/svenske kroner"],
+    ["TDKK", "danske kroner", "DKK/danske kroner"]
+  ])(
+    "treats scaled ISO unit %s as its underlying currency",
+    (sourceUnit, visibleCurrency, issueLabel) => {
+      const payload = createPayload({
+        bodyText: `Financial report. Amounts in ${sourceUnit}. Revenue was 10.`
+      });
+      const rewrite = createRewrite({
+        lead: `Selskapet rapporterte inntekter på 10 ${visibleCurrency}.`,
+        body: ["Meldingen oppgir ikke andre tall."]
+      });
+
+      const result = validateRewriteOutput(rewrite, payload);
+
+      expect(
+        result.issues.some(
+          (issue) =>
+            issue.code === "UNEXPECTED_CURRENCY" && issue.message.includes(issueLabel)
+        )
+      ).toBe(false);
+    }
+  );
+
+  it("keeps reader-friendly euro amounts when a report uses TEUR", () => {
+    const payload = createPayload({
+      title: "Øyfjellet Wind Investment AS interim report for H1 2026",
+      bodyText: [
+        "Amounts in TEUR.",
+        "Revenue 21,042 14,646.",
+        "Operating profit/(loss) 981 (15,106).",
+        "Profit/(loss) before tax (7,729) (20,552)."
+      ].join(" ")
+    });
+    const rewrite = createRewrite({
+      title: "Øyfjellet Wind Investment snudde til driftsoverskudd",
+      lead:
+        "Øyfjellet Wind Investment snudde til et driftsoverskudd på 981.000 euro i første halvår, fra et tap på 15,1 millioner euro året før.",
+      body: [
+        "Inntektene steg til 21 millioner euro, fra 14,6 millioner året før.",
+        "Underskuddet før skatt krympet til 7,7 millioner euro, fra 20,6 millioner."
+      ]
+    });
+
+    const result = validateRewriteOutput(rewrite, payload);
+
+    expect(
+      result.issues.some((issue) => issue.code === "UNEXPECTED_CURRENCY")
+    ).toBe(false);
+    expect(
+      result.publicationNumberAssessments
+        .filter((assessment) => assessment.disposition === "unexpected")
+        .map((assessment) => assessment.display)
+    ).toEqual(["981.000"]);
+    // The report reference checker separately verifies this exact TEUR-to-euro
+    // expansion, so it remains eligible for the grounded numeric override.
+  });
+
   it("does not treat Swedish kroner as unexpected NOK currency", () => {
     const payload = createPayload({
       bodyText:

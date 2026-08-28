@@ -278,8 +278,7 @@ const CURRENCY_MARKER_GROUPS: Array<{
       /\bNOK\b/,
       /\bnok\s+(?=\d)/,
       /\d\s+nok\b/,
-      /\bmnok\b/i,
-      /\bbnok\b/i,
+      /\b(?:tnok|knok|mnok|bnok)\b/i,
       /\bkr\b/i,
       /\bnorske kroner\b/i,
       /(?<!svenske )(?<!danske )\bkron(?:e|er)\b/i
@@ -287,23 +286,49 @@ const CURRENCY_MARKER_GROUPS: Array<{
   },
   {
     label: "USD/dollar",
-    patterns: [/\busd\b/i, /\bdollars?\b/i, /\$|＄/i]
+    patterns: [
+      /\busd\b/i,
+      /\b(?:tusd|kusd|musd|busd)\b/i,
+      /\bdollars?\b/i,
+      /\$|＄/i
+    ]
   },
   {
     label: "EUR/euro",
-    patterns: [/\beur\b/i, /\beuros?\b/i, /€/i]
+    patterns: [
+      /\beur\b/i,
+      /\b(?:teur|keur|meur|beur)\b/i,
+      /\beuros?\b/i,
+      /€/i
+    ]
   },
   {
     label: "GBP/pund",
-    patterns: [/\bgbp\b/i, /\bpund\b/i, /\bpounds?\b/i, /£/i]
+    patterns: [
+      /\bgbp\b/i,
+      /\b(?:tgbp|kgbp|mgbp|bgbp)\b/i,
+      /\bpund\b/i,
+      /\bpounds?\b/i,
+      /£/i
+    ]
   },
   {
     label: "SEK/svenske kroner",
-    patterns: [/\bsek\b/i, /\bsvenske kroner\b/i, /\bswedish kronor\b/i]
+    patterns: [
+      /\bsek\b/i,
+      /\b(?:tsek|ksek|msek|bsek)\b/i,
+      /\bsvenske kroner\b/i,
+      /\bswedish kronor\b/i
+    ]
   },
   {
     label: "DKK/danske kroner",
-    patterns: [/\bdkk\b/i, /\bdanske kroner\b/i, /\bdanish kroner\b/i]
+    patterns: [
+      /\bdkk\b/i,
+      /\b(?:tdkk|kdkk|mdkk|bdkk)\b/i,
+      /\bdanske kroner\b/i,
+      /\bdanish kroner\b/i
+    ]
   }
 ];
 

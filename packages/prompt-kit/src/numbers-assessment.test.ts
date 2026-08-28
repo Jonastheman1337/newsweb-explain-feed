@@ -119,6 +119,32 @@ describe("assessNumbers", () => {
     });
   });
 
+  it("attributes TEUR table values rounded to reader-friendly euro millions", () => {
+    const rewrite = createRewrite({
+      lead: "Inntektene steg til 21 millioner euro, fra 14,6 millioner året før."
+    });
+    const source = [
+      "Consolidated income statement (TEUR)",
+      "Revenue 21,042 14,646"
+    ].join("\n");
+
+    expect(assessNumbers(rewrite, source)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          display: "21",
+          disposition: "matched",
+          ruleId: "scaled_million_report_table"
+        }),
+        expect.objectContaining({
+          display: "14,6",
+          disposition: "matched",
+          ruleId: "scaled_million_report_table"
+        })
+      ])
+    );
+    wrapperMatchesAssessments(rewrite, source);
+  });
+
   it("attributes Norwegian tables explicitly stated in thousand kroner", () => {
     const rewrite = createRewrite({
       lead: "Tinde fikk et resultat før skatt på 31,1 millioner kroner."

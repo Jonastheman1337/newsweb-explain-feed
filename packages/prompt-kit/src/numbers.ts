@@ -14,7 +14,7 @@ const CURRENCY_SCALE_CONTEXT =
 const THOUSANDS_SCALE_CONTEXT =
   "(?:thousands?|tusen|1[,. ]?000s?|['’]?000s?)";
 const EXPLICIT_THOUSANDS_SCALE_PATTERNS = [
-  /\b(?:t(?:nok|sek|dkk)|k(?:nok|sek|dkk|usd|eur|gbp))\b|\$\s*['’]?000\b|\b(?:nok|sek|dkk|usd|eur|gbp)\s*['’]?000\b/i,
+  /\b(?:t|k)(?:nok|sek|dkk|usd|eur|gbp)\b|\$\s*['’]?000\b|\b(?:nok|sek|dkk|usd|eur|gbp)\s*['’]?000\b/i,
   /\b(?:tall|beløp|verdier|regnskapstall)\b.{0,80}\b(?:i|oppgitt\s+i|presentert\s+i)\b.{0,50}\b(?:nok|sek|dkk|usd|eur|gbp|norske kroner|svenske kroner|danske kroner|dollar|euro|pund)?\s*(?:tusen|['’]?000s?)\b/i,
   new RegExp(
     `\\b(?:amounts?|figures?|values?|numbers?)\\b.{0,80}\\b(?:in|presented\\s+in|shown\\s+in|stated\\s+in|reported\\s+in|expressed\\s+in)\\b.{0,50}\\b(?:${CURRENCY_SCALE_CONTEXT}\\s*)?${THOUSANDS_SCALE_CONTEXT}\\b`,
@@ -67,28 +67,28 @@ const SCALED_NUMBER_UNIT_PATTERNS: Array<{
 }> = [
   {
     unit: "sek",
-    pattern: /\b(?:(?:t|m|b)?sek|svenske kroner|swedish kronor)\b/gi
+    pattern: /\b(?:(?:t|k|m|b)?sek|svenske kroner|swedish kronor)\b/gi
   },
   {
     unit: "dkk",
-    pattern: /\b(?:(?:t|m|b)?dkk|danske kroner|danish kroner)\b/gi
+    pattern: /\b(?:(?:t|k|m|b)?dkk|danske kroner|danish kroner)\b/gi
   },
   {
     unit: "usd",
     pattern:
-      /\b(?:(?:k|m|b)?usd|u\.s\.\s*dollars?|us\s*dollars?|us\$|dollars?)\b|\$/gi
+      /\b(?:(?:t|k|m|b)?usd|u\.s\.\s*dollars?|us\s*dollars?|us\$|dollars?)\b|\$/gi
   },
   {
     unit: "eur",
-    pattern: /\b(?:(?:k|m|b)?eur|euros?|euro)\b/gi
+    pattern: /\b(?:(?:t|k|m|b)?eur|euros?|euro)\b/gi
   },
   {
     unit: "gbp",
-    pattern: /\b(?:(?:k|m|b)?gbp|pund|pounds?)\b/gi
+    pattern: /\b(?:(?:t|k|m|b)?gbp|pund|pounds?)\b/gi
   },
   {
     unit: "nok",
-    pattern: /\b(?:(?:t|m|b)?nok|nokm|norske kroner|kroner|kr)\b/gi
+    pattern: /\b(?:(?:t|k|m|b)?nok|nokm|norske kroner|kroner|kr)\b/gi
   },
   {
     unit: "shares",
