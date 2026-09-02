@@ -1,0 +1,14 @@
+[Unit]
+Description=Autoweb monthly PostgreSQL restore drill
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=autoweb
+Group=autoweb
+WorkingDirectory=/srv/autoweb/current/infra/upcloud
+Environment=AUTOWEB_ROOT=/srv/autoweb
+LoadCredential=host.env:/srv/autoweb/secrets/host.env
+Environment=HOST_ENV=%d/host.env
+ExecStart=/srv/autoweb/current/infra/upcloud/scripts/restore-drill.sh

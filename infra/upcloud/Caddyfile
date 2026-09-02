@@ -1,0 +1,29 @@
+{
+	email {$ACME_EMAIL}
+	admin off
+}
+
+(autoweb_app) {
+	encode zstd gzip
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		-Server
+	}
+	reverse_proxy web:3000
+}
+
+autoweb24.no {
+	import autoweb_app
+}
+
+www.autoweb24.no {
+	redir https://autoweb24.no{uri} 308
+}
+
+upcloud-preview.autoweb24.no {
+	@not_allowed not remote_ip {$PREVIEW_ALLOWED_CIDRS}
+	respond @not_allowed "Forbidden" 403
+	import autoweb_app
+}
