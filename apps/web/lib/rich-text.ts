@@ -1,3 +1,9 @@
+import {
+  AI_DISCLOSURE_LINK_HREF,
+  AI_DISCLOSURE_LINK_TEXT,
+  AI_DISCLOSURE_TEXT
+} from "./ai-disclosure";
+
 const ALLOWED_LINK_PROTOCOLS = new Set(["http:", "https:", "mailto:"]);
 
 export function escapeHtml(value: string): string {
@@ -341,6 +347,14 @@ export function richHtmlToPlainText(html: string): string {
     .join("\n\n");
 }
 
+export function createAiDisclosureHtml(): string {
+  return `<p>${escapeHtml(AI_DISCLOSURE_TEXT)}<a href="${AI_DISCLOSURE_LINK_HREF}">${escapeHtml(
+    AI_DISCLOSURE_LINK_TEXT
+  )}</a>.</p>`;
+}
+
 export function createNoticeClipboardHtml(title: string, bodyHtml: string): string {
-  return `<article><h2>${escapeHtml(title)}</h2>${sanitizeRichHtml(bodyHtml)}</article>`;
+  return `<article><h2>${escapeHtml(title)}</h2>${sanitizeRichHtml(
+    bodyHtml
+  )}${createAiDisclosureHtml()}</article>`;
 }

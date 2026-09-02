@@ -13,6 +13,7 @@ import {
   type MouseEvent as ReactMouseEvent,
   type ReactNode
 } from "react";
+import { aiDisclosurePlainText } from "../lib/ai-disclosure";
 import { useEditorialTelemetry } from "../lib/editorial-telemetry";
 import {
   createNoticeClipboardHtml,
@@ -27,6 +28,7 @@ import {
   saveRewriteDraft,
   type RewriteDraft
 } from "../lib/rewrite-drafts";
+import { AiDisclosure } from "./ai-disclosure";
 import { useTitleSuggestions } from "./title-suggestions";
 
 type EditableRewriteProps = {
@@ -801,7 +803,7 @@ export function EditableRewrite({
       viewMode
     });
 
-    const text = `${editedTitle}\n\n${currentBody.body}`;
+    const text = `${editedTitle}\n\n${currentBody.body}\n\n${aiDisclosurePlainText()}`;
     const html = createNoticeClipboardHtml(editedTitle, currentBody.bodyHtml);
     try {
       await copyNoticeToClipboard(text, html);
@@ -964,6 +966,7 @@ export function EditableRewrite({
         onKeyUp={handleBodyKeyUp}
         onKeyDown={handleBodyKeyDown}
       />
+      <AiDisclosure />
       <div
         ref={toolbarRef}
         className={`richEditToolbar${linkMode ? " richEditToolbarLink" : ""}`}
