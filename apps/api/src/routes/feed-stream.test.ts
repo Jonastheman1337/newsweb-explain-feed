@@ -106,6 +106,14 @@ describe("feed stream updates", () => {
     expect(applyFeedUpdateState(publishedItem, "source")).toEqual(publishedItem);
   });
 
+  it("keeps the skipped flag when the publish step emits a source-state event", () => {
+    const skippedItem = { ...baseItem, skipped: true, notGenerated: false };
+    expect(applyFeedUpdateState(skippedItem, "source")).toEqual(skippedItem);
+
+    const failedItem = { ...baseItem, failed: true, notGenerated: false };
+    expect(applyFeedUpdateState(failedItem, "source")).toEqual(failedItem);
+  });
+
   it("parses a valid phase and drops unknown phases", () => {
     expect(
       parseFeedUpdate(

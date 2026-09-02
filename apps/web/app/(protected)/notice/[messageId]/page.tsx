@@ -150,10 +150,8 @@ export default async function NoticePage({ params, searchParams }: NoticePagePro
           </>
         ) : isSkipped ? (
           <>
-            <p className="noticePanelTitle">Ikke generert enda</p>
             <h2>{notice.source.title}</h2>
             {dateline}
-            <p>Denne børsmeldingen har ikke blitt omskrevet enda.</p>
             <GenerateButton messageId={notice.source.messageId} hasAttachments={notice.source.hasAttachments} />
           </>
         ) : isFailed ? (

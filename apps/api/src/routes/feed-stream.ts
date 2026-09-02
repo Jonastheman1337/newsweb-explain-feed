@@ -42,21 +42,11 @@ export function applyFeedUpdateState(
   phase?: GenerationPhase
 ): FeedItem {
   if (state === "source") {
-    if (item.isFinal) return item;
-    return {
-      ...item,
-      lead: "",
-      body: [],
-      keyFacts: [],
-      negativeOrSurprising: [],
-      sourceLimitations: [],
-      importance: "uviktig",
-      notGenerated: true,
-      skipped: false,
-      failed: false,
-      processing: false,
-      regenerating: false
-    };
+    // The mapper already reflects the database truth for source-only items
+    // (not generated / skipped / failed / processing). Forcing notGenerated
+    // here made category- and triage-skipped notices render as "not
+    // generated yet" until the next full page load.
+    return item;
   }
 
   if (state === "processing") {

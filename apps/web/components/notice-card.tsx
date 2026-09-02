@@ -62,9 +62,9 @@ function MaxAiLink({ messageId }: { messageId: number }) {
 export function NoticeCard({ item }: NoticeCardProps) {
   const [showSplit, setShowSplit] = useState(false);
 
-  if (item.notGenerated) {
+  if (item.notGenerated || item.skipped) {
     return (
-      <article className="card" id={`notice-${item.messageId}`}>
+      <article className="card cardSkipped" id={`notice-${item.messageId}`}>
         <div className="muted">
           <a href={`https://newsweb.oslobors.no/message/${item.messageId}`} target="_blank" rel="noopener noreferrer">
             {formatOsloTime(item.publishedAt)} | {item.issuerName} ({item.issuerSign})
@@ -77,9 +77,7 @@ export function NoticeCard({ item }: NoticeCardProps) {
         </h2>
         {item.regenerating ? (
           <FeedProcessingIndicator hasAttachments={item.hasAttachments} phase={item.phase} />
-        ) : (
-          <p className="muted">Ikke generert enda</p>
-        )}
+        ) : null}
         <div className="editableActions">
           <MaxAiLink messageId={item.messageId} />
           <span className="actionsRight">
@@ -108,29 +106,6 @@ export function NoticeCard({ item }: NoticeCardProps) {
           <MaxAiLink messageId={item.messageId} />
           <span className="actionsRight">
             <GenerateButton messageId={item.messageId} label="Regenerer notis" hasAttachments={item.hasAttachments} />
-          </span>
-        </div>
-      </article>
-    );
-  }
-
-  if (item.skipped) {
-    return (
-      <article className="card cardSkipped" id={`notice-${item.messageId}`}>
-        <div className="muted">
-          <a href={`https://newsweb.oslobors.no/message/${item.messageId}`} target="_blank" rel="noopener noreferrer">
-            {formatOsloTime(item.publishedAt)} | {item.issuerName} ({item.issuerSign})
-          </a>
-        </div>
-        <h2>
-          <Link href={`/notice/${item.messageId}`} className="headlineLink">
-            {item.title}
-          </Link>
-        </h2>
-        <div className="editableActions">
-          <MaxAiLink messageId={item.messageId} />
-          <span className="actionsRight">
-            <GenerateButton messageId={item.messageId} hasAttachments={item.hasAttachments} />
           </span>
         </div>
       </article>
