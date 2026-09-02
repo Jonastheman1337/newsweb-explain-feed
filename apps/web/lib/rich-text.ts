@@ -348,9 +348,9 @@ export function richHtmlToPlainText(html: string): string {
 }
 
 export function createAiDisclosureHtml(): string {
-  return `<p>${escapeHtml(AI_DISCLOSURE_TEXT)}<a href="${AI_DISCLOSURE_LINK_HREF}">${escapeHtml(
+  return `<p><em>${escapeHtml(AI_DISCLOSURE_TEXT)}<a href="${AI_DISCLOSURE_LINK_HREF}">${escapeHtml(
     AI_DISCLOSURE_LINK_TEXT
-  )}</a>.</p>`;
+  )}</a>.</em></p>`;
 }
 
 export function createNoticeClipboardHtml(title: string, bodyHtml: string): string {

@@ -724,6 +724,7 @@ a {
 .aiDisclosure {
   margin: 0.65rem 0 0;
   font-size: 0.9rem;
+  font-style: italic;
   line-height: 1.5;
   color: var(--ink-soft);
 }
