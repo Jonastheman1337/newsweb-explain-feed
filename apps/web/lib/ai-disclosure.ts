@@ -4,7 +4,7 @@
  * both the HTML and plain-text clipboard payloads when a notice is copied.
  */
 export const AI_DISCLOSURE_TEXT =
-  "Teksten er skrevet ved hjelp av et AI-verktøy. Den er lest gjennom og redigert av journalisten. Les E24s AI-retningslinjer ";
+  "Teksten er skrevet ved hjelp av et AI-verktøy. Les E24s AI-retningslinjer ";
 export const AI_DISCLOSURE_LINK_TEXT = "her";
 export const AI_DISCLOSURE_LINK_HREF = "https://e24.no/informasjon/ai-retningslinjer";
 
