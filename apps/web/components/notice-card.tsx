@@ -8,6 +8,7 @@ import { GenerateButton } from "./generate-button";
 import { FeedProcessingIndicator } from "./feed-processing-indicator";
 import { EditableRewrite } from "./editable-rewrite";
 import { SplitViewPanel } from "./split-view-panel";
+import { formatCategoryList } from "../lib/format-category";
 
 function formatOsloTime(isoString: string): string {
   return new Intl.DateTimeFormat("nb-NO", {
@@ -29,6 +30,22 @@ function importanceLabel(value: FeedItem["importance"]): string {
     return "Uviktig";
   }
   return "Medium";
+}
+
+/**
+ * Time | issuer (sign) | category, linking to the Newsweb original. The
+ * category is plain text in the same muted line — no chip, no extra row.
+ */
+function CardDateline({ item }: { item: FeedItem }) {
+  const category = formatCategoryList(item.categories);
+  return (
+    <div className="muted">
+      <a href={`https://newsweb.oslobors.no/message/${item.messageId}`} target="_blank" rel="noopener noreferrer">
+        {formatOsloTime(item.publishedAt)} | {item.issuerName} ({item.issuerSign})
+        {category ? ` | ${category}` : ""}
+      </a>
+    </div>
+  );
 }
 
 function MaxAiLink({ messageId }: { messageId: number }) {
@@ -65,11 +82,7 @@ export function NoticeCard({ item }: NoticeCardProps) {
   if (item.notGenerated || item.skipped) {
     return (
       <article className="card cardSkipped" id={`notice-${item.messageId}`}>
-        <div className="muted">
-          <a href={`https://newsweb.oslobors.no/message/${item.messageId}`} target="_blank" rel="noopener noreferrer">
-            {formatOsloTime(item.publishedAt)} | {item.issuerName} ({item.issuerSign})
-          </a>
-        </div>
+        <CardDateline item={item} />
         <h2>
           <Link href={`/notice/${item.messageId}`} className="headlineLink">
             {item.title}
@@ -91,11 +104,7 @@ export function NoticeCard({ item }: NoticeCardProps) {
   if (item.processing) {
     return (
       <article className="card cardProcessing" id={`notice-${item.messageId}`}>
-        <div className="muted">
-          <a href={`https://newsweb.oslobors.no/message/${item.messageId}`} target="_blank" rel="noopener noreferrer">
-            {formatOsloTime(item.publishedAt)} | {item.issuerName} ({item.issuerSign})
-          </a>
-        </div>
+        <CardDateline item={item} />
         <h2>
           <Link href={`/notice/${item.messageId}`} className="headlineLink">
             {item.title}
@@ -115,11 +124,7 @@ export function NoticeCard({ item }: NoticeCardProps) {
   if (item.failed) {
     return (
       <article className="card cardSkipped" id={`notice-${item.messageId}`}>
-        <div className="muted">
-          <a href={`https://newsweb.oslobors.no/message/${item.messageId}`} target="_blank" rel="noopener noreferrer">
-            {formatOsloTime(item.publishedAt)} | {item.issuerName} ({item.issuerSign})
-          </a>
-        </div>
+        <CardDateline item={item} />
         <h2>
           <Link href={`/notice/${item.messageId}`} className="headlineLink">
             {item.title}
@@ -169,13 +174,7 @@ export function NoticeCard({ item }: NoticeCardProps) {
             contentHash={item.contentHash ?? undefined}
             isFinal={item.isFinal}
             className={showSplit && isImportant ? "cardImportantCol" : undefined}
-            dateline={
-              <div className="muted">
-                <a href={`https://newsweb.oslobors.no/message/${item.messageId}`} target="_blank" rel="noopener noreferrer">
-                  {formatOsloTime(item.publishedAt)} | {item.issuerName} ({item.issuerSign})
-                </a>
-              </div>
-            }
+            dateline={<CardDateline item={item} />}
             extraActions={
               <button
                 className={`splitButton${showSplit ? " splitButtonActive" : ""}`}
@@ -203,6 +202,7 @@ export function NoticeCard({ item }: NoticeCardProps) {
               issuerName={item.issuerName}
               issuerSign={item.issuerSign}
               publishedAt={item.publishedAt}
+              categories={item.categories}
               sourceTitle={item.sourceTitle}
               sourceBodyText={item.sourceBodyText}
               attachments={item.attachments}

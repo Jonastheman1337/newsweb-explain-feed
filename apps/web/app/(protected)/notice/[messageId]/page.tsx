@@ -14,6 +14,7 @@ import {
 } from "../../../../components/notice-telemetry";
 import { AttachmentLinks } from "../../../../components/attachment-links";
 import { getSessionToken } from "../../../../lib/session";
+import { formatCategoryList } from "../../../../lib/format-category";
 
 type NoticePageProps = {
   params: Promise<{ messageId: string }>;
@@ -95,6 +96,11 @@ export default async function NoticePage({ params, searchParams }: NoticePagePro
         ? "failed"
         : "published";
 
+  const category = formatCategoryList(notice.source.categories);
+  const datelineText = `${notice.source.issuerName} (${notice.source.issuerSign}) | ${formatOsloTime(
+    notice.source.publishedAt
+  )}${category ? ` | ${category}` : ""}`;
+
   const dateline = (
     <p key="dateline" className="muted">
       <SourceLink
@@ -103,8 +109,7 @@ export default async function NoticePage({ params, searchParams }: NoticePagePro
         publication={telemetryPublication}
         href={sourceUrl}
       >
-        {notice.source.issuerName} ({notice.source.issuerSign}) |{" "}
-        {formatOsloTime(notice.source.publishedAt)}
+        {datelineText}
       </SourceLink>
     </p>
   );
@@ -233,8 +238,7 @@ export default async function NoticePage({ params, searchParams }: NoticePagePro
             publication={telemetryPublication}
             href={sourceUrl}
           >
-            {notice.source.issuerName} ({notice.source.issuerSign}) |{" "}
-            {formatOsloTime(notice.source.publishedAt)}
+            {datelineText}
           </SourceLink>
         </p>
         <SourceBodyText text={notice.source.bodyText} />

@@ -1,5 +1,6 @@
 import { SourceBodyText } from "./source-body-text";
 import { AttachmentLinks } from "./attachment-links";
+import { formatCategoryList } from "../lib/format-category";
 
 type Attachment = {
   id: number;
@@ -13,6 +14,7 @@ type SplitViewPanelProps = {
   issuerName: string;
   issuerSign: string;
   publishedAt: string;
+  categories?: string[];
   sourceTitle: string;
   sourceBodyText: string;
   attachments: Attachment[];
@@ -31,16 +33,19 @@ export function SplitViewPanel({
   issuerName,
   issuerSign,
   publishedAt,
+  categories,
   sourceTitle,
   sourceBodyText,
   attachments
 }: SplitViewPanelProps) {
+  const category = formatCategoryList(categories);
   return (
     <div>
       <h3>{sourceTitle}</h3>
       <p className="muted">
         <a href={`https://newsweb.oslobors.no/message/${messageId}`} target="_blank" rel="noopener noreferrer">
           {issuerName} ({issuerSign}) | {formatOsloTime(publishedAt)}
+          {category ? ` | ${category}` : ""}
         </a>
       </p>
       <SourceBodyText text={sourceBodyText} />

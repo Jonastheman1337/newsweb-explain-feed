@@ -150,6 +150,22 @@ describe("mapDbItemToFeedItem", () => {
     expect(item?.title).toBe("Original tittel");
   });
 
+  it("passes source categories through and repairs legacy double-encoded rows", () => {
+    const dbItem = feedItem([]);
+    const item = mapDbItemToFeedItem({
+      ...dbItem,
+      sourceNotice: {
+        ...dbItem.sourceNotice,
+        categoriesJson: ["INNSIDEINFORMASJON", "BÃ˜RSPAUSE / HANDELSPAUSE"]
+      }
+    } as never);
+
+    expect(item?.categories).toEqual([
+      "INNSIDEINFORMASJON",
+      "BØRSPAUSE / HANDELSPAUSE"
+    ]);
+  });
+
   it("keeps failed rewrites visible as retryable source cards", () => {
     const item = mapDbItemToFeedItem(
       feedItem([rewrite(1, "failed", new Date("2026-05-07T08:00:00.000Z"))]) as never

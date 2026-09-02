@@ -1,4 +1,5 @@
 import {
+  fixDoubleEncodedUtf8,
   normalizeRewriteJson,
   noticeMaterialsResponseSchema,
   noticeResponseSchema,
@@ -113,7 +114,7 @@ function buildSourcePayload(notice: {
     issuerName: notice.issuerName,
     issuerSign: notice.issuerSign,
     publishedAt: notice.publishedAt.toISOString(),
-    categories: (notice.categoriesJson as string[]) ?? [],
+    categories: ((notice.categoriesJson as string[]) ?? []).map(fixDoubleEncodedUtf8),
     markets: (notice.marketsJson as string[]) ?? [],
     bodyText: notice.bodyText,
     hasAttachments: notice.hasAttachments,

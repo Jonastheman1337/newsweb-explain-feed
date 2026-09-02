@@ -1,4 +1,9 @@
-import { normalizeRewriteJson, rewriteOutputSchema, type FeedItem } from "@newsweb/shared";
+import {
+  fixDoubleEncodedUtf8,
+  normalizeRewriteJson,
+  rewriteOutputSchema,
+  type FeedItem
+} from "@newsweb/shared";
 import type {
   FeedItem as PrismaFeedItem,
   PublishedRewrite,
@@ -24,10 +29,15 @@ type FeedItemWithRelations = PrismaFeedItem & {
   };
 };
 
+// Rows ingested before the encoding fix may still hold double-encoded UTF-8
+// ("BÃ˜RSPAUSE"); the worker repairs on read, so the feed must too, or the
+// category shows as mojibake and never matches the mute/filter values.
 function sourceCategories(item: FeedItemWithRelations): string[] {
   const raw = item.sourceNotice.categoriesJson;
   return Array.isArray(raw)
-    ? raw.filter((value): value is string => typeof value === "string")
+    ? raw
+        .filter((value): value is string => typeof value === "string")
+        .map(fixDoubleEncodedUtf8)
     : [];
 }
 
