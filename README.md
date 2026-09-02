@@ -179,28 +179,42 @@ npm run typecheck
 npm test
 ```
 
-## Render Deploy
+## Production Deploy (UpCloud)
 
-`render.yaml` defines:
+Production runs on one UpCloud server (`autoweb-prod`, `81.27.105.83`) behind
+Caddy at https://autoweb24.no. Render is no longer used; `render.yaml`,
+`Dockerfile.render`, and the `RENDER_*` helpers below are historical. Pushing
+to `main` does not deploy anything.
 
-- `autoweb`: combined Next.js, Fastify API, and worker service
-- `newsweb-explain-db`: primary app Postgres DB
-- `newsweb-explain-log-db`: dedicated generation/action log DB
-- `newsweb-explain-redis`: Render Key Value / Redis-compatible queue backend
-
-The pre-deploy command runs:
+Deploy a pushed commit with one command (SSH key for the `autoweb` user must be
+installed locally):
 
 ```bash
-npm run prisma:migrate:deploy
+bash scripts/deploy-upcloud.sh            # deploys HEAD
+bash scripts/deploy-upcloud.sh <sha>      # deploys a specific pushed commit
+bash scripts/deploy-upcloud.sh --status   # live release SHA, containers, health
 ```
 
-That command applies Prisma migrations to the primary app DB and then runs
-`scripts/init-log-db.mjs` against `GENERATION_LOG_DATABASE_URL`.
-
-After first deploy, add users from the Render shell:
+The script archives the commit, uploads it to `/srv/autoweb/releases/incoming`,
+builds the api/worker/web images on the host (skipped when that SHA was built
+before), runs `infra/upcloud/scripts/deploy.sh` (Prisma migrations, then
+`docker compose up`), and prints `/api/health`. Rollback to the previous
+release:
 
 ```bash
-npm run invite:add -w apps/api -- user@example.com
+ssh autoweb@81.27.105.83 /srv/autoweb/current/infra/upcloud/scripts/rollback.sh
+```
+
+The full runbook, compose file, backup/watchdog timers, and host scripts live
+in `infra/upcloud/`. The host keeps its copy at
+`/srv/autoweb/current/infra/upcloud`; changes there must be copied to the host.
+
+Add users from the host:
+
+```bash
+ssh autoweb@81.27.105.83
+cd /srv/autoweb/current/infra/upcloud
+docker compose --env-file /srv/autoweb/secrets/host.env -f compose.yml   exec api npm run invite:add -w apps/api -- user@example.com
 ```
 
 ## Regeneration Behavior
@@ -353,7 +367,8 @@ temporary queue state. Do not rely on Redis for durable history.
 
 ## Production Troubleshooting
 
-From a Render service shell:
+On the UpCloud host (`ssh autoweb@81.27.105.83`), inside the api container
+(`docker compose ... exec api sh`, see Production Deploy):
 
 ```bash
 printenv DATABASE_URL

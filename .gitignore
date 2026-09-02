@@ -13,5 +13,6 @@ infra/data/
 .playwright-mcp/
 tmp/
 test-results/
-.claude/
+.claude/*
+!.claude/skills/
 prompts/
