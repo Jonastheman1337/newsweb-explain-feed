@@ -62,7 +62,8 @@ if [[ -d ${root}/releases/${sha}/source ]]; then
 else
   "${scripts}/build-release.sh" "${sha}" "${archive}" "${hash}"
 fi
-"${scripts}/deploy.sh" "${sha}"
+# deploy.sh rewrites the root-owned secrets/host.env and state files, so it runs as root.
+sudo -n "${scripts}/deploy.sh" "${sha}"
 echo "current-release=$(cat ${root}/state/current-release)"
 REMOTE
 
