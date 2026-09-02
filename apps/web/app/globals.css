@@ -8,7 +8,6 @@
   --accent-2: #36c89a;
   --line: #3d3d3d;
   --warning: #fa4747;
-  --link: #6ea8fe;
   --radius: 8px;
   --shadow: none;
 }
@@ -23,7 +22,6 @@
   --accent-2: #1a9a6e;
   --line: #d5d5d5;
   --warning: #d93025;
-  --link: #0b57d0;
   --shadow: none;
 }
 
@@ -730,7 +728,7 @@ a {
 }
 
 .aiDisclosure a {
-  color: var(--link);
+  color: inherit;
   text-decoration: underline;
   text-underline-offset: 2px;
 }
