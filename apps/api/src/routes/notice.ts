@@ -4,7 +4,9 @@ import {
   noticeMaterialsResponseSchema,
   noticeResponseSchema,
   outputModeSchema,
-  rewriteOutputSchema
+  relatedNoticeLinkSchema,
+  rewriteOutputSchema,
+  type RelatedNoticeLink
 } from "@newsweb/shared";
 import { logPrisma, prisma } from "@newsweb/shared/db";
 import { Readable } from "node:stream";
@@ -95,6 +97,41 @@ type MaterialSnapshot = {
   text: string;
   textChars: number;
 };
+
+// Earlier notices the worker attached automatically, read back from the
+// published rewrite's validation telemetry (validationJson.relatedNotices.
+// resolved). Only what the web linker needs; never the attached text.
+function relatedNoticeLinksFromValidation(
+  validationJson: Prisma.JsonValue
+): RelatedNoticeLink[] {
+  if (!validationJson || typeof validationJson !== "object" || Array.isArray(validationJson)) {
+    return [];
+  }
+  const related = (validationJson as Record<string, unknown>).relatedNotices;
+  if (!related || typeof related !== "object" || Array.isArray(related)) {
+    return [];
+  }
+  const resolved = (related as Record<string, unknown>).resolved;
+  if (!Array.isArray(resolved)) {
+    return [];
+  }
+  const links: RelatedNoticeLink[] = [];
+  for (const entry of resolved) {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) continue;
+    const record = entry as Record<string, unknown>;
+    const parsed = relatedNoticeLinkSchema.safeParse({
+      messageId: record.messageId,
+      title: typeof record.title === "string" ? record.title : `Newsweb ${String(record.messageId)}`,
+      publishedAt: record.publishedAt,
+      relation: record.relation,
+      url: `https://newsweb.oslobors.no/message/${String(record.messageId)}`
+    });
+    if (parsed.success) {
+      links.push(parsed.data);
+    }
+  }
+  return links;
+}
 
 function buildSourcePayload(notice: {
   messageId: number;
@@ -297,6 +334,9 @@ export const noticeRoutes: FastifyPluginAsync = async (fastify) => {
         isFinal: true as const
       }));
 
+      const relatedNotices = relatedNoticeLinksFromValidation(
+        activePublishedRewrite.validationJson
+      );
       const payload = {
         source: buildSourcePayload(notice),
         publication: {
@@ -308,7 +348,8 @@ export const noticeRoutes: FastifyPluginAsync = async (fastify) => {
           isFinal: true as const
         },
         rewrite,
-        rewrites
+        rewrites,
+        ...(relatedNotices.length > 0 ? { relatedNotices } : {})
       };
 
       return reply.send(noticeResponseSchema.parse(payload));

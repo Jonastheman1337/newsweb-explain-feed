@@ -124,12 +124,21 @@ export type RewriteVersion = {
   isFinal: true;
 };
 
+type RelatedNoticeLink = {
+  messageId: number;
+  title: string;
+  publishedAt: string;
+  relation: "reference" | "correction" | "sibling";
+  url: string;
+};
+
 type NoticeResponse =
   | {
       source: NoticeSource;
       publication: PublicationIdentity;
       rewrite: RewriteOutput;
       rewrites?: RewriteVersion[];
+      relatedNotices?: RelatedNoticeLink[];
       skipped?: false;
       processing?: false;
     }

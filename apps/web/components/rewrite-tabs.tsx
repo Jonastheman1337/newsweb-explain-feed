@@ -8,6 +8,7 @@ import {
   REWRITE_DRAFT_CHANGE_EVENT,
   type RewriteDraftChangeDetail
 } from "../lib/rewrite-drafts";
+import type { SourceLinkTargets } from "../lib/source-links";
 import { EditableRewrite } from "./editable-rewrite";
 import { InstructionInput } from "./instruction-input";
 
@@ -27,6 +28,7 @@ type RewriteTabsProps = {
   dateline: ReactNode;
   hasAttachments?: boolean;
   publicationRevision?: number;
+  sourceLinks?: SourceLinkTargets;
 };
 
 export function RewriteTabs({
@@ -34,7 +36,8 @@ export function RewriteTabs({
   messageId,
   dateline,
   hasAttachments,
-  publicationRevision
+  publicationRevision,
+  sourceLinks
 }: RewriteTabsProps) {
   const [activeIndex, setActiveIndex] = useState(rewrites.length - 1);
   const [draftVersions, setDraftVersions] = useState<Set<string>>(() => new Set());
@@ -137,6 +140,7 @@ export function RewriteTabs({
         isFinal={active.isFinal}
         dateline={dateline}
         panelTitle="AI-generert notis"
+        sourceLinks={sourceLinks}
       />
       <InstructionInput
         messageId={messageId}

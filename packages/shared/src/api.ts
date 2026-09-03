@@ -93,6 +93,16 @@ export const mutedCategoriesUpdateSchema = z.object({
   mutedCategories: z.array(z.string().min(1).max(200)).max(200)
 });
 
+export const relatedNoticeLinkSchema = z.object({
+  messageId: z.number().int(),
+  title: z.string(),
+  publishedAt: z.string(),
+  relation: z.enum(["reference", "correction", "sibling"]),
+  url: z.string()
+});
+
+export type RelatedNoticeLink = z.infer<typeof relatedNoticeLinkSchema>;
+
 export const noticeResponseSchema = z.object({
   source: z.object({
     messageId: z.number().int(),
@@ -134,7 +144,11 @@ export const noticeResponseSchema = z.object({
         isFinal: z.literal(true)
       })
     )
-    .optional()
+    .optional(),
+  // Earlier notices the worker auto-attached as background for the active
+  // version (from the rewrite's validation telemetry). The web client uses
+  // them to link the article's "meldte i juni" clause to the right notice.
+  relatedNotices: z.array(relatedNoticeLinkSchema).optional()
 });
 
 export const rewriteStatusResponseSchema = z.object({

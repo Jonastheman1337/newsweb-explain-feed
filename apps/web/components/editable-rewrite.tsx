@@ -22,6 +22,7 @@ import {
   richHtmlToPlainText,
   sanitizeRichHtml
 } from "../lib/rich-text";
+import { linkSourceAttributions, type SourceLinkTargets } from "../lib/source-links";
 import {
   deleteRewriteDraft,
   getRewriteDraft,
@@ -44,6 +45,10 @@ type EditableRewriteProps = {
   extraActions?: ReactNode;
   panelTitle?: string;
   className?: string;
+  // Newsweb links for the first attribution phrase (primary notice) and the
+  // first "meldte i juni" clause (earlier notice). Applied once when the
+  // generated text is turned into HTML; stored drafts are never re-linked.
+  sourceLinks?: SourceLinkTargets;
 };
 
 type DraftState = {
@@ -266,10 +271,14 @@ export function EditableRewrite({
   extraActions,
   panelTitle,
   className,
+  sourceLinks,
 }: EditableRewriteProps) {
   const originalBodyHtml = useMemo(
-    () => plainTextToRichHtml(originalBody),
-    [originalBody]
+    () =>
+      sourceLinks
+        ? linkSourceAttributions(plainTextToRichHtml(originalBody), sourceLinks)
+        : plainTextToRichHtml(originalBody),
+    [originalBody, sourceLinks]
   );
   const [editedTitle, setEditedTitle] = useState(originalTitle);
   const [editedBody, setEditedBody] = useState(originalBody);

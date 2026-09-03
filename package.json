@@ -17,7 +17,7 @@
     "local:prod:logs": "docker compose --env-file .env -f infra/docker-compose.prod-local.yml logs -f autoweb",
     "build": "npm run build -w packages/shared && npm run build -w packages/prompt-kit && npm run build -w apps/api && npm run build -w apps/worker && npm run build -w apps/web",
     "typecheck": "npm run build -w packages/shared && npm run build -w packages/prompt-kit && npm run typecheck -w packages/shared && npm run typecheck -w packages/prompt-kit && npm run typecheck -w apps/api && npm run typecheck -w apps/worker && npm run typecheck -w apps/web",
-    "test": "npm run test -w packages/shared && npm run test -w packages/prompt-kit && npm run build -w packages/shared && npm run build -w packages/prompt-kit && npm run test -w apps/api && npm run test -w apps/worker",
+    "test": "npm run test -w packages/shared && npm run test -w packages/prompt-kit && npm run build -w packages/shared && npm run build -w packages/prompt-kit && npm run test -w apps/api && npm run test -w apps/worker && npm run test -w apps/web",
     "eval:notice": "node scripts/run-targeted-notice-eval.mjs",
     "smoke:model-storytelling": "npm run build -w packages/shared && npm run build -w packages/prompt-kit && npm run smoke:model-storytelling -w apps/worker",
     "smoke:openai-5.6": "node scripts/smoke-openai-5.6.mjs",

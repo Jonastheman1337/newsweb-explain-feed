@@ -88,6 +88,20 @@ export default async function NoticePage({ params, searchParams }: NoticePagePro
       }
     : undefined;
   const sourceUrl = `https://newsweb.oslobors.no/message/${notice.source.messageId}`;
+  const sourceLinks = {
+    primary: {
+      url: sourceUrl,
+      issuerName: notice.source.issuerName,
+      issuerSign: notice.source.issuerSign
+    },
+    related: ("relatedNotices" in notice ? notice.relatedNotices ?? [] : []).map(
+      (related) => ({
+        url: related.url,
+        publishedAt: related.publishedAt,
+        relation: related.relation
+      })
+    )
+  };
   const telemetryState = isProcessing
     ? "processing"
     : isSkipped
@@ -192,6 +206,7 @@ export default async function NoticePage({ params, searchParams }: NoticePagePro
                       dateline={dateline}
                       hasAttachments={notice.source.hasAttachments}
                       publicationRevision={publication?.revision}
+                      sourceLinks={sourceLinks}
                     />
                     {regenerationIndicator}
                   </>
@@ -209,6 +224,7 @@ export default async function NoticePage({ params, searchParams }: NoticePagePro
                       isFinal={publication?.isFinal}
                       dateline={dateline}
                       panelTitle="AI-generert notis"
+                      sourceLinks={sourceLinks}
                     />
                     <InstructionInput
                       messageId={notice.source.messageId}

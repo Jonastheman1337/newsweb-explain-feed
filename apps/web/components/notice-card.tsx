@@ -150,6 +150,15 @@ export function NoticeCard({ item }: NoticeCardProps) {
   }
 
   const articleBody = [item.lead, ...item.body].filter(Boolean).join("\n\n");
+  // Feed cards know the primary notice only; earlier-notice links are added
+  // on the detail page where the related notices are available.
+  const sourceLinks = {
+    primary: {
+      url: `https://newsweb.oslobors.no/message/${item.messageId}`,
+      issuerName: item.issuerName,
+      issuerSign: item.issuerSign
+    }
+  };
   const isImportant = item.importance === "viktig";
   const cardClassName = isImportant && !showSplit ? "card cardImportant" : "card";
 
@@ -175,6 +184,7 @@ export function NoticeCard({ item }: NoticeCardProps) {
             isFinal={item.isFinal}
             className={showSplit && isImportant ? "cardImportantCol" : undefined}
             dateline={<CardDateline item={item} />}
+            sourceLinks={sourceLinks}
             extraActions={
               <button
                 className={`splitButton${showSplit ? " splitButtonActive" : ""}`}
