@@ -13,7 +13,8 @@
     "eval:notice": "tsx src/scripts/targeted-notice-eval.ts",
     "eval:report-prompt": "tsx src/scripts/report-prompt-eval.ts",
     "smoke:model-storytelling": "tsx src/scripts/model-smoke-storytelling.ts",
-    "test": "vitest run"
+    "test": "vitest run",
+    "review:prod": "tsx src/scripts/prod-reprocess-review.ts"
   },
   "dependencies": {
     "@newsweb/prompt-kit": "0.1.0",
