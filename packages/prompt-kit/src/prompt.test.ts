@@ -81,6 +81,39 @@ describe("OpenAI prompt contract", () => {
     expect(createReportDeveloperPrompt()).toContain("TIDLIGERE MELDING DET VISES TIL");
   });
 
+  it("freezes the pre-v5.10.0 prompt as the exact control arm", () => {
+    const frozen = createRegularPromptVariantMessages("regular_v5_9_2_frozen", {
+      ...samplePayload,
+      relatedNotices: [
+        {
+          messageId: 1,
+          relation: "reference",
+          title: "Tidligere",
+          issuerName: "Test ASA",
+          issuerSign: "TEST",
+          publishedAt: "2026-01-10T10:00:00Z",
+          text: "Tidligere melding.",
+          textChars: 18,
+          resolvedBy: "db",
+          score: 1
+        }
+      ]
+    });
+    expect(frozen.promptVersion).toBe("v5.9.2:regular_v5_9_2_frozen");
+    expect(frozen.systemPrompt).toBe(createSystemPrompt());
+    expect(frozen.developerPrompt).not.toContain("TIDLIGERE MELDING");
+    expect(frozen.developerPrompt).not.toContain("prior_");
+    expect(frozen.userPrompt).not.toContain("TIDLIGERE MELDING");
+    expect(frozen.userPrompt).not.toContain("[prior_1]");
+    // The only developer-prompt delta in v5.10.0 is the rules block.
+    const withBlockRemoved = createDeveloperPrompt().replace(
+      /\n\nTIDLIGERE MELDING DET VISES TIL[\s\S]*?prefikses med 'prior_<messageId>:'\./,
+      ""
+    );
+    expect(frozen.developerPrompt).toBe(withBlockRemoved);
+    expect(frozen.userPrompt).toBe(createUserPrompt(samplePayload));
+  });
+
   it("renders auto-attached related notices as dated background blocks", () => {
     const relatedNotices = [
       {
@@ -273,6 +306,7 @@ describe("OpenAI prompt contract", () => {
   it("exposes regular prompt variants for offline editorial evals", () => {
     expect(regularPromptVariantIds).toEqual([
       "regular_v5_6_control",
+      "regular_v5_9_2_frozen",
       "regular_v5_related_off",
       "audience_mechanism_v1",
       "regular_v6_full",
@@ -284,6 +318,7 @@ describe("OpenAI prompt contract", () => {
         (variantId) => getRegularPromptVariantProfile(variantId).responseSchemaId
       )
     ).toEqual([
+      "rewrite_v5_title_first_v1",
       "rewrite_v5_title_first_v1",
       "rewrite_v5_title_first_v1",
       "rewrite_v5_title_first_v1",

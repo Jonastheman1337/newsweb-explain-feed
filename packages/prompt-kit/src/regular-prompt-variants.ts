@@ -10,10 +10,14 @@ import {
   createSystemPromptV6,
   createUserPromptV6
 } from "./prompt-v6.js";
-import { EDITORIAL_AUDIENCE } from "./shared-editorial.js";
+import {
+  EDITORIAL_AUDIENCE,
+  EDITORIAL_RELATED_NOTICES
+} from "./shared-editorial.js";
 
 export const regularPromptVariantIds = [
   "regular_v5_6_control",
+  "regular_v5_9_2_frozen",
   "regular_v5_related_off",
   "audience_mechanism_v1",
   "regular_v6_full",
@@ -37,7 +41,17 @@ export type RegularPromptVariantProfile = {
   responseSchemaId: RegularPromptResponseSchemaId;
   parserProfileId: "rewrite_output_zod_v1";
   validationProfileId: "regular_rewrite_validation_v1";
+  // The eval runner removes auto-attached related notices from the case
+  // payload for this arm before prompting, validating and reference-checking,
+  // so the arm sees exactly what a worker without the feature would see.
+  stripRelatedNotices?: boolean;
 };
+
+/** Payload as it looked before the related-notice feature: no attached notices. */
+export function stripRelatedNoticesFromPayload(payload: PromptPayload): PromptPayload {
+  const { relatedNotices: _relatedNotices, ...rest } = payload;
+  return rest;
+}
 
 export const regularPromptVariantProfiles: Record<
   RegularPromptVariantId,
@@ -50,15 +64,27 @@ export const regularPromptVariantProfiles: Record<
     parserProfileId: "rewrite_output_zod_v1",
     validationProfileId: "regular_rewrite_validation_v1"
   },
-  // Production builders with auto-attached related notices stripped from the
-  // payload: the control arm for the related-notice A/B on a corpus whose
-  // cases carry relatedNotices.
+  // The production prompt as it was before v5.10.0 (the related-notice
+  // change): the current builders with the related-notice rules block
+  // removed and no attached notices. Byte-identical to the v5.9.2 builders
+  // for payloads without related notices; the exact "before" arm.
+  regular_v5_9_2_frozen: {
+    variantId: "regular_v5_9_2_frozen",
+    promptVersion: "v5.9.2:regular_v5_9_2_frozen",
+    responseSchemaId: "rewrite_v5_title_first_v1",
+    parserProfileId: "rewrite_output_zod_v1",
+    validationProfileId: "regular_rewrite_validation_v1",
+    stripRelatedNotices: true
+  },
+  // Current production builders (rules block present) with auto-attached
+  // related notices stripped: isolates the attached text from the rules.
   regular_v5_related_off: {
     variantId: "regular_v5_related_off",
     promptVersion: `${PROMPT_VERSION}:regular_v5_related_off`,
     responseSchemaId: "rewrite_v5_title_first_v1",
     parserProfileId: "rewrite_output_zod_v1",
-    validationProfileId: "regular_rewrite_validation_v1"
+    validationProfileId: "regular_rewrite_validation_v1",
+    stripRelatedNotices: true
   },
   audience_mechanism_v1: {
     variantId: "audience_mechanism_v1",
@@ -429,6 +455,18 @@ function createV6Draft2UserPrompt(payload: PromptPayload): string {
   );
 }
 
+// v5.10.0 changed the developer prompt in exactly one place: the related-
+// notice rules block inserted after SUPPLERENDE MATERIALE. Removing it
+// reproduces the v5.9.2 developer prompt byte for byte (guarded by a test).
+export function createV592DeveloperPrompt(): string {
+  const current = createDeveloperPrompt();
+  const needle = `\n\n${EDITORIAL_RELATED_NOTICES}`;
+  if (!current.includes(needle)) {
+    throw new Error("regular_v5_9_2_frozen anchor missing: EDITORIAL_RELATED_NOTICES block");
+  }
+  return current.replace(needle, "");
+}
+
 export function createRegularPromptVariantMessages(
   variantId: RegularPromptVariantId,
   payload: PromptPayload
@@ -445,13 +483,22 @@ export function createRegularPromptVariantMessages(
   }
 
   if (variantId === "regular_v5_related_off") {
-    const { relatedNotices: _relatedNotices, ...withoutRelated } = payload;
     return {
       variantId,
       promptVersion: profile.promptVersion,
       systemPrompt: createSystemPrompt(),
       developerPrompt: createDeveloperPrompt(),
-      userPrompt: createUserPrompt(withoutRelated)
+      userPrompt: createUserPrompt(stripRelatedNoticesFromPayload(payload))
+    };
+  }
+
+  if (variantId === "regular_v5_9_2_frozen") {
+    return {
+      variantId,
+      promptVersion: profile.promptVersion,
+      systemPrompt: createSystemPrompt(),
+      developerPrompt: createV592DeveloperPrompt(),
+      userPrompt: createUserPrompt(stripRelatedNoticesFromPayload(payload))
     };
   }
 

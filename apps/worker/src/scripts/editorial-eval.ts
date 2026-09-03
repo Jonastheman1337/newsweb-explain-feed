@@ -11,6 +11,7 @@ import {
   isRegularPromptVariantId,
   numberDerivationRuleIds,
   regularPromptVariantIds,
+  stripRelatedNoticesFromPayload,
   unexpectedNumberDisplays,
   type PromptPayload,
   type RegularPromptVariantId
@@ -2232,11 +2233,17 @@ async function runGeneration({
 }): Promise<EvalGeneration> {
   const generationStartedAt = new Date().toISOString();
   const startedAt = Date.now();
+  const registeredProfile = getRegularPromptVariantProfile(profile.variantId);
+  // An arm that models the pre-feature worker must not see attached related
+  // notices anywhere: not in the prompt, not in validation, not in the
+  // reference check.
+  const armPayload = registeredProfile.stripRelatedNotices
+    ? stripRelatedNoticesFromPayload(evalCase.payload)
+    : evalCase.payload;
   const messages = createRegularPromptVariantMessages(
     profile.variantId,
-    evalCase.payload
+    armPayload
   );
-  const registeredProfile = getRegularPromptVariantProfile(profile.variantId);
   if (
     messages.promptVersion !== profile.promptVersion ||
     registeredProfile.responseSchemaId !== profile.responseSchemaId
@@ -2300,13 +2307,13 @@ async function runGeneration({
     const parsed = rewriteOutputSchema.parse(clampRewriteArrays(JSON.parse(raw)));
     const styleResult = sanitizeRewriteStyle(parsed);
     const output = styleResult.rewrite;
-    const validation = validateRewriteOutput(output, evalCase.payload);
-    const referencePayload = evalCase.payload.pdfSupplementText
+    const validation = validateRewriteOutput(output, armPayload);
+    const referencePayload = armPayload.pdfSupplementText
       ? {
-          ...evalCase.payload,
-          bodyText: `${evalCase.payload.bodyText}\n\n${evalCase.payload.pdfSupplementText}`
+          ...armPayload,
+          bodyText: `${armPayload.bodyText}\n\n${armPayload.pdfSupplementText}`
         }
-      : evalCase.payload;
+      : armPayload;
     const referenceResult = await runReferenceCheck({
       payload: referencePayload,
       rewrite: output,
