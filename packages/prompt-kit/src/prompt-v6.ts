@@ -4,11 +4,13 @@ import {
   formatRewriteForRevisionPrompt,
   lengthInstructionForPayload,
   maxVisibleArticleCharsForPayload,
+  relatedNoticesPromptSection,
   type PromptPayload
 } from "./prompt.js";
 import {
   EDITORIAL_IMPORTANCE,
   EDITORIAL_QUOTES,
+  EDITORIAL_RELATED_NOTICES,
   EDITORIAL_REVISION_PRIORITY,
   EDITORIAL_SOURCE_AS_DATA
 } from "./shared-editorial.js";
@@ -142,6 +144,8 @@ ${EDITORIAL_SOURCE_AS_DATA}
 
 ${EDITORIAL_SUPPLEMENTAL_MATERIALS_V6}
 
+${EDITORIAL_RELATED_NOTICES}
+
 ${MECHANISM_FIRST_RULE_V6}
 
 ${EDITORIAL_LANGUAGE_V6}
@@ -234,6 +238,7 @@ export function createUserPromptV6(payload: PromptPayload): string {
   }
 
   parts.push(...supplementalMaterialsPromptSectionV6(payload));
+  parts.push(...relatedNoticesPromptSection(payload));
 
   return parts.join("\n");
 }
@@ -286,6 +291,7 @@ export function createRevisionUserPromptV6(
         ]
       : []),
     ...supplementalMaterialsPromptSectionV6(payload),
+    ...relatedNoticesPromptSection(payload),
     "",
     "INSTRUKSJON:",
     instruction

@@ -1,7 +1,10 @@
 import {
   collectNumberTokens,
   parseNumberToken,
+  relatedNoticeRelations,
   type PromptPayload,
+  type RelatedNoticePayload,
+  type RelatedNoticeRelation,
   type SupplementalMaterialPayload
 } from "@newsweb/prompt-kit";
 import { rewriteOutputSchema, type RewriteOutput } from "@newsweb/shared";
@@ -125,6 +128,44 @@ function supplementalMaterialsFromPayload(
   return materials;
 }
 
+export function relatedNoticesFromPayload(
+  value: unknown
+): RelatedNoticePayload[] | null | undefined {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value)) return null;
+  const notices: RelatedNoticePayload[] = [];
+  for (const item of value) {
+    const record = asRecord(item);
+    if (
+      !record ||
+      typeof record.messageId !== "number" ||
+      typeof record.relation !== "string" ||
+      !(relatedNoticeRelations as readonly string[]).includes(record.relation) ||
+      typeof record.title !== "string" ||
+      typeof record.issuerName !== "string" ||
+      typeof record.issuerSign !== "string" ||
+      typeof record.publishedAt !== "string" ||
+      typeof record.text !== "string"
+    ) {
+      return null;
+    }
+    notices.push({
+      messageId: record.messageId,
+      relation: record.relation as RelatedNoticeRelation,
+      title: record.title,
+      issuerName: record.issuerName,
+      issuerSign: record.issuerSign,
+      publishedAt: record.publishedAt,
+      text: record.text,
+      textChars:
+        typeof record.textChars === "number" ? record.textChars : record.text.length,
+      resolvedBy: record.resolvedBy === "newsweb" ? "newsweb" : "db",
+      score: typeof record.score === "number" ? record.score : 0
+    });
+  }
+  return notices;
+}
+
 function basePayloadFromSource(
   sourcePayload: Record<string, unknown>
 ): PromptPayload | null {
@@ -145,6 +186,10 @@ function basePayloadFromSource(
     sourcePayload.supplementalMaterials
   );
   if (supplementalMaterials === null) {
+    return null;
+  }
+  const relatedNotices = relatedNoticesFromPayload(sourcePayload.relatedNotices);
+  if (relatedNotices === null) {
     return null;
   }
   return {
@@ -173,6 +218,7 @@ function basePayloadFromSource(
       ? { maxVisibleArticleChars: sourcePayload.maxVisibleArticleChars }
       : {}),
     ...(supplementalMaterials !== undefined ? { supplementalMaterials } : {}),
+    ...(relatedNotices !== undefined ? { relatedNotices } : {}),
     ...(typeof sourcePayload.pdfSupplementText === "string"
       ? { pdfSupplementText: sourcePayload.pdfSupplementText }
       : {}),

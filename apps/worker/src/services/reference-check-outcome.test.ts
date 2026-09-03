@@ -179,7 +179,8 @@ describe("referenceCheck persistence builders", () => {
   const gate: ReferenceCheckGateResult = {
     blocking: true,
     reason: "Reference check found unsupported high-risk factual claims.",
-    highRiskUnsupportedSentences: coverage(false).unsupportedSentences
+    highRiskUnsupportedSentences: coverage(false).unsupportedSentences,
+    priorContextViolations: []
   };
   const flow = {
     attributionCorrectionApplied: true,
@@ -261,6 +262,95 @@ describe("referenceCheck persistence builders", () => {
     const built = referenceCheckValidationJson(state, gate, flow);
     expect(built).toEqual(legacy);
     expect(JSON.stringify(built)).toBe(JSON.stringify(legacy));
+  });
+
+  it("appends prior-context keys last, and only when a run carried related notices", () => {
+    const priorContext = {
+      sourceIds: ["prior_676863"],
+      issuerAliases: ["sentia", "sntia"],
+      timeMarkers: ["i juni"]
+    };
+    const withPrior = buildCoverageReport(
+      ["Hent signerte kontrakt.", "Selskapet meldte i juni om en innledende avtale."],
+      {
+        sentences: [
+          {
+            index: 0,
+            sentence: "Hent signerte kontrakt.",
+            grounded: true,
+            interpretation: "Dekket.",
+            sourceEvidence: "signert kontrakt",
+            source: "primary"
+          },
+          {
+            index: 1,
+            sentence: "Selskapet meldte i juni om en innledende avtale.",
+            grounded: true,
+            interpretation: "Dekket av tidligere melding.",
+            sourceEvidence: "innledende avtale",
+            source: "prior"
+          }
+        ]
+      },
+      { visibleArticleSentenceCount: 2, headSentenceCount: 1, priorContext }
+    );
+
+    const json = referenceCoverageJson(withPrior) as Record<string, unknown>;
+    expect(Object.keys(json)).toEqual([
+      "totalSentences",
+      "visibleArticleSentenceCount",
+      "groundedSentences",
+      "coveragePercent",
+      "sentenceReviews",
+      "unsupportedSentences",
+      "headSentenceCount",
+      "priorContext"
+    ]);
+    const reviews = json.sentenceReviews as Array<Record<string, unknown>>;
+    expect(Object.keys(reviews[1])).toEqual([
+      "index",
+      "sentence",
+      "grounded",
+      "interpretation",
+      "sourceEvidence",
+      "source"
+    ]);
+    expect(reviews[1].source).toBe("prior");
+    expect(json.headSentenceCount).toBe(1);
+    expect(json.priorContext).toEqual(priorContext);
+
+    // The legacy fixtures carry no source/prior keys and stay untouched.
+    const legacy = referenceCoverageJson(coverage(true)) as Record<string, unknown>;
+    expect(Object.keys(legacy)).toEqual([
+      "totalSentences",
+      "visibleArticleSentenceCount",
+      "groundedSentences",
+      "coveragePercent",
+      "sentenceReviews",
+      "unsupportedSentences"
+    ]);
+    expect(
+      Object.keys((legacy.sentenceReviews as Array<Record<string, unknown>>)[0])
+    ).toEqual(["index", "sentence", "grounded", "interpretation", "sourceEvidence"]);
+
+    const priorGate: ReferenceCheckGateResult = {
+      blocking: true,
+      reason: "Reference check found prior-notice-only sentence in lead or first paragraph.",
+      highRiskUnsupportedSentences: [],
+      priorContextViolations: [{ item: withPrior.items[1], kind: "prior_in_head" }]
+    };
+    const full = referenceCheckValidationJson(populatedState(), priorGate, flow) as Record<
+      string,
+      unknown
+    >;
+    const keys = Object.keys(full);
+    expect(keys.indexOf("priorContextViolationCount")).toBe(
+      keys.indexOf("highRiskUnsupportedSentenceCount") + 1
+    );
+    expect(full.priorContextViolationCount).toBe(1);
+    expect(
+      Object.keys(referenceCheckValidationJson(populatedState(), gate, flow))
+    ).not.toContain("priorContextViolationCount");
   });
 
   it("builds the frozen reduced failure literal byte-identically", () => {

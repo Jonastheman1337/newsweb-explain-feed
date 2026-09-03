@@ -226,6 +226,42 @@ endings never matter):
   Scoring dimensions and the promotion procedure live in
   `docs/editorial-eval-rubric.md`.
 
+## Related-notice replay (prior-notice context, v5.10.0)
+
+The worker now resolves the earlier notice a Newsweb notice explicitly cites
+("Reference is made to the stock exchange announcement published on 26 May 2026
+regarding …" / "Det vises til børsmelding 23. juni 2026 …") and attaches it to
+the prompt as `relatedNotices` (`packages/prompt-kit/src/prompt.ts`), rendered
+as `[prior_<messageId>]` blocks with a Norwegian date and a computed time
+marker. Rules: `EDITORIAL_RELATED_NOTICES` (`shared-editorial.ts`). Guards in
+the reference check: a sentence grounded only in a `[prior_*]` block must not
+sit in lead/first paragraph (`prior_in_head`) and must carry a time or
+attribution marker (`prior_unmarked`, `services/context-markers.ts`); both go
+through the normal repair loop and block on residual. Kill switch:
+`RELATED_NOTICE_CONTEXT=` (empty) on the worker; code default is
+`defaultEnabledRelatedNoticeRelations` in `services/related-notices.ts`.
+
+Replay flow (owner gate before shipping a prompt/guard change in this area):
+
+```
+# 1. Cases: referencing notices from the corpus (ids listed by
+#    tmp/related-notice-check.mts, or any curated list)
+npm run eval:editorial -w apps/worker -- build-cases --message-ids @tmp/editorial-eval/related-message-ids-sample-50.txt --out tmp/editorial-eval/cases-related-50.json
+
+# 2. Attach related notices offline (Newsweb API only; --source db to prefer local rows)
+npm run eval:editorial -w apps/worker -- enrich-related-notices --cases tmp/editorial-eval/cases-related-50.json --out tmp/editorial-eval/cases-related-50-enriched.json
+#    → also writes cases-related-50-enriched-related-report.json: resolution counts + 30 samples to eyeball
+
+# 3. A/B: production prompt without vs with the attached notices
+npm run eval:editorial -w apps/worker -- run --cases tmp/editorial-eval/cases-related-50-enriched.json --control regular_v5_related_off --challenger regular_v5_6_control --out tmp/editorial-eval/run-related-50.json
+```
+
+Read from the run artifact: `priorContextViolations` per attempt, residual
+blocks, fatal grounding rate, visible chars, share of outputs with `prior_`
+spans. Acceptance: no regression in fatal grounding; challenger wins on
+referencing cases; zero residual `prior_in_head`; prior context appears as a
+clause where the reader needs it, never as a trailing background paragraph.
+
 ## Offline numeric replay (P2 Phase B)
 
 The exported corpus (gitignored JSONL under `tmp/editorial-eval/`; keep copies

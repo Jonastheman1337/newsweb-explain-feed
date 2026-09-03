@@ -10,6 +10,7 @@ import {
   EDITORIAL_NO_MARKET_COMMENTARY,
   EDITORIAL_NORWEGIAN,
   EDITORIAL_QUOTES,
+  EDITORIAL_RELATED_NOTICES,
   EDITORIAL_REVISION_PRIORITY,
   EDITORIAL_SOURCE_AS_DATA,
   EDITORIAL_SUPPLEMENTAL_MATERIALS,
@@ -17,7 +18,7 @@ import {
   EDITORIAL_WRITING_STYLE
 } from "./shared-editorial.js";
 
-export const PROMPT_VERSION = "v5.9.2";
+export const PROMPT_VERSION = "v5.10.0";
 
 export type OutputMode = "notice" | "extended_notice";
 
@@ -29,6 +30,28 @@ export type SupplementalMaterialPayload = {
   url?: string | null;
   text: string;
   textChars?: number;
+};
+
+export const relatedNoticeRelations = ["reference", "correction", "sibling"] as const;
+export type RelatedNoticeRelation = (typeof relatedNoticeRelations)[number];
+
+/**
+ * An earlier (or parallel) Newsweb notice the worker resolved automatically and
+ * attached as labeled background. Kept separate from supplementalMaterials:
+ * the prompt needs date/issuer/relation, the editorial rules differ, and the
+ * reference-check guards must not sweep editor-added materials.
+ */
+export type RelatedNoticePayload = {
+  messageId: number;
+  relation: RelatedNoticeRelation;
+  title: string;
+  issuerName: string;
+  issuerSign: string;
+  publishedAt: string;
+  text: string;
+  textChars: number;
+  resolvedBy: "db" | "newsweb";
+  score: number;
 };
 
 export type PromptPayload = {
@@ -45,10 +68,160 @@ export type PromptPayload = {
   outputMode?: OutputMode;
   maxVisibleArticleChars?: number;
   supplementalMaterials?: SupplementalMaterialPayload[];
+  relatedNotices?: RelatedNoticePayload[];
   pdfSupplementText?: string;
   pdfSupplementPageCount?: number;
   pdfSupplementAttachmentId?: number;
 };
+
+export const RELATED_NOTICE_SOURCE_ID_PREFIX = "prior_";
+
+export function relatedNoticeSourceId(messageId: number): string {
+  return `${RELATED_NOTICE_SOURCE_ID_PREFIX}${messageId}`;
+}
+
+const OSLO_TIME_ZONE = "Europe/Oslo";
+
+type OsloDateParts = {
+  year: number;
+  month: number; // 1-12
+  day: number;
+  weekday: string;
+  monthName: string;
+};
+
+function osloDateParts(iso: string): OsloDateParts | null {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+  const numeric = new Intl.DateTimeFormat("en-US", {
+    timeZone: OSLO_TIME_ZONE,
+    year: "numeric",
+    month: "numeric",
+    day: "numeric"
+  }).formatToParts(date);
+  const names = new Intl.DateTimeFormat("nb-NO", {
+    timeZone: OSLO_TIME_ZONE,
+    weekday: "long",
+    month: "long"
+  }).formatToParts(date);
+  const pick = (parts: Intl.DateTimeFormatPart[], type: string) =>
+    parts.find((part) => part.type === type)?.value ?? "";
+  return {
+    year: Number(pick(numeric, "year")),
+    month: Number(pick(numeric, "month")),
+    day: Number(pick(numeric, "day")),
+    weekday: pick(names, "weekday").toLowerCase(),
+    monthName: pick(names, "month").toLowerCase()
+  };
+}
+
+/** "tirsdag 23. juni 2026" in Europe/Oslo; falls back to the raw ISO string. */
+export function formatNorwegianNoticeDate(iso: string): string {
+  const parts = osloDateParts(iso);
+  if (!parts) {
+    return iso;
+  }
+  return `${parts.weekday} ${parts.day}. ${parts.monthName} ${parts.year}`;
+}
+
+/**
+ * The time marker the article should use for an earlier notice, computed from
+ * the two publish dates so the model never does date arithmetic: "i dag",
+ * "i går", a weekday inside the same week, "i juni" within the year,
+ * "i juni i fjor", or "i juni 2024".
+ */
+export function relatedNoticeTimeMarker(
+  relatedPublishedAt: string,
+  currentPublishedAt: string
+): { daysBefore: number; marker: string } {
+  const related = osloDateParts(relatedPublishedAt);
+  const current = osloDateParts(currentPublishedAt);
+  if (!related || !current) {
+    return { daysBefore: 0, marker: "tidligere" };
+  }
+  const relatedUtc = Date.UTC(related.year, related.month - 1, related.day);
+  const currentUtc = Date.UTC(current.year, current.month - 1, current.day);
+  const daysBefore = Math.round((currentUtc - relatedUtc) / 86_400_000);
+
+  if (daysBefore <= 0) {
+    return { daysBefore: Math.max(daysBefore, 0), marker: "i dag" };
+  }
+  if (daysBefore === 1) {
+    return { daysBefore, marker: "i går" };
+  }
+  if (daysBefore <= 6) {
+    return { daysBefore, marker: related.weekday };
+  }
+  if (related.year === current.year) {
+    return { daysBefore, marker: `i ${related.monthName}` };
+  }
+  if (related.year === current.year - 1) {
+    return { daysBefore, marker: `i ${related.monthName} i fjor` };
+  }
+  return { daysBefore, marker: `i ${related.monthName} ${related.year}` };
+}
+
+function relatedNoticeRelationLabel(relation: RelatedNoticeRelation): string {
+  switch (relation) {
+    case "correction":
+      return "korrigeres av den nye meldingen";
+    case "sibling":
+      return "parallell melding om samme hendelse";
+    default:
+      return "viser til";
+  }
+}
+
+function relatedNoticeDistanceLabel(daysBefore: number): string {
+  if (daysBefore <= 0) {
+    return "samme dag som den nye meldingen";
+  }
+  if (daysBefore === 1) {
+    return "dagen før den nye meldingen";
+  }
+  return `${daysBefore} dager før den nye meldingen`;
+}
+
+/**
+ * Data-only user-prompt block for auto-attached related notices. The rules
+ * live once in the developer prompt (EDITORIAL_RELATED_NOTICES); this block
+ * carries the labeled text plus a Norwegian date and a computed time marker.
+ */
+export function relatedNoticesPromptSection(
+  payload: Pick<PromptPayload, "relatedNotices" | "publishedAt">
+): string[] {
+  const notices = payload.relatedNotices?.filter((notice) => notice.text.trim());
+  if (!notices || notices.length === 0) {
+    return [];
+  }
+
+  const sections: string[] = [
+    "",
+    "TIDLIGERE MELDING DET VISES TIL (bakgrunn, reglene står i oppgavebeskrivelsen):"
+  ];
+  for (const notice of notices) {
+    const { daysBefore, marker } = relatedNoticeTimeMarker(
+      notice.publishedAt,
+      payload.publishedAt
+    );
+    sections.push(
+      "",
+      `[${relatedNoticeSourceId(notice.messageId)}]`,
+      `relation: ${relatedNoticeRelationLabel(notice.relation)}`,
+      `publisert: ${formatNorwegianNoticeDate(notice.publishedAt)} (${relatedNoticeDistanceLabel(daysBefore)})`,
+      `anbefalt tidsmarkør: ${marker}`,
+      `utsteder: ${notice.issuerName} (${notice.issuerSign})`,
+      `title: ${notice.title}`,
+      `textChars: ${notice.textChars}`,
+      "<<<",
+      notice.text,
+      ">>>"
+    );
+  }
+  return sections;
+}
 
 export function maxVisibleArticleCharsForOutputMode(mode?: OutputMode): number {
   return mode === "extended_notice" ? 1800 : 1000;
@@ -181,6 +354,8 @@ ${EDITORIAL_SOURCE_AS_DATA}
 
 ${EDITORIAL_SUPPLEMENTAL_MATERIALS}
 
+${EDITORIAL_RELATED_NOTICES}
+
 ${MECHANISM_FIRST_RULE}
 
 ${EDITORIAL_LANGUAGE}
@@ -285,6 +460,7 @@ export function createUserPrompt(payload: PromptPayload): string {
   }
 
   parts.push(...supplementalMaterialsPromptSection(payload));
+  parts.push(...relatedNoticesPromptSection(payload));
 
   return parts.join("\n");
 }
@@ -369,6 +545,7 @@ export function createRevisionUserPrompt(
         ]
       : []),
     ...supplementalMaterialsPromptSection(payload),
+    ...relatedNoticesPromptSection(payload),
     "",
     "INSTRUKSJON:",
     instruction

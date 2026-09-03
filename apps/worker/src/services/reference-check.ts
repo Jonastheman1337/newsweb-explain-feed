@@ -1,6 +1,12 @@
-import type { PromptPayload } from "@newsweb/prompt-kit";
+import {
+  formatNorwegianNoticeDate,
+  relatedNoticeSourceId,
+  relatedNoticeTimeMarker,
+  type PromptPayload
+} from "@newsweb/prompt-kit";
 import type { RewriteOutput } from "@newsweb/shared";
 import { z } from "zod";
+import { hasContextMarker, issuerAliases } from "./context-markers.js";
 
 const sentenceBoundaryRegex = /(?<=[.!?])\s+/;
 const protectedPeriod = "<NEWSWEB_PERIOD>";
@@ -13,12 +19,24 @@ const dateWithMonthRegex = new RegExp(
 const abbreviationRegex =
   /\b(ca|cirka|kl|nr|mill|mrd|bln|bn|dr|prof|st|vs)\.\s+/gi;
 
+// Which reference block grounded a sentence. "primary" covers the new notice,
+// its PDF text and editor-added [material_*] blocks; "prior" means the
+// evidence exists only in an auto-attached earlier notice ([prior_*]).
+export const referenceCheckSourceValues = [
+  "primary",
+  "prior",
+  "both",
+  "none"
+] as const;
+export type ReferenceCheckSource = (typeof referenceCheckSourceValues)[number];
+
 export const referenceCheckSentenceSchema = z.object({
   index: z.number().int().min(0),
   sentence: z.string().min(1).max(700),
   grounded: z.boolean(),
   interpretation: z.string().min(1).max(700),
-  sourceEvidence: z.string().max(700)
+  sourceEvidence: z.string().max(700),
+  source: z.enum(referenceCheckSourceValues).optional()
 });
 
 export const referenceCheckResultSchema = z.object({
@@ -33,6 +51,16 @@ export type ReferenceCoverageItem = {
   grounded: boolean;
   interpretation: string;
   sourceEvidence: string;
+  source?: ReferenceCheckSource;
+};
+
+// Present only when the payload carried auto-attached related notices. Lives
+// on the report (not a gate option) because the gate is evaluated from three
+// call sites, including the persisted outcome, which has no payload access.
+export type ReferencePriorContext = {
+  sourceIds: string[];
+  issuerAliases: string[];
+  timeMarkers: string[];
 };
 
 export type ReferenceCoverageReport = {
@@ -42,12 +70,25 @@ export type ReferenceCoverageReport = {
   coveragePercent: number;
   items: ReferenceCoverageItem[];
   unsupportedSentences: ReferenceCoverageItem[];
+  // Sentences in lead + first body paragraph (index < headSentenceCount).
+  headSentenceCount?: number;
+  priorContext?: ReferencePriorContext;
+};
+
+export type ReferencePriorContextViolationKind =
+  | "prior_in_head"
+  | "prior_unmarked";
+
+export type ReferencePriorContextViolation = {
+  item: ReferenceCoverageItem;
+  kind: ReferencePriorContextViolationKind;
 };
 
 export type ReferenceCheckGateResult = {
   blocking: boolean;
   reason: string | null;
   highRiskUnsupportedSentences: ReferenceCoverageItem[];
+  priorContextViolations: ReferencePriorContextViolation[];
 };
 
 export type ReferenceCheckPrompt = {
@@ -56,6 +97,8 @@ export type ReferenceCheckPrompt = {
   userPrompt: string;
   draftSentences: string[];
   visibleDraftSentences: string[];
+  headDraftSentenceCount: number;
+  priorContext: ReferencePriorContext | null;
 };
 
 const HIGH_RISK_UNSUPPORTED_PATTERNS = [
@@ -93,14 +136,16 @@ export const referenceCheckJsonSchema = {
           sentence: { type: "string", minLength: 1, maxLength: 700 },
           grounded: { type: "boolean" },
           interpretation: { type: "string", minLength: 1, maxLength: 700 },
-          sourceEvidence: { type: "string", maxLength: 700 }
+          sourceEvidence: { type: "string", maxLength: 700 },
+          source: { type: "string", enum: [...referenceCheckSourceValues] }
         },
         required: [
           "index",
           "sentence",
           "grounded",
           "interpretation",
-          "sourceEvidence"
+          "sourceEvidence",
+          "source"
         ]
       }
     }
@@ -250,20 +295,65 @@ export function emptyReferenceCoverageReport(): ReferenceCoverageReport {
   };
 }
 
+export function collectHeadDraftSentenceCount(rewrite: RewriteOutput): number {
+  return (
+    splitIntoSentences(rewrite.lead).length +
+    splitIntoSentences(rewrite.body[0] ?? "").length
+  );
+}
+
+export function buildReferencePriorContext(
+  payload: Pick<PromptPayload, "relatedNotices" | "publishedAt">
+): ReferencePriorContext | null {
+  const notices = payload.relatedNotices?.filter((notice) => notice.text.trim());
+  if (!notices || notices.length === 0) {
+    return null;
+  }
+  const aliases = new Set<string>();
+  const timeMarkers = new Set<string>();
+  for (const notice of notices) {
+    for (const alias of issuerAliases(notice.issuerName, notice.issuerSign)) {
+      aliases.add(alias);
+    }
+    timeMarkers.add(
+      relatedNoticeTimeMarker(notice.publishedAt, payload.publishedAt).marker
+    );
+  }
+  return {
+    sourceIds: notices.map((notice) => relatedNoticeSourceId(notice.messageId)),
+    issuerAliases: [...aliases],
+    timeMarkers: [...timeMarkers]
+  };
+}
+
 export function buildReferenceCheckPrompt(
   payload: PromptPayload,
   draftRewrite: RewriteOutput
 ): ReferenceCheckPrompt {
   const visibleDraftSentences = collectVisibleDraftSentences(draftRewrite);
   const draftSentences = collectDraftSentences(draftRewrite);
+  const headDraftSentenceCount = collectHeadDraftSentenceCount(draftRewrite);
+  const priorContext = buildReferencePriorContext(payload);
+  const relatedNotices = priorContext
+    ? (payload.relatedNotices ?? []).filter((notice) => notice.text.trim())
+    : [];
   const referenceText = [
-    payload.bodyText || "ikke oppgitt",
+    [priorContext ? "[primary]" : "", payload.bodyText || "ikke oppgitt"]
+      .filter(Boolean)
+      .join("\n"),
     payload.pdfSupplementText ?? "",
     ...(payload.supplementalMaterials ?? []).map((material) =>
       [
         `[${material.sourceId}] ${material.title}`,
         material.url ?? "",
         material.text
+      ].join("\n")
+    ),
+    ...relatedNotices.map((notice) =>
+      [
+        `[${relatedNoticeSourceId(notice.messageId)}] ${notice.title}`,
+        `publisert: ${formatNorwegianNoticeDate(notice.publishedAt)}`,
+        notice.text
       ].join("\n")
     )
   ].filter((part) => part.trim()).join("\n\n");
@@ -272,6 +362,8 @@ export function buildReferenceCheckPrompt(
   const developerPrompt = [
     "Vurder hver setning i utkastet separat.",
     "Sett grounded=true kun hvis setningen har eksplisitt dekning i referanseteksten.",
+    "Referanseteksten kan være delt i blokker: [primary] er dagens melding med eventuell PDF-tekst, [material_*] er redaktørens tilleggsmateriale, [prior_*] er tidligere meldinger som bare er bakgrunn. Uten blokkmerker er hele teksten dagens melding.",
+    "source: 'primary' hvis dekningen finnes i dagens melding eller [material_*]; 'prior' hvis dekningen bare finnes i en [prior_*]-blokk; 'both' hvis begge deler dekker setningen; 'none' hvis ingenting dekker den.",
     "En naturlig norsk oversettelse eller gjengivelse av en formulering som står på engelsk i referanseteksten, regnes som eksplisitt dekning når mening, styrkegrad, forbehold og avsender er uendret. Dette gjelder også sitater med sitatstrek eller «...».",
     "At utkastet omtaler kilden som børsmelding eller melding, er kildeattribusjon og skal ikke gi grounded=false.",
     "Enkle regnestykker er dekket hvis alle inputtallene finnes eksplisitt i referanseteksten, for eksempel antall aksjer multiplisert med pris per aksje.",
@@ -302,18 +394,24 @@ export function buildReferenceCheckPrompt(
     developerPrompt,
     userPrompt,
     draftSentences,
-    visibleDraftSentences
+    visibleDraftSentences,
+    headDraftSentenceCount,
+    priorContext
   };
 }
 
 export function buildCoverageReport(
   draftSentences: string[],
   raw: ReferenceCheckResult,
-  options?: { visibleArticleSentenceCount?: number }
+  options?: {
+    visibleArticleSentenceCount?: number;
+    headSentenceCount?: number;
+    priorContext?: ReferencePriorContext | null;
+  }
 ): ReferenceCoverageReport {
   const byIndex = new Map(raw.sentences.map((item) => [item.index, item]));
 
-  const items = draftSentences.map((sentence, index) => {
+  const items = draftSentences.map((sentence, index): ReferenceCoverageItem => {
     const source = byIndex.get(index);
     if (!source) {
       return {
@@ -321,7 +419,8 @@ export function buildCoverageReport(
         sentence,
         grounded: false,
         interpretation: "Ingen referansesjekk ble returnert for setningen.",
-        sourceEvidence: ""
+        sourceEvidence: "",
+        ...(options?.priorContext ? { source: "none" as const } : {})
       };
     }
 
@@ -330,7 +429,8 @@ export function buildCoverageReport(
       sentence,
       grounded: source.grounded,
       interpretation: source.interpretation.trim(),
-      sourceEvidence: source.sourceEvidence.trim()
+      sourceEvidence: source.sourceEvidence.trim(),
+      ...(source.source !== undefined ? { source: source.source } : {})
     };
   });
 
@@ -349,13 +449,56 @@ export function buildCoverageReport(
     groundedSentences,
     coveragePercent,
     items,
-    unsupportedSentences
+    unsupportedSentences,
+    ...(options?.headSentenceCount !== undefined
+      ? { headSentenceCount: options.headSentenceCount }
+      : {}),
+    ...(options?.priorContext ? { priorContext: options.priorContext } : {})
   };
 }
 
-export function assessReferenceCheckGate(
+// Prior-context guards. Only active when the report carries priorContext
+// (the payload had auto-attached related notices), and only over sentences
+// the checker grounded exclusively in a [prior_*] block. Ungrounded sentences
+// stay with the unsupported-fact rules; "both"-grounded sentences are fine.
+export function collectPriorContextViolations(
+  report: ReferenceCoverageReport
+): ReferencePriorContextViolation[] {
+  const priorContext = report.priorContext;
+  if (!priorContext || priorContext.sourceIds.length === 0) {
+    return [];
+  }
+  const headSentenceCount = report.headSentenceCount ?? 0;
+  const violations: ReferencePriorContextViolation[] = [];
+  for (const item of report.items) {
+    if (!item.grounded || item.source !== "prior") {
+      continue;
+    }
+    if (item.index < headSentenceCount) {
+      violations.push({ item, kind: "prior_in_head" });
+      continue;
+    }
+    if (
+      item.index < report.visibleArticleSentenceCount &&
+      !hasContextMarker(item.sentence, priorContext.issuerAliases)
+    ) {
+      violations.push({ item, kind: "prior_unmarked" });
+    }
+  }
+  return violations;
+}
+
+function priorContextGateReason(
+  violations: ReferencePriorContextViolation[]
+): string {
+  return violations.some((violation) => violation.kind === "prior_in_head")
+    ? "Reference check found prior-notice-only sentence in lead or first paragraph."
+    : "Reference check found prior-notice-only sentence without time or attribution marker.";
+}
+
+function assessUnsupportedGate(
   report: ReferenceCoverageReport | null
-): ReferenceCheckGateResult {
+): Omit<ReferenceCheckGateResult, "priorContextViolations"> {
   if (!report || report.unsupportedSentences.length === 0) {
     return {
       blocking: false,
@@ -412,11 +555,66 @@ export function assessReferenceCheckGate(
   };
 }
 
+export function assessReferenceCheckGate(
+  report: ReferenceCoverageReport | null
+): ReferenceCheckGateResult {
+  const base = assessUnsupportedGate(report);
+  const priorContextViolations = report
+    ? collectPriorContextViolations(report)
+    : [];
+  if (priorContextViolations.length === 0) {
+    return { ...base, priorContextViolations: [] };
+  }
+  return {
+    blocking: true,
+    reason: base.blocking ? base.reason : priorContextGateReason(priorContextViolations),
+    highRiskUnsupportedSentences: base.highRiskUnsupportedSentences,
+    priorContextViolations
+  };
+}
+
+function priorContextCorrectionLines(
+  violation: ReferencePriorContextViolation,
+  priorContext: ReferencePriorContext | undefined
+): string {
+  const sourceIds = priorContext?.sourceIds.join(", ") || "prior";
+  const markerExamples = [
+    ...(priorContext?.timeMarkers ?? []).map((marker) => `'meldte ${marker}'`),
+    "'opplyste selskapet i juni'",
+    "'da emisjonen ble varslet torsdag'",
+    "'ifølge den tidligere meldingen'"
+  ]
+    .filter((example, index, all) => all.indexOf(example) === index)
+    .slice(0, 4)
+    .join(", ");
+  const problem =
+    violation.kind === "prior_in_head"
+      ? `Problem: Setningen står i lead eller første avsnitt, men bygger bare på den tidligere meldingen [${sourceIds}]. Nyheten skal stå først.`
+      : `Problem: Setningen bygger bare på den tidligere meldingen [${sourceIds}], men mangler tid eller avsender.`;
+  const requirement =
+    violation.kind === "prior_in_head"
+      ? "Krav: Flytt bakgrunnen lenger ned, eller bygg setningen om så det nye fra dagens melding bærer den. Stryk den hvis den ikke trengs. Ikke legg til nye fakta."
+      : `Krav: Legg til tid eller avsender uten å endre fakta, for eksempel ${markerExamples}.`;
+  return [
+    `Setning ${violation.item.index + 1}: ${violation.item.sentence}`,
+    problem,
+    requirement
+  ].join("\n");
+}
+
 export function buildCorrectionInstruction(
   report: ReferenceCoverageReport,
-  options: { attempt?: number; maxAttempts?: number } = {}
+  options: {
+    attempt?: number;
+    maxAttempts?: number;
+    gate?: ReferenceCheckGateResult;
+  } = {}
 ): string | null {
-  if (report.unsupportedSentences.length === 0) {
+  const priorContextViolations = options.gate?.priorContextViolations ?? [];
+  if (
+    report.unsupportedSentences.length === 0 &&
+    priorContextViolations.length === 0
+  ) {
     return null;
   }
 
@@ -428,6 +626,9 @@ export function buildCorrectionInstruction(
       `Hva som finnes i kilden: ${evidence}`
     ].join("\n");
   });
+  const priorContextList = priorContextViolations.map((violation) =>
+    priorContextCorrectionLines(violation, report.priorContext)
+  );
 
   const attempt =
     options.attempt && options.maxAttempts
@@ -455,9 +656,16 @@ export function buildCorrectionInstruction(
           "Dette er siste reparasjonsforsøk: stryk udekkede påstander i stedet for å omformulere dem. Sitater og personuttalelser som har dekning i kilden, skal beholdes."
         ]
       : []),
-    "",
-    "Setninger uten dekning i forrige utkast:",
-    unsupportedList.join("\n\n")
+    ...(unsupportedList.length > 0
+      ? ["", "Setninger uten dekning i forrige utkast:", unsupportedList.join("\n\n")]
+      : []),
+    ...(priorContextList.length > 0
+      ? [
+          "",
+          "Setninger med kontekst fra tidligere melding som må rettes:",
+          priorContextList.join("\n\n")
+        ]
+      : [])
   ].join("\n");
 }
 
@@ -683,7 +891,8 @@ export function applyReferenceCheckEnforcement(
   const vacuousGate: ReferenceCheckGateResult = {
     blocking: false,
     reason: null,
-    highRiskUnsupportedSentences: []
+    highRiskUnsupportedSentences: [],
+    priorContextViolations: []
   };
   // Stale evidence never blocks even when promoted — the verdict describes a
   // superseded draft; those runs fall through to the retry arm instead.

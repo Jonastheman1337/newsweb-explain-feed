@@ -3,6 +3,7 @@ import {
   formatRewriteForRevisionPrompt,
   lengthInstructionForPayload,
   maxVisibleArticleCharsForPayload,
+  relatedNoticesPromptSection,
   supplementalMaterialsPromptSection,
   type PromptPayload
 } from "./prompt.js";
@@ -15,6 +16,7 @@ import {
   EDITORIAL_NO_MARKET_COMMENTARY,
   EDITORIAL_NORWEGIAN,
   EDITORIAL_QUOTES,
+  EDITORIAL_RELATED_NOTICES,
   EDITORIAL_REVISION_PRIORITY,
   EDITORIAL_SOURCE_AS_DATA,
   EDITORIAL_SUPPLEMENTAL_MATERIALS,
@@ -108,6 +110,8 @@ ${EDITORIAL_AUDIENCE}
 ${EDITORIAL_SOURCE_AS_DATA}
 
 ${EDITORIAL_SUPPLEMENTAL_MATERIALS}
+
+${EDITORIAL_RELATED_NOTICES}
 
 HVILKE TALL ER VIKTIGE?
 Bruk redaksjonelt skjonn — plukk ut det som er mest nyhetsverdig:
@@ -272,6 +276,7 @@ export function createReportUserPrompt(payload: ReportPromptPayload): string {
   }
 
   parts.push(...supplementalMaterialsPromptSection(payload));
+  parts.push(...relatedNoticesPromptSection(payload));
 
   return parts.join("\n");
 }

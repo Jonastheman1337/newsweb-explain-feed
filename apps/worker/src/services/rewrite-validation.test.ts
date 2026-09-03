@@ -217,6 +217,68 @@ describe("validateRewriteOutput", () => {
     );
   });
 
+  it("accepts figures from an attached earlier notice in the body but not in the title", () => {
+    const relatedNotices = [
+      {
+        messageId: 676863,
+        relation: "reference" as const,
+        title: "HENT inngår innledende avtale med Nscale",
+        issuerName: "Sentia ASA",
+        issuerSign: "SNTIA",
+        publishedAt: "2026-06-23T14:25:02.930Z",
+        text: "HENT har inngått en innledende avtale om to datasenter med samlet kapasitet på 75 MW.",
+        textChars: 88,
+        resolvedBy: "db" as const,
+        score: 0.6
+      }
+    ];
+    const payload = createPayload({
+      bodyText: "HENT har signert kontrakt med Nscale om to bygg i Narvik. Arbeidet skal være ferdig i 2027.",
+      relatedNotices
+    });
+
+    const bodyUse = validateRewriteOutput(
+      createRewrite({
+        title: "Hent signerte Nscale-kontrakt",
+        lead: "Hent har signert kontrakt med Nscale om to bygg i Narvik, opplyser selskapet.",
+        body: ["Selskapet meldte i juni om en innledende avtale om 75 MW.", "Arbeidet skal være ferdig i 2027."],
+        source_spans: ["primary: signert kontrakt", "prior_676863: samlet kapasitet på 75 MW"]
+      }),
+      payload
+    );
+    expect(bodyUse.issues.some((issue) => issue.code === "UNEXPECTED_NUMBERS")).toBe(false);
+    expect(bodyUse.issues.some((issue) => issue.code === "SECONDARY_ONLY_TITLE_NUMBER")).toBe(false);
+
+    const titleUse = validateRewriteOutput(
+      createRewrite({
+        title: "Hent signerte kontrakt om 75 MW",
+        lead: "Hent har signert kontrakt med Nscale om to bygg i Narvik, opplyser selskapet.",
+        body: ["Arbeidet skal være ferdig i 2027."],
+        source_spans: ["primary: signert kontrakt"]
+      }),
+      payload
+    );
+    expect(titleUse.issues).toContainEqual({
+      code: "SECONDARY_ONLY_TITLE_NUMBER",
+      severity: "warning",
+      message: "Title uses numbers found only in an earlier notice: 75."
+    });
+
+    // Without related notices the same figure is simply unexpected, and the
+    // title guard stays silent.
+    const noRelated = validateRewriteOutput(
+      createRewrite({
+        title: "Hent signerte kontrakt om 75 MW",
+        lead: "Hent har signert kontrakt med Nscale om to bygg i Narvik, opplyser selskapet.",
+        body: ["Arbeidet skal være ferdig i 2027."],
+        source_spans: ["primary: signert kontrakt"]
+      }),
+      createPayload({ bodyText: payload.bodyText })
+    );
+    expect(noRelated.issues.some((issue) => issue.code === "SECONDARY_ONLY_TITLE_NUMBER")).toBe(false);
+    expect(noRelated.issues.some((issue) => issue.code === "UNEXPECTED_NUMBERS")).toBe(true);
+  });
+
   it("collects quote telemetry for source-close person attribution", () => {
     const payload = createPayload({
       bodyText:

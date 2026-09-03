@@ -3,7 +3,9 @@ import { config as loadDotEnv } from "dotenv";
 import { z } from "zod";
 import {
   numberDerivationRuleIds,
-  type NumberDerivationRuleId
+  relatedNoticeRelations,
+  type NumberDerivationRuleId,
+  type RelatedNoticeRelation
 } from "@newsweb/prompt-kit";
 import {
   triageClassIds,
@@ -104,6 +106,36 @@ const triageSkipClassesEnvSchema = z
   })
   .optional();
 
+// Emergency kill-switch override for auto-attached related notices (the
+// earlier notice a Newsweb notice explicitly cites). The code default lives
+// in defaultEnabledRelatedNoticeRelations (services/related-notices.ts).
+// Same semantics as TRIAGE_SKIP_CLASSES: UNSET = code default; SET — even
+// the empty string — is the exact enabled relation set ("" = feature off,
+// "reference,sibling" = both resolvers on).
+const relatedNoticeContextEnvSchema = z
+  .string()
+  .transform((value, ctx) => {
+    const entries = [
+      ...new Set(
+        value
+          .split(",")
+          .map((entry) => entry.trim())
+          .filter((entry) => entry.length > 0)
+      )
+    ];
+    const known = new Set<string>(relatedNoticeRelations);
+    const unknown = entries.filter((entry) => !known.has(entry));
+    if (unknown.length > 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Unknown related notice relation(s): ${unknown.join(", ")} (known: ${relatedNoticeRelations.join(", ")})`
+      });
+      return z.NEVER;
+    }
+    return entries as RelatedNoticeRelation[];
+  })
+  .optional();
+
 const referenceCheckEnforcementFlags = [
   "block_on_residual_unsupported",
   "retry_on_unavailable"
@@ -177,6 +209,7 @@ const configSchema = z
     NUMERIC_ACCEPTANCE_RULES: numericAcceptanceRulesEnvSchema,
     REFERENCE_CHECK_ENFORCEMENT: referenceCheckEnforcementEnvSchema,
     TRIAGE_SKIP_CLASSES: triageSkipClassesEnvSchema,
+    RELATED_NOTICE_CONTEXT: relatedNoticeContextEnvSchema,
     NEWSWEB_POLLING_ENABLED: booleanEnvSchema,
     POLL_INTERVAL_MS: z.coerce.number().int().min(5000).default(5000),
     LATEST_BOOTSTRAP_COUNT: z.coerce.number().int().min(0).max(50).default(30)

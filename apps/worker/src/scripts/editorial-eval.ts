@@ -89,6 +89,7 @@ import {
 import {
   findDigitVariantInSource,
   hiddenDraftRewriteOutputFromRow,
+  relatedNoticesFromPayload,
   replayValidationPayloadFromRow,
   storedRepairInitialUnexpectedNumbers,
   storedRewriteOutputFromRow,
@@ -228,6 +229,8 @@ async function main(): Promise<void> {
     await summarizeCommand(parsed.options);
   } else if (parsed.command === "lock-cases") {
     await lockCasesCommand(parsed.options);
+  } else if (parsed.command === "enrich-related-notices") {
+    await enrichRelatedNoticesCommand(parsed.options);
   } else if (parsed.command === "build-safety-fixtures") {
     await buildSafetyFixturesCommand(parsed.options, rootDir);
   } else if (parsed.command === "replay-numbers") {
@@ -573,6 +576,136 @@ async function lockCasesCommand(options: Map<string, string>): Promise<void> {
   await writeNewJsonArtifact(outPath, output);
   console.log(
     `Locked ${cases.length} cases from ${casesPath} as ${corpus.corpusId} at ${outPath}`
+  );
+}
+
+// Runs the related-notice resolver over an existing cases file and writes a
+// new cases file whose payloads carry relatedNotices (the challenger input),
+// plus a resolution report for the owner to eyeball before the run. Default
+// source is Newsweb only, so it works without the production database; pass
+// --source db to prefer local source_notices rows.
+async function enrichRelatedNoticesCommand(
+  options: Map<string, string>
+): Promise<void> {
+  const casesPath = requiredOption(options, "cases");
+  const outPath = requiredOption(options, "out");
+  const reportPath =
+    options.get("report") ?? outPath.replace(/\.json$/i, "") + "-related-report.json";
+  const source = options.get("source") ?? "newsweb";
+  const casesFile = await readJson<CasesFile>(casesPath);
+  const {
+    createNewswebRelatedNoticeClient,
+    createPrismaRelatedNoticeStore,
+    defaultEnabledRelatedNoticeRelations,
+    emptyRelatedNoticeStore,
+    resolveRelatedNotices
+  } = await import("../services/related-notices.js");
+  const enabledRelations = options.has("relations")
+    ? options
+        .get("relations")!
+        .split(",")
+        .map((entry) => entry.trim())
+        .filter((entry): entry is "reference" | "correction" | "sibling" =>
+          entry === "reference" || entry === "correction" || entry === "sibling"
+        )
+    : [...defaultEnabledRelatedNoticeRelations];
+  const store =
+    source === "db"
+      ? createPrismaRelatedNoticeStore((await import("@newsweb/shared/db")).prisma)
+      : emptyRelatedNoticeStore;
+  const newsweb = createNewswebRelatedNoticeClient();
+
+  const samples: Array<Record<string, unknown>> = [];
+  const counts = {
+    total: 0,
+    withReferences: 0,
+    attached: 0,
+    resolvedNotices: 0,
+    ambiguous: 0,
+    noCandidate: 0,
+    fetchFailed: 0
+  };
+  const cases: EvalCase[] = [];
+  for (const item of casesFile.cases) {
+    counts.total += 1;
+    const resolution = await resolveRelatedNotices(
+      {
+        messageId: item.messageId,
+        issuerName: item.payload.issuerName,
+        issuerSign: item.payload.issuerSign,
+        publishedAt: new Date(item.payload.publishedAt),
+        bodyText: item.payload.bodyText,
+        rawMessageJson: null
+      },
+      { enabledRelations, store, newsweb }
+    );
+    const { telemetry, related } = resolution;
+    if (telemetry.references.length > 0) counts.withReferences += 1;
+    if (related.length > 0) counts.attached += 1;
+    counts.resolvedNotices += related.length;
+    for (const entry of telemetry.unresolved) {
+      if (entry.reason === "ambiguous") counts.ambiguous += 1;
+      else if (entry.reason === "fetch-failed") counts.fetchFailed += 1;
+      else counts.noCandidate += 1;
+    }
+    const { relatedNotices: _previous, ...payloadWithoutRelated } = item.payload;
+    const payload: PromptPayload =
+      related.length > 0
+        ? { ...payloadWithoutRelated, relatedNotices: related }
+        : payloadWithoutRelated;
+    const difficultyTags = [
+      ...item.difficultyTags.filter(
+        (tag) => tag !== "related_notice_attached" && tag !== "references_prior_notice"
+      ),
+      ...(telemetry.references.length > 0 ? ["references_prior_notice"] : []),
+      ...(related.length > 0 ? ["related_notice_attached"] : [])
+    ];
+    cases.push({
+      ...item,
+      difficultyTags,
+      payload,
+      sourceSha256: sourcePayloadSha256(payload)
+    });
+    if (telemetry.references.length > 0 && samples.length < 30) {
+      samples.push({
+        messageId: item.messageId,
+        sourceTitle: item.sourceTitle,
+        publishedAt: item.payload.publishedAt,
+        references: telemetry.references,
+        resolved: telemetry.resolved,
+        unresolved: telemetry.unresolved
+      });
+    }
+    console.log(
+      `${item.messageId}: refs=${telemetry.references.length} attached=${related.length}${
+        telemetry.unresolved.length > 0
+          ? ` unresolved=${telemetry.unresolved.map((entry) => entry.reason).join(",")}`
+          : ""
+      }`
+    );
+  }
+
+  const corpus = createCorpusIdentity(cases, outPath);
+  const output: CasesFile = {
+    ...casesFile,
+    schemaVersion: 2,
+    totalCases: cases.length,
+    corpusId: corpus.corpusId,
+    corpusSha256: corpus.corpusSha256,
+    cases
+  };
+  await writeNewJsonArtifact(outPath, output);
+  await writeNewJsonArtifact(reportPath, {
+    createdAt: new Date().toISOString(),
+    casesPath,
+    outPath,
+    source,
+    enabledRelations,
+    counts,
+    samples
+  });
+  console.log(
+    `Enriched ${cases.length} cases (${counts.attached} with related notices, ${counts.ambiguous} ambiguous, ${counts.noCandidate} without candidate, ${counts.fetchFailed} fetch failures) → ${outPath}; report ${reportPath}`
   );
 }
 
@@ -2311,7 +2444,9 @@ async function runReferenceCheck({
   const parsed = referenceCheckResultSchema.parse(JSON.parse(raw));
   return {
     coverage: buildCoverageReport(referencePrompt.draftSentences, parsed, {
-      visibleArticleSentenceCount: referencePrompt.visibleDraftSentences.length
+      visibleArticleSentenceCount: referencePrompt.visibleDraftSentences.length,
+      headSentenceCount: referencePrompt.headDraftSentenceCount,
+      priorContext: referencePrompt.priorContext
     }),
     promptChars,
     modelCall: evalModelCall(
@@ -2478,6 +2613,12 @@ function extractRegularPayload(inputJson: Prisma.JsonValue | null): PromptPayloa
     typeof sourcePayload.sourceBodyChars === "number"
       ? sourcePayload.sourceBodyChars
       : sourcePayload.bodyText.length;
+  // Auto-attached related notices must survive replay so the challenger arm
+  // sees exactly what production saw; a malformed list drops the row.
+  const relatedNotices = relatedNoticesFromPayload(sourcePayload.relatedNotices);
+  if (relatedNotices === null) {
+    return null;
+  }
   return {
     messageId: sourcePayload.messageId,
     title: sourcePayload.title,
@@ -2493,6 +2634,7 @@ function extractRegularPayload(inputJson: Prisma.JsonValue | null): PromptPayloa
     bodyText: sourcePayload.bodyText,
     hasAttachments: sourcePayload.hasAttachments,
     sourceBodyChars,
+    ...(relatedNotices ? { relatedNotices } : {}),
     ...(typeof sourcePayload.pdfSupplementText === "string"
       ? { pdfSupplementText: sourcePayload.pdfSupplementText }
       : {}),
@@ -3253,6 +3395,7 @@ function printUsage(): void {
     "  npm run eval:editorial -w apps/worker -- summarize --run tmp/editorial-eval/run.json --reviews tmp/editorial-eval/reviews.json --out tmp/editorial-eval/summary.json",
     "  npm run eval:editorial -w apps/worker -- build-cases --message-ids 679311,677571 --out tmp/editorial-eval/curated.json  (curated corpus; also accepts @path/to/ids.txt)",
     "  npm run eval:editorial -w apps/worker -- lock-cases --cases tmp/editorial-eval/cases-v6-50.json --out apps/worker/src/fixtures/editorial-eval/editorial/cases-locked-2026-08.json",
+    "  npm run eval:editorial -w apps/worker -- enrich-related-notices --cases tmp/editorial-eval/cases-related-50.json --out tmp/editorial-eval/cases-related-50-enriched.json [--source newsweb|db] [--relations reference,correction]",
     "  npm run eval:editorial -w apps/worker -- build-safety-fixtures [--from YYYY-MM-DD] [--to YYYY-MM-DD] [--numeric-limit 40] [--not-news-ids IDS] [--false-skip-ids IDS] [--legacy-run PATH] [--out DIR]",
     "  (marker_leak/loaded_language seed from the legacy A/B artifact --legacy-run, default tmp/editorial-eval/run-v6draft-50.json; the rest from the generation-log DB)",
     "  npm run eval:editorial -w apps/worker -- build-safety-fixtures --update-expected  (offline; re-replays validators and rewrites expected blocks)",

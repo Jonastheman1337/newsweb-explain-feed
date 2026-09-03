@@ -454,6 +454,28 @@ export function buildValidationSourceText(payload: PromptPayload): string {
   ].join("\n");
 }
 
+/** Text of auto-attached related notices only (empty when none). */
+export function buildRelatedNoticesSourceText(payload: PromptPayload): string {
+  return (payload.relatedNotices ?? [])
+    .map((notice) =>
+      [`[prior_${notice.messageId}] ${notice.title}`, notice.text].join("\n")
+    )
+    .join("\n");
+}
+
+/**
+ * Source text for the numeric and currency gates only. Related notices are
+ * legitimate sources for figures the article labels as background, but they
+ * must stay out of buildValidationSourceText: that string also drives quote
+ * opportunities, right-of-reply and revenue/result checks, which would then
+ * demand content from the old notice.
+ */
+export function buildNumericValidationSourceText(payload: PromptPayload): string {
+  return [buildValidationSourceText(payload), buildRelatedNoticesSourceText(payload)]
+    .filter(Boolean)
+    .join("\n");
+}
+
 function hasAnyPattern(text: string, patterns: RegExp[]): boolean {
   return patterns.some((pattern) => pattern.test(text));
 }
@@ -766,6 +788,7 @@ export function validateRewriteOutput(
 } {
   const issues: RewriteValidationIssue[] = [];
   const validationSourceText = buildValidationSourceText(payload);
+  const numericValidationSourceText = buildNumericValidationSourceText(payload);
   const visibleText = visibleArticleText(rewrite);
   const quoteTelemetry = collectQuoteTelemetry(rewrite, payload);
   const maxVisibleArticleChars =
@@ -779,12 +802,12 @@ export function validateRewriteOutput(
   // metadata and are neither rendered nor an editorial claim to the reader.
   const numberAssessments = assessNumbers(
     rewrite,
-    validationSourceText,
+    numericValidationSourceText,
     numberAssessmentOptions
   );
   const publicationNumberAssessments = assessNumbersInText(
     visibleText,
-    validationSourceText,
+    numericValidationSourceText,
     numberAssessmentOptions
   );
   const numberErrors = unexpectedNumberDisplays(
@@ -935,9 +958,44 @@ export function validateRewriteOutput(
     );
   }
 
+  // The title always belongs to the new notice. A figure that only the
+  // attached earlier notice contains has no business in it (the reference
+  // checker never sees the title, so this is the title's own guard).
+  if ((payload.relatedNotices ?? []).length > 0) {
+    const relatedSourceText = buildRelatedNoticesSourceText(payload);
+    const primaryOnlyMisses = new Set(
+      unexpectedNumberDisplays(
+        assessNumbersInText(
+          rewrite.title,
+          validationSourceText,
+          numberAssessmentOptions
+        )
+      )
+    );
+    const relatedOnlyTitleNumbers = assessNumbersInText(
+      rewrite.title,
+      relatedSourceText,
+      numberAssessmentOptions
+    )
+      .filter(
+        (assessment) =>
+          assessment.disposition !== "unexpected" &&
+          primaryOnlyMisses.has(assessment.display)
+      )
+      .map((assessment) => assessment.display);
+    if (relatedOnlyTitleNumbers.length > 0) {
+      addIssue(
+        issues,
+        "SECONDARY_ONLY_TITLE_NUMBER",
+        "warning",
+        `Title uses numbers found only in an earlier notice: ${[...new Set(relatedOnlyTitleNumbers)].join(", ")}.`
+      );
+    }
+  }
+
   const unexpectedCurrencyMarkers = findUnexpectedCurrencyMarkers(
     rewrite,
-    validationSourceText
+    numericValidationSourceText
   );
   if (unexpectedCurrencyMarkers.length > 0) {
     addIssue(

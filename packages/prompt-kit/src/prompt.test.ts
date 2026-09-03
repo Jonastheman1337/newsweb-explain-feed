@@ -68,7 +68,67 @@ const sampleYearlyPayload: YearlyReportPromptPayload = {
 
 describe("OpenAI prompt contract", () => {
   it("bumps the prompt version for the editorial guardrail update", () => {
-    expect(PROMPT_VERSION).toBe("v5.9.2");
+    expect(PROMPT_VERSION).toBe("v5.10.0");
+  });
+
+  it("states the related-notice rules once, in the developer prompt only", () => {
+    const developer = createDeveloperPrompt();
+    expect(developer).toContain("TIDLIGERE MELDING DET VISES TIL");
+    expect(developer).toContain("Tittel, lead og første avsnitt bygger bare på den nye meldingen");
+    expect(developer.match(/TIDLIGERE MELDING DET VISES TIL/g)).toHaveLength(1);
+    expect(createSystemPrompt()).not.toContain("TIDLIGERE MELDING");
+    expect(createUserPrompt(samplePayload)).not.toContain("TIDLIGERE MELDING");
+    expect(createReportDeveloperPrompt()).toContain("TIDLIGERE MELDING DET VISES TIL");
+  });
+
+  it("renders auto-attached related notices as dated background blocks", () => {
+    const relatedNotices = [
+      {
+        messageId: 676863,
+        relation: "reference" as const,
+        title: "HENT inngår innledende avtale med Nscale",
+        issuerName: "Sentia ASA",
+        issuerSign: "SNTIA",
+        publishedAt: "2026-06-23T14:25:02.930Z",
+        text: "HENT har nå inngått en Limited Notice to Proceed (LNTP) med Nscale.",
+        textChars: 68,
+        resolvedBy: "db" as const,
+        score: 0.6
+      }
+    ];
+    const payload: PromptPayload = {
+      ...samplePayload,
+      publishedAt: "2026-09-02T05:00:04.025Z",
+      relatedNotices
+    };
+    const prompt = createUserPrompt(payload);
+
+    expect(prompt).toContain(
+      "TIDLIGERE MELDING DET VISES TIL (bakgrunn, reglene står i oppgavebeskrivelsen):"
+    );
+    expect(prompt).toContain("[prior_676863]");
+    expect(prompt).toContain("relation: viser til");
+    expect(prompt).toContain("publisert: tirsdag 23. juni 2026 (71 dager før den nye meldingen)");
+    expect(prompt).toContain("anbefalt tidsmarkør: i juni");
+    expect(prompt).toContain("utsteder: Sentia ASA (SNTIA)");
+    expect(prompt).toContain("Limited Notice to Proceed");
+    // Rules are not duplicated into the uncached user turn.
+    expect(prompt).not.toContain("Nyheten er det den nye meldingen sier");
+
+    const revision = createRevisionUserPrompt(payload, sampleOutput, "Kort ned.");
+    expect(revision).toContain("[prior_676863]");
+    expect(revision.indexOf("[prior_676863]")).toBeLessThan(
+      revision.indexOf("INSTRUKSJON:")
+    );
+
+    const controlWithoutRelated = createRegularPromptVariantMessages(
+      "regular_v5_related_off",
+      payload
+    );
+    expect(controlWithoutRelated.userPrompt).not.toContain("[prior_676863]");
+    expect(
+      createRegularPromptVariantMessages("regular_v5_6_control", payload).userPrompt
+    ).toContain("[prior_676863]");
   });
 
   it("uses materiality and mechanism-first regular notice framing by default", () => {
@@ -213,6 +273,7 @@ describe("OpenAI prompt contract", () => {
   it("exposes regular prompt variants for offline editorial evals", () => {
     expect(regularPromptVariantIds).toEqual([
       "regular_v5_6_control",
+      "regular_v5_related_off",
       "audience_mechanism_v1",
       "regular_v6_full",
       "regular_v6_draft",
@@ -223,6 +284,7 @@ describe("OpenAI prompt contract", () => {
         (variantId) => getRegularPromptVariantProfile(variantId).responseSchemaId
       )
     ).toEqual([
+      "rewrite_v5_title_first_v1",
       "rewrite_v5_title_first_v1",
       "rewrite_v5_title_first_v1",
       "rewrite_v6_extract_first_v1",

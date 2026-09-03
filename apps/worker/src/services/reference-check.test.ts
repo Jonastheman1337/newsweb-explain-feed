@@ -7,15 +7,19 @@ import {
   buildCorrectionInstruction,
   buildCoverageReport,
   buildReferenceCheckPrompt,
+  buildReferencePriorContext,
   classifyCheckerErrorKind,
   classifyLegacyCheckerErrorMessage,
   collectDraftSentences,
+  collectHeadDraftSentenceCount,
+  collectPriorContextViolations,
   defaultReferenceCheckEnforcement,
   hasFreshPassingReferenceCoverage,
   resolveReferenceCheckOutcome,
   splitIntoSentences,
   type ReferenceCheckerErrorEntry,
-  type ReferenceCheckResult
+  type ReferenceCheckResult,
+  type ReferencePriorContext
 } from "./reference-check.js";
 
 function createRewrite(overrides?: Partial<RewriteOutput>): RewriteOutput {
@@ -760,5 +764,169 @@ describe("applyReferenceCheckEnforcement", () => {
     );
     expect(enforced.gate.blocking).toBe(false);
     expect(enforced.forceNeedsRetry).toBe(true);
+  });
+});
+
+describe("prior-context guards", () => {
+  const relatedNotice = {
+    messageId: 676863,
+    relation: "reference" as const,
+    title: "HENT inngår innledende avtale med Nscale",
+    issuerName: "Sentia ASA",
+    issuerSign: "SNTIA",
+    publishedAt: "2026-06-23T14:25:02.930Z",
+    text: "HENT har nå inngått en Limited Notice to Proceed (LNTP) med Nscale om to datasenter med samlet kapasitet på 75 MW.",
+    textChars: 118,
+    resolvedBy: "db" as const,
+    score: 0.6
+  };
+  const payloadWithPrior = {
+    messageId: 681428,
+    title: "HENT har signert kontrakt",
+    issuerName: "Sentia ASA",
+    issuerSign: "SNTIA",
+    publishedAt: "2026-09-02T05:00:04.025Z",
+    categories: [] as string[],
+    markets: [] as string[],
+    bodyText: "HENT har nå signert kontrakt med Nscale for å utvide datasenteret med to bygg.",
+    hasAttachments: false,
+    sourceBodyChars: 80,
+    relatedNotices: [relatedNotice]
+  };
+  const draft = createRewrite({
+    lead: "Hent har signert kontrakt med Nscale om to bygg, opplyser selskapet.",
+    body: [
+      "Byggene skal stå ferdig i 2027.",
+      "Selskapet meldte i juni om en innledende avtale om de samme byggene.",
+      "Avtalen omfatter to datasenter."
+    ],
+    company_sentence: "Sentia er et norsk entreprenørkonsern."
+  });
+  // Visible order: lead (0), body[0] (1), body[1] (2), body[2] (3); company (4).
+  const priorContext: ReferencePriorContext = {
+    sourceIds: ["prior_676863"],
+    issuerAliases: ["sentia", "sntia"],
+    timeMarkers: ["i juni"]
+  };
+
+  function rawWithSources(
+    sources: Array<"primary" | "prior" | "both" | "none">
+  ): ReferenceCheckResult {
+    const sentences = collectDraftSentences(draft);
+    return {
+      sentences: sentences.map((sentence, index) => ({
+        index,
+        sentence,
+        grounded: sources[index] !== "none",
+        interpretation: "Vurdert.",
+        sourceEvidence: sources[index] === "none" ? "" : "dekning",
+        source: sources[index]
+      }))
+    };
+  }
+
+  it("labels the reference text and asks for a source per sentence when related notices exist", () => {
+    const prompt = buildReferenceCheckPrompt(payloadWithPrior, draft);
+    expect(prompt.userPrompt).toContain("[primary]\nHENT har nå signert kontrakt");
+    expect(prompt.userPrompt).toContain("[prior_676863] HENT inngår innledende avtale med Nscale");
+    expect(prompt.userPrompt).toContain("publisert: tirsdag 23. juni 2026");
+    expect(prompt.userPrompt).toContain("Limited Notice to Proceed");
+    expect(prompt.developerPrompt).toContain("source: 'primary'");
+    expect(prompt.headDraftSentenceCount).toBe(2);
+    expect(prompt.priorContext).toEqual(priorContext);
+
+    const plain = buildReferenceCheckPrompt(
+      { ...payloadWithPrior, relatedNotices: undefined },
+      draft
+    );
+    expect(plain.userPrompt).not.toContain("[primary]");
+    expect(plain.priorContext).toBeNull();
+    expect(buildReferencePriorContext({ publishedAt: "2026-09-02T05:00:04.025Z" })).toBeNull();
+    expect(collectHeadDraftSentenceCount(draft)).toBe(2);
+  });
+
+  it("blocks a prior-only sentence in the head and an unmarked prior-only body sentence", () => {
+    const report = buildCoverageReport(
+      collectDraftSentences(draft),
+      rawWithSources(["primary", "prior", "prior", "prior", "primary"]),
+      { visibleArticleSentenceCount: 4, headSentenceCount: 2, priorContext }
+    );
+    const violations = collectPriorContextViolations(report);
+    expect(violations.map((violation) => [violation.item.index, violation.kind])).toEqual([
+      [1, "prior_in_head"],
+      [3, "prior_unmarked"]
+    ]);
+
+    const gate = assessReferenceCheckGate(report);
+    expect(gate.blocking).toBe(true);
+    expect(gate.reason).toBe(
+      "Reference check found prior-notice-only sentence in lead or first paragraph."
+    );
+    expect(gate.highRiskUnsupportedSentences).toEqual([]);
+    expect(gate.priorContextViolations).toHaveLength(2);
+    expect(report.coveragePercent).toBe(100);
+
+    const instruction = buildCorrectionInstruction(report, {
+      attempt: 1,
+      maxAttempts: 3,
+      gate
+    });
+    expect(instruction).not.toBeNull();
+    expect(instruction).toContain("Setninger med kontekst fra tidligere melding som må rettes:");
+    expect(instruction).toContain("Setning 2: Byggene skal stå ferdig i 2027.");
+    expect(instruction).toContain("Nyheten skal stå først");
+    expect(instruction).toContain("Setning 4: Avtalen omfatter to datasenter.");
+    expect(instruction).toContain("'meldte i juni'");
+    expect(instruction).not.toContain("Setninger uten dekning i forrige utkast:");
+  });
+
+  it("accepts a marked prior-only body sentence and sentences grounded in both", () => {
+    const report = buildCoverageReport(
+      collectDraftSentences(draft),
+      rawWithSources(["primary", "both", "prior", "primary", "prior"]),
+      { visibleArticleSentenceCount: 4, headSentenceCount: 2, priorContext }
+    );
+    expect(collectPriorContextViolations(report)).toEqual([]);
+    const gate = assessReferenceCheckGate(report);
+    expect(gate.blocking).toBe(false);
+    expect(gate.priorContextViolations).toEqual([]);
+    expect(buildCorrectionInstruction(report, { gate })).toBeNull();
+  });
+
+  it("keeps the prior rules inert without prior context and never double-lists ungrounded sentences", () => {
+    const noContext = buildCoverageReport(
+      collectDraftSentences(draft),
+      rawWithSources(["prior", "prior", "prior", "prior", "prior"]),
+      { visibleArticleSentenceCount: 4 }
+    );
+    expect(collectPriorContextViolations(noContext)).toEqual([]);
+    expect(assessReferenceCheckGate(noContext).blocking).toBe(false);
+
+    const ungroundedHead = buildCoverageReport(
+      collectDraftSentences(draft),
+      rawWithSources(["primary", "none", "primary", "primary", "primary"]),
+      { visibleArticleSentenceCount: 4, headSentenceCount: 2, priorContext }
+    );
+    const gate = assessReferenceCheckGate(ungroundedHead);
+    expect(gate.priorContextViolations).toEqual([]);
+    expect(gate.blocking).toBe(true);
+    expect(gate.reason).toBe("Reference check found unsupported high-risk factual claims.");
+  });
+
+  it("uses the prior reason only when the unsupported rules did not already block", () => {
+    const report = buildCoverageReport(
+      collectDraftSentences(draft),
+      rawWithSources(["primary", "none", "prior", "prior", "primary"]),
+      { visibleArticleSentenceCount: 4, headSentenceCount: 2, priorContext }
+    );
+    const gate = assessReferenceCheckGate(report);
+    expect(gate.blocking).toBe(true);
+    expect(gate.reason).toBe("Reference check found unsupported high-risk factual claims.");
+    expect(gate.priorContextViolations.map((violation) => violation.kind)).toEqual([
+      "prior_unmarked"
+    ]);
+    const instruction = buildCorrectionInstruction(report, { gate });
+    expect(instruction).toContain("Setninger uten dekning i forrige utkast:");
+    expect(instruction).toContain("Setninger med kontekst fra tidligere melding som må rettes:");
   });
 });

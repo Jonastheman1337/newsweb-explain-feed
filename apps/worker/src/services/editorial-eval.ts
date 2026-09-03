@@ -1,5 +1,9 @@
 import { createHash } from "node:crypto";
-import type { PromptPayload, RegularPromptVariantId } from "@newsweb/prompt-kit";
+import {
+  extractNoticeReferences,
+  type PromptPayload,
+  type RegularPromptVariantId
+} from "@newsweb/prompt-kit";
 
 import type { QuoteTelemetry } from "./rewrite-validation.js";
 
@@ -390,6 +394,13 @@ export function difficultyTagsForPayload(payload: PromptPayload): string[] {
     )
   ) {
     tags.push("dilution_mechanism");
+  }
+  if (
+    (payload.relatedNotices?.length ?? 0) > 0 ||
+    extractNoticeReferences(payload.bodyText, { publishedAt: payload.publishedAt })
+      .length > 0
+  ) {
+    tags.push("references_prior_notice");
   }
   return tags;
 }

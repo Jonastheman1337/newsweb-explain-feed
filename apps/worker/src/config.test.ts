@@ -261,6 +261,30 @@ describe("parseWorkerConfig", () => {
     ).toThrow(/Unknown triage skip class id/);
   });
 
+  it("parses RELATED_NOTICE_CONTEXT like the other kill switches", () => {
+    const base = {
+      NODE_ENV: "development",
+      DATABASE_URL:
+        "postgresql://newsweb:newsweb@localhost:5432/newsweb_explain?schema=public",
+      REDIS_URL: "redis://localhost:6379",
+      OPENAI_API_KEY: "sk-openai-test-key"
+    };
+    expect(parseWorkerConfig(base).RELATED_NOTICE_CONTEXT).toBeUndefined();
+    expect(
+      parseWorkerConfig({ ...base, RELATED_NOTICE_CONTEXT: "" })
+        .RELATED_NOTICE_CONTEXT
+    ).toEqual([]);
+    expect(
+      parseWorkerConfig({
+        ...base,
+        RELATED_NOTICE_CONTEXT: "reference, sibling"
+      }).RELATED_NOTICE_CONTEXT
+    ).toEqual(["reference", "sibling"]);
+    expect(() =>
+      parseWorkerConfig({ ...base, RELATED_NOTICE_CONTEXT: "no_such_relation" })
+    ).toThrow(/Unknown related notice relation/);
+  });
+
   it("rejects unknown REFERENCE_CHECK_ENFORCEMENT flags at boot", () => {
     expect(() =>
       parseWorkerConfig({

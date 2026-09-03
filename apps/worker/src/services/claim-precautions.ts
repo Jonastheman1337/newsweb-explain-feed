@@ -8,7 +8,7 @@ export type AttributionRisk = {
   reason: string;
 };
 
-const ATTRIBUTION_MARKERS = [
+export const ATTRIBUTION_MARKERS = [
   "ifolge selskapet",
   "ifolge borsmeldingen",
   "ifolge meldingen",

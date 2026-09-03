@@ -8,8 +8,6 @@ import {
   fixDoubleEncodedUtf8,
   isYearlyReportCategory,
   needsNewsworthinessTriage,
-  newswebListResponseSchema,
-  newswebMessageResponseSchema,
   normalizeRewriteJson,
   parseRedisUrl,
   rewriteOutputJsonSchema,
@@ -112,6 +110,20 @@ import {
   parseTriageResponse
 } from "./services/newsworthiness-triage.js";
 import {
+  buildNewswebListUrl,
+  fetchNewswebListMessages,
+  fetchNewswebMessage
+} from "./services/newsweb-client.js";
+import {
+  createNewswebRelatedNoticeClient,
+  createPrismaRelatedNoticeStore,
+  defaultEnabledRelatedNoticeRelations,
+  emptyRelatedNoticeTelemetry,
+  resolveRelatedNotices,
+  type RelatedNoticeSource,
+  type RelatedNoticeTelemetry
+} from "./services/related-notices.js";
+import {
   downloadGeneralPdfAttachment,
   downloadReportPdfAttachment,
   downloadYearlyReportPdfAttachment,
@@ -158,9 +170,6 @@ import {
 } from "./services/numeric-shadow-monitor.js";
 import { finalizePublication } from "./services/publication.js";
 import { canWriteRewriteCandidate } from "./services/generation-ownership.js";
-
-const NEWSWEB_LIST_URL = "https://api3.oslo.oslobors.no/v1/newsreader/list";
-const NEWSWEB_MESSAGE_URL = "https://api3.oslo.oslobors.no/v1/newsreader/message";
 
 type IngestJobData = {
   messageId: number;
@@ -238,6 +247,15 @@ if (config.TRIAGE_SKIP_CLASSES) {
         "This is the emergency kill-switch; the durable state lives in defaultEnabledTriageClasses."
     );
   }
+}
+
+const activeRelatedNoticeRelations =
+  config.RELATED_NOTICE_CONTEXT ?? defaultEnabledRelatedNoticeRelations;
+if (config.RELATED_NOTICE_CONTEXT) {
+  console.warn(
+    `RELATED_NOTICE_CONTEXT overrides the code default: enabled=[${config.RELATED_NOTICE_CONTEXT.join(", ")}]. ` +
+      "This is the emergency kill-switch; the durable state lives in defaultEnabledRelatedNoticeRelations."
+  );
 }
 
 function modelForReasoningEffort(effort: OpenAIReasoningEffort): string {
@@ -538,23 +556,9 @@ async function claimRewriteCandidateOwnership(
   return reclaimed.count === 1;
 }
 
-function buildListUrl(daysBack = 0): string {
-  if (daysBack <= 0) return NEWSWEB_LIST_URL;
-  const today = new Date();
-  const fromDate = new Date(today);
-  fromDate.setDate(fromDate.getDate() - daysBack);
-  const fmt = (d: Date) => d.toISOString().slice(0, 10);
-  return `${NEWSWEB_LIST_URL}?fromDate=${fmt(fromDate)}&toDate=${fmt(today)}`;
-}
-
 async function fetchList(daysBack = 0): Promise<IngestJobData[]> {
-  const response = await fetch(buildListUrl(daysBack));
-  if (!response.ok) {
-    throw new Error(`Newsweb list failed: ${response.status}`);
-  }
-  const json = await response.json();
-  const parsed = newswebListResponseSchema.parse(json);
-  return parsed.data.messages.flatMap((message) => {
+  const messages = await fetchNewswebListMessages(buildNewswebListUrl(daysBack));
+  return messages.flatMap((message) => {
     if (!message.issuerSign) {
       if (!skippedMissingIssuerSign.has(message.messageId)) {
         skippedMissingIssuerSign.add(message.messageId);
@@ -599,28 +603,61 @@ async function fetchMessageDetails(messageId: number): Promise<{
   hasAttachments: boolean;
   rawMessageJson: unknown;
 }> {
-  const response = await fetch(`${NEWSWEB_MESSAGE_URL}?messageId=${messageId}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    }
-  });
-  if (!response.ok) {
-    throw new Error(`Newsweb message ${messageId} failed: ${response.status}`);
-  }
-  const json = await response.json();
-  const parsed = newswebMessageResponseSchema.parse(json);
-  const bodyText = parsed.data.message.body ?? "";
-  const hasAttachments = parsed.data.message.attachments.length > 0;
-
-  // Store the raw (unparsed) message so fields like attachment "name" aren't stripped by Zod
-  const rawMessage = (json as Record<string, unknown>).data as Record<string, unknown>;
-
+  const details = await fetchNewswebMessage(messageId);
   return {
-    bodyText,
-    hasAttachments,
-    rawMessageJson: rawMessage?.message ?? parsed.data.message
+    bodyText: details.bodyText,
+    hasAttachments: details.hasAttachments,
+    rawMessageJson: details.rawMessageJson
   };
+}
+
+const relatedNoticeStore = createPrismaRelatedNoticeStore(prisma);
+const relatedNoticeNewswebClient = createNewswebRelatedNoticeClient();
+
+// Resolves the earlier notice(s) the current notice cites and attaches them
+// to the payload in place, so every downstream prompt, the reference check
+// and the validator see them and upsertRewrite persists them into
+// inputJson.sourcePayload for replay. Never throws: a resolver failure is
+// telemetry, not a failed rewrite.
+async function attachRelatedNotices(
+  source: RelatedNoticeSource,
+  payload: PromptPayload
+): Promise<RelatedNoticeTelemetry> {
+  if (activeRelatedNoticeRelations.length === 0) {
+    return emptyRelatedNoticeTelemetry(activeRelatedNoticeRelations);
+  }
+  try {
+    const resolution = await resolveRelatedNotices(source, {
+      enabledRelations: activeRelatedNoticeRelations,
+      store: relatedNoticeStore,
+      newsweb: relatedNoticeNewswebClient
+    });
+    if (resolution.related.length > 0) {
+      payload.relatedNotices = resolution.related;
+      console.log(
+        `[related] ${source.messageId}: attached ${resolution.related
+          .map((notice) => `${notice.relation}:${notice.messageId}(${notice.resolvedBy})`)
+          .join(", ")}`
+      );
+    } else if (resolution.telemetry.unresolved.length > 0) {
+      console.log(
+        `[related] ${source.messageId}: unresolved ${resolution.telemetry.unresolved
+          .map((entry) => entry.reason)
+          .join(", ")}`
+      );
+    }
+    return resolution.telemetry;
+  } catch (error) {
+    console.warn(
+      `[related] ${source.messageId}: resolver failed: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
+    return {
+      ...emptyRelatedNoticeTelemetry(activeRelatedNoticeRelations),
+      unresolved: [{ raw: "resolver", reason: "fetch-failed" }]
+    };
+  }
 }
 
 async function enqueueLatestNotices(count: number): Promise<{
@@ -974,7 +1011,8 @@ const HIGH_RISK_VALIDATION_WARNING_CODES = new Set([
   "MISSING_RIGHT_OF_REPLY",
   "UNEXPLAINED_NAMED_TRANSACTION",
   "MISSING_REPORT_SOURCE_LIMITATION",
-  "WEAK_REPORT_EXTRACTION_LIMITATION"
+  "WEAK_REPORT_EXTRACTION_LIMITATION",
+  "SECONDARY_ONLY_TITLE_NUMBER"
 ]);
 
 type ValidationRepairAudit = {
@@ -1033,6 +1071,8 @@ function buildHighRiskValidationRepairInstruction(
                 : issue.code === "MISSING_REPORT_SOURCE_LIMITATION" ||
                     issue.code === "WEAK_REPORT_EXTRACTION_LIMITATION"
                   ? "Legg inn en konkret source_limitations-linje om at bare et utdrag/begrenset rapportgrunnlag er analysert, eller dropp synlige rapportkrav som ikke har dekning."
+                  : issue.code === "SECONDARY_ONLY_TITLE_NUMBER"
+                    ? "Tittelen skal bygge på dagens melding alene. Fjern tall som bare finnes i den tidligere meldingen fra tittelen; slike tall kan stå i body med tidsmarkør."
                 : "Rett problemet uten a legge til nye fakta.";
     return [`${issue.code}: ${issue.message}`, `Krav: ${codeInstruction}`].join(
       "\n"
@@ -1161,10 +1201,14 @@ function applyReferenceCheckGate(
     return validation;
   }
 
+  const priorContextSuffix =
+    gate.priorContextViolations.length > 0
+      ? ` Prior-context violations: ${gate.priorContextViolations.length}.`
+      : "";
   const issue: RewriteValidationIssue = {
     code: "REFERENCE_CHECK_UNSUPPORTED_FACTS",
     severity: "blocking",
-    message: `${gate.reason} High-risk unsupported sentences: ${gate.highRiskUnsupportedSentences.length}.`
+    message: `${gate.reason} High-risk unsupported sentences: ${gate.highRiskUnsupportedSentences.length}.${priorContextSuffix}`
   };
   const issues = [...validation.issues, issue];
   const errors = issues.map((item) => item.message);
@@ -1637,7 +1681,9 @@ async function callModelReferenceCheck(
   }
   return {
     coverage: buildCoverageReport(draftSentences, parsed, {
-      visibleArticleSentenceCount: visibleDraftSentences.length
+      visibleArticleSentenceCount: visibleDraftSentences.length,
+      headSentenceCount: referencePrompt.headDraftSentenceCount,
+      priorContext: referencePrompt.priorContext
     }),
     promptChars: result.promptChars,
     modelCall: result.modelCall
@@ -1829,7 +1875,10 @@ async function applyReferenceCheckRepair<TPayload extends PromptPayload>({
           sentence: item.sentence,
           interpretation: item.interpretation
         })
-      )
+      ),
+      ...(referenceCheck.coverage.priorContext
+        ? { priorContextViolationCount: gate.priorContextViolations.length }
+        : {})
     });
 
     const totalCorrectionAttempts =
@@ -1838,7 +1887,8 @@ async function applyReferenceCheckRepair<TPayload extends PromptPayload>({
       referenceCheck.coverage,
       {
         attempt: totalCorrectionAttempts + 1,
-        maxAttempts: MAX_REFERENCE_REPAIR_ATTEMPTS
+        maxAttempts: MAX_REFERENCE_REPAIR_ATTEMPTS,
+        gate
       }
     );
 
@@ -2277,6 +2327,10 @@ async function processReportRewrite(
   reportContent: ReportExtractionResult,
   revisionOptions: RewriteRevisionOptions = {}
 ): Promise<void> {
+  const relatedNoticeTelemetryJson = await attachRelatedNotices(
+    { ...source, messageId },
+    payload
+  );
   const reportPayload: ReportPromptPayload = {
     ...payload,
     reportText: reportContent.text,
@@ -2636,7 +2690,8 @@ async function processReportRewrite(
               body: hiddenDraft.body,
               company_sentence: hiddenDraft.company_sentence
             }
-          : null
+          : null,
+        relatedNotices: relatedNoticeTelemetryJson
       } as Prisma.InputJsonValue
     });
 
@@ -4223,6 +4278,10 @@ const rewriteWorker = new Worker<RewriteJobData>(
         return;
       }
 
+      // After triage (skipped notices never pay for a lookup), before the
+      // first model call so the draft, the checker and the validator agree.
+      const relatedNoticeTelemetryJson = await attachRelatedNotices(source, payload);
+
       try {
         await setGenerationPhaseAndNotify(generationRunId, messageId, "writing_notice");
         const initialDraftResult = await callModelRewrite(
@@ -4484,7 +4543,8 @@ const rewriteWorker = new Worker<RewriteJobData>(
                   company_sentence: hiddenDraft.company_sentence
                 }
               : null,
-            triage: triageTelemetryJson
+            triage: triageTelemetryJson,
+            relatedNotices: relatedNoticeTelemetryJson
           } as Prisma.InputJsonValue
         });
 
@@ -4522,6 +4582,7 @@ const rewriteWorker = new Worker<RewriteJobData>(
               sourceBodyChars: payload.sourceBodyChars,
               promptChars,
               styleSanitization,
+              relatedNotices: relatedNoticeTelemetryJson,
               referenceCheck: referenceCheckFailureJson(
                 referenceRepairState,
                 {
@@ -4561,6 +4622,7 @@ const rewriteWorker = new Worker<RewriteJobData>(
             sourceBodyChars: payload.sourceBodyChars,
             promptChars,
             styleSanitization,
+            relatedNotices: relatedNoticeTelemetryJson,
             referenceCheck: referenceCheckFailureJson(
               referenceRepairState,
               {

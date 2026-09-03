@@ -21,6 +21,8 @@ export type ReferenceRepairHistoryEntry = {
     sentence: string;
     interpretation: string;
   }>;
+  // Present only when the run carried auto-attached related notices.
+  priorContextViolationCount?: number;
 };
 
 export type ReferenceRepairResult = {
@@ -152,14 +154,22 @@ export function referenceCoverageJson(
       sentence: item.sentence,
       grounded: item.grounded,
       interpretation: item.interpretation,
-      sourceEvidence: item.sourceEvidence
+      sourceEvidence: item.sourceEvidence,
+      ...(item.source !== undefined ? { source: item.source } : {})
     })),
     unsupportedSentences: coverage.unsupportedSentences.map((item) => ({
       index: item.index,
       sentence: item.sentence,
       interpretation: item.interpretation,
-      sourceEvidence: item.sourceEvidence
-    }))
+      sourceEvidence: item.sourceEvidence,
+      ...(item.source !== undefined ? { source: item.source } : {})
+    })),
+    // Prior-context keys are appended last and only when present so the
+    // legacy literal stays byte-identical for runs without related notices.
+    ...(coverage.headSentenceCount !== undefined
+      ? { headSentenceCount: coverage.headSentenceCount }
+      : {}),
+    ...(coverage.priorContext ? { priorContext: coverage.priorContext } : {})
   };
 }
 
@@ -199,6 +209,9 @@ export function referenceCheckValidationJson(
     blocking: gate.blocking,
     blockingReason: gate.reason,
     highRiskUnsupportedSentenceCount: gate.highRiskUnsupportedSentences.length,
+    ...(gate.priorContextViolations.length > 0
+      ? { priorContextViolationCount: gate.priorContextViolations.length }
+      : {}),
     initialCoverage: referenceCoverageJson(initialCoverage),
     finalCoverage: referenceCoverageJson(finalCoverage ?? initialCoverage),
     totalSentences:
@@ -213,7 +226,8 @@ export function referenceCheckValidationJson(
         sentence: item.sentence,
         grounded: item.grounded,
         interpretation: item.interpretation,
-        sourceEvidence: item.sourceEvidence
+        sourceEvidence: item.sourceEvidence,
+        ...(item.source !== undefined ? { source: item.source } : {})
       })
     ),
     unsupportedSentences: (
@@ -224,7 +238,8 @@ export function referenceCheckValidationJson(
       index: item.index,
       sentence: item.sentence,
       interpretation: item.interpretation,
-      sourceEvidence: item.sourceEvidence
+      sourceEvidence: item.sourceEvidence,
+      ...(item.source !== undefined ? { source: item.source } : {})
     })),
     ...(outcome
       ? { outcome: referenceCheckOutcomeJson(outcome, enforcement) }

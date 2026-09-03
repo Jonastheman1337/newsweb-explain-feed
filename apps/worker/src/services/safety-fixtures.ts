@@ -6,10 +6,14 @@ import type { RewriteOutput } from "@newsweb/shared";
 import { evaluateTriageClasses } from "./newsworthiness-triage.js";
 import {
   classifyLegacyCheckerErrorMessage,
+  referenceCheckSourceValues,
   resolveReferenceCheckOutcome,
   type ReferenceCheckerErrorEntry,
   type ReferenceCheckOutcomeState,
-  type ReferenceCoverageReport
+  type ReferenceCheckSource,
+  type ReferenceCoverageItem,
+  type ReferenceCoverageReport,
+  type ReferencePriorContext
 } from "./reference-check.js";
 import {
   detectMarkerLeaks,
@@ -209,20 +213,49 @@ function coverageReportFromStored(
       (item): item is Record<string, unknown> =>
         !!item && typeof item === "object" && !Array.isArray(item)
     )
-    .map((item) => ({
+    .map((item): ReferenceCoverageItem => ({
       index: Number(item.index ?? 0),
       sentence: String(item.sentence ?? ""),
       grounded: Boolean(item.grounded),
       interpretation: String(item.interpretation ?? ""),
-      sourceEvidence: String(item.sourceEvidence ?? "")
+      sourceEvidence: String(item.sourceEvidence ?? ""),
+      ...(isReferenceCheckSource(item.source) ? { source: item.source } : {})
     }));
+  const priorContext = priorContextFromStored(blob.priorContext);
   return {
     totalSentences: blob.totalSentences,
     visibleArticleSentenceCount: blob.visibleArticleSentenceCount,
     groundedSentences: blob.groundedSentences,
     coveragePercent: blob.coveragePercent,
     items,
-    unsupportedSentences: items.filter((item) => !item.grounded)
+    unsupportedSentences: items.filter((item) => !item.grounded),
+    ...(typeof blob.headSentenceCount === "number"
+      ? { headSentenceCount: blob.headSentenceCount }
+      : {}),
+    ...(priorContext ? { priorContext } : {})
+  };
+}
+
+function isReferenceCheckSource(value: unknown): value is ReferenceCheckSource {
+  return (
+    typeof value === "string" &&
+    (referenceCheckSourceValues as readonly string[]).includes(value)
+  );
+}
+
+function stringList(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((entry): entry is string => typeof entry === "string")
+    : [];
+}
+
+function priorContextFromStored(raw: unknown): ReferencePriorContext | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const blob = raw as Record<string, unknown>;
+  return {
+    sourceIds: stringList(blob.sourceIds),
+    issuerAliases: stringList(blob.issuerAliases),
+    timeMarkers: stringList(blob.timeMarkers)
   };
 }
 

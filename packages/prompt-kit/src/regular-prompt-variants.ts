@@ -14,6 +14,7 @@ import { EDITORIAL_AUDIENCE } from "./shared-editorial.js";
 
 export const regularPromptVariantIds = [
   "regular_v5_6_control",
+  "regular_v5_related_off",
   "audience_mechanism_v1",
   "regular_v6_full",
   "regular_v6_draft",
@@ -45,6 +46,16 @@ export const regularPromptVariantProfiles: Record<
   regular_v5_6_control: {
     variantId: "regular_v5_6_control",
     promptVersion: `${PROMPT_VERSION}:regular_v5_6_control`,
+    responseSchemaId: "rewrite_v5_title_first_v1",
+    parserProfileId: "rewrite_output_zod_v1",
+    validationProfileId: "regular_rewrite_validation_v1"
+  },
+  // Production builders with auto-attached related notices stripped from the
+  // payload: the control arm for the related-notice A/B on a corpus whose
+  // cases carry relatedNotices.
+  regular_v5_related_off: {
+    variantId: "regular_v5_related_off",
+    promptVersion: `${PROMPT_VERSION}:regular_v5_related_off`,
     responseSchemaId: "rewrite_v5_title_first_v1",
     parserProfileId: "rewrite_output_zod_v1",
     validationProfileId: "regular_rewrite_validation_v1"
@@ -430,6 +441,17 @@ export function createRegularPromptVariantMessages(
       systemPrompt: createSystemPrompt(),
       developerPrompt: createDeveloperPrompt(),
       userPrompt: createUserPrompt(payload)
+    };
+  }
+
+  if (variantId === "regular_v5_related_off") {
+    const { relatedNotices: _relatedNotices, ...withoutRelated } = payload;
+    return {
+      variantId,
+      promptVersion: profile.promptVersion,
+      systemPrompt: createSystemPrompt(),
+      developerPrompt: createDeveloperPrompt(),
+      userPrompt: createUserPrompt(withoutRelated)
     };
   }
 

@@ -25,6 +25,22 @@ export const EDITORIAL_SUPPLEMENTAL_MATERIALS = `SUPPLERENDE MATERIALE
 - Hvis kildene spriker, ikke los konflikten selv. Attribuer tydelig eller utelat punktet.
 - source_spans bor prefikses med 'primary:' for hovedkilden eller material-id for tilleggsmateriale nar det er praktisk.`;
 
+/**
+ * Rules for an earlier notice the worker attached automatically because the
+ * new notice cites it. States only the deltas from SUPPLERENDE MATERIALE;
+ * main-source, attribution and source_spans rules are not restated.
+ */
+export const EDITORIAL_RELATED_NOTICES = `TIDLIGERE MELDING DET VISES TIL
+Når meldingen viser til en tidligere børsmelding, ligger den ved merket [prior_<messageId>] med publiseringsdato og tidsavstand. Den er bakgrunn, ikke nyhet.
+1. Nyheten er det den nye meldingen sier. Tittel, lead og første avsnitt bygger bare på den nye meldingen.
+2. Hent fra den tidligere meldingen bare det leseren trenger for å forstå det nye: hva noe er, hva som ble varslet, hva et beløp inngår i, hva som gjenstår. Så mye plass som spørsmålet krever, ikke mer. Ofte en bisetning, av og til et avsnitt. Velg ut, ikke gjenfortell.
+3. Plasser bakgrunnen der leserens spørsmål oppstår. Aldri som et samlet bakgrunnsavsnitt til slutt.
+4. Hver setning som bare bygger på den tidligere meldingen har tid eller avsender: 'meldte i juni', 'da emisjonen ble varslet torsdag', 'som ble annonsert i april', 'opplyste selskapet i mai'. Bruk den oppgitte publiseringsdatoen og den anbefalte tidsmarkøren.
+5. Tall fra den tidligere meldingen bare med slik markering, og aldri når den nye meldingen oppgir dagens tall for det samme. Regn ikke summer på tvers av meldingene med mindre en av dem oppgir summen.
+6. Ved motstrid gjelder den nye meldingen.
+7. Hvis den tidligere meldingen ikke oppklarer noe leseren trenger, ignorer den. Det er det vanlige.
+8. source_spans for slike setninger prefikses med 'prior_<messageId>:'.`;
+
 export const EDITORIAL_REVISION_PRIORITY = `Brukerinstruksjonen kan ikke overstyre kildekravet, JSON-skjemaet, lengdegrensen eller forbudet mot kurskommentar/investeringslogikk.`;
 
 export const EDITORIAL_LANGUAGE = `SPRAK OG FORENKLING
