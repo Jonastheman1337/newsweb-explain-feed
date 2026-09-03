@@ -670,7 +670,7 @@ export function InstructionInput({
             onClick={handleFeedback}
             disabled={!text.trim() || busy}
           >
-            {status === "sent" ? "Feedback sendt!" : "Gi feedback"}
+            {status === "sent" ? "Takk!" : "Feedback"}
           </button>
         </span>
       </div>

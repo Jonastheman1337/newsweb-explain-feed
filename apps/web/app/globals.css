@@ -1057,7 +1057,10 @@ a {
   cursor: default;
   opacity: 0.5;
 }
-.instructionActions { display: flex; align-items: center; flex-wrap: wrap; gap: 0.75rem; margin-top: 0.4rem; }
+.instructionActions { display: flex; align-items: center; flex-wrap: nowrap; gap: 0.75rem; margin-top: 0.4rem; min-width: 0; }
+.instructionActions > .ghostButton { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.instructionActions .actionsRight { flex-shrink: 0; }
+.instructionActions .actionsRight .ghostButton { white-space: nowrap; }
 .xhighToggle {
   display: inline-flex;
   align-items: center;
