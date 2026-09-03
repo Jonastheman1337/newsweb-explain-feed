@@ -28,7 +28,6 @@ import {
   saveRewriteDraft,
   type RewriteDraft
 } from "../lib/rewrite-drafts";
-import { AiDisclosure } from "./ai-disclosure";
 import { useTitleSuggestions } from "./title-suggestions";
 
 type EditableRewriteProps = {
@@ -966,7 +965,6 @@ export function EditableRewrite({
         onKeyUp={handleBodyKeyUp}
         onKeyDown={handleBodyKeyDown}
       />
-      <AiDisclosure />
       <div
         ref={toolbarRef}
         className={`richEditToolbar${linkMode ? " richEditToolbarLink" : ""}`}

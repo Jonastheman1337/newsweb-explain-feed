@@ -719,20 +719,6 @@ a {
   text-underline-offset: 2px;
 }
 
-.aiDisclosure {
-  margin: 0.65rem 0 0;
-  font-size: 0.9rem;
-  font-style: italic;
-  line-height: 1.5;
-  color: var(--ink-soft);
-}
-
-.aiDisclosure a {
-  color: inherit;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-
 .richEditToolbar {
   position: fixed;
   z-index: 1000;

@@ -1,7 +1,7 @@
 /**
- * E24's standard AI disclosure. It is appended, unedited, to the bottom of
- * every generated notice: rendered under the body in the UI and included in
- * both the HTML and plain-text clipboard payloads when a notice is copied.
+ * E24's standard AI disclosure. It is not shown in the UI; it is appended,
+ * unedited, to both the HTML and plain-text clipboard payloads when a notice
+ * is copied.
  */
 export const AI_DISCLOSURE_TEXT =
   "Teksten er skrevet ved hjelp av et AI-verktøy. Les E24s AI-retningslinjer ";
