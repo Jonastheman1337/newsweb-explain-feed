@@ -31,6 +31,10 @@ export function plainTextToRichHtml(text: string): string {
     .join("");
 }
 
+export function normalizePastedTitle(text: string): string {
+  return text.replace(/\s+/g, " ").trim();
+}
+
 export function normalizeLinkHref(value: string): string | null {
   const trimmed = value.trim();
   if (!trimmed) return null;
@@ -297,6 +301,36 @@ export function sanitizeRichHtml(html: string): string {
   const cleaned = document.createElement("div");
   appendCleanChildren(template.content, cleaned, document);
   return normalizeRoot(cleaned, document);
+}
+
+function unwrapElement(element: Element) {
+  const parent = element.parentNode;
+  if (!parent) return;
+
+  while (element.firstChild) {
+    parent.insertBefore(element.firstChild, element);
+  }
+  parent.removeChild(element);
+}
+
+/**
+ * Keep useful structure and links when text is pasted into the editor, but do
+ * not import emphasis inherited from the source page. Editors can still add
+ * bold and italic deliberately with the local formatting toolbar afterwards.
+ */
+export function sanitizePastedRichHtml(html: string): string {
+  const safeHtml = sanitizeRichHtml(html);
+  if (typeof document === "undefined") {
+    return safeHtml;
+  }
+
+  const template = document.createElement("template");
+  template.innerHTML = safeHtml;
+  for (const element of Array.from(template.content.querySelectorAll("strong, em"))) {
+    unwrapElement(element);
+  }
+
+  return sanitizeRichHtml(template.innerHTML);
 }
 
 export type RichHtmlToPlainTextOptions = {

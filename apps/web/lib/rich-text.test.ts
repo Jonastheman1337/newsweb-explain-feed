@@ -5,7 +5,9 @@ import { AI_DISCLOSURE_LINK_HREF, AI_DISCLOSURE_TEXT } from "./ai-disclosure";
 import {
   createNoticeClipboardHtml,
   createSakClipboard,
+  normalizePastedTitle,
   richHtmlToPlainText,
+  sanitizePastedRichHtml,
   sanitizeRichHtml
 } from "./rich-text";
 
@@ -35,6 +37,25 @@ describe("sanitizeRichHtml – subheadings", () => {
 
   it("drops empty headings", () => {
     expect(sanitizeRichHtml("<p>a</p><h3> </h3>")).toBe("<p>a</p>");
+  });
+});
+
+describe("paste normalization", () => {
+  it("removes source bold and italic while keeping paragraphs and safe links", () => {
+    expect(
+      sanitizePastedRichHtml(
+        '<p><span style="font-weight: 700; font-size: 11px">Fet ingress</span> og ' +
+          '<em>kursiv</em> <a href="https://example.com/story">lenke</a>.</p>'
+      )
+    ).toBe(
+      '<p>Fet ingress og kursiv <a href="https://example.com/story">lenke</a>.</p>'
+    );
+  });
+
+  it("keeps source text in one clean title line", () => {
+    expect(normalizePastedTitle("  En tittel\n med\tulik skrift  ")).toBe(
+      "En tittel med ulik skrift"
+    );
   });
 });
 

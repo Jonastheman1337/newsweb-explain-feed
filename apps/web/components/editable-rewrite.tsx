@@ -18,9 +18,11 @@ import { useEditorialTelemetry } from "../lib/editorial-telemetry";
 import {
   createNoticeClipboardHtml,
   createSakClipboard,
+  normalizePastedTitle,
   normalizeLinkHref,
   plainTextToRichHtml,
   richHtmlToPlainText,
+  sanitizePastedRichHtml,
   sanitizeRichHtml
 } from "../lib/rich-text";
 import { linkSourceAttributions, type SourceLinkTargets } from "../lib/source-links";
@@ -213,6 +215,24 @@ function runRichTextCommand(command: string, value?: string): boolean {
   }
 
   return document.execCommand(command, false, value);
+}
+
+function insertPlainTextAtSelection(root: HTMLElement, text: string) {
+  const selection = window.getSelection();
+  const range = selection?.rangeCount ? selection.getRangeAt(0) : null;
+
+  if (!selection || !range || !isNodeInside(root, range.commonAncestorContainer)) {
+    root.append(root.ownerDocument.createTextNode(text));
+    return;
+  }
+
+  range.deleteContents();
+  const textNode = root.ownerDocument.createTextNode(text);
+  range.insertNode(textNode);
+  range.setStartAfter(textNode);
+  range.collapse(true);
+  selection.removeAllRanges();
+  selection.addRange(range);
 }
 
 function copyNoticeWithCopyEvent(plainText: string, html: string): boolean {
@@ -568,6 +588,20 @@ export function EditableRewrite({
     syncBodyState();
   }
 
+  function handleTitlePaste(event: ReactClipboardEvent<HTMLHeadingElement>) {
+    event.preventDefault();
+    enterDraftMode();
+
+    const html = event.clipboardData.getData("text/html");
+    const clipboardText =
+      event.clipboardData.getData("text/plain") || richHtmlToPlainText(html);
+    const text = normalizePastedTitle(clipboardText);
+    if (text) {
+      insertPlainTextAtSelection(event.currentTarget, text);
+    }
+    setEditedTitle(event.currentTarget.textContent ?? "");
+  }
+
   function handleBodyPaste(event: ReactClipboardEvent<HTMLDivElement>) {
     event.preventDefault();
     enterDraftMode();
@@ -575,7 +609,7 @@ export function EditableRewrite({
     const html = event.clipboardData.getData("text/html");
     const text = event.clipboardData.getData("text/plain");
     if (html) {
-      const safeHtml = sanitizeRichHtml(html);
+      const safeHtml = sanitizePastedRichHtml(html);
       if (safeHtml) {
         runRichTextCommand("insertHTML", safeHtml);
       } else if (text) {
@@ -958,6 +992,7 @@ export function EditableRewrite({
         enterDraftMode();
         setEditedTitle(e.currentTarget.textContent ?? "");
       }}
+      onPaste={handleTitlePaste}
     >
     </h2>
   );
