@@ -12,3 +12,7 @@ export const AI_DISCLOSURE_LINK_HREF = "https://e24.no/informasjon/ai-retningsli
 export function aiDisclosurePlainText(): string {
   return `${AI_DISCLOSURE_TEXT}${AI_DISCLOSURE_LINK_TEXT} (${AI_DISCLOSURE_LINK_HREF}).`;
 }
+
+export function createNoticeClipboardPlainText(title: string, body: string): string {
+  return `${title}\n\n${body}\n\n${aiDisclosurePlainText()}`;
+}
