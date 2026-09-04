@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import type { FeedItem } from "@newsweb/shared";
@@ -77,66 +77,133 @@ function AdvancedLink({ messageId }: { messageId: number }) {
   );
 }
 
+function SplitButton({ active, onClick }: { active: boolean; onClick: () => void }) {
+  return (
+    <button
+      className={`splitButton${active ? " splitButtonActive" : ""}`}
+      onClick={onClick}
+      type="button"
+    >
+      Splitt <svg className="chipIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="3" x2="12" y2="21"/></svg>
+    </button>
+  );
+}
+
+/**
+ * Card for a notice without a published rewrite: not generated, skipped,
+ * failed, or still generating. The source is already on the item, so the
+ * original can be split open here exactly as on finished cards.
+ */
+function SourceOnlyCard({
+  item,
+  className,
+  showSplit,
+  onToggleSplit,
+  indicator,
+  actions
+}: {
+  item: FeedItem;
+  className: string;
+  showSplit: boolean;
+  onToggleSplit: () => void;
+  indicator?: ReactNode;
+  actions: ReactNode;
+}) {
+  return (
+    <article className={className} id={`notice-${item.messageId}`}>
+      <div className={showSplit ? "cardSplitGrid" : undefined}>
+        <div>
+          <CardDateline item={item} />
+          <h2>
+            <Link href={`/notice/${item.messageId}`} className="headlineLink">
+              {item.title}
+            </Link>
+          </h2>
+          {indicator}
+          <div className="editableActions">
+            <AdvancedLink messageId={item.messageId} />
+            <span className="actionsRight">
+              <SplitButton active={showSplit} onClick={onToggleSplit} />
+              {actions}
+            </span>
+          </div>
+        </div>
+        {showSplit && (
+          <div className="cardSourcePanel">
+            <SplitViewPanel
+              messageId={item.messageId}
+              issuerName={item.issuerName}
+              issuerSign={item.issuerSign}
+              publishedAt={item.publishedAt}
+              categories={item.categories}
+              sourceTitle={item.sourceTitle}
+              sourceBodyText={item.sourceBodyText}
+              attachments={item.attachments}
+            />
+          </div>
+        )}
+      </div>
+    </article>
+  );
+}
+
 export function NoticeCard({ item }: NoticeCardProps) {
   const [showSplit, setShowSplit] = useState(false);
 
+  function handleToggleSplit() {
+    setShowSplit((prev) => !prev);
+    // Trigger resize so EditableRewrite textarea recalculates height
+    requestAnimationFrame(() => window.dispatchEvent(new Event("resize")));
+  }
+
   if (item.notGenerated || item.skipped) {
     return (
-      <article className="card cardSkipped" id={`notice-${item.messageId}`}>
-        <CardDateline item={item} />
-        <h2>
-          <Link href={`/notice/${item.messageId}`} className="headlineLink">
-            {item.title}
-          </Link>
-        </h2>
-        {item.regenerating ? (
-          <FeedProcessingIndicator hasAttachments={item.hasAttachments} phase={item.phase} />
-        ) : null}
-        <div className="editableActions">
-          <AdvancedLink messageId={item.messageId} />
-          <span className="actionsRight">
-            <GenerateButton messageId={item.messageId} hasAttachments={item.hasAttachments} />
-          </span>
-        </div>
-      </article>
+      <SourceOnlyCard
+        item={item}
+        className="card cardSkipped"
+        showSplit={showSplit}
+        onToggleSplit={handleToggleSplit}
+        indicator={
+          item.regenerating ? (
+            <FeedProcessingIndicator hasAttachments={item.hasAttachments} phase={item.phase} />
+          ) : null
+        }
+        actions={<GenerateButton messageId={item.messageId} hasAttachments={item.hasAttachments} />}
+      />
     );
   }
 
   if (item.processing) {
+    // showSplit lives above the branches, so a split opened while generating
+    // survives the switch to the finished card.
     return (
-      <article className="card cardProcessing" id={`notice-${item.messageId}`}>
-        <CardDateline item={item} />
-        <h2>
-          <Link href={`/notice/${item.messageId}`} className="headlineLink">
-            {item.title}
-          </Link>
-        </h2>
-        <FeedProcessingIndicator hasAttachments={item.hasAttachments} phase={item.phase} />
-        <div className="editableActions">
-          <AdvancedLink messageId={item.messageId} />
-          <span className="actionsRight">
-            <GenerateButton messageId={item.messageId} label="Regenerer notis" hasAttachments={item.hasAttachments} />
-          </span>
-        </div>
-      </article>
+      <SourceOnlyCard
+        item={item}
+        className="card cardProcessing"
+        showSplit={showSplit}
+        onToggleSplit={handleToggleSplit}
+        indicator={<FeedProcessingIndicator hasAttachments={item.hasAttachments} phase={item.phase} />}
+        actions={
+          <GenerateButton messageId={item.messageId} label="Regenerer notis" hasAttachments={item.hasAttachments} />
+        }
+      />
     );
   }
 
   if (item.failed) {
     return (
-      <article className="card cardSkipped" id={`notice-${item.messageId}`}>
-        <CardDateline item={item} />
-        <h2>
-          <Link href={`/notice/${item.messageId}`} className="headlineLink">
-            {item.title}
-          </Link>
-        </h2>
-        {item.regenerating ? (
-          <FeedProcessingIndicator hasAttachments={item.hasAttachments} phase={item.phase} />
-        ) : null}
-        <div className="editableActions">
-          <AdvancedLink messageId={item.messageId} />
-          <span className="actionsRight">
+      <SourceOnlyCard
+        item={item}
+        className="card cardSkipped"
+        showSplit={showSplit}
+        onToggleSplit={handleToggleSplit}
+        indicator={
+          item.regenerating ? (
+            <FeedProcessingIndicator hasAttachments={item.hasAttachments} phase={item.phase} />
+          ) : null
+        }
+        actions={
+          <>
             <GenerateButton messageId={item.messageId} label="Prøv igjen" hasAttachments={item.hasAttachments} />
             <GenerateButton
               messageId={item.messageId}
@@ -144,9 +211,9 @@ export function NoticeCard({ item }: NoticeCardProps) {
               hasAttachments={item.hasAttachments}
               reasoningEffortOverride="xhigh"
             />
-          </span>
-        </div>
-      </article>
+          </>
+        }
+      />
     );
   }
 
@@ -162,12 +229,6 @@ export function NoticeCard({ item }: NoticeCardProps) {
   };
   const isImportant = item.importance === "viktig";
   const cardClassName = isImportant && !showSplit ? "card cardImportant" : "card";
-
-  function handleToggleSplit() {
-    setShowSplit((prev) => !prev);
-    // Trigger resize so EditableRewrite textarea recalculates height
-    requestAnimationFrame(() => window.dispatchEvent(new Event("resize")));
-  }
 
   return (
     <article className={cardClassName} id={`notice-${item.messageId}`}>
@@ -186,14 +247,7 @@ export function NoticeCard({ item }: NoticeCardProps) {
             className={showSplit && isImportant ? "cardImportantCol" : undefined}
             dateline={<CardDateline item={item} />}
             sourceLinks={sourceLinks}
-            extraActions={
-              <button
-                className={`splitButton${showSplit ? " splitButtonActive" : ""}`}
-                onClick={handleToggleSplit}
-              >
-                Splitt <svg className="chipIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="3" x2="12" y2="21"/></svg>
-              </button>
-            }
+            extraActions={<SplitButton active={showSplit} onClick={handleToggleSplit} />}
           >
             <AdvancedLink messageId={item.messageId} />
           </EditableRewrite>

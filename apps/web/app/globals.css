@@ -874,23 +874,58 @@ a {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 1.5rem;
-  align-items: start;
+}
+
+/* Split view: the notice column sets the row height and the source scrolls
+   inside it. The scrolling child is absolutely positioned so it adds no
+   height of its own; the card never grows past the notice and never leaves
+   a gap under it. min-height is a floor for one-paragraph notices. */
+.cardSplitGrid > div:first-child {
+  display: flex;
+  flex-direction: column;
+}
+
+.cardSplitGrid > div:first-child > .editableWrap {
+  flex: 1 0 auto;
 }
 
 .cardSourcePanel {
+  position: relative;
+  min-height: 14rem;
   border-left: 1px solid var(--line);
+}
+
+.cardSourcePanel > div {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
   padding-left: 1.5rem;
   padding-right: 0.5rem;
-  max-height: 24rem;
-  overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
   scrollbar-color: var(--line) transparent;
 }
 
-.cardSourcePanel::-webkit-scrollbar { width: 4px; }
-.cardSourcePanel::-webkit-scrollbar-track { background: transparent; }
-.cardSourcePanel::-webkit-scrollbar-thumb { background: var(--line); border-radius: 2px; }
+.cardSourcePanel > div::-webkit-scrollbar { width: 4px; }
+.cardSourcePanel > div::-webkit-scrollbar-track { background: transparent; }
+.cardSourcePanel > div::-webkit-scrollbar-thumb { background: var(--line); border-radius: 2px; }
+
+/* Without a generated notice the left column is only a title and a phase
+   line or a button, so give the source a proper reading height. */
+.cardProcessing .cardSourcePanel,
+.cardSkipped .cardSourcePanel {
+  min-height: 24rem;
+}
+
+/* Skipped and failed cards are dimmed. With the source split open, dim only
+   the notice column so the original stays readable. */
+.cardSkipped:has(.cardSplitGrid) {
+  opacity: 1;
+}
+
+.cardSkipped:has(.cardSplitGrid) .cardSplitGrid > div:first-child {
+  opacity: 0.5;
+}
 
 .cardSourcePanel h3 {
   margin: 0 0 0.4rem;
@@ -1641,7 +1676,15 @@ a {
     grid-template-columns: 1fr;
   }
 
-  .cardSourcePanel {
+  /* Stacked: the source sits under the notice, content-sized and capped. */
+  .cardSourcePanel,
+  .cardProcessing .cardSourcePanel,
+  .cardSkipped .cardSourcePanel {
+    min-height: 0;
+  }
+
+  .cardSourcePanel > div {
+    position: static;
     max-height: min(40vh, 14rem);
   }
 
