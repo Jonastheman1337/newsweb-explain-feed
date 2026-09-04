@@ -7,7 +7,9 @@ export const rewriteOutputSchema = z.object({
   title: z.string().min(6).max(140),
   lead: z.string().min(20).max(350),
   body: z.array(z.string().min(10).max(600)).min(0).max(8),
-  company_sentence: z.string().min(10).max(220),
+  // Empty is valid when the source does not contain a useful company profile.
+  // Historical JSON generation schemas below retain their original contract.
+  company_sentence: z.string().max(220),
   key_facts: z.array(z.string().min(5).max(300)).min(1).max(8),
   negative_or_surprising: z.array(z.string().min(5).max(300)).max(6),
   excluded_hype: z.array(z.string().min(5).max(300)).max(6),
@@ -99,6 +101,15 @@ export const rewriteOutputJsonSchema = {
     "importance",
     "source_spans"
   ]
+} as const;
+
+/** Versioned notice schema; legacy prompt/evaluation schema bytes stay frozen. */
+export const noticeRewriteOutputJsonSchema = {
+  ...rewriteOutputJsonSchema,
+  properties: {
+    ...rewriteOutputJsonSchema.properties,
+    company_sentence: { type: "string", maxLength: 220 }
+  }
 } as const;
 
 /**

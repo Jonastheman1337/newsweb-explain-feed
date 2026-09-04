@@ -931,7 +931,7 @@ export function validateRewriteOutput(
     );
   }
 
-  if (countSentences(rewrite.company_sentence) !== 1) {
+  if (rewrite.company_sentence.trim() && countSentences(rewrite.company_sentence) !== 1) {
     addIssue(
       issues,
       "COMPANY_SENTENCE_COUNT",

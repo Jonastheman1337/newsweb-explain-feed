@@ -1458,7 +1458,7 @@ function modelCallStats(generations) {
     let rewriteCalls = 0;
     for (const call of calls) {
       if (!call || typeof call !== "object") continue;
-      if (call.schemaName === "rewrite_output") rewriteCalls += 1;
+      if (call.schemaName === "rewrite_output" || call.schemaName === "notice_rewrite_output") rewriteCalls += 1;
       const effortKey = `${call.schemaName ?? "(unknown)"}:${call.reasoningEffort ?? "(unknown)"}`;
       bucket.reasoning_efforts.set(
         effortKey,

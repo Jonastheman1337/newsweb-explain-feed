@@ -1,4 +1,5 @@
 export * from "./notice-references.js";
+export * from "./notice-editorial-prompt.js";
 export * from "./numbers.js";
 export * from "./prompt.js";
 export * from "./prompt-v6.js";

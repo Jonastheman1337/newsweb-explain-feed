@@ -1,13 +1,26 @@
 // Use legacy build — the default build requires browser APIs (DOMMatrix)
 import { getDocument, type PDFDocumentProxy } from "pdfjs-dist/legacy/build/pdf.mjs";
+import {
+  extractReportFinancialFacts,
+  extractReportNumberValues,
+  type ReportFinancialFact
+} from "./report-financial-facts.js";
+export type { ReportFinancialFact, ReportFinancialPeriod } from "./report-financial-facts.js";
 
 const ATTACHMENT_URL =
   "https://api3.oslo.oslobors.no/v1/newsreader/attachment";
 const MAX_TEXT_CHARS = 15_000;
 const MAX_REPORT_CONTEXT_CHARS = 24_000;
+const MAX_REPORT_REFERENCE_CHARS = 72_000;
+const MAX_REPORT_ATTACHMENTS_INSPECTED = 4;
+const MAX_REPORT_ATTACHMENTS_SELECTED = 2;
+const MAX_REPORT_PDF_BYTES = 20 * 1024 * 1024;
+const MAX_REPORT_DOWNLOAD_BYTES = 40 * 1024 * 1024;
+const MAX_REPORT_PAGES_INSPECTED = 160;
 const MAX_PRIMARY_PAGE_CHARS = 4_500;
 const MAX_USER_PAGE_CHARS = 3_500;
 const MAX_SECONDARY_PAGE_CHARS = 3_000;
+const MAX_SECONDARY_PAGES = 4;
 const MIN_TEXT_CHARS = 500;
 const INCOME_STATEMENT_SCORE_THRESHOLD = 16;
 const FINANCIAL_FALLBACK_SCORE_THRESHOLD = 8;
@@ -46,7 +59,10 @@ export type ReportMetricCandidate = {
   label: string;
   values: string[];
   pageNumber: number;
+  rowNumber?: number;
   rowText: string;
+  attachmentId?: number;
+  attachmentName?: string | null;
 };
 
 export type SelectedReportPage = {
@@ -54,6 +70,17 @@ export type SelectedReportPage = {
   reasons: ReportPageReason[];
   score: number;
   textChars: number;
+  attachmentId?: number;
+  attachmentName?: string | null;
+};
+
+export type ReportAttachmentEvidence = {
+  attachmentId: number;
+  attachmentName: string | null;
+  pageCount: number;
+  extractedPageCount: number;
+  selectedPageNumbers: number[];
+  relevanceScore: number;
 };
 
 export type ReportExtractionDiagnostics = {
@@ -63,6 +90,18 @@ export type ReportExtractionDiagnostics = {
   requestedPageNumbers: number[];
   requestedTopicTerms: string[];
   totalExtractedChars: number;
+  usableFinancialFactCount?: number;
+  unresolvedFinancialFactCount?: number;
+  /** Completeness of extraction, never a claim that every material story fact was found. */
+  completeness?: "complete" | "partial" | "insufficient";
+  completenessReasons?: string[];
+  contextTruncated?: boolean;
+  referenceTextTruncated?: boolean;
+  eligibleAttachmentIds?: number[];
+  inspectedAttachmentIds?: number[];
+  selectedAttachmentIds?: number[];
+  uninspectedAttachmentIds?: number[];
+  failedAttachments?: Array<{ attachmentId: number; reason: string }>;
 };
 
 export type ReportContextPack = {
@@ -70,6 +109,8 @@ export type ReportContextPack = {
   referenceText: string;
   pageCount: number;
   metrics: ReportMetricCandidate[];
+  financialFacts?: ReportFinancialFact[];
+  attachments?: ReportAttachmentEvidence[];
   selectedPages: SelectedReportPage[];
   diagnostics: ReportExtractionDiagnostics;
 };
@@ -106,56 +147,90 @@ type MutableSelectedPage = {
 
 export async function downloadAttachmentPdf(
   messageId: number,
-  attachmentId: number
+  attachmentId: number,
+  options?: { maxBytes?: number }
 ): Promise<Buffer> {
   const url = `${ATTACHMENT_URL}?messageId=${messageId}&attachmentId=${attachmentId}`;
-  const response = await fetch(url);
+  const response = await fetch(url, { signal: AbortSignal.timeout(30_000) });
   if (!response.ok) {
     throw new Error(
       `Failed to download attachment ${attachmentId} for message ${messageId}: ${response.status}`
     );
   }
-  const arrayBuffer = await response.arrayBuffer();
-  return Buffer.from(arrayBuffer);
+  if (!options?.maxBytes) return Buffer.from(await response.arrayBuffer());
+  const maxBytes = options.maxBytes;
+  const contentLength = Number(response.headers.get("content-length"));
+  if (contentLength > maxBytes) {
+    await response.body?.cancel();
+    throw new Error(`PDF attachment ${attachmentId} exceeds the download byte budget`);
+  }
+  if (!response.body) return Buffer.alloc(0);
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      totalBytes += value.byteLength;
+      if (totalBytes > maxBytes) {
+        await reader.cancel();
+        throw new Error(`PDF attachment ${attachmentId} exceeds the download byte budget`);
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  return Buffer.concat(chunks);
 }
 
 /**
  * Extract text from each page of a PDF independently.
  */
 export async function extractPagesFromPdf(
-  buffer: Buffer
+  buffer: Buffer,
+  options?: { maxPages?: number }
 ): Promise<{ pages: string[]; pageCount: number }> {
   const data = new Uint8Array(buffer);
   const doc: PDFDocumentProxy = await getDocument({ data, useSystemFonts: true }).promise;
 
   const pages: string[] = [];
-  for (let i = 1; i <= doc.numPages; i++) {
-    const page = await doc.getPage(i);
-    const content = await page.getTextContent();
-    let lastY: number | undefined;
-    let pageText = "";
-    for (const item of content.items) {
-      if ("str" in item) {
-        if (lastY !== undefined && lastY !== item.transform[5]) {
-          pageText += "\n";
-        } else if (
-          pageText &&
-          item.str &&
-          !/\s$/.test(pageText) &&
-          !/^[\s,.;:%)]/.test(item.str)
-        ) {
-          pageText += " ";
+  const pageCount = doc.numPages;
+  try {
+    for (let i = 1; i <= Math.min(pageCount, options?.maxPages ?? pageCount); i++) {
+      const page = await doc.getPage(i);
+      const content = await page.getTextContent();
+      let lastY: number | undefined;
+      let lastEndX: number | undefined;
+      let pageText = "";
+      for (const item of content.items) {
+        if ("str" in item) {
+          if (lastY !== undefined && Math.abs(lastY - item.transform[5]) > 2) {
+            pageText += "\n";
+          } else if (lastEndX !== undefined && item.transform[4] - lastEndX >= Math.max(12, Math.abs(item.transform[0]) * 1.2)) {
+            // Preserve actual column gaps. A single ordinary space cannot tell a
+            // thousands separator from two adjacent values once geometry is lost.
+            pageText += "\t";
+          } else if (
+            pageText &&
+            item.str &&
+            !/\s$/.test(pageText) &&
+            !/^[\s,.;:%)]/.test(item.str)
+          ) {
+            pageText += " ";
+          }
+          pageText += item.str;
+          lastY = item.transform[5];
+          lastEndX = item.transform[4] + item.width;
         }
-        pageText += item.str;
-        lastY = item.transform[5];
       }
+      pages.push(pageText);
     }
-    pages.push(pageText);
+  } finally {
+    await doc.destroy();
   }
-
-  doc.destroy();
-
-  return { pages, pageCount: doc.numPages };
+  return { pages, pageCount };
 }
 
 export async function extractTextFromPdf(
@@ -184,7 +259,7 @@ function normalizeAttachments(rawMessageJson: unknown): AttachmentMeta[] {
     fileName: (att.fileName ?? att.name ?? null) as string | null,
     fileType: (att.fileType ?? att.contentType ?? null) as string | null,
     fileSize: (att.fileSize ?? att.size ?? null) as number | null
-  }));
+  })).filter((att) => Number.isSafeInteger(att.id) && att.id > 0);
 }
 
 function filterPdfs(attachments: AttachmentMeta[], filenamePattern?: RegExp): AttachmentMeta[] {
@@ -211,10 +286,11 @@ function pickLargestAttachment(attachments: AttachmentMeta[]): AttachmentMeta | 
 
 async function downloadPdfTarget(
   messageId: number,
-  target: AttachmentMeta
+  target: AttachmentMeta,
+  options?: { maxBytes?: number; maxPages?: number }
 ): Promise<PdfAttachmentDownload> {
-  const buffer = await downloadAttachmentPdf(messageId, target.id);
-  const { pageCount } = await extractPagesFromPdf(buffer);
+  const buffer = await downloadAttachmentPdf(messageId, target.id, options);
+  const { pageCount } = await extractPagesFromPdf(buffer, options);
   return {
     buffer,
     pageCount,
@@ -225,11 +301,19 @@ async function downloadPdfTarget(
 
 export async function downloadReportPdfAttachment(
   rawMessageJson: unknown,
-  messageId: number
+  messageId: number,
+  preferredAttachmentId?: number
 ): Promise<PdfAttachmentDownload | null> {
   const attachments = normalizeAttachments(rawMessageJson);
-  const target = pickLargestAttachment(filterPdfs(attachments, REPORT_FILENAME_PATTERN));
-  return target ? downloadPdfTarget(messageId, target) : null;
+  const preferred = filterPdfs(attachments).find((attachment) => attachment.id === preferredAttachmentId);
+  if (preferred) return downloadPdfTarget(messageId, preferred, { maxBytes: MAX_REPORT_PDF_BYTES, maxPages: 1 });
+  const inspection = await inspectReportAttachments(attachments, messageId);
+  const selected = inspection.documents.filter((document) => document.relevant).sort((a, b) => b.score - a.score)[0];
+  if (selected) return { buffer: selected.buffer, pageCount: selected.pageCount, attachmentId: selected.target.id, attachmentName: selected.target.fileName ?? null };
+  // A scanned, explicitly named report can still be sent to visual extraction.
+  // An opaque non-report must not enter the report route just because it is a PDF.
+  const named = inspection.documents.find((document) => REPORT_FILENAME_PATTERN.test(document.target.fileName ?? "") && document.pages.join("").trim().length < MIN_TEXT_CHARS);
+  return named ? { buffer: named.buffer, pageCount: named.pageCount, attachmentId: named.target.id, attachmentName: named.target.fileName ?? null } : null;
 }
 
 export async function downloadYearlyReportPdfAttachment(
@@ -239,7 +323,7 @@ export async function downloadYearlyReportPdfAttachment(
   const attachments = normalizeAttachments(rawMessageJson);
   const yearlyPdfs = filterPdfs(attachments, YEARLY_REPORT_FILENAME_PATTERN);
   const norwegianReport = yearlyPdfs.find((att) =>
-    /[Ã¥a]rsrapport/i.test(att.fileName ?? "")
+    /[åa]rsrapport/i.test(att.fileName ?? "")
   );
   const target =
     norwegianReport ??
@@ -268,12 +352,14 @@ export function reportNeedsOpenAIPdfFallback(
     context.diagnostics.requestedTopicTerms.length > 0 &&
     !context.selectedPages.some((page) => page.reasons.includes("user_topic"));
   const requestedPageMissing =
-    context.diagnostics.requestedPageNumbers.length > 0 &&
-    !context.selectedPages.some((page) => page.reasons.includes("user_page"));
+    context.diagnostics.requestedPageNumbers.some((number) =>
+      !context.selectedPages.some((page) => page.pageNumber === number && page.reasons.includes("user_page"))
+    );
 
   return (
     context.diagnostics.totalExtractedChars < 1200 ||
     context.metrics.length === 0 ||
+    (context.financialFacts !== undefined && !context.financialFacts.some((fact) => fact.usable)) ||
     requestedTopicMissing ||
     requestedPageMissing
   );
@@ -358,29 +444,23 @@ const NON_INCOME_STATEMENT_TERMS = [
   "balanse"
 ];
 
-const SECONDARY_CONTEXT_TERMS: Array<{ term: string; weight: number; reason: ReportPageReason }> = [
-  { term: "ceo", weight: 6, reason: "ceo_or_management" },
-  { term: "chief executive", weight: 6, reason: "ceo_or_management" },
-  { term: "letter from", weight: 4, reason: "ceo_or_management" },
-  { term: "konsernsjef", weight: 6, reason: "ceo_or_management" },
-  { term: "administrerende direktor", weight: 6, reason: "ceo_or_management" },
-  { term: "management review", weight: 5, reason: "ceo_or_management" },
-  { term: "directors report", weight: 4, reason: "ceo_or_management" },
-  { term: "financial review", weight: 4, reason: "ceo_or_management" },
-  { term: "outlook", weight: 5, reason: "outlook_or_events" },
-  { term: "guidance", weight: 4, reason: "outlook_or_events" },
-  { term: "key events", weight: 4, reason: "outlook_or_events" },
-  { term: "highlights", weight: 3, reason: "outlook_or_events" },
-  { term: "subsequent events", weight: 4, reason: "outlook_or_events" },
-  { term: "utsikter", weight: 5, reason: "outlook_or_events" },
-  { term: "hendelser", weight: 3, reason: "outlook_or_events" },
-  { term: "hoydepunkter", weight: 3, reason: "outlook_or_events" }
+// Match section headings, not accounting notes that merely mention management,
+// estimates or an income statement. Period suffixes cover report mastheads.
+const SECONDARY_CONTEXT_HEADINGS: Array<{ pattern: RegExp; weight: number; reason: ReportPageReason }> = [
+  { pattern: /^(?:(?:q[1-4]|h[12])\s+(?:20\d{2}\s+)?)?financial (?:results|review|performance)(?:\s+(?:q[1-4]|h[12]|20\d{2})[\d\s]*)?$/, weight: 12, reason: "ceo_or_management" },
+  { pattern: /^(?:resultat(?:et)? per\s+\d{1,2}\.\d{1,2}\.20\d{2}|resultatutvikling|okonomisk utvikling)$/, weight: 12, reason: "ceo_or_management" },
+  { pattern: /^(?:management (?:report|review)|(?:board of )?directors['’]? report|report (?:of|from) the (?:board of )?directors|styrets beretning|halvarsberetning)(?:\s+(?:q[1-4]|h[12]|20\d{2})[\d\s]*)?$/, weight: 10, reason: "ceo_or_management" },
+  { pattern: /^(?:(?:letter|message|statement|review|report) from (?:the )?(?:ceo|chief executive(?: officer)?|konsernsjef(?:en)?|administrerende direktor)|(?:ceo|chief executive(?: officer)?|konsernsjef(?:en)?|administrerende direktor)(?:['’]s)?\s+(?:letter|message|statement|review|report|kommentar|har ordet))$/, weight: 8, reason: "ceo_or_management" },
+  { pattern: /^(?:outlook|guidance|utsikter|fremtidsutsikter)$/, weight: 6, reason: "outlook_or_events" },
+  { pattern: /^(?:key events|highlights|subsequent events|events after (?:the )?reporting period|(?:viktige |vesentlige )?hendelser(?: etter balansedagen| i forste halvar(?: 20\d{2})?)?|hoydepunkter)$/, weight: 5, reason: "outlook_or_events" }
 ];
 
 const METRIC_MATCHERS: Record<ReportMetricKind, RegExp[]> = {
   revenue: [
     /\b(total\s+)?(operating\s+)?revenues?\b/,
     /\bsales revenue\b/,
+    /\btotal\s+operating\s+income\b/,
+    /\bsalgsinntekter\b/,
     /\bdriftsinntekter\b/,
     /\binntekter\b/,
     /\bomsetning\b/
@@ -478,11 +558,7 @@ function metricKindsInText(text: string): Set<ReportMetricKind> {
 }
 
 function extractNumberValues(text: string): string[] {
-  const matches = text.match(/(?:\(\s*)?-?\d[\d\s.,]*(?:\))?/g) ?? [];
-  return matches
-    .map((value) => value.replace(/\s+/g, " ").trim())
-    .filter((value) => /\d/.test(value))
-    .slice(0, 8);
+  return extractReportNumberValues(text).slice(0, 8);
 }
 
 function extractMetricLabel(rowText: string): string {
@@ -490,10 +566,6 @@ function extractMetricLabel(rowText: string): string {
   const label =
     numberIndex >= 0 ? rowText.slice(0, numberIndex) : rowText;
   return label.replace(/\s+/g, " ").trim().slice(0, 140);
-}
-
-function compactRowText(rowText: string): string {
-  return rowText.replace(/\s+/g, " ").trim().slice(0, 320);
 }
 
 function scoreTermWeights(
@@ -507,7 +579,40 @@ function scoreTermWeights(
 }
 
 function hasIncomeStatementHeading(page: PdfPageText): boolean {
-  return scoreTermWeights(page.normalized, INCOME_STATEMENT_TERMS) > 0;
+  if (isContentsPage(page) || isAccountingPolicyPage(page)) return false;
+  return possibleHeadingLines(page).some(line => {
+    const heading = line.match(/^(?:(?:condensed|consolidated|interim|unaudited|group|parent(?: company)?|konsern(?:ets)?)\s+)*(?:income statements?|statements? of (?:comprehensive income|profit (?:or|and) loss(?: and (?:other )?comprehensive income)?)|resultatregnskap(?:et)?(?: for konsernet)?|oppstilling over totalresultat|totalresultat)(?=$|\s|[(:–-])/);
+    if (!heading) return false;
+    const suffix = line.slice(heading[0].length).replace(/\([^)]{1,60}\)/g, "").trim();
+    if (!suffix) return true;
+    // Accept ordinary reporting-period headings, including wrapped long IFRS
+    // names, while rejecting sentences about how an income statement is used.
+    if (!/\b(?:20\d{2}|q[1-4]|h[12]|fy)\b/.test(suffix)) return false;
+    return suffix
+      .replace(/\b(?:for|the|periods?|perioden|quarter|kvartal|year|ended|ending|as|at|three|six|nine|twelve|months?|q[1-4]|h[12]|fy|january|february|march|april|may|june|july|august|september|october|november|december|januar|februar|mars|mai|juni|juli|oktober|desember)\b/g, "")
+      .replace(/[\d\s.,/:–-]/g, "").length === 0;
+  });
+}
+
+function normalizedPageLines(page: PdfPageText): string[] {
+  return page.text.split(/\r?\n/).map(normalizeForSearch).filter(Boolean);
+}
+
+function possibleHeadingLines(page: PdfPageText): string[] {
+  const lines = normalizedPageLines(page);
+  return lines.flatMap((line, index) => line.length <= 80 && lines[index + 1]?.length <= 80
+    ? [line, `${line} ${lines[index + 1]}`]
+    : [line]);
+}
+
+function isContentsPage(page: PdfPageText): boolean {
+  return normalizedPageLines(page).some(line => /^(?:table of contents|contents|innholdsfortegnelse|innhold)$/.test(line));
+}
+
+function isAccountingPolicyPage(page: PdfPageText): boolean {
+  return normalizedPageLines(page).some(line =>
+    /^(?:note\s+\d+\s*[-.:]?\s*)?(?:(?:significant |material |summary of significant )?accounting (?:principles|policies)|basis (?:for consolidation|of preparation)|regnskapsprinsipper)(?:\s*\([^)]*\))?$/.test(line)
+  );
 }
 
 function scoreIncomeStatementPage(page: PdfPageText): number {
@@ -529,6 +634,7 @@ function scoreIncomeStatementPage(page: PdfPageText): number {
 }
 
 function scoreFinancialFallbackPage(page: PdfPageText): number {
+  if (isAccountingPolicyPage(page)) return 0;
   let score = metricKindsInText(page.text).size * 6;
   score += scoreTermWeights(page.normalized, [
     { term: "financial review", weight: 5 },
@@ -551,18 +657,28 @@ function scoreFinancialFallbackPage(page: PdfPageText): number {
 }
 
 function scoreSecondaryPage(page: PdfPageText): { score: number; reason: ReportPageReason } {
+  if (isContentsPage(page) || isAccountingPolicyPage(page)) return { score: 0, reason: "ceo_or_management" };
   let score = 0;
   let reason: ReportPageReason = "ceo_or_management";
-  for (const term of SECONDARY_CONTEXT_TERMS) {
-    if (page.normalized.includes(term.term)) {
-      score += term.weight;
-      reason = term.reason;
+  const headings = possibleHeadingLines(page).map(line => line.split(":")[0].trim()).filter(line => line.length <= 120);
+  for (const heading of SECONDARY_CONTEXT_HEADINGS) {
+    if (headings.some(line => heading.pattern.test(line)) && heading.weight > score) {
+      score = heading.weight;
+      reason = heading.reason;
     }
   }
-  if (hasAnyTerm(page.normalized, CONTENTS_TERMS)) {
-    score -= 12;
-  }
-  return { score: Math.max(0, score), reason };
+  return { score, reason };
+}
+
+function isManagementContinuation(page: PdfPageText): boolean {
+  if (isContentsPage(page) || isAccountingPolicyPage(page) || hasIncomeStatementHeading(page)) return false;
+  // Do not follow management prose into a financial statement, a numbered note,
+  // an image page or a table. One adjacent prose page is enough to recover a
+  // section broken at a physical page boundary without unbounded expansion.
+  const lines = normalizedPageLines(page);
+  if (lines.some(line => /^(?:note\s+\d+\b|(?:consolidated )?(?:statement of financial position|balance sheet|cash flow statement)|balanse|kontantstromoppstilling|nokkel(?:tall|tal))/.test(line))) return false;
+  const prose = lines.filter(line => (line.match(/[a-z]+/g) ?? []).length >= 8 && !/^\d/.test(line));
+  return prose.join(" ").length >= 120;
 }
 
 function scoreByInstructionTerms(page: PdfPageText, terms: string[]): number {
@@ -680,36 +796,42 @@ function extractMetricsFromPages(
   pageIndexes: Set<number>
 ): ReportMetricCandidate[] {
   const candidates: ReportMetricCandidate[] = [];
-  const perKindCount = new Map<ReportMetricKind, number>();
 
   for (const page of pages) {
     if (!pageIndexes.has(page.index)) continue;
-    const lines = page.text
-      .split(/\n+/)
-      .map((line) => line.trim())
-      .filter(Boolean);
+    const lines = page.text.split(/\r?\n/);
 
-    for (const line of lines) {
+    for (const [lineIndex, line] of lines.entries()) {
       const normalizedLine = normalizeForSearch(line);
       const values = extractNumberValues(line);
       if (values.length === 0) continue;
 
       for (const kind of Object.keys(METRIC_MATCHERS) as ReportMetricKind[]) {
         if (!metricKindMatches(normalizedLine, kind)) continue;
-        if ((perKindCount.get(kind) ?? 0) >= 2) continue;
         candidates.push({
           metric: kind,
           label: extractMetricLabel(line) || metricDisplayName(kind),
           values,
           pageNumber: page.pageNumber,
-          rowText: compactRowText(line)
+          rowNumber: lineIndex + 1,
+          rowText: line
         });
-        perKindCount.set(kind, (perKindCount.get(kind) ?? 0) + 1);
       }
     }
   }
 
-  return candidates;
+  // Preserve the bounded context while keeping explicit totals ahead of
+  // components. Otherwise sales + other income can consume both slots before
+  // a later total operating income row is considered.
+  const selected = new Set<ReportMetricCandidate>();
+  const isRevenueTotal = (candidate: ReportMetricCandidate) =>
+    /^(?:total\s+(?:(?:operating\s+)?revenues?|operating\s+income)|sum\s+(?:driftsinntekter|inntekter|omsetning))$/.test(normalizeForSearch(candidate.label));
+  for (const kind of Object.keys(METRIC_MATCHERS) as ReportMetricKind[]) {
+    const matching = candidates.filter(candidate => candidate.metric === kind);
+    if (kind === "revenue") matching.sort((left, right) => Number(isRevenueTotal(right)) - Number(isRevenueTotal(left)));
+    for (const candidate of matching.slice(0, 2)) selected.add(candidate);
+  }
+  return candidates.filter(candidate => selected.has(candidate));
 }
 
 function buildMetricSection(metrics: ReportMetricCandidate[]): string {
@@ -736,7 +858,8 @@ function buildMetricSection(metrics: ReportMetricCandidate[]): string {
 function buildReportContextText(
   pages: PdfPageText[],
   selected: Map<number, MutableSelectedPage>,
-  metrics: ReportMetricCandidate[]
+  metrics: ReportMetricCandidate[],
+  financialFacts: ReportFinancialFact[]
 ): string {
   const selectedItems = [...selected.values()];
   const hasReason = (item: MutableSelectedPage, reasons: ReportPageReason[]) =>
@@ -764,7 +887,16 @@ function buildReportContextText(
     "outlook_or_events"
   ]).filter((index) => !primarySet.has(index) && !userSet.has(index));
 
-  const sections: string[] = [buildMetricSection(metrics)];
+  const usableFacts = financialFacts.filter((fact) => fact.usable);
+  const sections: string[] = [
+    [
+      "ALIGNED FINANCIAL FACTS (original units; no conversions):",
+      ...(usableFacts.length ? usableFacts.map((fact) =>
+        `- ${fact.metric}: ${fact.rawValue} ${fact.currency} ${fact.scale}; ${fact.period?.label}; ${fact.tableScope}; PDF page ${fact.pageNumber}, row ${fact.rowNumber}; comparison column: ${fact.comparisonPeriodId ?? "none identified"}`
+      ) : ["- None. Column periods, scale, currency or scope could not be resolved safely. Do not infer them from column order."])
+    ].join("\n"),
+    buildMetricSection(metrics)
+  ];
   if (primaryIndexes.length > 0) {
     sections.push(
       [
@@ -803,7 +935,8 @@ function buildReportContextText(
 
 export function buildReportContextFromPages(
   rawPages: string[],
-  userInstruction?: string
+  userInstruction?: string,
+  options?: { pageCount?: number }
 ): ReportContextPack {
   const pages: PdfPageText[] = rawPages.map((text, index) => ({
     index,
@@ -816,10 +949,7 @@ export function buildReportContextFromPages(
   const incomeScores: ScoredPage[] = pages
     .map((page) => ({ index: page.index, score: scoreIncomeStatementPage(page) }))
     .sort((left, right) => right.score - left.score);
-  const incomeStatementFound =
-    (incomeScores[0]?.score ?? 0) >= INCOME_STATEMENT_SCORE_THRESHOLD &&
-    !!incomeScores[0] &&
-    hasIncomeStatementHeading(pages[incomeScores[0].index]);
+  const incomeStatementFound = incomeScores.some((item) => item.score >= INCOME_STATEMENT_SCORE_THRESHOLD && hasIncomeStatementHeading(pages[item.index]));
 
   if (incomeStatementFound) {
     for (const item of incomeScores
@@ -854,7 +984,7 @@ export function buildReportContextFromPages(
 
   const requestedPageNumbers = extractRequestedPageNumbers(
     userInstruction,
-    pages.length
+    options?.pageCount ?? pages.length
   );
   for (const pageNumber of requestedPageNumbers) {
     const index = pageNumber - 1;
@@ -894,35 +1024,145 @@ export function buildReportContextFromPages(
       ? selectedPrimaryIndexes
       : new Set(incomeScores.slice(0, 3).map((item) => item.index));
   const metrics = extractMetricsFromPages(pages, metricPageIndexes);
+  const financialFacts = extractReportFinancialFacts(pages, metrics);
 
-  const secondaryScores = pages
+  const secondaryCandidates = pages
     .map((page) => ({
       index: page.index,
       ...scoreSecondaryPage(page)
     }))
-    .filter((item) => item.score >= 4)
-    .sort((left, right) => right.score - left.score)
-    .slice(0, 4);
+    .filter((item) => item.score >= 4 && !selectedPrimaryIndexes.has(item.index));
+  const secondaryByIndex = new Map(secondaryCandidates.map(item => [item.index, item]));
+  for (const item of secondaryCandidates) {
+    const next = pages[item.index + 1];
+    if (item.reason === "ceo_or_management" && next && !selected.has(next.index) && !secondaryByIndex.has(next.index) && isManagementContinuation(next)) {
+      secondaryByIndex.set(next.index, { index: next.index, score: item.score - 1, reason: item.reason });
+    }
+  }
+  const secondaryScores = [...secondaryByIndex.values()]
+    .sort((left, right) => right.score - left.score || left.index - right.index)
+    .slice(0, MAX_SECONDARY_PAGES);
   for (const item of secondaryScores) {
     addSelectedPage(selected, pages, item.index, item.reason, item.score);
   }
 
   const selectedPages = toSelectedPages(selected, pages);
-  const text = buildReportContextText(pages, selected, metrics);
+  const text = buildReportContextText(pages, selected, metrics, financialFacts);
+  const evidenceRows = financialFacts.filter((fact, index) => financialFacts.findIndex((other) => other.pageNumber === fact.pageNumber && other.rowNumber === fact.rowNumber) === index);
+  // Put the exact financial rows and their source headings before long pages so
+  // truncation cannot leave only a derived value without its original evidence.
+  const rawReferenceText = [
+    ...evidenceRows.map((fact) => `[PDF page ${fact.pageNumber}, row ${fact.rowNumber}; original table headings and row]\n${[...fact.headerText, fact.rowText].join("\n")}`),
+    ...selectedPages.map((page) => `[PDF page ${page.pageNumber}]\n${rawPages[page.pageNumber - 1]}`)
+  ].join("\n\n");
+  const referenceTextTruncated = rawReferenceText.length > MAX_REPORT_REFERENCE_CHARS;
+  const referenceText = referenceTextTruncated ? `${rawReferenceText.slice(0, MAX_REPORT_REFERENCE_CHARS)}\n[... selected source pages truncated ...]` : rawReferenceText;
+  const contextTruncated = text.includes("[... page truncated ...]") || text.includes("[... more selected report context omitted ...]");
+  const usableFinancialFactCount = financialFacts.filter((fact) => fact.usable).length;
+  const unresolvedFinancialFactCount = financialFacts.length - usableFinancialFactCount;
+  const completenessReasons: string[] = [];
+  if (!incomeStatementFound) completenessReasons.push("income_statement_not_identified");
+  if (!metrics.length) completenessReasons.push("metric_rows_not_identified");
+  if (new Set(financialFacts.filter((fact) => fact.usable).map((fact) => fact.metric)).size < Object.keys(METRIC_MATCHERS).length) completenessReasons.push("key_financial_metrics_unresolved");
+  if (!usableFinancialFactCount) completenessReasons.push("no_usable_financial_facts");
+  if (unresolvedFinancialFactCount) completenessReasons.push("financial_fact_ambiguity");
+  if (contextTruncated) completenessReasons.push("selected_context_truncated");
+  if (referenceTextTruncated) completenessReasons.push("selected_reference_pages_truncated");
+  if ([...secondaryByIndex.keys()].some(index => !selected.has(index))) completenessReasons.push("management_context_selection_budget");
+  if (requestedTopicTerms.length && !selectedPages.some((page) => page.reasons.includes("user_topic"))) completenessReasons.push("requested_topic_not_found");
+  if (requestedPageNumbers.some((number) => !selectedPages.some((page) => page.pageNumber === number && page.reasons.includes("user_page")))) completenessReasons.push("requested_page_not_found");
 
   return {
     text,
-    referenceText: text,
+    referenceText,
     pageCount: pages.length,
     metrics,
+    financialFacts,
     selectedPages,
     diagnostics: {
       incomeStatementFound,
       fallbackUsed: !incomeStatementFound,
       requestedPageNumbers,
       requestedTopicTerms,
-      totalExtractedChars: rawPages.join("\n\n").length
+      totalExtractedChars: rawPages.join("\n\n").length,
+      usableFinancialFactCount,
+      unresolvedFinancialFactCount,
+      completeness: usableFinancialFactCount === 0 ? "insufficient" : completenessReasons.length ? "partial" : "complete",
+      completenessReasons,
+      contextTruncated,
+      referenceTextTruncated
     }
+  };
+}
+
+type InspectedReportDocument = {
+  target: AttachmentMeta;
+  buffer: Buffer;
+  pages: string[];
+  pageCount: number;
+  relevant: boolean;
+  score: number;
+};
+
+/** Filename hints affect the bounded inspection order; content decides relevance. */
+function scoreReportDocument(pages: string[]): { relevant: boolean; score: number } {
+  let bestScore = 0;
+  let relevant = false;
+  for (const [index, text] of pages.entries()) {
+    const page = { index, pageNumber: index + 1, text, normalized: normalizeForSearch(text) };
+    if (hasAnyTerm(page.normalized, CONTENTS_TERMS)) continue;
+    const rows = extractMetricsFromPages([page], new Set([index]));
+    const kinds = new Set(rows.map((row) => row.metric));
+    const statement = hasIncomeStatementHeading(page) && kinds.size >= 1;
+    const summary = kinds.size >= 2 && new Set(rows.map((row) => row.rowNumber)).size >= 2 && /\b(?:q[1-4]|h[12]|quarter(?:ly)?|kvartal|halvar|interim|financial results|financial report)\b/.test(page.normalized);
+    if (statement || summary) {
+      relevant = true;
+      bestScore = Math.max(bestScore, scoreIncomeStatementPage(page) + kinds.size * 8 + (statement ? 20 : 0));
+    }
+  }
+  return { relevant, score: bestScore };
+}
+
+async function inspectReportAttachments(attachments: AttachmentMeta[], messageId: number): Promise<{
+  documents: InspectedReportDocument[];
+  eligibleAttachmentIds: number[];
+  inspectedAttachmentIds: number[];
+  uninspectedAttachmentIds: number[];
+  failedAttachments: Array<{ attachmentId: number; reason: string }>;
+}> {
+  const eligible = filterPdfs(attachments);
+  const priority = (attachment: AttachmentMeta) => REPORT_FILENAME_PATTERN.test(attachment.fileName ?? "") ? 2 : YEARLY_REPORT_FILENAME_PATTERN.test(attachment.fileName ?? "") ? 0 : 1;
+  const candidates = [...eligible].sort((a, b) => priority(b) - priority(a));
+  const documents: InspectedReportDocument[] = [];
+  const inspectedAttachmentIds: number[] = [];
+  const failedAttachments: Array<{ attachmentId: number; reason: string }> = [];
+  let remainingBytes = MAX_REPORT_DOWNLOAD_BYTES;
+  for (const target of candidates.slice(0, MAX_REPORT_ATTACHMENTS_INSPECTED)) {
+    if (remainingBytes <= 0) break;
+    const maxBytes = Math.min(MAX_REPORT_PDF_BYTES, remainingBytes);
+    if (target.fileSize && target.fileSize > maxBytes) {
+      failedAttachments.push({ attachmentId: target.id, reason: "download_byte_budget" });
+      continue;
+    }
+    inspectedAttachmentIds.push(target.id);
+    // Reserve the whole allowance until a successful download establishes the
+    // actual byte count. A failed/truncated response cannot evade the total cap.
+    remainingBytes -= maxBytes;
+    try {
+      const buffer = await downloadAttachmentPdf(messageId, target.id, { maxBytes });
+      remainingBytes += maxBytes - buffer.byteLength;
+      const { pages, pageCount } = await extractPagesFromPdf(buffer, { maxPages: MAX_REPORT_PAGES_INSPECTED });
+      documents.push({ target, buffer, pages, pageCount, ...scoreReportDocument(pages) });
+    } catch (error) {
+      failedAttachments.push({ attachmentId: target.id, reason: error instanceof Error ? error.message.slice(0, 200) : "pdf_extraction_failed" });
+    }
+  }
+  return {
+    documents,
+    eligibleAttachmentIds: eligible.map((attachment) => attachment.id),
+    inspectedAttachmentIds,
+    uninspectedAttachmentIds: eligible.filter((attachment) => !inspectedAttachmentIds.includes(attachment.id)).map((attachment) => attachment.id),
+    failedAttachments
   };
 }
 
@@ -936,23 +1176,75 @@ export async function extractReportContent(
   userInstruction?: string
 ): Promise<ReportExtractionResult | null> {
   const attachments = normalizeAttachments(rawMessageJson);
-  const reportPdfs = filterPdfs(attachments, REPORT_FILENAME_PATTERN);
-  const target = pickLargestAttachment(reportPdfs);
-  if (!target) return null;
-
-  const buffer = await downloadAttachmentPdf(messageId, target.id);
-  const { pages, pageCount } = await extractPagesFromPdf(buffer);
-  const fullText = pages.join("\n\n");
-
-  if (fullText.trim().length < MIN_TEXT_CHARS) return null;
-
-  const contextPack = buildReportContextFromPages(pages, userInstruction);
-
+  const inspection = await inspectReportAttachments(attachments, messageId);
+  const relevant = inspection.documents.filter((document) => document.relevant && document.pages.join("\n\n").trim().length >= MIN_TEXT_CHARS).sort((a, b) => b.score - a.score);
+  // Keep substantively different PDFs; exact duplicate language copies waste the
+  // limited context without contributing a source or a missing financial fact.
+  const unique = relevant.filter((document, index) => relevant.findIndex((other) => other.pages.join("\n").trim() === document.pages.join("\n").trim()) === index);
+  const selected = unique.slice(0, MAX_REPORT_ATTACHMENTS_SELECTED);
+  if (!selected.length) return null;
+  const contexts = selected.map((document) => ({ document, context: buildReportContextFromPages(document.pages, userInstruction, { pageCount: document.pageCount }) }));
+  const primary = contexts[0];
+  const attachmentHeading = (document: InspectedReportDocument) => `[PDF attachment ${document.target.id}: ${(document.target.fileName ?? "unnamed").replace(/\s+/g, " ").slice(0, 160)}]`;
+  const perDocumentTextBudget = Math.floor((MAX_REPORT_CONTEXT_CHARS - 1000) / selected.length);
+  const perDocumentReferenceBudget = Math.floor((MAX_REPORT_REFERENCE_CHARS - 1000) / selected.length);
+  let contextTruncated = false;
+  let referenceTextTruncated = false;
+  const withBudget = (value: string, budget: number, reference: boolean) => {
+    if (value.length <= budget) return value;
+    if (reference) referenceTextTruncated = true;
+    else contextTruncated = true;
+    const lastLineEnd = value.lastIndexOf("\n", budget);
+    return `${value.slice(0, lastLineEnd > budget / 2 ? lastLineEnd : budget)}\n[... attachment context truncated ...]`;
+  };
+  const text = contexts.map(({ document, context }) => `${attachmentHeading(document)}\n${withBudget(context.text, perDocumentTextBudget, false)}`).join("\n\n---\n\n");
+  const referenceText = contexts.map(({ document, context }) => `${attachmentHeading(document)}\n${withBudget(context.referenceText, perDocumentReferenceBudget, true)}`).join("\n\n");
+  const provenance = (document: InspectedReportDocument) => ({ attachmentId: document.target.id, attachmentName: document.target.fileName ?? null });
+  const metrics = contexts.flatMap(({ document, context }) => context.metrics.map((metric) => ({ ...metric, ...provenance(document) })));
+  const financialFacts = contexts.flatMap(({ document, context }) => (context.financialFacts ?? []).map((fact) => ({ ...fact, ...provenance(document) })));
+  const selectedPages = contexts.flatMap(({ document, context }) => context.selectedPages.map((page) => ({ ...page, ...provenance(document) })));
+  const completenessReasons = new Set(contexts.flatMap(({ context }) => context.diagnostics.completenessReasons ?? []));
+  if (inspection.uninspectedAttachmentIds.length) completenessReasons.add("attachment_inspection_budget");
+  if (inspection.failedAttachments.length) completenessReasons.add("attachment_extraction_failed");
+  if (unique.length > selected.length) completenessReasons.add("additional_relevant_attachments_omitted");
+  if (contexts.some(({ document }) => document.pages.length < document.pageCount)) completenessReasons.add("report_page_inspection_budget");
+  contextTruncated ||= contexts.some(({ context }) => context.diagnostics.contextTruncated);
+  referenceTextTruncated ||= contexts.some(({ context }) => context.diagnostics.referenceTextTruncated);
+  if (contextTruncated) completenessReasons.add("selected_context_truncated");
+  if (referenceTextTruncated) completenessReasons.add("selected_reference_pages_truncated");
+  const usableFinancialFactCount = financialFacts.filter((fact) => fact.usable).length;
   return {
-    ...contextPack,
-    pageCount,
-    attachmentId: target.id,
-    attachmentName: target.fileName ?? null
+    text,
+    referenceText,
+    // Compatibility: singular page count/id describe the primary attachment.
+    pageCount: primary.document.pageCount,
+    attachmentId: primary.document.target.id,
+    attachmentName: primary.document.target.fileName ?? null,
+    metrics,
+    financialFacts,
+    selectedPages,
+    attachments: contexts.map(({ document, context }) => ({
+      ...provenance(document),
+      pageCount: document.pageCount,
+      extractedPageCount: document.pages.length,
+      selectedPageNumbers: context.selectedPages.map((page) => page.pageNumber),
+      relevanceScore: document.score
+    })),
+    diagnostics: {
+      ...primary.context.diagnostics,
+      totalExtractedChars: contexts.reduce((sum, { context }) => sum + context.diagnostics.totalExtractedChars, 0),
+      usableFinancialFactCount,
+      unresolvedFinancialFactCount: financialFacts.length - usableFinancialFactCount,
+      completeness: usableFinancialFactCount === 0 ? "insufficient" : completenessReasons.size ? "partial" : "complete",
+      completenessReasons: [...completenessReasons],
+      contextTruncated,
+      referenceTextTruncated,
+      eligibleAttachmentIds: inspection.eligibleAttachmentIds,
+      inspectedAttachmentIds: inspection.inspectedAttachmentIds,
+      selectedAttachmentIds: selected.map((document) => document.target.id),
+      uninspectedAttachmentIds: inspection.uninspectedAttachmentIds,
+      failedAttachments: inspection.failedAttachments
+    }
   };
 }
 

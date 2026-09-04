@@ -426,7 +426,8 @@ export function buildReferencePriorContext(
 
 export function buildReferenceCheckPrompt(
   payload: PromptPayload,
-  draftRewrite: RewriteOutput
+  draftRewrite: RewriteOutput,
+  options: { noticeSemantics?: boolean } = {}
 ): ReferenceCheckPrompt {
   const visibleDraftSentences = collectVisibleDraftSentences(draftRewrite);
   const draftSentences = collectDraftSentences(draftRewrite);
@@ -494,7 +495,13 @@ export function buildReferenceCheckPrompt(
     "Hvis en setning inneholder subjektive vurderinger eller verdisprak (f.eks. 'milepael', 'styrker posisjon', 'betydelig') uten tydelig attribusjon til kilden/selskapet, skal grounded settes til false.",
     "Paatander om effekt, betydning eller kommersiell verdi ma enten ha direkte dekning i kilden og attribusjon, eller markeres som ikke dekket.",
     "interpretation skal kort forklare hvorfor setningen er dekket eller ikke.",
-    "sourceEvidence skal inneholde et kort tekstutdrag fra referansen; tom streng hvis ingenting dekker setningen."
+    "sourceEvidence skal inneholde et kort tekstutdrag fra referansen; tom streng hvis ingenting dekker setningen.",
+    ...(options.noticeSemantics ? [
+      "Kontroller tall som en samlet opplysning: selskap/konsern, mål, beløp, valuta, skala, periode og sammenligningsperiode må høre sammen. At tallet finnes et annet sted i kilden er ikke dekning.",
+      "Bevar sikkerhetsgrad i begge retninger: rapporterte tall og bekreftede hendelser skal ikke omskrives til 'kan ha', 'skal ha' eller 'hevdes det'. Prognoser, betingelser og planer skal heller ikke presenteres som gjennomført. En slik endring betyr grounded=false.",
+      "Rapportert økning eller fall er ikke en usikker effektpåstand. En attribuert vurdering eller årsaksforklaring trenger ikke et ekstra 'kan' når kilden fremsetter den uten et slikt forbehold.",
+      "Skill samlet kjøpesum fra betaling ved overtakelse, bindende beløp fra opsjon/tak og kontantstrøm fra resultat. Behold vilkår som endrer betydningen."
+    ] : [])
   ].join("\n");
 
   const userPrompt = [

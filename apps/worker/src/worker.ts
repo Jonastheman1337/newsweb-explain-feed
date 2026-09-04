@@ -7,10 +7,8 @@ import {
   REDIS_CHANNELS,
   fixDoubleEncodedUtf8,
   isYearlyReportCategory,
-  needsNewsworthinessTriage,
   normalizeRewriteJson,
   parseRedisUrl,
-  rewriteOutputJsonSchema,
   rewriteOutputSchema,
   shouldSkipRewrite,
   toPrismaJsonValue,
@@ -27,88 +25,20 @@ import {
 } from "@newsweb/shared/db";
 import { Prisma, type PrismaClient } from "@prisma/client";
 import {
-  PROMPT_VERSION,
-  createDeveloperPrompt,
-  createReportDeveloperPrompt,
-  createReportRevisionUserPrompt,
-  createReportSystemPrompt,
-  createReportUserPrompt,
-  createRevisionUserPrompt,
-  createSystemPrompt,
-  createUserPrompt,
-  createYearlyReportDeveloperPrompt,
-  createYearlyReportRevisionUserPrompt,
-  createYearlyReportSystemPrompt,
-  createYearlyReportUserPrompt,
+  NOTICE_EDITORIAL_PROMPT_VERSION as PROMPT_VERSION,
+  type NoticePromptKind,
   defaultEnabledDerivationRules,
   maxVisibleArticleCharsForOutputMode,
   numberDerivationRuleIds,
   type PromptPayload,
-  type SupplementalMaterialPayload,
-  type ReportPromptPayload,
-  type YearlyReportPromptPayload
+  type SupplementalMaterialPayload
 } from "@newsweb/prompt-kit";
 import { Job, Queue, Worker } from "bullmq";
 import { Redis } from "ioredis";
+import { isAmbiguousBareRemovalInstruction } from "./services/revision-instructions.js";
 import {
-  buildAttributionCorrectionInstruction,
-  findAttributionRisks
-} from "./services/claim-precautions.js";
-import { applyImportanceHighBar } from "./services/importance.js";
-import {
-  appendRevisionChecklist,
-  isAmbiguousBareRemovalInstruction,
-  validateRevisionInstructionCompliance,
-  type RevisionInstructionCompliance
-} from "./services/revision-instructions.js";
-import {
-  EDITORIAL_REVIEW_DEVELOPER_PROMPT,
-  EDITORIAL_REVIEW_SYSTEM_PROMPT,
-  buildEditorialRevisionReviewUserPrompt,
-  editorialRepairInstruction,
-  editorialRevisionReviewJsonSchema,
-  parseEditorialRevisionReviewResponse,
-  shouldRunEditorialRevisionReview,
-  type EditorialRevisionReview
-} from "./services/editorial-review.js";
-import {
-  applyReferenceCheckEnforcement,
-  defaultReferenceCheckEnforcement,
-  buildReferenceCheckPrompt,
-  buildCorrectionInstruction,
-  buildCoverageReport,
-  classifyCheckerErrorKind,
-  emptyReferenceCoverageReport,
-  assessReferenceCheckGate,
-  hasFreshPassingReferenceCoverage,
-  referenceCheckJsonSchema,
-  referenceCheckResultSchema,
-  type ReferenceCheckerErrorEntry,
-  type ReferenceCheckGateResult,
-  type ReferenceCheckResult,
-  type ReferenceCoverageReport
-} from "./services/reference-check.js";
-import {
-  absorbReferenceRepairResult,
-  createReferenceRepairAccumulator,
-  maybeAccumulatedReferenceCheckOutcome,
-  referenceCheckFailureJson,
-  referenceCheckValidationJson,
-  resolveAccumulatedReferenceCheckOutcome,
-  type ReferenceRepairHistoryEntry
-} from "./services/reference-check-outcome.js";
-import {
-  ensureReportSourceLimitation,
-  validateRewriteOutput,
-  type ReportExtractionValidationContext,
-  type RewriteValidationIssue
-} from "./services/rewrite-validation.js";
-import {
-  TRIAGE_PROMPT,
-  buildTriageUserPrompt,
   defaultEnabledTriageClasses,
-  evaluateTriageClasses,
-  parseTriageResponse
+  evaluateTriageClasses
 } from "./services/newsworthiness-triage.js";
 import {
   buildNewswebListUrl,
@@ -157,7 +87,9 @@ import {
   shouldRecoverStaleGenerationRun,
   staleGenerationRecoveryJobId
 } from "./services/stale-generation-recovery.js";
-import { sanitizeRewriteStyle } from "./services/style-sanitizer.js";
+import { runNoticePipeline } from "./services/notice-pipeline.js";
+import { noticeReferencePayload, type NoticePayload } from "./services/notice-evidence.js";
+import { mergeReportPdfFallback } from "./services/report-pdf-fallback.js";
 import { setGenerationPhase } from "./services/generation-phase.js";
 import {
   classifyIngestJobName,
@@ -222,13 +154,10 @@ if (config.NUMERIC_ACCEPTANCE_RULES) {
   }
 }
 
-const activeReferenceCheckEnforcement =
-  config.REFERENCE_CHECK_ENFORCEMENT ?? defaultReferenceCheckEnforcement;
 if (config.REFERENCE_CHECK_ENFORCEMENT) {
   console.warn(
-    `REFERENCE_CHECK_ENFORCEMENT overrides the code default: block_on_residual_unsupported=${activeReferenceCheckEnforcement.blockOnResidualUnsupported}, ` +
-      `retry_on_unavailable=${activeReferenceCheckEnforcement.retryOnUnavailable}. ` +
-      "This is the emergency kill-switch; the durable state lives in defaultReferenceCheckEnforcement."
+    "REFERENCE_CHECK_ENFORCEMENT is a legacy override. The notice pipeline requires fresh " +
+      "reference and editorial coverage checks; use an application rollback to restore the legacy pipeline."
   );
 }
 
@@ -270,7 +199,6 @@ function modelForReasoningEffort(effort: OpenAIReasoningEffort): string {
 }
 
 const connection = parseRedisUrl(config.REDIS_URL);
-const MAX_REFERENCE_REPAIR_ATTEMPTS = 3;
 const REDIS_WATCHDOG_WINDOW_MS = 60_000;
 const REDIS_WATCHDOG_ERROR_THRESHOLD = 30;
 const REDIS_WATCHDOG_EXIT_GRACE_MS = 250;
@@ -861,109 +789,6 @@ function generationInputJson(
   });
 }
 
-function validateRewriteWithRevisionCompliance(
-  rewrite: RewriteOutput,
-  payload: PromptPayload,
-  context: {
-    instruction?: string | null;
-    previousOutput?: RewriteOutput;
-    attachmentTextAvailable?: boolean;
-    reportExtraction?: ReportExtractionValidationContext;
-  }
-): {
-  valid: boolean;
-  errors: string[];
-  issues: RewriteValidationIssue[];
-  blockingErrors: string[];
-  warnings: string[];
-  quoteTelemetry: ReturnType<typeof validateRewriteOutput>["quoteTelemetry"];
-  numberAssessments: ReturnType<typeof validateRewriteOutput>["numberAssessments"];
-  publicationNumberAssessments: ReturnType<
-    typeof validateRewriteOutput
-  >["publicationNumberAssessments"];
-  markerLeaks: ReturnType<typeof validateRewriteOutput>["markerLeaks"];
-  revisionCompliance: RevisionInstructionCompliance | null;
-} {
-  const revisionCompliance = validateRevisionInstructionCompliance(rewrite, {
-    instruction: context.instruction,
-    previousOutput: context.previousOutput,
-    attachmentTextAvailable: context.attachmentTextAvailable
-  });
-  const validation = validateRewriteOutput(rewrite, payload, {
-    maxVisibleArticleChars:
-      revisionCompliance?.maxVisibleArticleChars ?? payload.maxVisibleArticleChars,
-    reportExtraction: context.reportExtraction,
-    // Kill-switch only: unset env keeps the prompt-kit code default, which is
-    // exactly what the CI safety-gate replay uses.
-    ...(config.NUMERIC_ACCEPTANCE_RULES
-      ? { enabledDerivationRules: config.NUMERIC_ACCEPTANCE_RULES }
-      : {})
-  });
-  const revisionWarnings = revisionCompliance?.warnings ?? [];
-  const revisionIssues: RewriteValidationIssue[] = revisionWarnings.map((message) => ({
-    code: "REVISION_INSTRUCTION_COMPLIANCE",
-    severity: "blocking",
-    message
-  }));
-  const issues = [...validation.issues, ...revisionIssues];
-  const errors = issues.map((issue) => issue.message);
-  const blockingErrors = issues
-    .filter((issue) => issue.severity === "blocking")
-    .map((issue) => issue.message);
-  const warnings = issues
-    .filter((issue) => issue.severity === "warning")
-    .map((issue) => issue.message);
-
-  return {
-    valid: issues.length === 0,
-    errors,
-    issues,
-    blockingErrors,
-    warnings,
-    quoteTelemetry: validation.quoteTelemetry,
-    numberAssessments: validation.numberAssessments,
-    publicationNumberAssessments: validation.publicationNumberAssessments,
-    markerLeaks: validation.markerLeaks,
-    revisionCompliance
-  };
-}
-
-function validationErrorCode(validation: {
-  valid: boolean;
-  blockingErrors: string[];
-}): string | null {
-  if (validation.blockingErrors.length > 0) {
-    return "BLOCKING_VALIDATION_ERRORS";
-  }
-  return validation.valid ? null : "NON_BLOCKING_VALIDATION_WARNINGS";
-}
-
-function numericPublicationPolicyJson(
-  validation: RewriteValidationResult,
-  referenceGroundsVisibleNumbers: boolean
-): Record<string, unknown> {
-  const unexpectedDisplays = [
-    ...new Set(
-      validation.publicationNumberAssessments
-        .filter((assessment) => assessment.disposition === "unexpected")
-        .map((assessment) => assessment.display)
-    )
-  ];
-  return {
-    scope: "title_lead_body",
-    unexpectedDisplays,
-    referenceGroundedOverrideApplied:
-      referenceGroundsVisibleNumbers &&
-      validation.issues.some((issue) => issue.code === "UNEXPECTED_NUMBERS")
-  };
-}
-
-function statusForValidation(validation: {
-  blockingErrors: string[];
-}): "pending" | "failed" {
-  return validation.blockingErrors.length > 0 ? "failed" : "pending";
-}
-
 function phaseForRewriteStatus(
   status: "pending" | "needs_retry" | "failed" | "published" | "skipped"
 ) {
@@ -972,264 +797,6 @@ function phaseForRewriteStatus(
   if (status === "published") return "published";
   if (status === "skipped") return "skipped";
   return "failed";
-}
-
-function rewriteJsonForValidation(
-  rewrite: RewriteOutput,
-  validation: { blockingErrors: string[] }
-): Prisma.InputJsonValue {
-  if (validation.blockingErrors.length === 0) {
-    return rewrite as unknown as Prisma.InputJsonValue;
-  }
-
-  return {
-    errorCode: "BLOCKING_VALIDATION_ERRORS",
-    message: validation.blockingErrors.join("; "),
-    blockedRewrite: rewrite as unknown as Prisma.InputJsonValue
-  } as Prisma.InputJsonValue;
-}
-
-type RewriteValidationResult = ReturnType<typeof validateRewriteWithRevisionCompliance>;
-
-function referenceCanAdjudicateUnexpectedNumbers(
-  rewrite: RewriteOutput,
-  validation: RewriteValidationResult,
-  outcome: ReturnType<typeof resolveAccumulatedReferenceCheckOutcome>
-): boolean {
-  if (!hasFreshPassingReferenceCoverage(outcome)) {
-    return false;
-  }
-  // The reference checker currently evaluates lead/body sentences, not the
-  // headline. A matcher miss in the title therefore remains conservative.
-  const unexpectedDisplays = validation.publicationNumberAssessments
-    .filter((assessment) => assessment.disposition === "unexpected")
-    .map((assessment) => assessment.display);
-  return !unexpectedDisplays.some((display) => rewrite.title.includes(display));
-}
-
-const HIGH_RISK_VALIDATION_WARNING_CODES = new Set([
-  "UNEXPECTED_NUMBERS",
-  "UNEXPECTED_CURRENCY",
-  "REVENUE_RESULT_MIXUP",
-  "MISSING_RIGHT_OF_REPLY",
-  "UNEXPLAINED_NAMED_TRANSACTION",
-  "MISSING_REPORT_SOURCE_LIMITATION",
-  "WEAK_REPORT_EXTRACTION_LIMITATION",
-  "SECONDARY_ONLY_TITLE_NUMBER"
-]);
-
-type ValidationRepairAudit = {
-  applied: boolean;
-  issueCodes: string[];
-  initialWarnings: string[];
-  finalWarnings: string[];
-  error: string | null;
-};
-
-function emptyValidationRepairAudit(): ValidationRepairAudit {
-  return {
-    applied: false,
-    issueCodes: [],
-    initialWarnings: [],
-    finalWarnings: [],
-    error: null
-  };
-}
-
-function highRiskValidationWarningIssues(
-  validation: RewriteValidationResult,
-  options: { skipUnexpectedNumbers?: boolean } = {}
-): RewriteValidationIssue[] {
-  return validation.issues.filter(
-    (issue) =>
-      issue.severity === "warning" &&
-      !(options.skipUnexpectedNumbers && issue.code === "UNEXPECTED_NUMBERS") &&
-      HIGH_RISK_VALIDATION_WARNING_CODES.has(issue.code)
-  );
-}
-
-function validationIssueMessages(issues: RewriteValidationIssue[]): string[] {
-  return issues.map((issue) => issue.message);
-}
-
-function uniqueIssueCodes(issues: RewriteValidationIssue[]): string[] {
-  return [...new Set(issues.map((issue) => issue.code))];
-}
-
-function buildHighRiskValidationRepairInstruction(
-  issues: RewriteValidationIssue[]
-): string {
-  const issueLines = issues.map((issue) => {
-    const codeInstruction =
-      issue.code === "UNEXPECTED_NUMBERS"
-        ? "Fjern tall som ikke finnes eksplisitt i kilden. Ikke legg til estimater eller valutaomregninger."
-        : issue.code === "UNEXPECTED_CURRENCY"
-          ? "Bruk bare valuta som finnes eksplisitt i kilden. Ikke regn om til kroner eller annen valuta."
-          : issue.code === "REVENUE_RESULT_MIXUP"
-            ? "Ikke bruk resultat, overskudd eller tap hvis kilden bare omtaler inntekter eller omsetning."
-            : issue.code === "MISSING_RIGHT_OF_REPLY"
-              ? "Ta med tilsvar, avvisning eller bestridelse fra kilden i lead/body."
-              : issue.code === "UNEXPLAINED_NAMED_TRANSACTION"
-                ? "Forklar kort hva det navngitte prosjektet, plattformen eller transaksjonen er med dekning i kilden, eller generaliser/dropp navnet."
-                : issue.code === "MISSING_REPORT_SOURCE_LIMITATION" ||
-                    issue.code === "WEAK_REPORT_EXTRACTION_LIMITATION"
-                  ? "Legg inn en konkret source_limitations-linje om at bare et utdrag/begrenset rapportgrunnlag er analysert, eller dropp synlige rapportkrav som ikke har dekning."
-                  : issue.code === "SECONDARY_ONLY_TITLE_NUMBER"
-                    ? "Tittelen skal bygge på dagens melding alene. Fjern tall som bare finnes i den tidligere meldingen fra tittelen; slike tall kan stå i body med tidsmarkør."
-                : "Rett problemet uten a legge til nye fakta.";
-    return [`${issue.code}: ${issue.message}`, `Krav: ${codeInstruction}`].join(
-      "\n"
-    );
-  });
-
-  return [
-    "Lag et nytt korrigert utkast basert pa samme kildetekst.",
-    "Rett bare valideringsproblemene under. Ikke legg til fakta, tall eller valuta som ikke finnes i kilden.",
-    "Behold nyhetsvinkel, struktur og lengde sa langt det er mulig.",
-    "",
-    "Valideringsproblemer som ma rettes:",
-    issueLines.join("\n\n")
-  ].join("\n");
-}
-
-function promoteHighRiskValidationWarnings(
-  validation: RewriteValidationResult,
-  options: { keepUnexpectedNumbersAsWarning?: boolean } = {}
-): RewriteValidationResult {
-  const issues = validation.issues.map((issue) =>
-    issue.severity === "warning" &&
-    !(options.keepUnexpectedNumbersAsWarning &&
-      issue.code === "UNEXPECTED_NUMBERS") &&
-    HIGH_RISK_VALIDATION_WARNING_CODES.has(issue.code)
-      ? { ...issue, severity: "blocking" as const }
-      : issue
-  );
-  const errors = issues.map((issue) => issue.message);
-  const blockingErrors = issues
-    .filter((issue) => issue.severity === "blocking")
-    .map((issue) => issue.message);
-  const warnings = issues
-    .filter((issue) => issue.severity === "warning")
-    .map((issue) => issue.message);
-
-  return {
-    ...validation,
-    valid: issues.length === 0,
-    errors,
-    issues,
-    blockingErrors,
-    warnings
-  };
-}
-
-async function applyHighRiskValidationRepair<TPayload extends PromptPayload>({
-  payload,
-  rewrite,
-  validation,
-  revisionInstructionForPrompt,
-  reasoningEffort,
-  modelCalls,
-  callRewrite,
-  skipUnexpectedNumbers = false
-}: {
-  payload: TPayload;
-  rewrite: RewriteOutput;
-  validation: RewriteValidationResult;
-  revisionInstructionForPrompt?: string;
-  reasoningEffort: OpenAIReasoningEffort;
-  modelCalls: ModelCallLog[];
-  callRewrite: (
-    payload: TPayload,
-    revisionInstruction?: string,
-    previousOutput?: RewriteOutput,
-    reasoningEffort?: OpenAIReasoningEffort
-  ) => Promise<{ rewrite: RewriteOutput; promptChars: number; modelCall: ModelCallLog }>;
-  skipUnexpectedNumbers?: boolean;
-}): Promise<{
-  rewrite: RewriteOutput;
-  promptChars: number;
-  audit: ValidationRepairAudit;
-}> {
-  const issues = highRiskValidationWarningIssues(validation, {
-    skipUnexpectedNumbers
-  });
-  const audit: ValidationRepairAudit = {
-    applied: false,
-    issueCodes: uniqueIssueCodes(issues),
-    initialWarnings: validationIssueMessages(issues),
-    finalWarnings: [],
-    error: null
-  };
-
-  if (issues.length === 0) {
-    return { rewrite, promptChars: 0, audit };
-  }
-
-  const instruction = buildHighRiskValidationRepairInstruction(issues);
-  const combinedInstruction = [revisionInstructionForPrompt, instruction]
-    .filter(Boolean)
-    .join("\n\n");
-
-  try {
-    const result = await callRewrite(
-      payload,
-      combinedInstruction,
-      rewrite,
-      reasoningEffort
-    );
-    modelCalls.push(result.modelCall);
-    return {
-      rewrite: result.rewrite,
-      promptChars: result.promptChars,
-      audit: { ...audit, applied: true }
-    };
-  } catch (error) {
-    const promptChars = collectFailedModelCall(error, modelCalls);
-    return {
-      rewrite,
-      promptChars,
-      audit: {
-        ...audit,
-        error: error instanceof Error ? error.message : String(error)
-      }
-    };
-  }
-}
-
-function applyReferenceCheckGate(
-  validation: RewriteValidationResult,
-  gate: ReferenceCheckGateResult
-): RewriteValidationResult {
-  if (!gate.blocking) {
-    return validation;
-  }
-
-  const priorContextSuffix =
-    gate.priorContextViolations.length > 0
-      ? ` Prior-context violations: ${gate.priorContextViolations.length}.`
-      : "";
-  const issue: RewriteValidationIssue = {
-    code: "REFERENCE_CHECK_UNSUPPORTED_FACTS",
-    severity: "blocking",
-    message: `${gate.reason} High-risk unsupported sentences: ${gate.highRiskUnsupportedSentences.length}.${priorContextSuffix}`
-  };
-  const issues = [...validation.issues, issue];
-  const errors = issues.map((item) => item.message);
-  const blockingErrors = issues
-    .filter((item) => item.severity === "blocking")
-    .map((item) => item.message);
-  const warnings = issues
-    .filter((item) => item.severity === "warning")
-    .map((item) => item.message);
-
-  return {
-    ...validation,
-    valid: false,
-    errors,
-    issues,
-    blockingErrors,
-    warnings
-  };
 }
 
 async function startGenerationRun(
@@ -1408,26 +975,6 @@ function collectFailedModelCall(
   return enriched.promptChars ?? enriched.modelCall.promptChars;
 }
 
-const triageJsonSchema = {
-  type: "object",
-  additionalProperties: false,
-  properties: {
-    newsworthy: { type: "boolean" },
-    reason: { type: "string" }
-  },
-  required: ["newsworthy", "reason"]
-} as const;
-
-function clampRewriteArrays(raw: Record<string, unknown>): Record<string, unknown> {
-  const limits: Record<string, number> = { body: 8, key_facts: 8, source_spans: 8, negative_or_surprising: 6, excluded_hype: 6, source_limitations: 6 };
-  for (const [key, max] of Object.entries(limits)) {
-    if (Array.isArray(raw[key]) && (raw[key] as unknown[]).length > max) {
-      raw[key] = (raw[key] as unknown[]).slice(0, max);
-    }
-  }
-  return raw;
-}
-
 function applyOpenAITelemetry(
   modelCall: ModelCallLog,
   telemetry: OpenAIModelCallTelemetry
@@ -1515,552 +1062,6 @@ async function callModelForJson({
     enriched.modelCall = modelCall;
     enriched.promptChars = promptChars;
     throw enriched;
-  }
-}
-
-async function callModelTriage(
-  title: string,
-  bodyText: string,
-  categories: string[],
-  hasAttachments?: boolean
-): Promise<{
-  newsworthy: boolean;
-  reason: string;
-  promptChars: number;
-  modelCall: ModelCallLog | null;
-}> {
-  const userPrompt = buildTriageUserPrompt(title, bodyText, categories, hasAttachments);
-
-  try {
-    const result = await callModelForJson({
-      schemaName: "newsworthiness_triage",
-      schema: triageJsonSchema as Record<string, unknown>,
-      systemPrompt: TRIAGE_PROMPT,
-      developerPrompt: "Svar kun med strukturert triage etter skjemaet.",
-      userPrompt,
-      model: config.OPENAI_FAST_MODEL,
-      reasoningEffort: config.OPENAI_TRIAGE_REASONING_EFFORT,
-      timeoutMs: config.OPENAI_FAST_TIMEOUT_MS,
-      maxOutputTokens: 768,
-      promptCacheKey: `newsweb:triage:${PROMPT_VERSION}`,
-      promptCacheMode: promptCacheModeForFlow("triage")
-    });
-
-    return {
-      ...parseTriageResponse(result.content),
-      promptChars: result.promptChars,
-      modelCall: result.modelCall
-    };
-  } catch {
-    // Fail-open: if triage errors, proceed with full rewrite
-    return {
-      newsworthy: true,
-      reason: "Triage call error - defaulting to newsworthy",
-      promptChars: 0,
-      modelCall: null
-    };
-  }
-}
-
-async function callModelEditorialRevisionReview({
-  instruction,
-  previousOutput,
-  draftRewrite,
-  reasoningEffort = config.OPENAI_REVIEW_REASONING_EFFORT
-}: {
-  instruction: string;
-  previousOutput: RewriteOutput;
-  draftRewrite: RewriteOutput;
-  reasoningEffort?: OpenAIReasoningEffort;
-}): Promise<{
-  review: EditorialRevisionReview;
-  promptChars: number;
-  modelCall: ModelCallLog;
-}> {
-  const result = await callModelForJson({
-    schemaName: "editorial_revision_review",
-    schema: editorialRevisionReviewJsonSchema as Record<string, unknown>,
-    systemPrompt: EDITORIAL_REVIEW_SYSTEM_PROMPT,
-    developerPrompt: EDITORIAL_REVIEW_DEVELOPER_PROMPT,
-    userPrompt: buildEditorialRevisionReviewUserPrompt({
-      instruction,
-      previousOutput,
-      draftRewrite
-    }),
-    reasoningEffort,
-    promptCacheKey: `newsweb:editorial-review:${PROMPT_VERSION}`,
-    promptCacheMode: promptCacheModeForFlow("editorial-review")
-  });
-
-  return {
-    review: parseEditorialRevisionReviewResponse(result.content),
-    promptChars: result.promptChars,
-    modelCall: result.modelCall
-  };
-}
-
-async function callModelRewrite(
-  payload: PromptPayload,
-  revisionInstruction?: string,
-  previousOutput?: RewriteOutput,
-  reasoningEffort: OpenAIReasoningEffort = config.OPENAI_DEFAULT_REASONING_EFFORT
-): Promise<{
-  rewrite: RewriteOutput;
-  promptChars: number;
-  modelCall: ModelCallLog;
-}> {
-  const systemPrompt = createSystemPrompt();
-  const developerPrompt = createDeveloperPrompt(undefined, payload);
-  let userPrompt: string;
-  if (revisionInstruction && previousOutput) {
-    userPrompt = createRevisionUserPrompt(
-      payload,
-      previousOutput,
-      revisionInstruction
-    );
-  } else if (revisionInstruction) {
-    userPrompt = `${createUserPrompt(payload)}\n\nKORRIGERINGSMODUS:\n${revisionInstruction}`;
-  } else {
-    userPrompt = createUserPrompt(payload);
-  }
-  const result = await callModelForJson({
-    schemaName: "rewrite_output",
-    schema: rewriteOutputJsonSchema as Record<string, unknown>,
-    systemPrompt,
-    developerPrompt,
-    userPrompt,
-    reasoningEffort,
-    promptCacheKey: `newsweb:rewrite-regular:${PROMPT_VERSION}`,
-    promptCacheMode: promptCacheModeForFlow("rewrite-regular")
-  });
-
-  return {
-    rewrite: rewriteOutputSchema.parse(clampRewriteArrays(JSON.parse(result.content))),
-    promptChars: result.promptChars,
-    modelCall: result.modelCall
-  };
-}
-
-async function callModelReferenceCheck(
-  payload: PromptPayload,
-  draftRewrite: RewriteOutput,
-  reasoningEffort: OpenAIReasoningEffort = config.OPENAI_REFERENCE_REASONING_EFFORT
-): Promise<{
-  coverage: ReferenceCoverageReport;
-  promptChars: number;
-  modelCall: ModelCallLog | null;
-}> {
-  const referencePrompt = buildReferenceCheckPrompt(payload, draftRewrite);
-  const { draftSentences, visibleDraftSentences } = referencePrompt;
-  if (draftSentences.length === 0) {
-    return {
-      coverage: emptyReferenceCoverageReport(),
-      promptChars: 0,
-      modelCall: null
-    };
-  }
-
-  const result = await callModelForJson({
-    schemaName: "reference_check_result",
-    schema: referenceCheckJsonSchema as Record<string, unknown>,
-    systemPrompt: referencePrompt.systemPrompt,
-    developerPrompt: referencePrompt.developerPrompt,
-    userPrompt: referencePrompt.userPrompt,
-    reasoningEffort,
-    promptCacheKey: `newsweb:reference-check:${PROMPT_VERSION}`,
-    promptCacheMode: promptCacheModeForFlow("reference-check")
-  });
-
-  let parsed: ReferenceCheckResult;
-  try {
-    parsed = referenceCheckResultSchema.parse(JSON.parse(result.content));
-  } catch (error) {
-    // The model call itself succeeded; carry its telemetry on the parse
-    // error so collectFailedModelCall records the spent tokens.
-    if (error instanceof Error && result.modelCall) {
-      const carrier = error as ModelCallFailureCarrier;
-      carrier.modelCall = result.modelCall;
-      carrier.promptChars = result.promptChars;
-    }
-    throw error;
-  }
-  return {
-    coverage: buildCoverageReport(draftSentences, parsed, {
-      visibleArticleSentenceCount: visibleDraftSentences.length,
-      headSentenceCount: referencePrompt.headDraftSentenceCount,
-      priorContext: referencePrompt.priorContext
-    }),
-    promptChars: result.promptChars,
-    modelCall: result.modelCall
-  };
-}
-
-async function callModelReportRewrite(
-  payload: ReportPromptPayload,
-  revisionInstruction?: string,
-  previousOutput?: RewriteOutput,
-  reasoningEffort: OpenAIReasoningEffort = config.OPENAI_REPORT_REASONING_EFFORT
-): Promise<{
-  rewrite: RewriteOutput;
-  promptChars: number;
-  modelCall: ModelCallLog;
-}> {
-  const systemPrompt = createReportSystemPrompt();
-  const developerPrompt = createReportDeveloperPrompt(undefined, payload);
-  let userPrompt: string;
-  if (revisionInstruction && previousOutput) {
-    userPrompt = createReportRevisionUserPrompt(
-      payload,
-      previousOutput,
-      revisionInstruction
-    );
-  } else if (revisionInstruction) {
-    userPrompt = `${createReportUserPrompt(payload)}\n\nKORRIGERINGSMODUS:\n${revisionInstruction}`;
-  } else {
-    userPrompt = createReportUserPrompt(payload);
-  }
-  const result = await callModelForJson({
-    schemaName: "rewrite_output",
-    schema: rewriteOutputJsonSchema as Record<string, unknown>,
-    systemPrompt,
-    developerPrompt,
-    userPrompt,
-    reasoningEffort,
-    promptCacheKey: `newsweb:rewrite-report:${PROMPT_VERSION}`,
-    promptCacheMode: promptCacheModeForFlow("rewrite-report")
-  });
-
-  return {
-    rewrite: rewriteOutputSchema.parse(clampRewriteArrays(JSON.parse(result.content))),
-    promptChars: result.promptChars,
-    modelCall: result.modelCall
-  };
-}
-
-async function callModelYearlyReportRewrite(
-  payload: YearlyReportPromptPayload,
-  revisionInstruction?: string,
-  previousOutput?: RewriteOutput,
-  reasoningEffort: OpenAIReasoningEffort = config.OPENAI_REPORT_REASONING_EFFORT
-): Promise<{
-  rewrite: RewriteOutput;
-  promptChars: number;
-  modelCall: ModelCallLog;
-}> {
-  const systemPrompt = createYearlyReportSystemPrompt();
-  const developerPrompt = createYearlyReportDeveloperPrompt();
-  let userPrompt: string;
-  if (revisionInstruction && previousOutput) {
-    userPrompt = createYearlyReportRevisionUserPrompt(
-      payload,
-      previousOutput,
-      revisionInstruction
-    );
-  } else if (revisionInstruction) {
-    userPrompt = `${createYearlyReportUserPrompt(payload)}\n\nKORRIGERINGSMODUS:\n${revisionInstruction}`;
-  } else {
-    userPrompt = createYearlyReportUserPrompt(payload);
-  }
-  const result = await callModelForJson({
-    schemaName: "rewrite_output",
-    schema: rewriteOutputJsonSchema as Record<string, unknown>,
-    systemPrompt,
-    developerPrompt,
-    userPrompt,
-    reasoningEffort,
-    promptCacheKey: `newsweb:rewrite-yearly:${PROMPT_VERSION}`,
-    promptCacheMode: promptCacheModeForFlow("rewrite-yearly")
-  });
-
-  return {
-    rewrite: rewriteOutputSchema.parse(clampRewriteArrays(JSON.parse(result.content))),
-    promptChars: result.promptChars,
-    modelCall: result.modelCall
-  };
-}
-
-async function applyReferenceCheckRepair<TPayload extends PromptPayload>({
-  referencePayload,
-  rewritePayload,
-  rewrite,
-  revisionInstructionForPrompt,
-  correctionReasoningEffort,
-  existingCorrectionAttempts = 0,
-  modelCalls,
-  callRewrite
-}: {
-  referencePayload: PromptPayload;
-  rewritePayload: TPayload;
-  rewrite: RewriteOutput;
-  revisionInstructionForPrompt?: string;
-  correctionReasoningEffort: OpenAIReasoningEffort;
-  existingCorrectionAttempts?: number;
-  modelCalls: ModelCallLog[];
-  callRewrite: (
-    payload: TPayload,
-    revisionInstruction?: string,
-    previousOutput?: RewriteOutput,
-    reasoningEffort?: OpenAIReasoningEffort
-  ) => Promise<{
-    rewrite: RewriteOutput;
-    promptChars: number;
-    modelCall: ModelCallLog;
-  }>;
-}): Promise<{
-  rewrite: RewriteOutput;
-  promptChars: number;
-  checkerError: string | null;
-  checkerErrors: ReferenceCheckerErrorEntry[];
-  correctionAttempts: number;
-  initialCoverage: ReferenceCoverageReport | null;
-  finalCoverage: ReferenceCoverageReport | null;
-  repairHistory: ReferenceRepairHistoryEntry[];
-}> {
-  let currentRewrite = rewrite;
-  let promptChars = 0;
-  let correctionAttempts = 0;
-  let initialCoverage: ReferenceCoverageReport | null = null;
-  let finalCoverage: ReferenceCoverageReport | null = null;
-  const repairHistory: ReferenceRepairHistoryEntry[] = [];
-  // Classified failures, call-local stages: a checker failure is numbered as
-  // the check that never completed (repairHistory.length + 1); a repair-
-  // rewrite failure belongs to the pass of the check that triggered it
-  // (repairHistory.length). Flow-level accumulation re-offsets stages.
-  const checkerErrors: ReferenceCheckerErrorEntry[] = [];
-
-  while (true) {
-    let referenceCheck: Awaited<ReturnType<typeof callModelReferenceCheck>>;
-    try {
-      referenceCheck = await callModelReferenceCheck(
-        referencePayload,
-        currentRewrite
-      );
-    } catch (error) {
-      promptChars += collectFailedModelCall(error, modelCalls);
-      checkerErrors.push({
-        stage: repairHistory.length + 1,
-        kind: classifyCheckerErrorKind(error),
-        message: error instanceof Error ? error.message : String(error),
-        // A prior correction in this call means the last successful coverage
-        // describes the pre-repair draft.
-        afterCorrection: correctionAttempts > 0
-      });
-      return {
-        rewrite: currentRewrite,
-        promptChars,
-        checkerError: error instanceof Error ? error.message : String(error),
-        checkerErrors,
-        correctionAttempts,
-        initialCoverage,
-        finalCoverage,
-        repairHistory
-      };
-    }
-
-    if (referenceCheck.modelCall) {
-      modelCalls.push(referenceCheck.modelCall);
-    }
-    promptChars += referenceCheck.promptChars;
-    initialCoverage ??= referenceCheck.coverage;
-    finalCoverage = referenceCheck.coverage;
-
-    const gate = assessReferenceCheckGate(referenceCheck.coverage);
-    repairHistory.push({
-      checkNumber: repairHistory.length + 1,
-      correctionAttempt: existingCorrectionAttempts + correctionAttempts,
-      coveragePercent: referenceCheck.coverage.coveragePercent,
-      unsupportedSentenceCount: referenceCheck.coverage.unsupportedSentences.length,
-      highRiskUnsupportedSentenceCount:
-        gate.highRiskUnsupportedSentences.length,
-      blocking: gate.blocking,
-      blockingReason: gate.reason,
-      unsupportedSentences: referenceCheck.coverage.unsupportedSentences.map(
-        (item) => ({
-          index: item.index,
-          sentence: item.sentence,
-          interpretation: item.interpretation
-        })
-      ),
-      ...(referenceCheck.coverage.priorContext
-        ? { priorContextViolationCount: gate.priorContextViolations.length }
-        : {})
-    });
-
-    const totalCorrectionAttempts =
-      existingCorrectionAttempts + correctionAttempts;
-    const correctionInstruction = buildCorrectionInstruction(
-      referenceCheck.coverage,
-      {
-        attempt: totalCorrectionAttempts + 1,
-        maxAttempts: MAX_REFERENCE_REPAIR_ATTEMPTS,
-        gate
-      }
-    );
-
-    if (!correctionInstruction) {
-      return {
-        rewrite: currentRewrite,
-        promptChars,
-        checkerError: null,
-        checkerErrors,
-        correctionAttempts,
-        initialCoverage,
-        finalCoverage,
-        repairHistory
-      };
-    }
-
-    if (
-      totalCorrectionAttempts >= MAX_REFERENCE_REPAIR_ATTEMPTS ||
-      (!gate.blocking && correctionAttempts > 0)
-    ) {
-      return {
-        rewrite: currentRewrite,
-        promptChars,
-        checkerError: null,
-        checkerErrors,
-        correctionAttempts,
-        initialCoverage,
-        finalCoverage,
-        repairHistory
-      };
-    }
-
-    const combinedCorrection = [
-      revisionInstructionForPrompt,
-      correctionInstruction
-    ]
-      .filter(Boolean)
-      .join("\n\n");
-
-    try {
-      const correctedResult = await callRewrite(
-        rewritePayload,
-        combinedCorrection,
-        currentRewrite,
-        correctionReasoningEffort
-      );
-      modelCalls.push(correctedResult.modelCall);
-      promptChars += correctedResult.promptChars;
-      currentRewrite = correctedResult.rewrite;
-      correctionAttempts += 1;
-    } catch (error) {
-      promptChars += collectFailedModelCall(error, modelCalls);
-      checkerErrors.push({
-        stage: repairHistory.length,
-        kind: "repair_rewrite_failed",
-        message: error instanceof Error ? error.message : String(error)
-      });
-      return {
-        rewrite: currentRewrite,
-        promptChars,
-        checkerError: error instanceof Error ? error.message : String(error),
-        checkerErrors,
-        correctionAttempts,
-        initialCoverage,
-        finalCoverage,
-        repairHistory
-      };
-    }
-  }
-}
-
-type EditorialReviewAudit = {
-  enabled: boolean;
-  repairApplied: boolean;
-  error: string | null;
-  review: EditorialRevisionReview | null;
-};
-
-async function applyEditorialRevisionReviewRepair<TPayload extends PromptPayload>({
-  payload,
-  rewrite,
-  instruction,
-  previousOutput,
-  revisionInstructionForPrompt,
-  reasoningEffort,
-  modelCalls,
-  callRewrite
-}: {
-  payload: TPayload;
-  rewrite: RewriteOutput;
-  instruction?: string | null;
-  previousOutput?: RewriteOutput;
-  revisionInstructionForPrompt?: string;
-  reasoningEffort: OpenAIReasoningEffort;
-  modelCalls: ModelCallLog[];
-  callRewrite: (
-    payload: TPayload,
-    revisionInstruction?: string,
-    previousOutput?: RewriteOutput,
-    reasoningEffort?: OpenAIReasoningEffort
-  ) => Promise<{
-    rewrite: RewriteOutput;
-    promptChars: number;
-    modelCall: ModelCallLog;
-  }>;
-}): Promise<{
-  rewrite: RewriteOutput;
-  promptChars: number;
-  audit: EditorialReviewAudit | null;
-}> {
-  if (
-    !shouldRunEditorialRevisionReview({
-      instruction,
-      previousOutput
-    }) ||
-    !instruction ||
-    !previousOutput
-  ) {
-    return { rewrite, promptChars: 0, audit: null };
-  }
-
-  const audit: EditorialReviewAudit = {
-    enabled: true,
-    repairApplied: false,
-    error: null,
-    review: null
-  };
-  let promptChars = 0;
-
-  try {
-    const reviewResult = await callModelEditorialRevisionReview({
-      instruction,
-      previousOutput,
-      draftRewrite: rewrite,
-      reasoningEffort
-    });
-    modelCalls.push(reviewResult.modelCall);
-    promptChars += reviewResult.promptChars;
-    audit.review = reviewResult.review;
-
-    const repairInstruction = editorialRepairInstruction(reviewResult.review);
-    if (!repairInstruction) {
-      return { rewrite, promptChars, audit };
-    }
-
-    const combinedRepairInstruction = [
-      revisionInstructionForPrompt,
-      "REDAKTØRSJEKK: Reparer utkastet smalt etter denne kontrollen. Ikke gjør andre endringer.",
-      repairInstruction
-    ]
-      .filter(Boolean)
-      .join("\n\n");
-    const repaired = await callRewrite(
-      payload,
-      combinedRepairInstruction,
-      rewrite,
-      reasoningEffort
-    );
-    modelCalls.push(repaired.modelCall);
-    promptChars += repaired.promptChars;
-    audit.repairApplied = true;
-
-    return { rewrite: repaired.rewrite, promptChars, audit };
-  } catch (error) {
-    promptChars += collectFailedModelCall(error, modelCalls);
-    audit.error = error instanceof Error ? error.message : String(error);
-    return { rewrite, promptChars, audit };
   }
 }
 
@@ -2270,33 +1271,8 @@ async function extractGeneralContextWithOpenAIPdf(
   });
 }
 
-function reportExtractionFromOpenAIPdf(
-  pdf: PdfAttachmentDownload,
-  result: PdfContextResult,
-  existing?: ReportExtractionResult
-): ReportExtractionResult {
-  const text = formatPdfContext(result, "OPENAI PDF FALLBACK REPORT CONTEXT");
-  return {
-    text,
-    referenceText: text,
-    pageCount: pdf.pageCount,
-    metrics: existing?.metrics ?? [],
-    selectedPages: existing?.selectedPages ?? [],
-    diagnostics: {
-      incomeStatementFound: existing?.diagnostics.incomeStatementFound ?? false,
-      fallbackUsed: true,
-      openAIPdfFallback: true,
-      requestedPageNumbers: existing?.diagnostics.requestedPageNumbers ?? [],
-      requestedTopicTerms: existing?.diagnostics.requestedTopicTerms ?? [],
-      totalExtractedChars:
-        existing?.diagnostics.totalExtractedChars ?? text.length
-    },
-    attachmentId: pdf.attachmentId,
-    attachmentName: pdf.attachmentName
-  };
-}
-
 type RewriteRevisionOptions = {
+  allowSkip?: boolean;
   version?: number;
   userInstruction?: string;
   reasoningEffortOverride?: OpenAIReasoningEffort;
@@ -2314,882 +1290,142 @@ type YearlyReportExtractionResult = {
   openAIPdfFallback?: boolean;
 };
 
+/** Persistence/queue adapter only. All editorial behavior lives in the shared pipeline. */
+async function processNoticeRewrite(
+  messageId: number,
+  payload: NoticePayload,
+  kind: NoticePromptKind,
+  job: { opts: { attempts?: number }; attemptsMade: number },
+  revisionOptions: RewriteRevisionOptions = {},
+  context: {
+    relatedNotices?: RelatedNoticeTelemetry;
+    triage?: unknown;
+    reportExtraction?: ReportExtractionResult;
+    yearlyExtraction?: YearlyReportExtractionResult;
+  } = {}
+): Promise<void> {
+  const finalAttempt = job.attemptsMade + 1 >= (job.opts.attempts ?? 1);
+  const pipeline = await runNoticePipeline({
+    payload, kind,
+    call: async request => callModelForJson({
+      ...request,
+      promptCacheMode: promptCacheModeForFlow(
+        request.schemaName === "reference_check_result" ? "reference-check" :
+        request.schemaName === "notice_editorial_coverage" ? "editorial-review" :
+        kind === "report" ? "rewrite-report" : kind === "yearly" ? "rewrite-yearly" : "rewrite-regular"
+      )
+    }),
+    instruction: revisionOptions.userInstruction,
+    previousOutput: revisionOptions.previousOutput,
+    allowSkip: revisionOptions.allowSkip ?? false,
+    reasoningEffort: revisionOptions.reasoningEffortOverride ??
+      (kind === "regular" ? config.OPENAI_DEFAULT_REASONING_EFFORT : config.OPENAI_REPORT_REASONING_EFFORT),
+    referenceReasoningEffort: config.OPENAI_REFERENCE_REASONING_EFFORT,
+    reviewReasoningEffort: config.OPENAI_REVIEW_REASONING_EFFORT,
+    reportExtraction: context.reportExtraction,
+    enabledDerivationRules: config.NUMERIC_ACCEPTANCE_RULES,
+    onPhase: phase => setGenerationPhaseAndNotify(revisionOptions.generationRunId, messageId, phase as GenerationPhase)
+  });
+  const modelCalls = [...(revisionOptions.modelCalls ?? []), ...pipeline.modelCalls];
+  const promptChars = (revisionOptions.promptChars ?? 0) + pipeline.promptChars;
+  const retry = pipeline.decision === "retry" && !finalAttempt;
+  const status = pipeline.decision === "publish" ? "pending" :
+    pipeline.decision === "skip" ? "skipped" : retry ? "needs_retry" : "failed";
+  const errorCode = status === "failed" || status === "needs_retry"
+    ? pipeline.decision === "retry" ? "NOTICE_PIPELINE_UNAVAILABLE" : "BLOCKING_VALIDATION_ERRORS"
+    : pipeline.validation && !pipeline.validation.valid ? "NON_BLOCKING_VALIDATION_WARNINGS" : null;
+  const errors = pipeline.errors.length ? pipeline.errors : pipeline.validation?.errors ?? [];
+  const rewriteJson = pipeline.decision === "skip"
+    ? { skippedReason: "EDITORIAL_BRIEF_TRIAGE_SKIP", triageReason: pipeline.brief?.reason, categories: payload.categories }
+    : pipeline.decision === "publish" && pipeline.rewrite ? pipeline.rewrite
+    : { errorCode, message: errors.join("; "), blockedRewrite: pipeline.rewrite };
+  const extraction = context.reportExtraction;
+  const validationJson = {
+    ...(pipeline.validation ?? { valid: status === "skipped", errors, issues: [], warnings: [], blockingErrors: errors }),
+    valid: status === "pending" ? pipeline.validation?.valid === true : status === "skipped",
+    errorCode, errors, sourceBodyChars: payload.sourceBodyChars, promptChars,
+    revisionInstructionCompliance: pipeline.validation?.revisionCompliance ?? null,
+    numericPublicationPolicy: pipeline.audit.numericPublicationPolicy,
+    referenceCheck: pipeline.audit.referenceCheck,
+    noticePipeline: pipeline.audit,
+    editorialBrief: pipeline.brief,
+    editorialCoverage: pipeline.audit.finalCoverage,
+    validationRepair: {
+      applied: pipeline.audit.repairAttempts > 0,
+      attempts: pipeline.audit.repairAttempts,
+      issueCodes: [...new Set(pipeline.audit.iterations.flatMap(iteration =>
+        iteration.validation?.issues.filter(issue => issue.severity === "blocking").map(issue => issue.code) ?? []))],
+      initialWarnings: pipeline.audit.iterations[0]?.diagnostics ?? [],
+      finalWarnings: pipeline.errors,
+      error: pipeline.decision === "retry" ? pipeline.errors.join("; ") : null
+    },
+    hiddenDraft: pipeline.initialDraft,
+    reportExtraction: extraction ? {
+      attachmentId: extraction.attachmentId, attachmentName: extraction.attachmentName,
+      pageCount: extraction.pageCount, extractedChars: extraction.diagnostics.totalExtractedChars,
+      contextChars: extraction.text.length, validationSourceChars: noticeReferencePayload(payload).bodyText.length,
+      selectedPages: extraction.selectedPages, metricCandidates: extraction.metrics,
+      financialFacts: extraction.financialFacts, attachments: extraction.attachments,
+      diagnostics: extraction.diagnostics
+    } : context.yearlyExtraction ?? null,
+    relatedNotices: context.relatedNotices ?? null,
+    triage: context.triage ?? null
+  };
+  const persisted = await upsertRewrite({
+    messageId, version: revisionOptions.version, userInstruction: revisionOptions.userInstruction,
+    generationRunId: revisionOptions.generationRunId,
+    inputJson: generationInputJson(payload, revisionOptions.previousOutput, modelCalls, revisionOptions.reasoningEffortOverride),
+    rewriteJson: toPrismaJsonValue(rewriteJson), validationJson: toPrismaJsonValue(validationJson), status
+  });
+  // An older run must never enqueue a candidate it no longer owns.
+  if (!persisted) return;
+  if (status === "pending" || status === "skipped") {
+    await enqueuePublish(messageId, revisionOptions.version ?? 1, revisionOptions.generationRunId);
+  } else if (retry) {
+    throw new Error("notice pipeline retry for " + messageId + ": " + errors.join("; "));
+  } else {
+    logFinalRewriteFailure(messageId, errorCode ?? "NOTICE_PIPELINE_FAILED", errors.join("; "));
+    await publishFeedUpdate(messageId, "failed");
+  }
+}
+
 async function processReportRewrite(
   messageId: number,
-  source: {
-    title: string;
-    issuerName: string;
-    issuerSign: string;
-    publishedAt: Date;
-    categoriesJson: unknown;
-    marketsJson: unknown;
-    bodyText: string;
-    hasAttachments: boolean;
-    rawMessageJson: unknown;
-  },
+  source: RelatedNoticeSource,
   payload: PromptPayload,
   job: { opts: { attempts?: number }; attemptsMade: number },
   reportContent: ReportExtractionResult,
   revisionOptions: RewriteRevisionOptions = {}
 ): Promise<void> {
-  const relatedNoticeTelemetryJson = await attachRelatedNotices(
-    { ...source, messageId },
-    payload
-  );
-  const reportPayload: ReportPromptPayload = {
-    ...payload,
-    reportText: reportContent.text,
+  const relatedNotices = await attachRelatedNotices({ ...source, messageId }, payload);
+  const reportPayload: NoticePayload = {
+    ...payload, reportText: reportContent.text,
+    reportReferenceText: reportContent.referenceText,
+    reportCompleteness: reportContent.diagnostics.completeness,
+    reportFinancialFacts: reportContent.financialFacts,
     reportPageCount: reportContent.pageCount,
-    reportMetrics: reportContent.metrics,
-    reportSelectedPages: reportContent.selectedPages
+    reportMetrics: reportContent.metrics, reportSelectedPages: reportContent.selectedPages
   };
-
-  const maxAttempts = job.opts.attempts ?? 1;
-  const finalAttempt = job.attemptsMade + 1 >= maxAttempts;
-  let promptChars = revisionOptions.promptChars ?? 0;
-  const referenceRepairState = createReferenceRepairAccumulator();
-  let hiddenDraft: RewriteOutput | null = null;
-  let importanceAdjusted = false;
-  let importanceAdjustReason: string | null = null;
-  let attributionCorrectionApplied = false;
-  let attributionRiskCount = 0;
-  let styleSanitization: ReturnType<typeof sanitizeRewriteStyle>["stats"] | null = null;
-  let editorialReview: EditorialReviewAudit | null = null;
-  let validationRepair: ValidationRepairAudit = emptyValidationRepairAudit();
-  let needsFinalReferenceRepair = false;
-  const modelCalls: ModelCallLog[] = [...(revisionOptions.modelCalls ?? [])];
-  const reportReasoningEffort =
-    revisionOptions.reasoningEffortOverride ??
-    config.OPENAI_REPORT_REASONING_EFFORT;
-  const reportReferenceText = [
-    payload.bodyText && payload.bodyText.trim().length >= 100
-      ? payload.bodyText
-      : "",
-    reportContent.referenceText || reportContent.text
-  ]
-    .filter(Boolean)
-    .join("\n\n");
-  const reportReferencePayload: PromptPayload = {
-    ...payload,
-    bodyText: reportReferenceText,
-    sourceBodyChars: reportReferenceText.length
-  };
-  const revisionInstructionForPrompt = appendRevisionChecklist(
-    revisionOptions.userInstruction
-  );
-  const attachmentTextAvailable =
-    Boolean(reportContent.text.trim()) ||
-    Boolean(reportContent.referenceText?.trim());
-
-  try {
-    await setGenerationPhaseAndNotify(
-      revisionOptions.generationRunId,
-      messageId,
-      "writing_notice"
-    );
-    const initialDraftResult = await callModelReportRewrite(
-      reportPayload,
-      revisionInstructionForPrompt,
-      revisionOptions.previousOutput,
-      reportReasoningEffort
-    );
-    modelCalls.push(initialDraftResult.modelCall);
-    promptChars += initialDraftResult.promptChars;
-    hiddenDraft = initialDraftResult.rewrite;
-    let rewrite = hiddenDraft;
-
-    await setGenerationPhaseAndNotify(
-      revisionOptions.generationRunId,
-      messageId,
-      "checking_references"
-    );
-    const referenceRepair = await applyReferenceCheckRepair({
-      referencePayload: reportReferencePayload,
-      rewritePayload: reportPayload,
-      rewrite,
-      revisionInstructionForPrompt,
-      correctionReasoningEffort: reportReasoningEffort,
-      modelCalls,
-      callRewrite: callModelReportRewrite
-    });
-    rewrite = referenceRepair.rewrite;
-    promptChars += referenceRepair.promptChars;
-    absorbReferenceRepairResult(referenceRepairState, referenceRepair);
-
-    await setGenerationPhaseAndNotify(
-      revisionOptions.generationRunId,
-      messageId,
-      "finalizing"
-    );
-    const attributionRisks = findAttributionRisks(rewrite);
-    attributionRiskCount = attributionRisks.length;
-    const attributionInstruction =
-      buildAttributionCorrectionInstruction(attributionRisks);
-    if (attributionInstruction) {
-      const combinedAttribution = [
-        revisionInstructionForPrompt,
-        attributionInstruction
-      ]
-        .filter(Boolean)
-        .join("\n\n");
-      const correctedForAttribution = await callModelReportRewrite(
-        reportPayload,
-        combinedAttribution,
-        rewrite,
-        reportReasoningEffort
-      );
-      modelCalls.push(correctedForAttribution.modelCall);
-      promptChars += correctedForAttribution.promptChars;
-      rewrite = correctedForAttribution.rewrite;
-      attributionCorrectionApplied = true;
-      attributionRiskCount = findAttributionRisks(rewrite).length;
-      needsFinalReferenceRepair = true;
-    }
-
-    const editorialReviewResult = await applyEditorialRevisionReviewRepair({
-      payload: reportPayload,
-      rewrite,
-      instruction: revisionOptions.userInstruction,
-      previousOutput: revisionOptions.previousOutput,
-      revisionInstructionForPrompt,
-      reasoningEffort: reportReasoningEffort,
-      modelCalls,
-      callRewrite: callModelReportRewrite
-    });
-    rewrite = editorialReviewResult.rewrite;
-    promptChars += editorialReviewResult.promptChars;
-    editorialReview = editorialReviewResult.audit;
-    if (editorialReview?.repairApplied) {
-      needsFinalReferenceRepair = true;
-    }
-
-    const importanceResult = applyImportanceHighBar(rewrite, payload);
-    rewrite = importanceResult.rewrite;
-    importanceAdjusted = importanceResult.adjusted;
-    importanceAdjustReason = importanceResult.reason;
-
-    const styleResult = sanitizeRewriteStyle(rewrite);
-    rewrite = styleResult.rewrite;
-    styleSanitization = styleResult.stats;
-    if (styleResult.stats.changed) {
-      needsFinalReferenceRepair = true;
-    }
-
-    if (needsFinalReferenceRepair) {
-      const finalReferenceRepair = await applyReferenceCheckRepair({
-        referencePayload: reportReferencePayload,
-        rewritePayload: reportPayload,
-        rewrite,
-        revisionInstructionForPrompt,
-        correctionReasoningEffort: reportReasoningEffort,
-        existingCorrectionAttempts: referenceRepairState.correctionAttempts,
-        modelCalls,
-        callRewrite: callModelReportRewrite
-      });
-      rewrite = finalReferenceRepair.rewrite;
-      promptChars += finalReferenceRepair.promptChars;
-      absorbReferenceRepairResult(referenceRepairState, finalReferenceRepair);
-    }
-
-    rewrite = ensureReportSourceLimitation(
-      rewrite,
-      reportReferencePayload,
-      reportContent
-    );
-    let validationResult = validateRewriteWithRevisionCompliance(
-      rewrite,
-      reportReferencePayload,
-      {
-        instruction: revisionOptions.userInstruction,
-        previousOutput: revisionOptions.previousOutput,
-        attachmentTextAvailable,
-        reportExtraction: reportContent
-      }
-    );
-
-    const validationRepairResult = await applyHighRiskValidationRepair({
-      payload: reportPayload,
-      rewrite,
-      validation: validationResult,
-      revisionInstructionForPrompt,
-      reasoningEffort: reportReasoningEffort,
-      modelCalls,
-      callRewrite: callModelReportRewrite,
-      // Report rewrites already have a sentence-level source check over the
-      // selected attachment pages. Do not ask a second model call to delete a
-      // visible number that this fresh check has explicitly grounded.
-      skipUnexpectedNumbers: referenceCanAdjudicateUnexpectedNumbers(
-        rewrite,
-        validationResult,
-        resolveAccumulatedReferenceCheckOutcome(referenceRepairState)
-      )
-    });
-    rewrite = validationRepairResult.rewrite;
-    promptChars += validationRepairResult.promptChars;
-    validationRepair = validationRepairResult.audit;
-
-    if (validationRepair.applied) {
-      const postRepairAttributionRisks = findAttributionRisks(rewrite);
-      attributionRiskCount = postRepairAttributionRisks.length;
-      const postRepairAttributionInstruction =
-        buildAttributionCorrectionInstruction(postRepairAttributionRisks);
-      if (postRepairAttributionInstruction) {
-        const combinedAttribution = [
-          revisionInstructionForPrompt,
-          postRepairAttributionInstruction
-        ]
-          .filter(Boolean)
-          .join("\n\n");
-        const correctedForAttribution = await callModelReportRewrite(
-          reportPayload,
-          combinedAttribution,
-          rewrite,
-          reportReasoningEffort
-        );
-        modelCalls.push(correctedForAttribution.modelCall);
-        promptChars += correctedForAttribution.promptChars;
-        rewrite = correctedForAttribution.rewrite;
-        attributionCorrectionApplied = true;
-        attributionRiskCount = findAttributionRisks(rewrite).length;
-      }
-
-      const postRepairImportanceResult = applyImportanceHighBar(rewrite, payload);
-      rewrite = postRepairImportanceResult.rewrite;
-      importanceAdjusted =
-        importanceAdjusted || postRepairImportanceResult.adjusted;
-      importanceAdjustReason =
-        postRepairImportanceResult.reason ?? importanceAdjustReason;
-
-      const postRepairStyleResult = sanitizeRewriteStyle(rewrite);
-      rewrite = postRepairStyleResult.rewrite;
-      styleSanitization = postRepairStyleResult.stats;
-
-      const repairedReferenceRepair = await applyReferenceCheckRepair({
-        referencePayload: reportReferencePayload,
-        rewritePayload: reportPayload,
-        rewrite,
-        revisionInstructionForPrompt,
-        correctionReasoningEffort: reportReasoningEffort,
-        existingCorrectionAttempts: referenceRepairState.correctionAttempts,
-        modelCalls,
-        callRewrite: callModelReportRewrite
-      });
-      rewrite = repairedReferenceRepair.rewrite;
-      promptChars += repairedReferenceRepair.promptChars;
-      absorbReferenceRepairResult(
-        referenceRepairState,
-        repairedReferenceRepair
-      );
-
-      rewrite = ensureReportSourceLimitation(
-        rewrite,
-        reportReferencePayload,
-        reportContent
-      );
-      validationResult = validateRewriteWithRevisionCompliance(
-        rewrite,
-        reportReferencePayload,
-        {
-          instruction: revisionOptions.userInstruction,
-          previousOutput: revisionOptions.previousOutput,
-          attachmentTextAvailable,
-          reportExtraction: reportContent
-        }
-      );
-    }
-
-    const referenceOutcome =
-      resolveAccumulatedReferenceCheckOutcome(referenceRepairState);
-    const referenceGroundsVisibleNumbers = referenceCanAdjudicateUnexpectedNumbers(
-      rewrite,
-      validationResult,
-      referenceOutcome
-    );
-    validationRepair.finalWarnings = validationIssueMessages(
-      highRiskValidationWarningIssues(validationResult)
-    );
-    validationResult = promoteHighRiskValidationWarnings(validationResult, {
-      keepUnexpectedNumbersAsWarning: referenceGroundsVisibleNumbers
-    });
-    const { gate: referenceGate, forceNeedsRetry: referenceForceNeedsRetry } =
-      applyReferenceCheckEnforcement(
-        referenceOutcome,
-        { legacyCheckerError: referenceRepairState.checkerError },
-        activeReferenceCheckEnforcement
-      );
-    if (referenceForceNeedsRetry) {
-      // Promotion-only path (retryOnUnavailable). Throwing routes through the
-      // existing catch/retry machinery: BullMQ re-attempts, finalAttempt
-      // handling applies, and nothing persists a needs_retry the queue would
-      // never pick up again.
-      throw new Error(
-        "Reference check unavailable: checker failed with no usable coverage evidence."
-      );
-    }
-    const validation = applyReferenceCheckGate(validationResult, referenceGate);
-    const rewriteStatus = statusForValidation(validation);
-    const persistedRewriteJson = rewriteJsonForValidation(rewrite, validation);
-
-    await upsertRewrite({
-      messageId,
-      version: revisionOptions.version,
-      userInstruction: revisionOptions.userInstruction,
-      generationRunId: revisionOptions.generationRunId,
-      inputJson: generationInputJson(
-        reportPayload,
-        revisionOptions.previousOutput,
-        modelCalls,
-        revisionOptions.reasoningEffortOverride
-      ),
-      rewriteJson: persistedRewriteJson,
-      status: rewriteStatus,
-      validationJson: {
-        valid: validation.valid,
-        errorCode: validationErrorCode(validation),
-        errors: validation.errors,
-        issues: validation.issues,
-        blockingErrors: validation.blockingErrors,
-        warnings: validation.warnings,
-        quoteTelemetry: validation.quoteTelemetry,
-        numberAssessments: validation.numberAssessments,
-        publicationNumberAssessments:
-          validation.publicationNumberAssessments,
-        numericPublicationPolicy: numericPublicationPolicyJson(
-          validation,
-          referenceGroundsVisibleNumbers
-        ),
-        markerLeaks: validation.markerLeaks,
-        revisionInstructionCompliance: validation.revisionCompliance,
-        sourceBodyChars: payload.sourceBodyChars,
-        promptChars,
-        reportExtraction: {
-          attachmentId: reportContent.attachmentId,
-          attachmentName: reportContent.attachmentName,
-          pageCount: reportContent.pageCount,
-          extractedChars: reportContent.diagnostics.totalExtractedChars,
-          contextChars: reportContent.text.length,
-          validationSourceChars: reportReferenceText.length,
-          selectedPages: reportContent.selectedPages,
-          metricCandidates: reportContent.metrics,
-          diagnostics: reportContent.diagnostics
-        },
-        styleSanitization,
-        editorialReview,
-        validationRepair,
-        referenceCheck: referenceCheckValidationJson(
-          referenceRepairState,
-          referenceGate,
-          {
-            attributionCorrectionApplied,
-            attributionRiskCount,
-            importanceAdjusted,
-            importanceAdjustReason
-          },
-          referenceOutcome,
-          activeReferenceCheckEnforcement
-        ),
-        hiddenDraft: hiddenDraft
-          ? {
-              title: hiddenDraft.title,
-              lead: hiddenDraft.lead,
-              body: hiddenDraft.body,
-              company_sentence: hiddenDraft.company_sentence
-            }
-          : null,
-        relatedNotices: relatedNoticeTelemetryJson
-      } as Prisma.InputJsonValue
-    });
-
-    if (rewriteStatus === "pending") {
-      await enqueuePublish(
-        messageId,
-        revisionOptions.version ?? 1,
-        revisionOptions.generationRunId
-      );
-    } else {
-      await publishFeedUpdate(messageId, "failed");
-    }
-  } catch (error) {
-    promptChars += collectFailedModelCall(error, modelCalls);
-    const errorText = error instanceof Error ? error.message : String(error);
-
-    if (!finalAttempt) {
-      await upsertRewrite({
-        messageId,
-        version: revisionOptions.version,
-        userInstruction: revisionOptions.userInstruction,
-        generationRunId: revisionOptions.generationRunId,
-        inputJson: generationInputJson(
-          reportPayload,
-          revisionOptions.previousOutput,
-          modelCalls,
-          revisionOptions.reasoningEffortOverride
-        ),
-        rewriteJson: {
-          errorCode: "REPORT_REWRITE_ATTEMPT_FAILED",
-          message: errorText
-        } as Prisma.InputJsonValue,
-        status: "needs_retry",
-        validationJson: {
-          valid: false,
-          errorCode: "REPORT_REWRITE_ATTEMPT_FAILED",
-          errors: [errorText],
-          sourceBodyChars: payload.sourceBodyChars,
-          promptChars
-        } as Prisma.InputJsonValue
-      });
-      throw new Error(`report rewrite pipeline failed for ${messageId}: ${errorText}`);
-    }
-
-    await upsertRewrite({
-      messageId,
-      version: revisionOptions.version,
-      userInstruction: revisionOptions.userInstruction,
-      generationRunId: revisionOptions.generationRunId,
-      inputJson: generationInputJson(
-        reportPayload,
-        revisionOptions.previousOutput,
-        modelCalls,
-        revisionOptions.reasoningEffortOverride
-      ),
-      rewriteJson: {
-        errorCode: "REPORT_REWRITE_FAILED_FINAL",
-        message: errorText
-      } as Prisma.InputJsonValue,
-      status: "failed",
-      validationJson: {
-        valid: false,
-        errorCode: "REPORT_REWRITE_FAILED_FINAL",
-        errors: [errorText],
-        sourceBodyChars: payload.sourceBodyChars,
-        promptChars
-      } as Prisma.InputJsonValue
-    });
-    logFinalRewriteFailure(messageId, "REPORT_REWRITE_FAILED_FINAL", errorText);
-    await publishFeedUpdate(messageId, "failed");
-  }
+  await processNoticeRewrite(messageId, reportPayload, "report", job, revisionOptions,
+    { relatedNotices, reportExtraction: reportContent });
 }
 
 async function processYearlyReportRewrite(
   messageId: number,
-  source: {
-    title: string;
-    issuerName: string;
-    issuerSign: string;
-    publishedAt: Date;
-    categoriesJson: unknown;
-    marketsJson: unknown;
-    bodyText: string;
-    hasAttachments: boolean;
-    rawMessageJson: unknown;
-  },
+  source: RelatedNoticeSource,
   payload: PromptPayload,
   job: { opts: { attempts?: number }; attemptsMade: number },
   yearlyContent: YearlyReportExtractionResult,
   revisionOptions: RewriteRevisionOptions = {}
 ): Promise<void> {
-  const yearlyPayload: YearlyReportPromptPayload = {
-    ...payload,
-    letterText: yearlyContent.letterText,
-    remunerationText: yearlyContent.remunerationText,
+  const relatedNotices = await attachRelatedNotices({ ...source, messageId }, payload);
+  const yearlyPayload: NoticePayload = {
+    ...payload, letterText: yearlyContent.letterText, remunerationText: yearlyContent.remunerationText,
     reportPageCount: yearlyContent.pageCount
   };
-
-  // Build combined text for reference checking
-  const combinedText = [
-    yearlyContent.letterText,
-    yearlyContent.remunerationText
-  ]
-    .filter(Boolean)
-    .join("\n\n");
-
-  const maxAttempts = job.opts.attempts ?? 1;
-  const finalAttempt = job.attemptsMade + 1 >= maxAttempts;
-  let promptChars = revisionOptions.promptChars ?? 0;
-  const referenceRepairState = createReferenceRepairAccumulator();
-  let hiddenDraft: RewriteOutput | null = null;
-  let importanceAdjusted = false;
-  let importanceAdjustReason: string | null = null;
-  let attributionCorrectionApplied = false;
-  let attributionRiskCount = 0;
-  let styleSanitization: ReturnType<typeof sanitizeRewriteStyle>["stats"] | null = null;
-  let editorialReview: EditorialReviewAudit | null = null;
-  let validationRepair: ValidationRepairAudit = emptyValidationRepairAudit();
-  let needsFinalReferenceRepair = false;
-  const modelCalls: ModelCallLog[] = [...(revisionOptions.modelCalls ?? [])];
-  const reportReasoningEffort =
-    revisionOptions.reasoningEffortOverride ??
-    config.OPENAI_REPORT_REASONING_EFFORT;
-  const revisionInstructionForPrompt = appendRevisionChecklist(
-    revisionOptions.userInstruction
-  );
-  const attachmentTextAvailable = Boolean(combinedText.trim());
-
-  try {
-    await setGenerationPhaseAndNotify(
-      revisionOptions.generationRunId,
-      messageId,
-      "writing_notice"
-    );
-    const initialDraftResult = await callModelYearlyReportRewrite(
-      yearlyPayload,
-      revisionInstructionForPrompt,
-      revisionOptions.previousOutput,
-      reportReasoningEffort
-    );
-    modelCalls.push(initialDraftResult.modelCall);
-    promptChars += initialDraftResult.promptChars;
-    hiddenDraft = initialDraftResult.rewrite;
-    let rewrite = hiddenDraft;
-
-    // Reference check against combined yearly report text
-    const refPayload: PromptPayload = {
-      ...payload,
-      bodyText: combinedText,
-      sourceBodyChars: combinedText.length
-    };
-
-    await setGenerationPhaseAndNotify(
-      revisionOptions.generationRunId,
-      messageId,
-      "checking_references"
-    );
-    const referenceRepair = await applyReferenceCheckRepair({
-      referencePayload: refPayload,
-      rewritePayload: yearlyPayload,
-      rewrite,
-      revisionInstructionForPrompt,
-      correctionReasoningEffort: reportReasoningEffort,
-      modelCalls,
-      callRewrite: callModelYearlyReportRewrite
-    });
-    rewrite = referenceRepair.rewrite;
-    promptChars += referenceRepair.promptChars;
-    absorbReferenceRepairResult(referenceRepairState, referenceRepair);
-
-    await setGenerationPhaseAndNotify(
-      revisionOptions.generationRunId,
-      messageId,
-      "finalizing"
-    );
-    const attributionRisks = findAttributionRisks(rewrite);
-    attributionRiskCount = attributionRisks.length;
-    const attributionInstruction =
-      buildAttributionCorrectionInstruction(attributionRisks);
-    if (attributionInstruction) {
-      const combinedAttribution = [
-        revisionInstructionForPrompt,
-        attributionInstruction
-      ]
-        .filter(Boolean)
-        .join("\n\n");
-      const correctedForAttribution = await callModelYearlyReportRewrite(
-        yearlyPayload,
-        combinedAttribution,
-        rewrite,
-        reportReasoningEffort
-      );
-      modelCalls.push(correctedForAttribution.modelCall);
-      promptChars += correctedForAttribution.promptChars;
-      rewrite = correctedForAttribution.rewrite;
-      attributionCorrectionApplied = true;
-      attributionRiskCount = findAttributionRisks(rewrite).length;
-      needsFinalReferenceRepair = true;
-    }
-
-    const editorialReviewResult = await applyEditorialRevisionReviewRepair({
-      payload: yearlyPayload,
-      rewrite,
-      instruction: revisionOptions.userInstruction,
-      previousOutput: revisionOptions.previousOutput,
-      revisionInstructionForPrompt,
-      reasoningEffort: reportReasoningEffort,
-      modelCalls,
-      callRewrite: callModelYearlyReportRewrite
-    });
-    rewrite = editorialReviewResult.rewrite;
-    promptChars += editorialReviewResult.promptChars;
-    editorialReview = editorialReviewResult.audit;
-    if (editorialReview?.repairApplied) {
-      needsFinalReferenceRepair = true;
-    }
-
-    const importanceResult = applyImportanceHighBar(rewrite, payload);
-    rewrite = importanceResult.rewrite;
-    importanceAdjusted = importanceResult.adjusted;
-    importanceAdjustReason = importanceResult.reason;
-
-    const styleResult = sanitizeRewriteStyle(rewrite);
-    rewrite = styleResult.rewrite;
-    styleSanitization = styleResult.stats;
-    if (styleResult.stats.changed) {
-      needsFinalReferenceRepair = true;
-    }
-
-    if (needsFinalReferenceRepair) {
-      const finalReferenceRepair = await applyReferenceCheckRepair({
-        referencePayload: refPayload,
-        rewritePayload: yearlyPayload,
-        rewrite,
-        revisionInstructionForPrompt,
-        correctionReasoningEffort: reportReasoningEffort,
-        existingCorrectionAttempts: referenceRepairState.correctionAttempts,
-        modelCalls,
-        callRewrite: callModelYearlyReportRewrite
-      });
-      rewrite = finalReferenceRepair.rewrite;
-      promptChars += finalReferenceRepair.promptChars;
-      absorbReferenceRepairResult(referenceRepairState, finalReferenceRepair);
-    }
-
-    rewrite = ensureReportSourceLimitation(rewrite, payload);
-    let validationResult = validateRewriteWithRevisionCompliance(rewrite, payload, {
-      instruction: revisionOptions.userInstruction,
-      previousOutput: revisionOptions.previousOutput,
-      attachmentTextAvailable
-    });
-
-    const validationRepairResult = await applyHighRiskValidationRepair({
-      payload: yearlyPayload,
-      rewrite,
-      validation: validationResult,
-      revisionInstructionForPrompt,
-      reasoningEffort: reportReasoningEffort,
-      modelCalls,
-      callRewrite: callModelYearlyReportRewrite
-    });
-    rewrite = validationRepairResult.rewrite;
-    promptChars += validationRepairResult.promptChars;
-    validationRepair = validationRepairResult.audit;
-
-    if (validationRepair.applied) {
-      const postRepairAttributionRisks = findAttributionRisks(rewrite);
-      attributionRiskCount = postRepairAttributionRisks.length;
-      const postRepairAttributionInstruction =
-        buildAttributionCorrectionInstruction(postRepairAttributionRisks);
-      if (postRepairAttributionInstruction) {
-        const combinedAttribution = [
-          revisionInstructionForPrompt,
-          postRepairAttributionInstruction
-        ]
-          .filter(Boolean)
-          .join("\n\n");
-        const correctedForAttribution = await callModelYearlyReportRewrite(
-          yearlyPayload,
-          combinedAttribution,
-          rewrite,
-          reportReasoningEffort
-        );
-        modelCalls.push(correctedForAttribution.modelCall);
-        promptChars += correctedForAttribution.promptChars;
-        rewrite = correctedForAttribution.rewrite;
-        attributionCorrectionApplied = true;
-        attributionRiskCount = findAttributionRisks(rewrite).length;
-      }
-
-      const postRepairImportanceResult = applyImportanceHighBar(rewrite, payload);
-      rewrite = postRepairImportanceResult.rewrite;
-      importanceAdjusted =
-        importanceAdjusted || postRepairImportanceResult.adjusted;
-      importanceAdjustReason =
-        postRepairImportanceResult.reason ?? importanceAdjustReason;
-
-      const postRepairStyleResult = sanitizeRewriteStyle(rewrite);
-      rewrite = postRepairStyleResult.rewrite;
-      styleSanitization = postRepairStyleResult.stats;
-
-      const repairedReferenceRepair = await applyReferenceCheckRepair({
-        referencePayload: refPayload,
-        rewritePayload: yearlyPayload,
-        rewrite,
-        revisionInstructionForPrompt,
-        correctionReasoningEffort: reportReasoningEffort,
-        existingCorrectionAttempts: referenceRepairState.correctionAttempts,
-        modelCalls,
-        callRewrite: callModelYearlyReportRewrite
-      });
-      rewrite = repairedReferenceRepair.rewrite;
-      promptChars += repairedReferenceRepair.promptChars;
-      absorbReferenceRepairResult(
-        referenceRepairState,
-        repairedReferenceRepair
-      );
-
-      rewrite = ensureReportSourceLimitation(rewrite, payload);
-      validationResult = validateRewriteWithRevisionCompliance(rewrite, payload, {
-        instruction: revisionOptions.userInstruction,
-        previousOutput: revisionOptions.previousOutput,
-        attachmentTextAvailable
-      });
-    }
-
-    validationRepair.finalWarnings = validationIssueMessages(
-      highRiskValidationWarningIssues(validationResult)
-    );
-    validationResult = promoteHighRiskValidationWarnings(validationResult);
-    const referenceOutcome =
-      resolveAccumulatedReferenceCheckOutcome(referenceRepairState);
-    const { gate: referenceGate, forceNeedsRetry: referenceForceNeedsRetry } =
-      applyReferenceCheckEnforcement(
-        referenceOutcome,
-        { legacyCheckerError: referenceRepairState.checkerError },
-        activeReferenceCheckEnforcement
-      );
-    if (referenceForceNeedsRetry) {
-      // Promotion-only path (retryOnUnavailable). Throwing routes through the
-      // existing catch/retry machinery: BullMQ re-attempts, finalAttempt
-      // handling applies, and nothing persists a needs_retry the queue would
-      // never pick up again.
-      throw new Error(
-        "Reference check unavailable: checker failed with no usable coverage evidence."
-      );
-    }
-    const validation = applyReferenceCheckGate(validationResult, referenceGate);
-    const rewriteStatus = statusForValidation(validation);
-    const persistedRewriteJson = rewriteJsonForValidation(rewrite, validation);
-
-    await upsertRewrite({
-      messageId,
-      version: revisionOptions.version,
-      userInstruction: revisionOptions.userInstruction,
-      generationRunId: revisionOptions.generationRunId,
-      inputJson: generationInputJson(
-        yearlyPayload,
-        revisionOptions.previousOutput,
-        modelCalls,
-        revisionOptions.reasoningEffortOverride
-      ),
-      rewriteJson: persistedRewriteJson,
-      status: rewriteStatus,
-      validationJson: {
-        valid: validation.valid,
-        errorCode: validationErrorCode(validation),
-        errors: validation.errors,
-        issues: validation.issues,
-        blockingErrors: validation.blockingErrors,
-        warnings: validation.warnings,
-        quoteTelemetry: validation.quoteTelemetry,
-        numberAssessments: validation.numberAssessments,
-        publicationNumberAssessments:
-          validation.publicationNumberAssessments,
-        numericPublicationPolicy: numericPublicationPolicyJson(
-          validation,
-          false
-        ),
-        markerLeaks: validation.markerLeaks,
-        revisionInstructionCompliance: validation.revisionCompliance,
-        sourceBodyChars: payload.sourceBodyChars,
-        promptChars,
-        yearlyReportExtraction: {
-          attachmentId: yearlyContent.attachmentId,
-          pageCount: yearlyContent.pageCount,
-          openAIPdfFallback: yearlyContent.openAIPdfFallback ?? false,
-          hasLetterText: !!yearlyContent.letterText,
-          hasRemunerationText: !!yearlyContent.remunerationText,
-          extractedChars: combinedText.length
-        },
-        styleSanitization,
-        editorialReview,
-        validationRepair,
-        referenceCheck: referenceCheckValidationJson(
-          referenceRepairState,
-          referenceGate,
-          {
-            attributionCorrectionApplied,
-            attributionRiskCount,
-            importanceAdjusted,
-            importanceAdjustReason
-          },
-          referenceOutcome,
-          activeReferenceCheckEnforcement
-        ),
-        hiddenDraft: hiddenDraft
-          ? {
-              title: hiddenDraft.title,
-              lead: hiddenDraft.lead,
-              body: hiddenDraft.body,
-              company_sentence: hiddenDraft.company_sentence
-            }
-          : null
-      } as Prisma.InputJsonValue
-    });
-
-    if (rewriteStatus === "pending") {
-      await enqueuePublish(
-        messageId,
-        revisionOptions.version ?? 1,
-        revisionOptions.generationRunId
-      );
-    } else {
-      await publishFeedUpdate(messageId, "failed");
-    }
-  } catch (error) {
-    promptChars += collectFailedModelCall(error, modelCalls);
-    const errorText = error instanceof Error ? error.message : String(error);
-
-    if (!finalAttempt) {
-      await upsertRewrite({
-        messageId,
-        version: revisionOptions.version,
-        userInstruction: revisionOptions.userInstruction,
-        generationRunId: revisionOptions.generationRunId,
-        inputJson: generationInputJson(
-          yearlyPayload,
-          revisionOptions.previousOutput,
-          modelCalls,
-          revisionOptions.reasoningEffortOverride
-        ),
-        rewriteJson: {
-          errorCode: "YEARLY_REPORT_REWRITE_ATTEMPT_FAILED",
-          message: errorText
-        } as Prisma.InputJsonValue,
-        status: "needs_retry",
-        validationJson: {
-          valid: false,
-          errorCode: "YEARLY_REPORT_REWRITE_ATTEMPT_FAILED",
-          errors: [errorText],
-          sourceBodyChars: payload.sourceBodyChars,
-          promptChars
-        } as Prisma.InputJsonValue
-      });
-      throw new Error(
-        `yearly report rewrite pipeline failed for ${messageId}: ${errorText}`
-      );
-    }
-
-    await upsertRewrite({
-      messageId,
-      version: revisionOptions.version,
-      userInstruction: revisionOptions.userInstruction,
-      generationRunId: revisionOptions.generationRunId,
-      inputJson: generationInputJson(
-        yearlyPayload,
-        revisionOptions.previousOutput,
-        modelCalls,
-        revisionOptions.reasoningEffortOverride
-      ),
-      rewriteJson: {
-        errorCode: "YEARLY_REPORT_REWRITE_FAILED_FINAL",
-        message: errorText
-      } as Prisma.InputJsonValue,
-      status: "failed",
-      validationJson: {
-        valid: false,
-        errorCode: "YEARLY_REPORT_REWRITE_FAILED_FINAL",
-        errors: [errorText],
-        sourceBodyChars: payload.sourceBodyChars,
-        promptChars
-      } as Prisma.InputJsonValue
-    });
-    logFinalRewriteFailure(
-      messageId,
-      "YEARLY_REPORT_REWRITE_FAILED_FINAL",
-      errorText
-    );
-    await publishFeedUpdate(messageId, "failed");
-  }
+  await processNoticeRewrite(messageId, yearlyPayload, "yearly", job, revisionOptions,
+    { relatedNotices, yearlyExtraction: yearlyContent });
 }
-
 function rewriteModelFromInputJson(inputJson: unknown): string {
   if (!inputJson || typeof inputJson !== "object" || Array.isArray(inputJson)) {
     return config.OPENAI_MODEL;
@@ -3202,7 +1438,7 @@ function rewriteModelFromInputJson(inputJson: unknown): string {
         call !== null &&
         typeof call === "object" &&
         !Array.isArray(call) &&
-        (call as Record<string, unknown>).schemaName === "rewrite_output"
+        ["rewrite_output", "notice_rewrite_output"].includes(String((call as Record<string, unknown>).schemaName))
     );
     const model =
       rewriteCall && typeof rewriteCall === "object"
@@ -3901,6 +2137,7 @@ const rewriteWorker = new Worker<RewriteJobData>(
       }
 
       // Three-tier PDF processing for notices with attachments
+      let reportPipelineStarted = false;
       if (source.hasAttachments) {
         await setGenerationPhaseAndNotify(
           generationRunId,
@@ -3958,6 +2195,7 @@ const rewriteWorker = new Worker<RewriteJobData>(
               }
             }
             if (yearlyContent) {
+              reportPipelineStarted = true;
               await processYearlyReportRewrite(
                 messageId,
                 source,
@@ -4008,14 +2246,14 @@ const rewriteWorker = new Worker<RewriteJobData>(
             return;
           }
 
-          // TIER 2: Quarterly report — filename-matched PDF extraction (existing behavior)
+          // TIER 2: Reports — inspect content and retain complementary evidence.
           let reportContent = await extractReportContent(
             rawJson,
             messageId,
             job.data.instruction
           );
           if (reportContent && reportNeedsOpenAIPdfFallback(reportContent)) {
-            const reportPdf = await downloadReportPdfAttachment(rawJson, messageId);
+            const reportPdf = await downloadReportPdfAttachment(rawJson, messageId, reportContent.attachmentId);
             if (reportPdf) {
               const fallback = await extractReportContextWithOpenAIPdf(
                 reportPdf,
@@ -4026,7 +2264,7 @@ const rewriteWorker = new Worker<RewriteJobData>(
               preRewriteModelCalls.push(fallback.modelCall);
               preRewritePromptChars += fallback.promptChars;
               if (fallback.context.trim().length > 0) {
-                reportContent = reportExtractionFromOpenAIPdf(
+                reportContent = mergeReportPdfFallback(
                   reportPdf,
                   fallback,
                   reportContent
@@ -4046,11 +2284,12 @@ const rewriteWorker = new Worker<RewriteJobData>(
               preRewriteModelCalls.push(fallback.modelCall);
               preRewritePromptChars += fallback.promptChars;
               if (fallback.context.trim().length > 0) {
-                reportContent = reportExtractionFromOpenAIPdf(reportPdf, fallback);
+                reportContent = mergeReportPdfFallback(reportPdf, fallback);
               }
             }
           }
           if (reportContent) {
+            reportPipelineStarted = true;
             await processReportRewrite(
               messageId,
               source,
@@ -4064,7 +2303,8 @@ const rewriteWorker = new Worker<RewriteJobData>(
                 generationRunId,
                 modelCalls: preRewriteModelCalls,
                 promptChars: preRewritePromptChars,
-                reasoningEffortOverride: job.data.reasoningEffortOverride
+                reasoningEffortOverride: job.data.reasoningEffortOverride,
+                allowSkip: job.data.reason !== "manual-reprocess"
               }
             );
             return;
@@ -4099,6 +2339,10 @@ const rewriteWorker = new Worker<RewriteJobData>(
             }
           }
         } catch (error) {
+          // Queue/validation failures must retain their report evidence and
+          // retry normally, never silently downgrade to a text-only rewrite.
+          if (reportPipelineStarted) throw error;
+          preRewritePromptChars += collectFailedModelCall(error, preRewriteModelCalls);
           console.log(
             `[pdf] PDF extraction/rewrite failed for ${messageId} (${source.issuerSign}), falling through to normal pipeline: ${
               error instanceof Error ? error.message : String(error)
@@ -4180,470 +2424,15 @@ const rewriteWorker = new Worker<RewriteJobData>(
         }
       }
 
-      // AI triage for ambiguous categories — lightweight check before full pipeline
-      if (job.data.reason !== "manual-reprocess" && needsNewsworthinessTriage(categories)) {
-        const triage = await callModelTriage(
-          source.title,
-          source.bodyText,
-          categories,
-          source.hasAttachments
-        );
-        if (triage.modelCall) {
-          preRewriteModelCalls.push(triage.modelCall);
-          preRewritePromptChars += triage.promptChars;
-        }
-        if (!triage.newsworthy) {
-          console.log(
-            `[triage] skipping ${messageId} (${source.issuerSign}): ${triage.reason}`
-          );
-          await upsertRewrite({
-            messageId,
-            version: targetVersion,
-            userInstruction: job.data.instruction,
-            generationRunId,
-            inputJson: generationInputJson(
-              payload,
-              previousOutput,
-              preRewriteModelCalls,
-              job.data.reasoningEffortOverride
-            ),
-            rewriteJson: {
-              skippedReason: "AI_TRIAGE_SKIP",
-              triageReason: triage.reason,
-              categories
-            } as Prisma.InputJsonValue,
-            status: "skipped",
-            validationJson: {
-              valid: true,
-              errorCode: null,
-              errors: [],
-              sourceBodyChars: payload.sourceBodyChars,
-              promptChars: preRewritePromptChars,
-              triageResult: { newsworthy: false, reason: triage.reason },
-              // Model-skipped rows carry the shadow evaluation too: shadow
-              // classes explicitly target notices the model also skips, so
-              // omitting it here would hide most of their real match volume.
-              triage: triageTelemetryJson
-            } as Prisma.InputJsonValue
-          });
-
-          await enqueuePublish(messageId, targetVersion, generationRunId);
-          return;
-        }
-        console.log(
-          `[triage] proceeding with ${messageId} (${source.issuerSign}): ${triage.reason}`
-        );
-      }
-
-      const maxAttempts = job.opts.attempts ?? 1;
-      const finalAttempt = job.attemptsMade + 1 >= maxAttempts;
-      let promptChars = preRewritePromptChars;
-      const referenceRepairState = createReferenceRepairAccumulator();
-      let hiddenDraft: RewriteOutput | null = null;
-      let importanceAdjusted = false;
-      let importanceAdjustReason: string | null = null;
-      let attributionCorrectionApplied = false;
-      let attributionRiskCount = 0;
-      let styleSanitization: ReturnType<typeof sanitizeRewriteStyle>["stats"] | null =
-        null;
-      let editorialReview: EditorialReviewAudit | null = null;
-      let validationRepair: ValidationRepairAudit = emptyValidationRepairAudit();
-      let needsFinalReferenceRepair = false;
-      const modelCalls: ModelCallLog[] = [...preRewriteModelCalls];
-      const rewriteReasoningEffort =
-        job.data.reasoningEffortOverride ?? config.OPENAI_DEFAULT_REASONING_EFFORT;
-      // Corrections revise the same notice with the same prompt family, so they
-      // run at the rewrite effort (not the report effort, which is a different pipeline).
-      const correctionReasoningEffort = rewriteReasoningEffort;
-      const revisionInstructionForPrompt = appendRevisionChecklist(
-        job.data.instruction
-      );
-      const attachmentTextAvailable = Boolean(payload.pdfSupplementText?.trim());
-
-      if (payload.bodyText.trim().length === 0) {
-        await upsertRewrite({
-          messageId,
-          version: targetVersion,
-          userInstruction: job.data.instruction,
-          generationRunId,
-          rewriteJson: {
-            errorCode: "SOURCE_TEXT_EMPTY",
-            message: "Source bodyText is empty."
-          } as Prisma.InputJsonValue,
-          status: "failed",
-          validationJson: {
-            valid: false,
-            errorCode: "SOURCE_TEXT_EMPTY",
-            errors: ["Source body text is empty."],
-            sourceBodyChars: payload.sourceBodyChars,
-            promptChars
-          } as Prisma.InputJsonValue
-        });
-        await publishFeedUpdate(messageId, "failed");
-        return;
-      }
-
-      // After triage (skipped notices never pay for a lookup), before the
-      // first model call so the draft, the checker and the validator agree.
-      const relatedNoticeTelemetryJson = await attachRelatedNotices(source, payload);
-
-      try {
-        await setGenerationPhaseAndNotify(generationRunId, messageId, "writing_notice");
-        const initialDraftResult = await callModelRewrite(
-          payload,
-          revisionInstructionForPrompt,
-          previousOutput,
-          rewriteReasoningEffort
-        );
-        modelCalls.push(initialDraftResult.modelCall);
-        promptChars += initialDraftResult.promptChars;
-        hiddenDraft = initialDraftResult.rewrite;
-        let rewrite = hiddenDraft;
-        const refPayload = payload.pdfSupplementText
-          ? { ...payload, bodyText: payload.bodyText + "\n\n" + payload.pdfSupplementText }
-          : payload;
-
-        await setGenerationPhaseAndNotify(generationRunId, messageId, "checking_references");
-        const referenceRepair = await applyReferenceCheckRepair({
-          referencePayload: refPayload,
-          rewritePayload: payload,
-          rewrite,
-          revisionInstructionForPrompt,
-          correctionReasoningEffort,
-          modelCalls,
-          callRewrite: callModelRewrite
-        });
-        rewrite = referenceRepair.rewrite;
-        promptChars += referenceRepair.promptChars;
-        absorbReferenceRepairResult(referenceRepairState, referenceRepair);
-
-        await setGenerationPhaseAndNotify(generationRunId, messageId, "finalizing");
-        const attributionRisks = findAttributionRisks(rewrite);
-        attributionRiskCount = attributionRisks.length;
-        const attributionInstruction =
-          buildAttributionCorrectionInstruction(attributionRisks);
-        if (attributionInstruction) {
-          const combinedAttribution = [revisionInstructionForPrompt, attributionInstruction]
-            .filter(Boolean)
-            .join("\n\n");
-          const correctedForAttribution = await callModelRewrite(
-            payload,
-            combinedAttribution,
-            rewrite,
-            correctionReasoningEffort
-          );
-          modelCalls.push(correctedForAttribution.modelCall);
-          promptChars += correctedForAttribution.promptChars;
-          rewrite = correctedForAttribution.rewrite;
-          attributionCorrectionApplied = true;
-          attributionRiskCount = findAttributionRisks(rewrite).length;
-          needsFinalReferenceRepair = true;
-        }
-
-        const editorialReviewResult = await applyEditorialRevisionReviewRepair({
-          payload,
-          rewrite,
-          instruction: job.data.instruction,
-          previousOutput,
-          revisionInstructionForPrompt,
-          reasoningEffort: correctionReasoningEffort,
-          modelCalls,
-          callRewrite: callModelRewrite
-        });
-        rewrite = editorialReviewResult.rewrite;
-        promptChars += editorialReviewResult.promptChars;
-        editorialReview = editorialReviewResult.audit;
-        if (editorialReview?.repairApplied) {
-          needsFinalReferenceRepair = true;
-        }
-
-        const importanceResult = applyImportanceHighBar(rewrite, payload);
-        rewrite = importanceResult.rewrite;
-        importanceAdjusted = importanceResult.adjusted;
-        importanceAdjustReason = importanceResult.reason;
-
-        const styleResult = sanitizeRewriteStyle(rewrite);
-        rewrite = styleResult.rewrite;
-        styleSanitization = styleResult.stats;
-        if (styleResult.stats.changed) {
-          needsFinalReferenceRepair = true;
-        }
-
-        if (needsFinalReferenceRepair) {
-          const finalReferenceRepair = await applyReferenceCheckRepair({
-            referencePayload: refPayload,
-            rewritePayload: payload,
-            rewrite,
-            revisionInstructionForPrompt,
-            correctionReasoningEffort,
-            existingCorrectionAttempts: referenceRepairState.correctionAttempts,
-            modelCalls,
-            callRewrite: callModelRewrite
-          });
-          rewrite = finalReferenceRepair.rewrite;
-          promptChars += finalReferenceRepair.promptChars;
-          absorbReferenceRepairResult(
-            referenceRepairState,
-            finalReferenceRepair
-          );
-        }
-
-        rewrite = ensureReportSourceLimitation(rewrite, payload);
-        let validationResult = validateRewriteWithRevisionCompliance(rewrite, payload, {
-          instruction: job.data.instruction,
-          previousOutput,
-          attachmentTextAvailable
-        });
-
-        const validationRepairResult = await applyHighRiskValidationRepair({
-          payload,
-          rewrite,
-          validation: validationResult,
-          revisionInstructionForPrompt,
-          reasoningEffort: correctionReasoningEffort,
-          modelCalls,
-          callRewrite: callModelRewrite
-        });
-        rewrite = validationRepairResult.rewrite;
-        promptChars += validationRepairResult.promptChars;
-        validationRepair = validationRepairResult.audit;
-
-        if (validationRepair.applied) {
-          const postRepairAttributionRisks = findAttributionRisks(rewrite);
-          attributionRiskCount = postRepairAttributionRisks.length;
-          const postRepairAttributionInstruction =
-            buildAttributionCorrectionInstruction(postRepairAttributionRisks);
-          if (postRepairAttributionInstruction) {
-            const combinedAttribution = [
-              revisionInstructionForPrompt,
-              postRepairAttributionInstruction
-            ]
-              .filter(Boolean)
-              .join("\n\n");
-            const correctedForAttribution = await callModelRewrite(
-              payload,
-              combinedAttribution,
-              rewrite,
-              correctionReasoningEffort
-            );
-            modelCalls.push(correctedForAttribution.modelCall);
-            promptChars += correctedForAttribution.promptChars;
-            rewrite = correctedForAttribution.rewrite;
-            attributionCorrectionApplied = true;
-            attributionRiskCount = findAttributionRisks(rewrite).length;
-          }
-
-          const postRepairImportanceResult = applyImportanceHighBar(rewrite, payload);
-          rewrite = postRepairImportanceResult.rewrite;
-          importanceAdjusted =
-            importanceAdjusted || postRepairImportanceResult.adjusted;
-          importanceAdjustReason =
-            postRepairImportanceResult.reason ?? importanceAdjustReason;
-
-          const postRepairStyleResult = sanitizeRewriteStyle(rewrite);
-          rewrite = postRepairStyleResult.rewrite;
-          styleSanitization = postRepairStyleResult.stats;
-
-          const repairedReferenceRepair = await applyReferenceCheckRepair({
-            referencePayload: refPayload,
-            rewritePayload: payload,
-            rewrite,
-            revisionInstructionForPrompt,
-            correctionReasoningEffort,
-            existingCorrectionAttempts: referenceRepairState.correctionAttempts,
-            modelCalls,
-            callRewrite: callModelRewrite
-          });
-          rewrite = repairedReferenceRepair.rewrite;
-          promptChars += repairedReferenceRepair.promptChars;
-          absorbReferenceRepairResult(
-            referenceRepairState,
-            repairedReferenceRepair
-          );
-
-          rewrite = ensureReportSourceLimitation(rewrite, payload);
-          validationResult = validateRewriteWithRevisionCompliance(rewrite, payload, {
-            instruction: job.data.instruction,
-            previousOutput,
-            attachmentTextAvailable
-          });
-        }
-
-        validationRepair.finalWarnings = validationIssueMessages(
-          highRiskValidationWarningIssues(validationResult)
-        );
-        validationResult = promoteHighRiskValidationWarnings(validationResult);
-        const referenceOutcome =
-          resolveAccumulatedReferenceCheckOutcome(referenceRepairState);
-        const {
-          gate: referenceGate,
-          forceNeedsRetry: referenceForceNeedsRetry
-        } = applyReferenceCheckEnforcement(
-          referenceOutcome,
-          { legacyCheckerError: referenceRepairState.checkerError },
-          activeReferenceCheckEnforcement
-        );
-        if (referenceForceNeedsRetry) {
-          // Promotion-only path (retryOnUnavailable); see the report flow.
-          throw new Error(
-            "Reference check unavailable: checker failed with no usable coverage evidence."
-          );
-        }
-        const validation = applyReferenceCheckGate(validationResult, referenceGate);
-        const rewriteStatus = statusForValidation(validation);
-        const persistedRewriteJson = rewriteJsonForValidation(rewrite, validation);
-
-        await upsertRewrite({
-          messageId,
-          version: targetVersion,
-          userInstruction: job.data.instruction,
-          generationRunId,
-          inputJson: generationInputJson(
-            payload,
-            previousOutput,
-            modelCalls,
-            job.data.reasoningEffortOverride
-          ),
-          rewriteJson: persistedRewriteJson,
-          status: rewriteStatus,
-          validationJson: {
-            valid: validation.valid,
-            errorCode: validationErrorCode(validation),
-            errors: validation.errors,
-            issues: validation.issues,
-            blockingErrors: validation.blockingErrors,
-            warnings: validation.warnings,
-            quoteTelemetry: validation.quoteTelemetry,
-            numberAssessments: validation.numberAssessments,
-            publicationNumberAssessments:
-              validation.publicationNumberAssessments,
-            numericPublicationPolicy: numericPublicationPolicyJson(
-              validation,
-              false
-            ),
-            markerLeaks: validation.markerLeaks,
-            revisionInstructionCompliance: validation.revisionCompliance,
-            sourceBodyChars: payload.sourceBodyChars,
-            promptChars,
-            styleSanitization,
-            editorialReview,
-            validationRepair,
-            referenceCheck: referenceCheckValidationJson(
-              referenceRepairState,
-              referenceGate,
-              {
-                attributionCorrectionApplied,
-                attributionRiskCount,
-                importanceAdjusted,
-                importanceAdjustReason
-              },
-              referenceOutcome,
-              activeReferenceCheckEnforcement
-            ),
-            hiddenDraft: hiddenDraft
-              ? {
-                  title: hiddenDraft.title,
-                  lead: hiddenDraft.lead,
-                  body: hiddenDraft.body,
-                  company_sentence: hiddenDraft.company_sentence
-                }
-              : null,
-            triage: triageTelemetryJson,
-            relatedNotices: relatedNoticeTelemetryJson
-          } as Prisma.InputJsonValue
-        });
-
-        if (rewriteStatus === "pending") {
-          await enqueuePublish(messageId, targetVersion, generationRunId);
-        } else {
-          await publishFeedUpdate(messageId, "failed");
-        }
-        return;
-      } catch (error) {
-        promptChars += collectFailedModelCall(error, modelCalls);
-        const errorText = error instanceof Error ? error.message : String(error);
-
-        if (!finalAttempt) {
-          await upsertRewrite({
-            messageId,
-            version: targetVersion,
-            userInstruction: job.data.instruction,
-            generationRunId,
-            inputJson: generationInputJson(
-              payload,
-              previousOutput,
-              modelCalls,
-              job.data.reasoningEffortOverride
-            ),
-            rewriteJson: {
-              errorCode: "REWRITE_ATTEMPT_FAILED",
-              message: errorText
-            } as Prisma.InputJsonValue,
-            status: "needs_retry",
-            validationJson: {
-              valid: false,
-              errorCode: "REWRITE_ATTEMPT_FAILED",
-              errors: [errorText],
-              sourceBodyChars: payload.sourceBodyChars,
-              promptChars,
-              styleSanitization,
-              relatedNotices: relatedNoticeTelemetryJson,
-              referenceCheck: referenceCheckFailureJson(
-                referenceRepairState,
-                {
-                  attributionCorrectionApplied,
-                  attributionRiskCount,
-                  importanceAdjusted,
-                  importanceAdjustReason
-                },
-                maybeAccumulatedReferenceCheckOutcome(referenceRepairState),
-                activeReferenceCheckEnforcement
-              )
-            } as Prisma.InputJsonValue
-          });
-          throw new Error(`rewrite pipeline failed for ${messageId}: ${errorText}`);
-        }
-
-        await upsertRewrite({
-          messageId,
-          version: targetVersion,
-          userInstruction: job.data.instruction,
-          generationRunId,
-          inputJson: generationInputJson(
-            payload,
-            previousOutput,
-            modelCalls,
-            job.data.reasoningEffortOverride
-          ),
-          rewriteJson: {
-            errorCode: "REWRITE_FAILED_FINAL",
-            message: errorText
-          } as Prisma.InputJsonValue,
-          status: "failed",
-          validationJson: {
-            valid: false,
-            errorCode: "REWRITE_FAILED_FINAL",
-            errors: [errorText],
-            sourceBodyChars: payload.sourceBodyChars,
-            promptChars,
-            styleSanitization,
-            relatedNotices: relatedNoticeTelemetryJson,
-            referenceCheck: referenceCheckFailureJson(
-              referenceRepairState,
-              {
-                attributionCorrectionApplied,
-                attributionRiskCount,
-                importanceAdjusted,
-                importanceAdjustReason
-              },
-              maybeAccumulatedReferenceCheckOutcome(referenceRepairState),
-              activeReferenceCheckEnforcement
-            )
-          } as Prisma.InputJsonValue
-        });
-        logFinalRewriteFailure(messageId, "REWRITE_FAILED_FINAL", errorText);
-        await publishFeedUpdate(messageId, "failed");
-      }
+      // The brief performs newsworthiness triage with the full extracted source
+      // and resolved background, then remains the completeness contract.
+      const relatedNotices = await attachRelatedNotices(source, payload);
+      await processNoticeRewrite(messageId, payload, "regular", job, {
+        version: targetVersion, userInstruction: job.data.instruction, previousOutput,
+        generationRunId, modelCalls: preRewriteModelCalls, promptChars: preRewritePromptChars,
+        reasoningEffortOverride: job.data.reasoningEffortOverride,
+        allowSkip: job.data.reason !== "manual-reprocess"
+      }, { relatedNotices, triage: triageTelemetryJson });
     });
   },
   {
