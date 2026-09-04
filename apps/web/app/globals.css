@@ -874,12 +874,23 @@ a {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 1.5rem;
+  align-items: start;
 }
 
 .cardSourcePanel {
   border-left: 1px solid var(--line);
   padding-left: 1.5rem;
+  padding-right: 0.5rem;
+  max-height: 24rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
 }
+
+.cardSourcePanel::-webkit-scrollbar { width: 4px; }
+.cardSourcePanel::-webkit-scrollbar-track { background: transparent; }
+.cardSourcePanel::-webkit-scrollbar-thumb { background: var(--line); border-radius: 2px; }
 
 .cardSourcePanel h3 {
   margin: 0 0 0.4rem;
@@ -1628,6 +1639,10 @@ a {
 
   .cardSplitGrid {
     grid-template-columns: 1fr;
+  }
+
+  .cardSourcePanel {
+    max-height: min(40vh, 14rem);
   }
 
   .signalsFilters {
