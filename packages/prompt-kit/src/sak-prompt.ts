@@ -26,7 +26,7 @@ import {
   EDITORIAL_WRITING_STYLE
 } from "./shared-editorial.js";
 
-export const SAK_PROMPT_VERSION = "sak-v1.0.0";
+export const SAK_PROMPT_VERSION = "sak-v1.1.0";
 
 export type SakMaterialPayload = {
   /** Prompt label, e.g. "material_ckabc" (see sakMaterialSourceId). */

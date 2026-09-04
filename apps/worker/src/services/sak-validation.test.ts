@@ -228,6 +228,62 @@ describe("validateSakArticle", () => {
     expect(result.warnings.join(" ")).toContain("material_ckm1");
   });
 
+  it("blocks when a used source with a user-supplied link is never linked in the text", () => {
+    const withUrl = payload({
+      materials: [
+        ...payload().materials,
+        {
+          sourceId: "material_ckm3",
+          kind: "url",
+          title: "Rentebeslutning august 2026",
+          url: "https://www.norges-bank.no/tema/pengepolitikk/Rentemoter/2026/august-2026/",
+          text: "Norges Bank holdt styringsrenten uendret på 4,25 prosent.",
+          textChars: 60,
+          status: "ready"
+        }
+      ]
+    });
+    const used = article({
+      sources: [
+        { materialId: "material_ckm1", usedFor: "rutedager, flytype og sitat" },
+        { materialId: "material_ckm3", usedFor: "rentebeslutningen i august" }
+      ]
+    });
+    const result = validateSakArticle(used, withUrl, { targetChars: 1500, isFirstDraft: true });
+    expect(codes(result)).toContain("SAK_SOURCE_NOT_LINKED");
+    expect(result.blockingErrors.join(" ")).toContain("material_ckm3");
+
+    const unused = article({
+      sources: [
+        { materialId: "material_ckm1", usedFor: "rutedager, flytype og sitat" },
+        { materialId: "material_ckm3", usedFor: "ikke brukt: overlapper med rapporten" }
+      ]
+    });
+    expect(codes(validateSakArticle(unused, withUrl, { targetChars: 1500, isFirstDraft: true }))).not.toContain(
+      "SAK_SOURCE_NOT_LINKED"
+    );
+
+    const linked = article({
+      sources: [
+        { materialId: "material_ckm1", usedFor: "rutedager, flytype og sitat" },
+        { materialId: "material_ckm3", usedFor: "rentebeslutningen i august" }
+      ],
+      lead: "Norges Bank [[holdt renten uendret|material_ckm3]] i august, og Air Canada starter direkterute neste sommer."
+    });
+    expect(codes(validateSakArticle(linked, withUrl, { targetChars: 1500, isFirstDraft: true }))).not.toContain(
+      "SAK_SOURCE_NOT_LINKED"
+    );
+  });
+
+  it("does not demand a link for a pdf or pasted text without a url", () => {
+    const result = validateSakArticle(
+      article({ blocks: article().blocks.map((block) => ({ ...block, text: block.text.replace(/\[\[([^|]+)\|material_ckm1\]\]/g, "$1") })) }),
+      payload(),
+      { targetChars: 1500, isFirstDraft: true }
+    );
+    expect(codes(result)).not.toContain("SAK_SOURCE_NOT_LINKED");
+  });
+
   it("blocks a revision that keeps what the instruction asked to drop", () => {
     const previous = article();
     const revised = validateSakArticle(article({ change_note: "Kortet ned\nlitt" }), payload(), {

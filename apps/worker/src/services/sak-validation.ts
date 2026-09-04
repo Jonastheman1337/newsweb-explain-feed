@@ -13,6 +13,7 @@ import {
   ensureSitatstrek,
   sakBlockDisplayText,
   sakBlockPlainText,
+  sakLinkedMaterialIds,
   type RewriteOutput,
   type SakArticle
 } from "@newsweb/shared";
@@ -467,6 +468,29 @@ export function validateSakArticle(
       parts.push(`viser til ukjent materiale ${unknownSources.join(", ")}`);
     }
     addIssue(issues, "SAK_SOURCE_LEDGER_INCOMPLETE", "warning", `sources ${parts.join("; ")}.`);
+  }
+
+  // (9b) A source the user supplied WITH a link must be linked in the text the
+  // first time it is used. PDFs and pasted text without a url are exempt, and
+  // so is a material the ledger marks as unused.
+  const linkedIds = new Set(sakLinkedMaterialIds(article));
+  const usedForById = new Map(article.sources.map((source) => [source.materialId, source.usedFor]));
+  const unlinkedSources = payload.materials.filter((material) => {
+    if (material.status !== "ready" || !material.url) return false;
+    const usedFor = usedForById.get(material.sourceId);
+    if (usedFor === undefined) return false;
+    if (/^ikke brukt/i.test(usedFor.trim())) return false;
+    return !linkedIds.has(material.sourceId);
+  });
+  if (unlinkedSources.length > 0) {
+    addIssue(
+      issues,
+      "SAK_SOURCE_NOT_LINKED",
+      "blocking",
+      `Kilder med lenke må lenkes første gang de brukes i teksten, som [[tekst|material_<id>]]: ${unlinkedSources
+        .map((material) => `${material.sourceId} («${material.title}»)`)
+        .join(", ")}.`
+    );
   }
 
   // (10) change_note: one line; the first draft always says so.

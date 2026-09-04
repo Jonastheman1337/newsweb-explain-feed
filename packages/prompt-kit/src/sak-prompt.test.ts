@@ -86,6 +86,13 @@ describe("sak prompt", () => {
     expect(developer).toContain("desk_notes i denne oppgaven");
   });
 
+  it("requires a link at first use for user-supplied urls and 'skriver' for written sources", () => {
+    const developer = createSakDeveloperPrompt();
+    expect(developer).toContain("SKAL lenkes første gang det brukes");
+    expect(developer).toContain("Materiale uten url (opplastet PDF, limt tekst) kan ikke lenkes");
+    expect(developer).toContain("Skriftlige kilder (rapport, pressemelding, nettside, børsmelding) skriver");
+  });
+
   it("developer prompt leaves the notice-only rules out", () => {
     const developer = createSakDeveloperPrompt();
     expect(developer).not.toContain("Newsweb-meldingen er hovedkilden");
