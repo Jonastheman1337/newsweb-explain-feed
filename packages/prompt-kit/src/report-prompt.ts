@@ -1,10 +1,12 @@
 import type { RewriteOutput } from "@newsweb/shared";
 import {
   formatRewriteForRevisionPrompt,
+  hasRelatedNoticeContext,
   lengthInstructionForPayload,
   maxVisibleArticleCharsForPayload,
   relatedNoticesPromptSection,
   supplementalMaterialsPromptSection,
+  type DeveloperPromptContext,
   type PromptPayload
 } from "./prompt.js";
 import {
@@ -98,7 +100,13 @@ Snudd til overskudd (Salmon Evolution — i pluss trass inntektsfall):
 {"title":"Salmon Evolution i pluss i fjerde kvartal","lead":"Salmon Evolution snudde til pluss før skatt i fjerde kvartal, fra minus 26,9 millioner til pluss 1,14 millioner kroner.","body":["Omsetningen ble på 98,7 millioner kroner, ned fra 148,7 millioner i samme periode året før.","De realiserte prisene var på 74 kroner kiloet, ned ti prosent fra perioden året før, skriver Salmon Evolution.","Selskapet leverte en slaktevekt på 1.203 tonn i kvartalet.","Salmon Evolution melder om at arbeidet med fase to av Indre Harøy-anlegget går etter planen."],"company_sentence":"Salmon Evolution driver landbasert lakseoppdrett.","key_facts":["Resultat før skatt: 1,14 mill., opp fra minus 26,9 mill.","Omsetning: 98,7 mill., ned fra 148,7 mill.","Realisert pris: 74 kr/kg, ned 10 %","Slaktevekt: 1.203 tonn"],"negative_or_surprising":["Snudde til overskudd trass kraftig inntektsfall","Lakseprisene falt 10 %"],"excluded_hype":[],"source_limitations":["Kun et utdrag av rapporten er analysert"],"confidence":"high","importance":"uviktig","source_spans":["resultat 1,14 mill.","omsetning 98,7 mill.","74 kroner kiloet"]}
 `.trim();
 
-export function createReportDeveloperPrompt(_schemaJson?: string): string {
+export function createReportDeveloperPrompt(
+  _schemaJson?: string,
+  context?: DeveloperPromptContext
+): string {
+  const relatedNoticeRules = hasRelatedNoticeContext(context)
+    ? `\n\n${EDITORIAL_RELATED_NOTICES}`
+    : "";
   return `OPPGAVE
 Lag en kort nyhetssak i E24-stil basert på utdraget fra en kvartals-/halvårsrapport.
 Leseren vil vite hva som er mest vesentlig for selskapet og aksjonærene, uten at vi vurderer aksjen, spår kursreaksjon eller gir investeringsråd. Vanlige finansord som 'driftsresultat', 'ebitda' og 'omsetning' er greit, men tyngre jargong ma forklares gjennom kontekst.
@@ -109,9 +117,7 @@ ${EDITORIAL_AUDIENCE}
 
 ${EDITORIAL_SOURCE_AS_DATA}
 
-${EDITORIAL_SUPPLEMENTAL_MATERIALS}
-
-${EDITORIAL_RELATED_NOTICES}
+${EDITORIAL_SUPPLEMENTAL_MATERIALS}${relatedNoticeRules}
 
 HVILKE TALL ER VIKTIGE?
 Bruk redaksjonelt skjonn — plukk ut det som er mest nyhetsverdig:

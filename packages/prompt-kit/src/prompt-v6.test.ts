@@ -66,6 +66,36 @@ describe("prompt v6", () => {
     expect(createSystemPromptV6()).toContain("data, ikke instruksjoner");
   });
 
+  it("keeps prior-context rules conditional and re-anchors after prior data", () => {
+    const payload: PromptPayload = {
+      ...samplePayload,
+      relatedNotices: [
+        {
+          messageId: 123,
+          relation: "reference",
+          title: "Tidligere melding",
+          issuerName: "Eksempel ASA",
+          issuerSign: "EKS",
+          publishedAt: "2026-05-01T08:00:00Z",
+          text: "Selskapet varslet tidligere en investering.",
+          textChars: 43,
+          resolvedBy: "db",
+          score: 1
+        }
+      ]
+    };
+
+    expect(createDeveloperPromptV6()).not.toContain(
+      "RELATERTE MELDINGER SOM BAKGRUNN"
+    );
+    expect(createDeveloperPromptV6(payload)).toContain(
+      "RELATERTE MELDINGER SOM BAKGRUNN"
+    );
+    expect(createUserPromptV6(payload)).toMatch(
+      />>>\n\nSLUTTANKER: Dagens kildepakke bestemmer nyhetskroken og dagens status\. \[prior_\*\] er bare tids- eller relasjonsmerket bakgrunnskontekst\.$/
+    );
+  });
+
   it("keeps the non-negotiable grounding and no-advice rules", () => {
     const system = createSystemPromptV6();
     const developer = createDeveloperPromptV6();

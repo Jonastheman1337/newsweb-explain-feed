@@ -208,7 +208,7 @@ function buildSmokeCases(
         sourceBodyChars: reportReferenceText.length
       },
       systemPrompt: createReportSystemPrompt(),
-      developerPrompt: createReportDeveloperPrompt(),
+      developerPrompt: createReportDeveloperPrompt(undefined, reportPayload),
       userPrompt: createReportUserPrompt(reportPayload),
       reasoningEffort: reportReasoningEffort
     },
@@ -218,7 +218,7 @@ function buildSmokeCases(
       payload: namedPlatformPayload,
       validationPayload: namedPlatformPayload,
       systemPrompt: createSystemPrompt(),
-      developerPrompt: createDeveloperPrompt(),
+      developerPrompt: createDeveloperPrompt(undefined, namedPlatformPayload),
       userPrompt: createUserPrompt(namedPlatformPayload),
       reasoningEffort: defaultReasoningEffort
     }

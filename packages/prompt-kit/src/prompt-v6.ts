@@ -2,9 +2,11 @@ import type { RewriteOutput } from "@newsweb/shared";
 
 import {
   formatRewriteForRevisionPrompt,
+  hasRelatedNoticeContext,
   lengthInstructionForPayload,
   maxVisibleArticleCharsForPayload,
   relatedNoticesPromptSection,
+  type DeveloperPromptContext,
   type PromptPayload
 } from "./prompt.js";
 import {
@@ -131,7 +133,12 @@ Materiell hendelse (2 body-avsnitt):
 {"source_spans":["midlertidig har stengt produksjonen","tiltak for å beskytte ansatte"],"key_facts":["Produksjonen er stanset midlertidig","Ansatte beskyttes, anlegg ikke skadet"],"negative_or_surprising":["Produksjonsstans grunnet sikkerhetssituasjon"],"excluded_hype":[],"source_limitations":[],"importance":"viktig","company_sentence":"Gulf Keystone er et oljeselskap som produserer olje i Kurdistan-regionen i Irak.","title":"Gulf Keystone stopper produksjonen","lead":"Oljeselskapet Gulf Keystone har midlertidig stengt ned produksjonen i Kurdistan i Irak på grunn av sikkerhetssituasjonen.","body":["Selskapet har satt i gang tiltak for å beskytte de ansatte. Oljeanleggene er ikke skadet, ifølge meldingen.","Gulf Keystone følger situasjonen tett og lover å komme med oppdateringer."],"confidence":"high"}
 `.trim();
 
-export function createDeveloperPromptV6(): string {
+export function createDeveloperPromptV6(
+  context?: DeveloperPromptContext
+): string {
+  const relatedNoticeRules = hasRelatedNoticeContext(context)
+    ? `\n\n${EDITORIAL_RELATED_NOTICES}`
+    : "";
   return `OPPGAVE
 Lag en kort, publiserbar nyhetssak i E24-stil fra børsmeldingen i brukerprompten. Ikke et referat eller sammendrag.
 - Ikke løft rutineinformasjon over nyhetsterskelen. Hvis tilgjengelig tekst bare sier at et dokument, en presentasjon eller et skjema er publisert, er det støy: skriv ekstremt kort, sett importance til 'uviktig' og legg manglende grunnlag i source_limitations.
@@ -142,9 +149,7 @@ ${EDITORIAL_AUDIENCE_V6}
 
 ${EDITORIAL_SOURCE_AS_DATA}
 
-${EDITORIAL_SUPPLEMENTAL_MATERIALS_V6}
-
-${EDITORIAL_RELATED_NOTICES}
+${EDITORIAL_SUPPLEMENTAL_MATERIALS_V6}${relatedNoticeRules}
 
 ${MECHANISM_FIRST_RULE_V6}
 

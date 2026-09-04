@@ -395,6 +395,23 @@ function parseIsoDate(date: string): Date | null {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
+const osloDateFormatter = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Europe/Oslo",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit"
+});
+
+/** Calendar date at Oslo Bors, independent of the worker host timezone. */
+export function osloCalendarDate(date: Date): string | null {
+  if (Number.isNaN(date.getTime())) return null;
+  const parts = osloDateFormatter.formatToParts(date);
+  const year = parts.find((part) => part.type === "year")?.value;
+  const month = parts.find((part) => part.type === "month")?.value;
+  const day = parts.find((part) => part.type === "day")?.value;
+  return year && month && day ? `${year}-${month}-${day}` : null;
+}
+
 function correctionTargetFromRaw(rawMessageJson: unknown): number | null {
   if (!rawMessageJson || typeof rawMessageJson !== "object") return null;
   const value = (rawMessageJson as Record<string, unknown>).correctionForMessageId;
@@ -489,6 +506,9 @@ export async function resolveRelatedNotices(
 
   const accept = (pick: Pick_, relation: RelatedNoticeRelation): boolean => {
     if (seen.has(pick.candidate.messageId)) return false;
+    if (pick.candidate.publishedAt.getTime() >= source.publishedAt.getTime()) {
+      return false;
+    }
     const payload = toPayload(pick.candidate, relation, pick.resolvedBy, pick.score);
     if (!payload) return false;
     seen.add(pick.candidate.messageId);
@@ -506,18 +526,26 @@ export async function resolveRelatedNotices(
   };
 
   const fetchById = async (
-    messageId: number
+    messageId: number,
+    expectedOsloDate?: string | null
   ): Promise<Pick_ | { reason: RelatedNoticeUnresolvedReason }> => {
+    const isEligible = (candidate: RelatedNoticeCandidate): boolean =>
+      candidate.publishedAt.getTime() < source.publishedAt.getTime() &&
+      (!expectedOsloDate || osloCalendarDate(candidate.publishedAt) === expectedOsloDate);
     try {
       const stored = await options.store.findByMessageId(messageId);
-      if (stored) return { candidate: stored, resolvedBy: "db", score: 1 };
+      if (stored) {
+        return isEligible(stored)
+          ? { candidate: stored, resolvedBy: "db", score: 1 }
+          : { reason: "no-candidate" };
+      }
     } catch {
       // fall through to Newsweb
     }
     if (!options.newsweb) return { reason: "no-candidate" };
     try {
       const fetched = await options.newsweb.fetchMessage(messageId);
-      return fetched
+      return fetched && isEligible(fetched)
         ? { candidate: fetched, resolvedBy: "newsweb", score: 1 }
         : { reason: "no-candidate" };
     } catch {
@@ -574,7 +602,7 @@ export async function resolveRelatedNotices(
         telemetry.unresolved.push({ raw: reference.raw, reason: "self" });
         continue;
       }
-      const result = await fetchById(reference.messageId);
+      const result = await fetchById(reference.messageId, reference.date);
       if ("reason" in result) {
         telemetry.unresolved.push({ raw: reference.raw, reason: result.reason });
       } else {
@@ -610,7 +638,12 @@ export async function resolveRelatedNotices(
           to,
           before: source.publishedAt
         })
-      ).filter((candidate) => !seen.has(candidate.messageId));
+      ).filter(
+        (candidate) =>
+          !seen.has(candidate.messageId) &&
+          candidate.publishedAt.getTime() < source.publishedAt.getTime() &&
+          (!reference.date || osloCalendarDate(candidate.publishedAt) === reference.date)
+      );
     } catch {
       dbFailed = true;
     }
@@ -633,13 +666,16 @@ export async function resolveRelatedNotices(
       continue;
     }
     try {
-      const listed = (await options.newsweb.listByDate(listFrom, listTo)).filter(
-        (item) =>
+      const listed = (await options.newsweb.listByDate(listFrom, listTo)).filter((item) => {
+        const publishedAt = new Date(item.publishedTime);
+        return (
           item.issuerSign === source.issuerSign &&
           item.messageId !== source.messageId &&
           !seen.has(item.messageId) &&
-          new Date(item.publishedTime).getTime() < source.publishedAt.getTime()
-      );
+          publishedAt.getTime() < source.publishedAt.getTime() &&
+          (!reference.date || osloCalendarDate(publishedAt) === reference.date)
+        );
+      });
       if (listed.length === 0) {
         telemetry.unresolved.push({ raw: reference.raw, reason: "no-candidate" });
         continue;
@@ -653,7 +689,14 @@ export async function resolveRelatedNotices(
       const fetched: RelatedNoticeCandidate[] = [];
       for (const item of ranked.slice(0, 6)) {
         const candidate = await options.newsweb.fetchMessage(item.messageId);
-        if (candidate) fetched.push(candidate);
+        if (
+          candidate &&
+          candidate.issuerSign === source.issuerSign &&
+          candidate.publishedAt.getTime() < source.publishedAt.getTime() &&
+          (!reference.date || osloCalendarDate(candidate.publishedAt) === reference.date)
+        ) {
+          fetched.push(candidate);
+        }
       }
       const picked = pickCandidate(reference, fetched, preferredLanguage, mode);
       if ("pick" in picked) {

@@ -225,6 +225,10 @@ function coverageReportFromStored(
   return {
     totalSentences: blob.totalSentences,
     visibleArticleSentenceCount: blob.visibleArticleSentenceCount,
+    // Frozen safety rows predate title checking: their visible count is
+    // lead + body only. Preserve the historical <=3 short-article gate when
+    // replaying them instead of treating the stored count as title-inclusive.
+    visibleArticleSentenceCountIncludesTitle: false,
     groundedSentences: blob.groundedSentences,
     coveragePercent: blob.coveragePercent,
     items,

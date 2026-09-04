@@ -18,7 +18,7 @@ import {
   EDITORIAL_WRITING_STYLE
 } from "./shared-editorial.js";
 
-export const PROMPT_VERSION = "v5.10.0";
+export const PROMPT_VERSION = "v5.11.0";
 
 export type OutputMode = "notice" | "extended_notice";
 
@@ -74,6 +74,36 @@ export type PromptPayload = {
   pdfSupplementAttachmentId?: number;
 };
 
+export type DeveloperPromptContext = Pick<
+  PromptPayload,
+  "relatedNotices" | "publishedAt"
+>;
+
+export function isRelatedNoticeTimestampValid(
+  relatedPublishedAt: string,
+  currentPublishedAt: string
+): boolean {
+  const relatedTime = new Date(relatedPublishedAt).getTime();
+  const currentTime = new Date(currentPublishedAt).getTime();
+  return (
+    Number.isFinite(relatedTime) &&
+    Number.isFinite(currentTime) &&
+    relatedTime <= currentTime
+  );
+}
+
+export function hasRelatedNoticeContext(
+  context?: DeveloperPromptContext
+): boolean {
+  return Boolean(
+    context?.relatedNotices?.some(
+      (notice) =>
+        notice.text.trim().length > 0 &&
+        isRelatedNoticeTimestampValid(notice.publishedAt, context.publishedAt)
+    )
+  );
+}
+
 export const RELATED_NOTICE_SOURCE_ID_PREFIX = "prior_";
 
 export function relatedNoticeSourceId(messageId: number): string {
@@ -128,25 +158,45 @@ export function formatNorwegianNoticeDate(iso: string): string {
 
 /**
  * The time marker the article should use for an earlier notice, computed from
- * the two publish dates so the model never does date arithmetic: "i dag",
- * "i går", a weekday inside the same week, "i juni" within the year,
+ * the two publish dates so the model never does date arithmetic: "tidligere
+ * samme dag", "i går", a weekday inside the same week, "i juni" within the year,
  * "i juni i fjor", or "i juni 2024".
  */
 export function relatedNoticeTimeMarker(
   relatedPublishedAt: string,
   currentPublishedAt: string
 ): { daysBefore: number; marker: string } {
+  const relatedInstant = new Date(relatedPublishedAt).getTime();
+  const currentInstant = new Date(currentPublishedAt).getTime();
+  if (!Number.isFinite(relatedInstant) || !Number.isFinite(currentInstant)) {
+    return { daysBefore: -1, marker: "UGYLDIG FREMTIDIG KILDE – IKKE BRUK" };
+  }
+  if (relatedInstant > currentInstant) {
+    return {
+      daysBefore: -Math.max(
+        1,
+        Math.ceil((relatedInstant - currentInstant) / 86_400_000)
+      ),
+      marker: "UGYLDIG FREMTIDIG KILDE – IKKE BRUK"
+    };
+  }
   const related = osloDateParts(relatedPublishedAt);
   const current = osloDateParts(currentPublishedAt);
   if (!related || !current) {
-    return { daysBefore: 0, marker: "tidligere" };
+    return { daysBefore: -1, marker: "UGYLDIG FREMTIDIG KILDE – IKKE BRUK" };
   }
   const relatedUtc = Date.UTC(related.year, related.month - 1, related.day);
   const currentUtc = Date.UTC(current.year, current.month - 1, current.day);
   const daysBefore = Math.round((currentUtc - relatedUtc) / 86_400_000);
 
-  if (daysBefore <= 0) {
-    return { daysBefore: Math.max(daysBefore, 0), marker: "i dag" };
+  if (daysBefore < 0) {
+    return {
+      daysBefore,
+      marker: "UGYLDIG FREMTIDIG KILDE – IKKE BRUK"
+    };
+  }
+  if (daysBefore === 0) {
+    return { daysBefore, marker: "i en tidligere melding samme dag" };
   }
   if (daysBefore === 1) {
     return { daysBefore, marker: "i går" };
@@ -163,19 +213,54 @@ export function relatedNoticeTimeMarker(
   return { daysBefore, marker: `i ${related.monthName} ${related.year}` };
 }
 
+/** Relation-aware marker: sibling notices are parallel same-day sources. */
+export function relatedNoticeContextMarker(
+  relation: RelatedNoticeRelation,
+  relatedPublishedAt: string,
+  currentPublishedAt: string
+): string {
+  if (!isRelatedNoticeTimestampValid(relatedPublishedAt, currentPublishedAt)) {
+    return "UGYLDIG FREMTIDIG KILDE – IKKE BRUK";
+  }
+  if (relation === "sibling") {
+    return "i en parallell melding samme dag";
+  }
+  return relatedNoticeTimeMarker(relatedPublishedAt, currentPublishedAt).marker;
+}
+
 function relatedNoticeRelationLabel(relation: RelatedNoticeRelation): string {
   switch (relation) {
     case "correction":
-      return "korrigeres av den nye meldingen";
+      return "korrigering – tidligere melding som dagens melding korrigerer";
     case "sibling":
-      return "parallell melding om samme hendelse";
+      return "parallell – annen melding om samme hendelse";
     default:
-      return "viser til";
+      return "referanse – tidligere melding som dagens melding viser til";
+  }
+}
+
+function relatedNoticesHeading(
+  notices: readonly RelatedNoticePayload[]
+): string {
+  const relations = new Set(notices.map((notice) => notice.relation));
+  if (relations.size !== 1) {
+    return "RELATERTE MELDINGER SOM BAKGRUNN";
+  }
+  switch (notices[0]?.relation) {
+    case "correction":
+      return "TIDLIGERE MELDING SOM DAGENS MELDING KORRIGERER";
+    case "sibling":
+      return "PARALLELL MELDING OM SAMME HENDELSE";
+    default:
+      return "TIDLIGERE MELDING SOM DAGENS MELDING VISER TIL";
   }
 }
 
 function relatedNoticeDistanceLabel(daysBefore: number): string {
-  if (daysBefore <= 0) {
+  if (daysBefore < 0) {
+    return "publisert etter den nye meldingen – ugyldig bakgrunnskilde";
+  }
+  if (daysBefore === 0) {
     return "samme dag som den nye meldingen";
   }
   if (daysBefore === 1) {
@@ -192,24 +277,33 @@ function relatedNoticeDistanceLabel(daysBefore: number): string {
 export function relatedNoticesPromptSection(
   payload: Pick<PromptPayload, "relatedNotices" | "publishedAt">
 ): string[] {
-  const notices = payload.relatedNotices?.filter((notice) => notice.text.trim());
+  const notices = payload.relatedNotices?.filter(
+    (notice) =>
+      notice.text.trim() &&
+      isRelatedNoticeTimestampValid(notice.publishedAt, payload.publishedAt)
+  );
   if (!notices || notices.length === 0) {
     return [];
   }
 
   const sections: string[] = [
     "",
-    "TIDLIGERE MELDING DET VISES TIL (bakgrunn, reglene står i oppgavebeskrivelsen):"
+    `${relatedNoticesHeading(notices)} (bakgrunnskilder, reglene står i oppgavebeskrivelsen):`
   ];
   for (const notice of notices) {
-    const { daysBefore, marker } = relatedNoticeTimeMarker(
+    const { daysBefore } = relatedNoticeTimeMarker(
+      notice.publishedAt,
+      payload.publishedAt
+    );
+    const marker = relatedNoticeContextMarker(
+      notice.relation,
       notice.publishedAt,
       payload.publishedAt
     );
     sections.push(
       "",
       `[${relatedNoticeSourceId(notice.messageId)}]`,
-      `relation: ${relatedNoticeRelationLabel(notice.relation)}`,
+      `rolle: ${relatedNoticeRelationLabel(notice.relation)}`,
       `publisert: ${formatNorwegianNoticeDate(notice.publishedAt)} (${relatedNoticeDistanceLabel(daysBefore)})`,
       `anbefalt tidsmarkør: ${marker}`,
       `utsteder: ${notice.issuerName} (${notice.issuerSign})`,
@@ -220,6 +314,10 @@ export function relatedNoticesPromptSection(
       ">>>"
     );
   }
+  sections.push(
+    "",
+    "SLUTTANKER: Dagens kildepakke bestemmer nyhetskroken og dagens status. [prior_*] er bare tids- eller relasjonsmerket bakgrunnskontekst."
+  );
   return sections;
 }
 
@@ -340,7 +438,13 @@ Materiell hendelse (2 body-avsnitt):
 {"title":"Gulf Keystone stopper produksjonen","lead":"Oljeselskapet Gulf Keystone har midlertidig stengt ned produksjonen i Kurdistan i Irak på grunn av sikkerhetssituasjonen.","body":["Selskapet har satt i gang tiltak for å beskytte de ansatte. Oljeanleggene er ikke skadet, ifølge meldingen.","Gulf Keystone følger situasjonen tett og lover å komme med oppdateringer."],"company_sentence":"Gulf Keystone er et oljeselskap som produserer olje i Kurdistan-regionen i Irak.","key_facts":["Produksjonen er stanset midlertidig","Ansatte beskyttes, anlegg ikke skadet"],"negative_or_surprising":["Produksjonsstans grunnet sikkerhetssituasjon"],"excluded_hype":[],"source_limitations":[],"confidence":"high","importance":"viktig","source_spans":["midlertidig har stengt produksjonen","tiltak for å beskytte ansatte"]}
 `.trim();
 
-export function createDeveloperPrompt(_schemaJson?: string): string {
+export function createDeveloperPrompt(
+  _schemaJson?: string,
+  context?: DeveloperPromptContext
+): string {
+  const relatedNoticeRules = hasRelatedNoticeContext(context)
+    ? `\n\n${EDITORIAL_RELATED_NOTICES}`
+    : "";
   const basePrompt = `OPPGAVE
 Lag en kort nyhetssak i E24-stil. Ikke et referat, men en publiserbar nyhet.
 Leseren vil vite hva som er mest vesentlig for selskapet og aksjonærene, uten at vi vurderer aksjen, spår kursreaksjon eller gir investeringsråd. Vanlige finansord som 'datterselskap', 'kontrakt' og 'aksjekapital' er greit, men tyngre jargong ma forklares gjennom kontekst.
@@ -352,9 +456,7 @@ ${EDITORIAL_AUDIENCE}
 
 ${EDITORIAL_SOURCE_AS_DATA}
 
-${EDITORIAL_SUPPLEMENTAL_MATERIALS}
-
-${EDITORIAL_RELATED_NOTICES}
+${EDITORIAL_SUPPLEMENTAL_MATERIALS}${relatedNoticeRules}
 
 ${MECHANISM_FIRST_RULE}
 

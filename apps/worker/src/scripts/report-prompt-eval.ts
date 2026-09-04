@@ -141,7 +141,7 @@ for (const idText of messageIds) {
     }
 
     const systemPrompt = createReportSystemPrompt();
-    const developerPrompt = createReportDeveloperPrompt();
+    const developerPrompt = createReportDeveloperPrompt(undefined, payload);
     const userPrompt = createReportUserPrompt(payload);
     if (dryRun) {
       result.errorText = `dry-run: prompts built (user prompt ${userPrompt.length} chars, reportText ${payload.reportText.length} chars).`;

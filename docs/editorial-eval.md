@@ -2,18 +2,116 @@
 
 This note is for future agents who need to find or rerun the OpenAI-only editorial A/B eval for regular Newsweb notices.
 
+## Current 15-notice retrospective review
+
+The current manual QA protocol is a **non-promotable one-shot pilot**. It reuses
+15 completed `v5.9.2` production generations as the frozen A arm and makes one
+new rewrite plus one reference-check call per case for the corrected
+challenger. It is deliberately fail-closed:
+
+- exactly 15 unique message IDs and exact original `generation_runs.id` values;
+- exactly one stored `rewrite_output` call and one stored
+  `reference_check_result` call per A case, `correctionAttempts=0`, and no
+  applied validation repair or style-sanitizer change; the pinned generation
+  output must exactly equal its immutable `published_rewrites` row;
+- full stored A output, source payload, exact prompts, all model-call
+  provenance and prompt hashes;
+- schema-filtered generator and checker profiles are both `gpt-5.6-terra`,
+  reasoning `medium`, service tier `default`, and 16,384 max output tokens;
+  requested and actual response model/service tier must also match the fresh
+  challenger calls (triage calls are ignored for this parity check);
+- the frozen `regular_v5_9_2_frozen` builder must reproduce every stored A
+  prompt and source-payload hash before a model client is created;
+- challenger model, reasoning, service tier, schema, parser, validator,
+  importance high-bar and style sanitizer match A; only the declared
+  prompt/related-notice treatment may differ;
+- deterministic independent assignment/order seeds, a 7/8 side split, stored
+  assignment and display-order hashes, and opaque IDs in the reviewer HTML.
+
+This pilot is for directional manual QA only. Every plan and run records
+`retrospective_one_shot_selected_pilot`, sets `promotionEligible=false`, and
+states that it is not shipping evidence. Do not use its winner count alone to
+approve a release.
+
+Put the selected exact generation-run pins in a two-column file (`messageId
+generationRunId`) and the same 15 IDs in the companion ID file. Never select
+“latest by message”. Choose only rows that satisfy the one-shot gates above;
+do not publish a locked list or claim enrichment counts until the revised
+selection and read-only enrichment have actually completed. The plan requires
+at least 10 of the 15 cases to have attached related notices.
+
+Use the direct `tsx` entrypoint for the production read-only export. The
+production review utility now requires exactly one explicit mode:
+`--skip-queue` (read-only) or `--execute-reprocess` (publishes). There is no
+default mutation mode, and unknown/nonnumeric arguments fail loudly.
+
+```powershell
+# Read-only: export the 15 already-completed A generations by exact run ID.
+npx tsx apps/worker/src/scripts/prod-reprocess-review.ts `
+  @tmp/editorial-eval/one-shot-v5.9.2-ids-15.txt `
+  --skip-queue `
+  --baseline-runs tmp/editorial-eval/one-shot-v5.9.2-generation-runs-15.txt `
+  --baseline-out tmp/editorial-eval/one-shot-v5.9.2-baseline-15.json
+
+# Offline: derive the 15 primary-notice cases from the immutable baseline.
+npx tsx apps/worker/src/scripts/editorial-eval.ts cases-from-baseline `
+  --baseline tmp/editorial-eval/one-shot-v5.9.2-baseline-15.json `
+  --out tmp/editorial-eval/one-shot-v5.9.2-cases-15.json
+
+# Read-only Newsweb fetches; no model calls. Review the resolution report.
+npx tsx apps/worker/src/scripts/editorial-eval.ts enrich-related-notices `
+  --cases tmp/editorial-eval/one-shot-v5.9.2-cases-15.json `
+  --out tmp/editorial-eval/one-shot-v5.9.2-cases-15-enriched.json
+
+# Offline preflight after the prompt/checker edits are final.
+npx tsx apps/worker/src/scripts/editorial-eval.ts plan-locked-15 `
+  --baseline tmp/editorial-eval/one-shot-v5.9.2-baseline-15.json `
+  --cases tmp/editorial-eval/one-shot-v5.9.2-cases-15-enriched.json `
+  --challenger regular_v5_11_candidate `
+  --model gpt-5.6-terra --effort medium --service-tier default `
+  --reference-model gpt-5.6-terra --reference-effort medium `
+  --reference-service-tier default `
+  --assignment-seed autoweb-v511-sides-15-v1 `
+  --ordering-seed autoweb-v511-order-15-v1 `
+  --out tmp/editorial-eval/one-shot-plan-15.json
+
+# Only this step makes model calls: 15 challenger calls plus their checker calls.
+# It never queues or publishes a production rewrite.
+npx tsx apps/worker/src/scripts/editorial-eval.ts run-locked-15 `
+  --plan tmp/editorial-eval/one-shot-plan-15.json `
+  --out tmp/editorial-eval/one-shot-run-15.json
+
+npx tsx apps/worker/src/scripts/editorial-eval.ts review-html `
+  --run tmp/editorial-eval/one-shot-run-15.json `
+  --out tmp/editorial-eval/one-shot-review-15.html
+```
+
+The reviewer artifact contains the original and attached related notices plus
+visible A/B article text and a neutral invalid/fatal/checker-error status when
+present. It omits arm names, variants, profiles, detailed machine scores and
+true generation IDs. Review exports carry opaque assignment/output
+IDs; `summarize` verifies and maps them back through the immutable run protocol.
+The run artifact retains the baseline/plan receipts, true arm mapping and side
+diagnostics for the post-review audit.
+
 ## Current Status
 
-- The mechanism-first challenger has already been shipped as the default regular notice prompt in `packages/prompt-kit/src/prompt.ts`.
-- The production prompt version is `v5.9.0` (quote-frequency update, 2026-06-10:
-  HOVEDREGEL FOR PERSONUTTALELSER + uttalelses-regnskap via `excluded_hype` in
+- The current checkout declares prompt version `v5.11.0` in
+  `packages/prompt-kit/src/prompt.ts`, and the locked pilot above uses
+  `regular_v5_11_candidate`. This handoff does **not** establish which Git SHA
+  or prompt version is currently deployed; verify that through the release
+  workflow before describing it as the production version.
+- Historical note: `v5.9.0` was the quote-frequency update of 2026-06-10
+  (HOVEDREGEL FOR PERSONUTTALELSER + uttalelses-regnskap via `excluded_hype` in
   `EDITORIAL_QUOTES`, two new quote-bearing style examples in both v5 and v6,
   SELVSJEKK SITAT at the end of the v5 developer prompt, de-hedged report
   management-comment rule, and quote-preserving reference-repair instructions).
-  Production baseline before the change (29 days, v5.8.0 and older): 2.9% of
-  published articles contained a real quote, zero dash quotes, 31% quote rate
-  when the source had a quotable key-person statement. Re-measure with
-  `npm run signals:pull` + `node scripts/analyze-quote-telemetry.mjs <artifact>`.
+  Its production baseline before that change (29 days, v5.8.0 and older) was
+  2.9% of published articles with a real quote, zero dash quotes, and a 31%
+  quote rate when the source had a quotable key-person statement. Re-measure
+  with `npm run signals:pull` +
+  `node scripts/analyze-quote-telemetry.mjs <artifact>`; do not treat these
+  historical figures as current telemetry.
 - A `regular_v6_full` challenger (correct bokmål, deduplicated blocks, SELVSJEKK
   self-check, extract-then-write schema `rewriteOutputJsonSchemaV6`) is registered
   in `packages/prompt-kit/src/prompt-v6.ts` + `regular-prompt-variants.ts` and is
@@ -226,41 +324,40 @@ endings never matter):
   Scoring dimensions and the promotion procedure live in
   `docs/editorial-eval-rubric.md`.
 
-## Related-notice replay (prior-notice context, v5.10.0)
+## Related-notice replay and repository guards (v5.11.0 candidate)
 
-The worker now resolves the earlier notice a Newsweb notice explicitly cites
-("Reference is made to the stock exchange announcement published on 26 May 2026
-regarding …" / "Det vises til børsmelding 23. juni 2026 …") and attaches it to
-the prompt as `relatedNotices` (`packages/prompt-kit/src/prompt.ts`), rendered
-as `[prior_<messageId>]` blocks with a Norwegian date and a computed time
-marker. Rules: `EDITORIAL_RELATED_NOTICES` (`shared-editorial.ts`). Guards in
-the reference check: a sentence grounded only in a `[prior_*]` block must not
-sit in lead/first paragraph (`prior_in_head`) and must carry a time or
-attribution marker (`prior_unmarked`, `services/context-markers.ts`); both go
-through the normal repair loop and block on residual. Kill switch:
-`RELATED_NOTICE_CONTEXT=` (empty) on the worker; code default is
-`defaultEnabledRelatedNoticeRelations` in `services/related-notices.ts`.
+The worker resolves referenced and corrected Newsweb notices and attaches them
+as `relatedNotices`, rendered as relation-aware `[prior_<messageId>]` source
+blocks. The prompt contract also supports same-day `sibling` sources, while the
+current resolver default keeps sibling discovery disabled pending separate
+evidence. A dated textual citation accepts candidates only when their
+Europe/Oslo calendar date exactly matches the cited date; the wider database
+query window is retrieval padding, not an acceptance window. Explicit-ID and
+correction candidates must also predate the current source.
 
-Replay flow (owner gate before shipping a prompt/guard change in this area):
+The current `EDITORIAL_RELATED_NOTICES` contract and reference checker require:
 
-```
-# 1. Cases: referencing notices from the corpus (ids listed by
-#    tmp/related-notice-check.mts, or any curated list)
-npm run eval:editorial -w apps/worker -- build-cases --message-ids @tmp/editorial-eval/related-message-ids-sample-50.txt --out tmp/editorial-eval/cases-related-50.json
+- today's source package controls the current status, title and lead;
+- every related-source fact names its exact `prior_<messageId>` in
+  `source_spans` and has a source-specific evidence match;
+- each historical reference/correction fact carries an explicit historical
+  marker, while a sibling fact uses the relation marker "i en parallell
+  melding samme dag"; issuer attribution alone is not enough;
+- corrected facts state the current correction status; and
+- the article does not end on a fact available only in a related notice.
 
-# 2. Attach related notices offline (Newsweb API only; --source db to prefer local rows)
-npm run eval:editorial -w apps/worker -- enrich-related-notices --cases tmp/editorial-eval/cases-related-50.json --out tmp/editorial-eval/cases-related-50-enriched.json
-#    → also writes cases-related-50-enriched-related-report.json: resolution counts + 30 samples to eyeball
+These are enforced through `prior_in_head`, `prior_message_unknown`,
+`prior_evidence_mismatch`, `prior_unmarked`, `prior_correction_status_missing`
+and `prior_at_end` signals. Residual blocking signals remain visible in the
+blind review metadata. The emergency kill switch is
+`RELATED_NOTICE_CONTEXT=` (empty); the repository default is
+`defaultEnabledRelatedNoticeRelations` in
+`apps/worker/src/services/related-notices.ts`.
 
-# 3. A/B: production prompt without vs with the attached notices
-npm run eval:editorial -w apps/worker -- run --cases tmp/editorial-eval/cases-related-50-enriched.json --control regular_v5_related_off --challenger regular_v5_6_control --out tmp/editorial-eval/run-related-50.json
-```
-
-Read from the run artifact: `priorContextViolations` per attempt, residual
-blocks, fatal grounding rate, visible chars, share of outputs with `prior_`
-spans. Acceptance: no regression in fatal grounding; challenger wins on
-referencing cases; zero residual `prior_in_head`; prior context appears as a
-clause where the reader needs it, never as a trailing background paragraph.
+The old v5.10 replay commands and `regular_v5_6_control` challenger are
+historical and are not a current release gate. Use the locked, non-promotable
+15-case one-shot workflow at the top of this document for directional review,
+and require separate production-parity evidence before shipping.
 
 ## Offline numeric replay (P2 Phase B)
 

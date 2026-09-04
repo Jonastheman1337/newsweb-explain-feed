@@ -52,8 +52,15 @@ items, both-bad A/B cases) are built with
 Any change to prompt text, examples, schema, model, reasoning effort or
 verbosity that is a promotion candidate:
 
-1. `npm run eval:editorial -w apps/worker -- run --cases <locked corpus> --control regular_v5_6_control --challenger <candidate> --assignment-seed <fresh> --ordering-seed <fresh> --out tmp/editorial-eval/run-<name>.json`
-   (one variable per comparison; the runner refuses prompt/schema mismatches)
+1. Freeze a control that reproduces the currently deployed generation path
+   and matches the challenger on every dimension except the declared variable,
+   then run
+   `npm run eval:editorial -w apps/worker -- run --cases <locked corpus> --control <frozen-production-control> --challenger <candidate> --assignment-seed <fresh> --ordering-seed <fresh> --out tmp/editorial-eval/run-<name>.json`.
+   `regular_v5_6_control` is retained for historical comparisons; it is not a
+   generic production control. The retrospective v5.11 one-shot pilot in
+   `docs/editorial-eval.md` is explicitly non-promotable and cannot substitute
+   for this production-parity run. The runner refuses incompatible
+   prompt/schema profiles.
 2. `review-html` → blind review in the browser → export reviews JSON.
 3. `summarize` → check the summary's `integrity` block first: legacy or
    imbalanced runs are `promotionEligible: false` and stop here.

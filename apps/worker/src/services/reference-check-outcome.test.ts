@@ -268,7 +268,16 @@ describe("referenceCheck persistence builders", () => {
     const priorContext = {
       sourceIds: ["prior_676863"],
       issuerAliases: ["sentia", "sntia"],
-      timeMarkers: ["i juni"]
+      timeMarkers: ["i juni"],
+      sources: [
+        {
+          sourceId: "prior_676863",
+          messageId: 676863,
+          relation: "reference" as const,
+          contextMarker: "i juni",
+          normalizedEvidence: "innledende avtale"
+        }
+      ]
     };
     const withPrior = buildCoverageReport(
       ["Hent signerte kontrakt.", "Selskapet meldte i juni om en innledende avtale."],
@@ -288,7 +297,16 @@ describe("referenceCheck persistence builders", () => {
             grounded: true,
             interpretation: "Dekket av tidligere melding.",
             sourceEvidence: "innledende avtale",
-            source: "prior"
+            source: "prior",
+            priorUses: [
+              {
+                priorMessageId: 676863,
+                fact: "Selskapet meldte i juni om en innledende avtale.",
+                sourceEvidence: "innledende avtale",
+                historicalMarker: "i juni",
+                correctionStatusMarker: ""
+              }
+            ]
           }
         ]
       },
@@ -313,11 +331,35 @@ describe("referenceCheck persistence builders", () => {
       "grounded",
       "interpretation",
       "sourceEvidence",
-      "source"
+      "source",
+      "priorUses"
     ]);
     expect(reviews[1].source).toBe("prior");
+    expect(reviews[1].priorUses).toEqual([
+      {
+        priorMessageId: 676863,
+        fact: "Selskapet meldte i juni om en innledende avtale.",
+        sourceEvidence: "innledende avtale",
+        historicalMarker: "i juni",
+        correctionStatusMarker: "",
+        sourceEvidenceMatchesCitedSource: true
+      }
+    ]);
     expect(json.headSentenceCount).toBe(1);
-    expect(json.priorContext).toEqual(priorContext);
+    expect(json.priorContext).toEqual({
+      sourceIds: ["prior_676863"],
+      issuerAliases: ["sentia", "sntia"],
+      timeMarkers: ["i juni"],
+      sources: [
+        {
+          sourceId: "prior_676863",
+          messageId: 676863,
+          relation: "reference",
+          contextMarker: "i juni"
+        }
+      ]
+    });
+    expect(JSON.stringify(json)).not.toContain("normalizedEvidence");
 
     // The legacy fixtures carry no source/prior keys and stay untouched.
     const legacy = referenceCoverageJson(coverage(true)) as Record<string, unknown>;
@@ -348,6 +390,26 @@ describe("referenceCheck persistence builders", () => {
       keys.indexOf("highRiskUnsupportedSentenceCount") + 1
     );
     expect(full.priorContextViolationCount).toBe(1);
+
+    const priorState = createReferenceRepairAccumulator();
+    absorbReferenceRepairResult(
+      priorState,
+      repairResult({
+        initialCoverage: withPrior,
+        finalCoverage: withPrior,
+        repairHistory: [historyEntry(1)]
+      })
+    );
+    const fullWithPrior = referenceCheckValidationJson(
+      priorState,
+      priorGate,
+      flow
+    ) as Record<string, unknown>;
+    const topLevelReviews = fullWithPrior.sentenceReviews as Array<
+      Record<string, unknown>
+    >;
+    expect(topLevelReviews[1]?.priorUses).toEqual(reviews[1]?.priorUses);
+    expect(JSON.stringify(fullWithPrior)).not.toContain("normalizedEvidence");
     expect(
       Object.keys(referenceCheckValidationJson(populatedState(), gate, flow))
     ).not.toContain("priorContextViolationCount");

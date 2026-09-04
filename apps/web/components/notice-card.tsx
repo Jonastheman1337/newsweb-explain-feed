@@ -48,7 +48,7 @@ function CardDateline({ item }: { item: FeedItem }) {
   );
 }
 
-function MaxAiLink({ messageId }: { messageId: number }) {
+function AdvancedLink({ messageId }: { messageId: number }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const queryString = searchParams.toString();
@@ -71,7 +71,8 @@ function MaxAiLink({ messageId }: { messageId: number }) {
       className="originalLink"
       onClick={rememberFeedPosition}
     >
-      Max AI →
+      Avansert
+      <svg className="chipIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
     </Link>
   );
 }
@@ -92,7 +93,7 @@ export function NoticeCard({ item }: NoticeCardProps) {
           <FeedProcessingIndicator hasAttachments={item.hasAttachments} phase={item.phase} />
         ) : null}
         <div className="editableActions">
-          <MaxAiLink messageId={item.messageId} />
+          <AdvancedLink messageId={item.messageId} />
           <span className="actionsRight">
             <GenerateButton messageId={item.messageId} hasAttachments={item.hasAttachments} />
           </span>
@@ -112,7 +113,7 @@ export function NoticeCard({ item }: NoticeCardProps) {
         </h2>
         <FeedProcessingIndicator hasAttachments={item.hasAttachments} phase={item.phase} />
         <div className="editableActions">
-          <MaxAiLink messageId={item.messageId} />
+          <AdvancedLink messageId={item.messageId} />
           <span className="actionsRight">
             <GenerateButton messageId={item.messageId} label="Regenerer notis" hasAttachments={item.hasAttachments} />
           </span>
@@ -134,7 +135,7 @@ export function NoticeCard({ item }: NoticeCardProps) {
           <FeedProcessingIndicator hasAttachments={item.hasAttachments} phase={item.phase} />
         ) : null}
         <div className="editableActions">
-          <MaxAiLink messageId={item.messageId} />
+          <AdvancedLink messageId={item.messageId} />
           <span className="actionsRight">
             <GenerateButton messageId={item.messageId} label="Prøv igjen" hasAttachments={item.hasAttachments} />
             <GenerateButton
@@ -190,11 +191,11 @@ export function NoticeCard({ item }: NoticeCardProps) {
                 className={`splitButton${showSplit ? " splitButtonActive" : ""}`}
                 onClick={handleToggleSplit}
               >
-                Splitt <svg className="copyIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="3" x2="12" y2="21"/></svg>
+                Splitt <svg className="chipIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="3" x2="12" y2="21"/></svg>
               </button>
             }
           >
-            <MaxAiLink messageId={item.messageId} />
+            <AdvancedLink messageId={item.messageId} />
           </EditableRewrite>
           {item.regenerating && (
             <div className="feedRegenerationStatus">

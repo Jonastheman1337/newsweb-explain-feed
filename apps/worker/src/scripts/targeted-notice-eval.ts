@@ -272,7 +272,7 @@ async function main(): Promise<void> {
     ...(maxVisibleArticleChars ? { maxVisibleArticleChars } : {})
   };
   const systemPrompt = createSystemPrompt();
-  const developerPrompt = createDeveloperPrompt();
+  const developerPrompt = createDeveloperPrompt(undefined, payload);
   const userPrompt = createUserPrompt(payload);
   const promptChars =
     systemPrompt.length + developerPrompt.length + userPrompt.length;

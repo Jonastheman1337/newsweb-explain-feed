@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   dedupeBilingualCandidates,
   detectNoticeLanguage,
+  osloCalendarDate,
   resolveRelatedNotices,
   scoreRelatedNoticeCandidate,
   trimRelatedNoticeText,
@@ -238,6 +239,102 @@ describe("resolveRelatedNotices", () => {
     expect(result.telemetry.resolved[0].resolvedBy).toBe("newsweb");
   });
 
+  it.each([
+    ["previous", "2026-06-22T10:00:00.000Z"],
+    ["next", "2026-06-24T10:00:00.000Z"]
+  ])(
+    "rejects a %s-calendar-day database hit and falls back to the exact cited day",
+    async (_label, wrongPublishedAt) => {
+      const wrongDay = candidate({
+        messageId: 676862,
+        publishedAt: new Date(wrongPublishedAt),
+        title: "Sentia ASA: Generic company update",
+        bodyText: "Sentia ASA provides a general company update."
+      });
+      const newsweb: RelatedNoticeNewswebClient = {
+        async listByDate(fromDate, toDate) {
+          expect([fromDate, toDate]).toEqual(["2026-06-23", "2026-06-23"]);
+          return [
+            {
+              messageId: 676863,
+              title: candidate().title,
+              issuerName: "Sentia ASA",
+              issuerSign: "SNTIA",
+              publishedTime: "2026-06-23T14:25:02.930Z"
+            }
+          ];
+        },
+        async fetchMessage(messageId) {
+          return candidate({ messageId });
+        }
+      };
+
+      const result = await resolveRelatedNotices(source(), {
+        enabledRelations,
+        store: memoryStore([wrongDay]),
+        newsweb
+      });
+
+      expect(result.related).toHaveLength(1);
+      expect(result.related[0]).toMatchObject({
+        messageId: 676863,
+        resolvedBy: "newsweb"
+      });
+    }
+  );
+
+  it("uses the Europe/Oslo calendar date at UTC day boundaries", async () => {
+    const osloJune23 = candidate({
+      messageId: 676860,
+      publishedAt: new Date("2026-06-22T22:00:00.000Z")
+    });
+    const osloJune24 = candidate({
+      messageId: 676861,
+      publishedAt: new Date("2026-06-23T22:00:00.000Z")
+    });
+
+    expect(osloCalendarDate(osloJune23.publishedAt)).toBe("2026-06-23");
+    expect(osloCalendarDate(osloJune24.publishedAt)).toBe("2026-06-24");
+
+    const result = await resolveRelatedNotices(source(), {
+      enabledRelations,
+      store: memoryStore([osloJune23, osloJune24])
+    });
+    expect(result.related.map((notice) => notice.messageId)).toEqual([676860]);
+  });
+
+  it("rechecks the fetched Newsweb candidate's Oslo date before accepting it", async () => {
+    const newsweb: RelatedNoticeNewswebClient = {
+      async listByDate() {
+        return [
+          {
+            messageId: 676863,
+            title: candidate().title,
+            issuerName: "Sentia ASA",
+            issuerSign: "SNTIA",
+            publishedTime: "2026-06-23T14:25:02.930Z"
+          }
+        ];
+      },
+      async fetchMessage(messageId) {
+        return candidate({
+          messageId,
+          publishedAt: new Date("2026-06-24T10:00:00.000Z")
+        });
+      }
+    };
+
+    const result = await resolveRelatedNotices(source(), {
+      enabledRelations,
+      store: memoryStore([]),
+      newsweb
+    });
+    expect(result.related).toEqual([]);
+    expect(result.telemetry.unresolved).toEqual([
+      { raw: expect.stringContaining("vises til"), reason: "no-candidate" }
+    ]);
+  });
+
   it("records fetch-failed when both the database and Newsweb are unavailable", async () => {
     const newsweb: RelatedNoticeNewswebClient = {
       async listByDate() {
@@ -277,6 +374,38 @@ describe("resolveRelatedNotices", () => {
       messageId: 681400,
       raw: "correctionForMessageId=681400"
     });
+  });
+
+  it("rejects explicit-ID and correction candidates published after the source", async () => {
+    const future = candidate({
+      messageId: 700001,
+      publishedAt: new Date("2026-09-03T05:00:00.000Z")
+    });
+
+    const explicit = await resolveRelatedNotices(
+      source({
+        bodyText:
+          "Reference is made to https://newsweb.oslobors.no/message/700001 for details."
+      }),
+      { enabledRelations, store: memoryStore([future]) }
+    );
+    expect(explicit.related).toEqual([]);
+    expect(explicit.telemetry.unresolved).toContainEqual({
+      raw: expect.stringContaining("700001"),
+      reason: "no-candidate"
+    });
+
+    const correction = await resolveRelatedNotices(
+      source({
+        bodyText: "Correction notice.",
+        rawMessageJson: { correctionForMessageId: 700001 }
+      }),
+      { enabledRelations: ["correction"], store: memoryStore([future]) }
+    );
+    expect(correction.related).toEqual([]);
+    expect(correction.telemetry.unresolved).toEqual([
+      { raw: "correctionForMessageId=700001", reason: "no-candidate" }
+    ]);
   });
 
   it("resolves an undated formula reference within the previous week on a clear topic match", async () => {

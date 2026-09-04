@@ -5,6 +5,8 @@ import {
   type ReferenceCheckerErrorEntry,
   type ReferenceCheckGateResult,
   type ReferenceCheckOutcome,
+  type ReferenceCoverageItem,
+  type ReferencePriorContext,
   type ReferenceCoverageReport
 } from "./reference-check.js";
 
@@ -140,6 +142,54 @@ export function referenceCheckOutcomeJson(
   };
 }
 
+function persistedPriorUses(
+  item: ReferenceCoverageItem,
+  hasPriorContext: boolean
+): Record<string, unknown> {
+  if (!hasPriorContext || item.priorUses === undefined) {
+    return {};
+  }
+  return {
+    priorUses: item.priorUses.map((priorUse) => ({
+      priorMessageId: priorUse.priorMessageId,
+      fact: priorUse.fact,
+      sourceEvidence: priorUse.sourceEvidence,
+      historicalMarker: priorUse.historicalMarker,
+      ...(priorUse.correctionStatusMarker !== undefined
+        ? { correctionStatusMarker: priorUse.correctionStatusMarker }
+        : {}),
+      ...(priorUse.sourceEvidenceMatchesCitedSource !== undefined
+        ? {
+            sourceEvidenceMatchesCitedSource:
+              priorUse.sourceEvidenceMatchesCitedSource
+          }
+        : {})
+    }))
+  };
+}
+
+function persistedPriorContext(
+  priorContext: ReferencePriorContext
+): ReferencePriorContext {
+  return {
+    sourceIds: priorContext.sourceIds,
+    issuerAliases: priorContext.issuerAliases,
+    timeMarkers: priorContext.timeMarkers,
+    ...(priorContext.sources
+      ? {
+          sources: priorContext.sources.map(
+            ({ sourceId, messageId, relation, contextMarker }) => ({
+              sourceId,
+              messageId,
+              relation,
+              ...(contextMarker !== undefined ? { contextMarker } : {})
+            })
+          )
+        }
+      : {})
+  };
+}
+
 export function referenceCoverageJson(
   coverage: ReferenceCoverageReport | null
 ): Record<string, unknown> | null {
@@ -155,7 +205,8 @@ export function referenceCoverageJson(
       grounded: item.grounded,
       interpretation: item.interpretation,
       sourceEvidence: item.sourceEvidence,
-      ...(item.source !== undefined ? { source: item.source } : {})
+      ...(item.source !== undefined ? { source: item.source } : {}),
+      ...persistedPriorUses(item, coverage.priorContext !== undefined)
     })),
     unsupportedSentences: coverage.unsupportedSentences.map((item) => ({
       index: item.index,
@@ -169,7 +220,9 @@ export function referenceCoverageJson(
     ...(coverage.headSentenceCount !== undefined
       ? { headSentenceCount: coverage.headSentenceCount }
       : {}),
-    ...(coverage.priorContext ? { priorContext: coverage.priorContext } : {})
+    ...(coverage.priorContext
+      ? { priorContext: persistedPriorContext(coverage.priorContext) }
+      : {})
   };
 }
 
@@ -191,6 +244,8 @@ export function referenceCheckValidationJson(
   enforcement?: ReferenceCheckEnforcementConfig
 ): Record<string, unknown> {
   const { initialCoverage, finalCoverage } = state;
+  const reviewedCoverage = finalCoverage ?? initialCoverage;
+  const hasPriorContext = reviewedCoverage?.priorContext !== undefined;
   return {
     enabled: true,
     checkerError: state.checkerError,
@@ -220,16 +275,15 @@ export function referenceCheckValidationJson(
       finalCoverage?.unsupportedSentences.length ??
       initialCoverage?.unsupportedSentences.length ??
       0,
-    sentenceReviews: (finalCoverage?.items ?? initialCoverage?.items ?? []).map(
-      (item) => ({
-        index: item.index,
-        sentence: item.sentence,
-        grounded: item.grounded,
-        interpretation: item.interpretation,
-        sourceEvidence: item.sourceEvidence,
-        ...(item.source !== undefined ? { source: item.source } : {})
-      })
-    ),
+    sentenceReviews: (reviewedCoverage?.items ?? []).map((item) => ({
+      index: item.index,
+      sentence: item.sentence,
+      grounded: item.grounded,
+      interpretation: item.interpretation,
+      sourceEvidence: item.sourceEvidence,
+      ...(item.source !== undefined ? { source: item.source } : {}),
+      ...persistedPriorUses(item, hasPriorContext)
+    })),
     unsupportedSentences: (
       finalCoverage?.unsupportedSentences ??
       initialCoverage?.unsupportedSentences ??

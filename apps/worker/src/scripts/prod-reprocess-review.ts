@@ -3,8 +3,8 @@
 // repairs, validation, publish as a new version), wait for the runs, dump the
 // results and write a before/after review page.
 //
-//   npm run review:prod -w apps/worker -- 675152 681428 681076
-//   npm run review:prod -w apps/worker -- @tmp/editorial-eval/ids.txt --out tmp/editorial-eval/prod-review.html
+//   npm run review:prod -w apps/worker -- 675152 681428 681076 --execute-reprocess
+//   npm run review:prod -w apps/worker -- @tmp/editorial-eval/ids.txt --execute-reprocess --out tmp/editorial-eval/prod-review.html
 //   npm run review:prod -w apps/worker -- 675152 --skip-queue   # only dump + render existing versions
 //
 // Needs SSH access to the production host (same as scripts/deploy-upcloud.sh).
@@ -15,8 +15,13 @@ import { execFile } from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
-import type { RewriteOutput } from "@newsweb/shared";
+import { rewriteOutputJsonSchema, type RewriteOutput } from "@newsweb/shared";
 import { splitIntoSentences } from "../services/reference-check.js";
+import {
+  createRetrospectiveBaselineArtifact,
+  sha256CanonicalJson,
+  writeNewJsonArtifact
+} from "../services/editorial-eval-artifact.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -57,6 +62,25 @@ type NoticeRow = {
   publishedAt: string;
   rewrites: RewriteRow[];
   published: Array<{ id: string; version: number; rewriteJson: RewriteOutput }>;
+};
+
+type BaselineRow = {
+  id: string;
+  publishedRewriteId: string;
+  messageId: number;
+  version: number | null;
+  status: string;
+  reason: string;
+  requestedAt: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+  model: string | null;
+  promptVersion: string | null;
+  promptChars: number | null;
+  inputJson: unknown;
+  outputJson: unknown;
+  publishedRewriteJson: unknown;
+  validationJson: unknown;
 };
 
 async function ssh(command: string, stdin?: string): Promise<string> {
@@ -144,6 +168,52 @@ async function dumpNotices(ids: number[]): Promise<NoticeRow[]> {
     .split("\n")
     .filter(Boolean)
     .map((line) => JSON.parse(line) as NoticeRow);
+}
+
+async function dumpRetrospectiveBaselineRows(
+  pins: Array<{ messageId: number; generationRunId: string }>
+): Promise<BaselineRow[]> {
+  const values = pins
+    .map(
+      (item, index) =>
+        `(${item.messageId},'${item.generationRunId}',${index + 1})`
+    )
+    .join(",");
+  const sql = `with ordered(message_id, generation_run_id, position) as (
+  values ${values}
+)
+select json_build_object(
+  'id', g.id, 'messageId', g.message_id, 'version', g.version,
+  'publishedRewriteId', p.id, 'publishedRewriteJson', p.rewrite_json,
+  'status', g.status, 'reason', g.reason, 'requestedAt', g.requested_at,
+  'startedAt', g.started_at, 'finishedAt', g.finished_at,
+  'model', g.model, 'promptVersion', g.prompt_version, 'promptChars', g.prompt_chars,
+  'inputJson', g.input_json, 'outputJson', g.output_json, 'validationJson', g.validation_json
+)::text
+from ordered o
+cross join lateral (
+  select * from generation_runs g
+  where g.message_id = o.message_id
+    and g.id = o.generation_run_id
+    and g.prompt_version = 'v5.9.2'
+    and g.status = 'published'
+    and g.input_json is not null
+    and g.output_json is not null
+    and g.input_json->'previousRewrite' = 'null'::jsonb
+    and not (g.input_json->'sourcePayload' ? 'relatedNotices')
+  order by g.requested_at desc
+  limit 1
+) g
+join published_rewrites p
+  on p.generation_run_id = g.id
+ and p.message_id = g.message_id
+ and p.version = g.version
+order by o.position;`;
+  const out = await psql(sql);
+  return out
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => JSON.parse(line) as BaselineRow);
 }
 
 const esc = (value: unknown) =>
@@ -310,24 +380,107 @@ async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const options = new Map<string, string>();
   const ids: number[] = [];
+  const booleanOptions = new Set(["skip-queue", "execute-reprocess"]);
+  const valueOptions = new Set([
+    "out",
+    "dump",
+    "title",
+    "baseline-out",
+    "baseline-runs"
+  ]);
+  const parseIds = (text: string, source: string): number[] =>
+    text
+      .split(/[\s,]+/)
+      .filter(Boolean)
+      .map((value) => {
+        if (!/^\d+$/.test(value) || Number(value) <= 0) {
+          throw new Error(`Invalid message ID ${JSON.stringify(value)} in ${source}`);
+        }
+        return Number(value);
+      });
   for (let i = 0; i < args.length; i += 1) {
     const arg = args[i];
-    if (arg === "--skip-queue") {
-      options.set("skip-queue", "1");
-    } else if (arg.startsWith("--")) {
-      options.set(arg.slice(2), args[i + 1] ?? "");
+    if (arg.startsWith("--")) {
+      const name = arg.slice(2);
+      if (booleanOptions.has(name)) {
+        options.set(name, "1");
+        continue;
+      }
+      if (!valueOptions.has(name)) {
+        throw new Error(`Unknown option: ${arg}`);
+      }
+      const value = args[i + 1];
+      if (!value || value.startsWith("--")) {
+        throw new Error(`Missing value for ${arg}`);
+      }
+      options.set(name, value);
       i += 1;
     } else if (arg.startsWith("@")) {
       const text = await fs.readFile(arg.slice(1), "utf8");
-      ids.push(...text.split(/[\s,]+/).filter(Boolean).map(Number));
+      ids.push(...parseIds(text, arg));
     } else {
-      ids.push(Number(arg));
+      ids.push(...parseIds(arg, "command line"));
     }
   }
-  const validIds = [...new Set(ids.filter((id) => Number.isInteger(id) && id > 0))];
+  if (new Set(ids).size !== ids.length) {
+    throw new Error("Duplicate message IDs are not allowed");
+  }
+  const validIds = ids;
   if (validIds.length === 0) {
-    console.error("Usage: prod-reprocess-review <messageId ...|@file> [--out page.html] [--dump rows.jsonl] [--title ...] [--skip-queue]");
+    console.error("Usage: prod-reprocess-review <messageId ...|@file> (--execute-reprocess|--skip-queue) [--out page.html] [--dump rows.jsonl] [--title ...] [--baseline-out baseline.json --baseline-runs pins.txt]");
     process.exit(1);
+  }
+  if (options.has("skip-queue") === options.has("execute-reprocess")) {
+    throw new Error(
+      "Choose exactly one mode: --execute-reprocess (publishes) or --skip-queue (read-only)"
+    );
+  }
+  if (options.has("baseline-out")) {
+    if (!options.has("skip-queue")) {
+      throw new Error("--baseline-out is read-only and requires --skip-queue");
+    }
+    if (validIds.length !== 15) {
+      throw new Error(`--baseline-out requires exactly 15 unique message IDs; received ${validIds.length}`);
+    }
+    const pinsPath = options.get("baseline-runs");
+    if (!pinsPath) {
+      throw new Error("--baseline-out requires --baseline-runs with exact messageId generationRunId pairs");
+    }
+    const pins = (await fs.readFile(pinsPath.replace(/^@/, ""), "utf8"))
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => {
+        const [messageIdRaw, generationRunId, ...extra] = line.split(/\s+/);
+        const messageId = Number(messageIdRaw);
+        if (
+          !Number.isInteger(messageId) ||
+          !generationRunId ||
+          extra.length > 0 ||
+          !/^[a-zA-Z0-9_-]+$/.test(generationRunId)
+        ) {
+          throw new Error(`Invalid baseline pin: ${line}`);
+        }
+        return { messageId, generationRunId };
+      });
+    if (
+      pins.length !== 15 ||
+      pins.map((item) => item.messageId).join(",") !== validIds.join(",")
+    ) {
+      throw new Error("--baseline-runs must pin exactly the same 15 message IDs in the same order");
+    }
+    const baselinePath = options.get("baseline-out")!;
+    const baselineRows = await dumpRetrospectiveBaselineRows(pins);
+    const baseline = createRetrospectiveBaselineArtifact({
+      createdAt: new Date().toISOString(),
+      host: HOST,
+      messageIds: validIds,
+      schemaSha256: sha256CanonicalJson(rewriteOutputJsonSchema),
+      rows: baselineRows
+    });
+    await writeNewJsonArtifact(baselinePath, baseline);
+    console.log(`[review] wrote read-only retrospective baseline ${baseline.baselineId} to ${baselinePath}`);
+    return;
   }
   const stamp = new Date().toISOString().slice(0, 10);
   const outPath = options.get("out") ?? `tmp/editorial-eval/prod-review-${stamp}.html`;
@@ -335,7 +488,7 @@ async function main(): Promise<void> {
   const title = options.get("title") ?? `${validIds.length} saker gjennom hele løypa`;
 
   const targets = new Map<number, number>();
-  if (!options.has("skip-queue")) {
+  if (options.has("execute-reprocess")) {
     for (const messageId of validIds) {
       const queued = await queueReprocess(messageId);
       targets.set(messageId, queued.version);
