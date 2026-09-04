@@ -9,11 +9,11 @@ import {
 import type { RewriteOutput } from "@newsweb/shared";
 
 const MAX_ALLOWED_UNEXPECTED_NUMBERS = 0;
-const MAX_TITLE_WORDS = 8;
+export const MAX_TITLE_WORDS = 8;
 const MAX_SUMMARY_SENTENCES = 15;
 const MAX_VISIBLE_ARTICLE_CHARS = 1000;
 
-const VISIBLE_ATTACHMENT_REFERENCE_PATTERNS = [
+export const VISIBLE_ATTACHMENT_REFERENCE_PATTERNS = [
   /\bpdf(?:-en)?\b/i,
   /\bvedlegg(?:et|ene)?\b/i,
   /\bvedlagt(?:e)?\s+skjema\b/i,

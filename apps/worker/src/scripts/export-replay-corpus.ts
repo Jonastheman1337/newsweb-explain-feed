@@ -121,7 +121,7 @@ const cohortCounts = new Map<CorpusCohort, { window: number; matched: number }>(
 for (const cohort of ["failed", "published"] as const) {
   if (!cohorts.has(cohort)) continue;
   const rows = await logPrisma.generationRun.findMany({
-    where: { status: cohort, requestedAt: { gte: from, lte: to } },
+    where: { status: cohort, requestedAt: { gte: from, lte: to }, messageId: { gt: 0 } },
     select: {
       id: true,
       messageId: true,

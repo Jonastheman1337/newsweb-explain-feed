@@ -65,7 +65,7 @@ async function claimAndReserve(
   });
 }
 
-async function activeRunIsStillLive(generationRunId: string): Promise<boolean> {
+export async function activeRunIsStillLive(generationRunId: string): Promise<boolean> {
   if (generationRunId === "unknown") return false;
   const run = await logPrisma.generationRun.findUnique({
     where: { id: generationRunId },

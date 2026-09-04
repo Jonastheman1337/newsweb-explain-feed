@@ -275,3 +275,69 @@ model TitleSuggestionLog {
   @@index([eventId])
   @@map("title_suggestion_logs")
 }
+
+// ---------------------------------------------------------------------------
+// /sak: free-standing drafts written from user-supplied materials. Scoped per
+// browser (ownerId = editor id), expire 24 h after creation, never in the feed.
+// ---------------------------------------------------------------------------
+
+model SakDraft {
+  id                    String        @id @default(cuid())
+  ownerId               String        @map("owner_id")
+  titleOverride         String?       @map("title_override")
+  targetChars           Int?          @map("target_chars")
+  nextVersion           Int           @default(1) @map("next_version")
+  activeGenerationRunId String?       @map("active_generation_run_id")
+  createdAt             DateTime      @default(now()) @map("created_at")
+  lastActivityAt        DateTime      @default(now()) @map("last_activity_at")
+  expiresAt             DateTime      @map("expires_at")
+  materials             SakMaterial[]
+  versions              SakVersion[]
+
+  @@index([ownerId, lastActivityAt(sort: Desc)])
+  @@index([expiresAt])
+  @@map("sak_drafts")
+}
+
+model SakMaterial {
+  id            String   @id @default(cuid())
+  sakId         String   @map("sak_id")
+  kind          String
+  title         String
+  url           String?
+  fileName      String?  @map("file_name")
+  fileSize      Int?     @map("file_size")
+  extractedText String   @map("extracted_text") @db.Text
+  textChars     Int      @map("text_chars")
+  status        String
+  errorText     String?  @map("error_text") @db.Text
+  enabled       Boolean  @default(true)
+  metadataJson  Json?    @map("metadata_json")
+  createdAt     DateTime @default(now()) @map("created_at")
+  draft         SakDraft @relation(fields: [sakId], references: [id], onDelete: Cascade)
+
+  @@index([sakId, createdAt])
+  @@map("sak_materials")
+}
+
+model SakVersion {
+  id              String    @id @default(cuid())
+  sakId           String    @map("sak_id")
+  version         Int
+  status          String
+  articleJson     Json?     @map("article_json")
+  userInstruction String?   @map("user_instruction") @db.Text
+  changeNote      String?   @map("change_note")
+  promptVersion   String?   @map("prompt_version")
+  model           String?
+  errorText       String?   @map("error_text") @db.Text
+  validationJson  Json?     @map("validation_json")
+  generationRunId String?   @map("generation_run_id")
+  requestedAt     DateTime  @default(now()) @map("requested_at")
+  generatedAt     DateTime? @map("generated_at")
+  draft           SakDraft  @relation(fields: [sakId], references: [id], onDelete: Cascade)
+
+  @@unique([sakId, version])
+  @@index([sakId, requestedAt])
+  @@map("sak_versions")
+}

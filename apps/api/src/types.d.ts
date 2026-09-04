@@ -8,6 +8,7 @@ declare module "fastify" {
     config: AppConfig;
     redis: Redis;
     rewriteQueue: Queue;
+    sakQueue: Queue;
     authenticate: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
   }
 }

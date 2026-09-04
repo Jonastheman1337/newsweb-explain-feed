@@ -1,7 +1,12 @@
 export const QUEUE_NAMES = {
   ingest: "notice-ingest",
   rewrite: "notice-rewrite",
-  publish: "notice-publish"
+  publish: "notice-publish",
+  sak: "sak-draft"
+} as const;
+
+export const JOB_NAMES = {
+  sakDraft: "sak-draft"
 } as const;
 
 export const CACHE_KEYS = {

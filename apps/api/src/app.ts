@@ -14,6 +14,7 @@ import { feedStreamRoutes } from "./routes/feed-stream.js";
 import { healthRoutes } from "./routes/health.js";
 import { metaRoutes } from "./routes/meta.js";
 import { noticeRoutes } from "./routes/notice.js";
+import { sakRoutes } from "./routes/sak.js";
 import { settingsRoutes } from "./routes/settings.js";
 import { MAX_MATERIAL_FILE_BYTES } from "./services/notice-materials.js";
 
@@ -45,10 +46,14 @@ export async function buildApp(): Promise<FastifyInstance> {
   const rewriteQueue = new Queue(QUEUE_NAMES.rewrite, {
     connection: parseRedisUrl(config.REDIS_URL)
   });
+  const sakQueue = new Queue(QUEUE_NAMES.sak, {
+    connection: parseRedisUrl(config.REDIS_URL)
+  });
 
   app.decorate("config", config);
   app.decorate("redis", redis);
   app.decorate("rewriteQueue", rewriteQueue);
+  app.decorate("sakQueue", sakQueue);
 
   await app.register(cors, {
     origin: true,
@@ -89,6 +94,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(feedRoutes);
   await app.register(feedStreamRoutes);
   await app.register(noticeRoutes);
+  await app.register(sakRoutes);
   await app.register(metaRoutes);
   await app.register(settingsRoutes);
   await app.register(adminRoutes);
@@ -96,6 +102,7 @@ export async function buildApp(): Promise<FastifyInstance> {
 
   app.addHook("onClose", async () => {
     await rewriteQueue.close();
+    await sakQueue.close();
     await redis.quit();
   });
 

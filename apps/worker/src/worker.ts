@@ -16,7 +16,8 @@ import {
   toPrismaJsonValue,
   type GenerationPhase,
   type OpenAIModelCallTelemetry,
-  type RewriteOutput
+  type RewriteOutput,
+  type SakDraftJobData
 } from "@newsweb/shared";
 import { loadConfig } from "./config.js";
 import {
@@ -170,6 +171,8 @@ import {
 } from "./services/numeric-shadow-monitor.js";
 import { finalizePublication } from "./services/publication.js";
 import { canWriteRewriteCandidate } from "./services/generation-ownership.js";
+import { processSakDraft } from "./services/sak-draft.js";
+import { SAK_EXPIRY_SWEEP_MS, expireSakDrafts } from "./services/sak-expiry.js";
 
 type IngestJobData = {
   messageId: number;
@@ -1366,7 +1369,8 @@ type PromptCacheFlow =
   | "reference-check"
   | "rewrite-report"
   | "rewrite-yearly"
-  | "pdf-context";
+  | "pdf-context"
+  | "sak";
 
 function promptCacheModeForFlow(flow: PromptCacheFlow): OpenAIPromptCacheMode {
   const overrides: Record<PromptCacheFlow, OpenAIPromptCacheMode | undefined> = {
@@ -1376,7 +1380,8 @@ function promptCacheModeForFlow(flow: PromptCacheFlow): OpenAIPromptCacheMode {
     "reference-check": config.OPENAI_PROMPT_CACHE_MODE_REFERENCE_CHECK,
     "rewrite-report": config.OPENAI_PROMPT_CACHE_MODE_REWRITE_REPORT,
     "rewrite-yearly": config.OPENAI_PROMPT_CACHE_MODE_REWRITE_YEARLY,
-    "pdf-context": config.OPENAI_PROMPT_CACHE_MODE_PDF_CONTEXT
+    "pdf-context": config.OPENAI_PROMPT_CACHE_MODE_PDF_CONTEXT,
+    sak: config.OPENAI_PROMPT_CACHE_MODE_SAK
   };
   return overrides[flow] ?? config.OPENAI_PROMPT_CACHE_MODE;
 }
@@ -1605,7 +1610,7 @@ async function callModelRewrite(
   modelCall: ModelCallLog;
 }> {
   const systemPrompt = createSystemPrompt();
-  const developerPrompt = createDeveloperPrompt();
+  const developerPrompt = createDeveloperPrompt(undefined, payload);
   let userPrompt: string;
   if (revisionInstruction && previousOutput) {
     userPrompt = createRevisionUserPrompt(
@@ -1701,7 +1706,7 @@ async function callModelReportRewrite(
   modelCall: ModelCallLog;
 }> {
   const systemPrompt = createReportSystemPrompt();
-  const developerPrompt = createReportDeveloperPrompt();
+  const developerPrompt = createReportDeveloperPrompt(undefined, payload);
   let userPrompt: string;
   if (revisionInstruction && previousOutput) {
     userPrompt = createReportRevisionUserPrompt(
@@ -4768,9 +4773,37 @@ const publishWorker = new Worker<PublishJobData>(
   }
 );
 
+// /sak drafts: their own queue and a single slot, so a 2–5 minute long-form
+// job never occupies one of the notice queue's three workers. All logic lives
+// in services/sak-draft.ts; this only hands it the process-owned pieces.
+const sakWorker = new Worker<SakDraftJobData>(
+  QUEUE_NAMES.sak,
+  async (job: Job<SakDraftJobData>) => {
+    return withJobRun("sak-draft", null, async () => {
+      await processSakDraft(job, {
+        prisma,
+        logPrisma,
+        callModelForJson,
+        promptCacheMode: promptCacheModeForFlow("sak"),
+        config: {
+          OPENAI_SAK_REASONING_EFFORT: config.OPENAI_SAK_REASONING_EFFORT,
+          OPENAI_SAK_TIMEOUT_MS: config.OPENAI_SAK_TIMEOUT_MS
+        },
+        collectFailedModelCall: (error, modelCalls) =>
+          collectFailedModelCall(error, modelCalls as ModelCallLog[])
+      });
+    });
+  },
+  {
+    connection,
+    concurrency: 1
+  }
+);
+
 attachRedisRuntimeErrorHandler("ingest-worker", ingestWorker);
 attachRedisRuntimeErrorHandler("rewrite-worker", rewriteWorker);
 attachRedisRuntimeErrorHandler("publish-worker", publishWorker);
+attachRedisRuntimeErrorHandler("sak-worker", sakWorker);
 
 async function recoverStaleNewMessageRuns(): Promise<{
   candidates: number;
@@ -5193,6 +5226,11 @@ async function bootstrap(): Promise<void> {
     void runStaleRecoverySweep("interval");
   }, STALE_GENERATION_RECOVERY_INTERVAL_MS);
 
+  await runSakExpirySweep("boot");
+  sakExpiryTimer = setInterval(() => {
+    void runSakExpirySweep("interval");
+  }, SAK_EXPIRY_SWEEP_MS);
+
   console.log(
     `[worker] started. polling=${config.NEWSWEB_POLLING_ENABLED} pollInterval=${config.POLL_INTERVAL_MS}ms model=${config.OPENAI_MODEL} fastModel=${config.OPENAI_FAST_MODEL} hardModel=${config.OPENAI_HARD_MODEL} serviceTier=${config.OPENAI_SERVICE_TIER}`
   );
@@ -5237,6 +5275,57 @@ async function runStaleRecoverySweep(trigger: "boot" | "interval"): Promise<void
     staleRecoveryRunning = false;
   }
 }
+
+let sakExpiryTimer: ReturnType<typeof setInterval> | null = null;
+
+async function runSakExpirySweep(trigger: "boot" | "interval"): Promise<void> {
+  try {
+    const deleted = await expireSakDrafts(prisma);
+    console.log(
+      JSON.stringify({
+        service: "worker",
+        event: "sak_expiry_sweep",
+        trigger,
+        deleted
+      })
+    );
+  } catch (error) {
+    console.error(
+      JSON.stringify({
+        service: "worker",
+        event: "sak_expiry_sweep_failed",
+        trigger,
+        error: error instanceof Error ? error.message : String(error)
+      })
+    );
+  }
+}
+
+sakWorker.on("completed", (job) => {
+  console.log(
+    JSON.stringify({
+      service: "worker",
+      queue: QUEUE_NAMES.sak,
+      event: "completed",
+      jobId: job.id,
+      sakId: job.data.sakId,
+      version: job.data.targetVersion
+    })
+  );
+});
+
+sakWorker.on("failed", (job, error) => {
+  console.error(
+    JSON.stringify({
+      service: "worker",
+      queue: QUEUE_NAMES.sak,
+      event: "failed",
+      jobId: job?.id ?? null,
+      sakId: job?.data?.sakId ?? null,
+      error: error.message
+    })
+  );
+});
 
 ingestWorker.on("completed", (job) => {
   console.log(
@@ -5298,10 +5387,15 @@ async function shutdown(): Promise<void> {
     clearInterval(staleRecoveryTimer);
     staleRecoveryTimer = null;
   }
+  if (sakExpiryTimer) {
+    clearInterval(sakExpiryTimer);
+    sakExpiryTimer = null;
+  }
   await Promise.all([
     ingestWorker.close(),
     rewriteWorker.close(),
     publishWorker.close(),
+    sakWorker.close(),
     ingestQueue.close(),
     rewriteQueue.close(),
     publishQueue.close()

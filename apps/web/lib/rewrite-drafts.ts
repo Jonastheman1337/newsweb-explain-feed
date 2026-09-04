@@ -8,7 +8,7 @@ export type RewriteDraft = {
 };
 
 export type RewriteDraftChangeDetail = {
-  messageId: number;
+  messageId: number | string;
   version: number;
   rewriteId?: string;
   hasDraft: boolean;
@@ -27,7 +27,7 @@ function getDraftStorage(): Storage | null {
 }
 
 export function getRewriteDraftKey(
-  messageId: number,
+  messageId: number | string,
   version?: number | null,
   rewriteId?: string | null
 ): string | null {
@@ -80,7 +80,7 @@ function parseDraft(value: string | null): RewriteDraft | null {
 }
 
 function emitDraftChange(
-  messageId: number,
+  messageId: number | string,
   version: number,
   rewriteId: string | undefined,
   hasDraft: boolean
@@ -94,7 +94,7 @@ function emitDraftChange(
 }
 
 export function getRewriteDraft(args: {
-  messageId: number;
+  messageId: number | string;
   version?: number | null;
   rewriteId?: string | null;
   originalTitle?: string;
@@ -154,7 +154,7 @@ export function getRewriteDraft(args: {
 }
 
 export function hasRewriteDraft(args: {
-  messageId: number;
+  messageId: number | string;
   version?: number | null;
   rewriteId?: string | null;
   originalTitle?: string;
@@ -164,7 +164,7 @@ export function hasRewriteDraft(args: {
 }
 
 export function saveRewriteDraft(args: {
-  messageId: number;
+  messageId: number | string;
   version?: number | null;
   rewriteId?: string | null;
   title: string;
@@ -221,7 +221,7 @@ export function saveRewriteDraft(args: {
 }
 
 export function deleteRewriteDraft(args: {
-  messageId: number;
+  messageId: number | string;
   version?: number | null;
   rewriteId?: string | null;
 }) {

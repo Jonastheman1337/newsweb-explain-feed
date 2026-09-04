@@ -7,16 +7,21 @@ export const MAX_MATERIAL_FILE_BYTES = 20 * 1024 * 1024;
 
 const NEWSWEB_MESSAGE_URL = "https://api3.oslo.oslobors.no/v1/newsreader/message";
 
-export function truncateMaterialText(text: string): string {
+export const MATERIAL_TRUNCATION_MARKER = "[... materialet er avkortet ...]";
+
+export function truncateMaterialText(
+  text: string,
+  maxChars: number = MAX_MATERIAL_TEXT_CHARS
+): string {
   const normalized = text
     .replace(/\r\n/g, "\n")
     .replace(/[ \t]+\n/g, "\n")
     .replace(/\n{4,}/g, "\n\n\n")
     .trim();
-  if (normalized.length <= MAX_MATERIAL_TEXT_CHARS) {
+  if (normalized.length <= maxChars) {
     return normalized;
   }
-  return `${normalized.slice(0, MAX_MATERIAL_TEXT_CHARS)}\n\n[... materialet er avkortet ...]`;
+  return `${normalized.slice(0, maxChars)}\n\n${MATERIAL_TRUNCATION_MARKER}`;
 }
 
 export function sanitizeMaterialTitle(title: string, fallback = "Materiale"): string {
@@ -35,10 +40,14 @@ export function pdfTitleFromFileName(fileName: string): string {
   return sanitizeMaterialTitle(withoutExt, "PDF-materiale");
 }
 
-export async function extractPdfMaterialText(buffer: Buffer): Promise<{
+export async function extractPdfMaterialText(
+  buffer: Buffer,
+  options: { maxChars?: number } = {}
+): Promise<{
   text: string;
   pageCount: number;
 }> {
+  const maxChars = options.maxChars ?? MAX_MATERIAL_TEXT_CHARS;
   const data = new Uint8Array(buffer);
   const doc: PDFDocumentProxy = await getDocument({
     data,
@@ -76,7 +85,7 @@ export async function extractPdfMaterialText(buffer: Buffer): Promise<{
   }
 
   return {
-    text: truncateMaterialText(pages.join("\n\n")),
+    text: truncateMaterialText(pages.join("\n\n"), maxChars),
     pageCount
   };
 }

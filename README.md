@@ -405,6 +405,34 @@ For a failed regeneration:
    exists.
 4. Check `rewrites` in the primary DB to verify all versions and statuses.
 
+## Sak (skjult)
+
+`/sak` is a hidden page behind the same login: a hand-drafted news article
+built from files, links and pasted text instead of a Newsweb notice. Nothing
+links to it; open the URL directly.
+
+- Drafts are scoped to the browser: the web app sends the per-browser id from
+  localStorage (`newsweb_editor_id`) as `x-sak-owner`. Another browser sees an
+  empty list.
+- A draft lives 24 h from creation (`SAK_TTL_HOURS`); the worker sweep then
+  deletes it and its materials. An expired draft redirects to `/sak?gone=1`.
+- Materials: PDF upload, URL (fetched server-side to text; paywalled or blocked
+  pages get a failure row and the text can be pasted instead), pasted text.
+  Each instruction produces a new version; the log lists the instruction and
+  the model's one-line change note.
+- Copy keeps inline links and subheads (`<h3>`); no AI disclosure is appended.
+
+Endpoints (all require the session bearer and `x-sak-owner`):
+
+- `POST /sak` · `GET /sak` · `GET /sak/:id` · `DELETE /sak/:id`
+- `POST /sak/:id/materials/pdf` (multipart `file`) ·
+  `POST /sak/:id/materials/url` · `POST /sak/:id/materials/text`
+- `PATCH /sak/:id/materials/:materialId` (`{enabled}`) ·
+  `DELETE /sak/:id/materials/:materialId`
+- `POST /sak/:id/generate` · `GET /sak/:id/status?jobId=&version=`
+
+The web app proxies these under `/api/sak/**` (`apps/web/lib/bff-proxy.ts`).
+
 ## API Endpoints
 
 - `POST /auth/request-magic-link`

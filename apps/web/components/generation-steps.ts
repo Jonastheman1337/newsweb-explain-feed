@@ -76,3 +76,33 @@ export function getGenerationPhaseLabel(
     ? GENERATION_PHASE_LABELS[phase]
     : GENERATION_PHASE_LABELS.queued;
 }
+
+// /sak drafts reuse the notice phase names but the work behind them differs,
+// so the labels are sak-specific. Shown as the generate button label.
+const SAK_GENERATION_STEP_LABELS: Record<
+  (typeof BASE_GENERATION_STEP_PHASES)[number],
+  string
+> = {
+  reading_notice: "Leser materiale",
+  analyzing_content: "Analyserer kilder",
+  writing_notice: "Skriver utkast",
+  checking_references: "Sjekker tall og sitater",
+  finalizing: "Ferdigstiller"
+};
+
+export function getSakGenerationSteps(): readonly string[] {
+  return BASE_GENERATION_STEP_PHASES.map((phase) => SAK_GENERATION_STEP_LABELS[phase]);
+}
+
+export function getSakGenerationStepIndex(
+  phase: GenerationPhase | string | null | undefined
+): number {
+  const parsedPhase = isGenerationPhase(phase) ? phase : null;
+  const stepPhase = normalizeStepPhase(parsedPhase);
+  if (!stepPhase) {
+    return -1;
+  }
+
+  const index = (BASE_GENERATION_STEP_PHASES as readonly GenerationPhase[]).indexOf(stepPhase);
+  return index >= 0 ? index : 0;
+}

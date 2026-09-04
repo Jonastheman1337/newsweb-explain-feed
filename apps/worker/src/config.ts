@@ -106,9 +106,9 @@ const triageSkipClassesEnvSchema = z
   })
   .optional();
 
-// Emergency kill-switch override for auto-attached related notices (the
-// earlier notice a Newsweb notice explicitly cites). The code default lives
-// in defaultEnabledRelatedNoticeRelations (services/related-notices.ts).
+// Emergency kill-switch override for auto-attached related notices (an
+// earlier reference/correction or a parallel same-day sibling). The code
+// default lives in defaultEnabledRelatedNoticeRelations (services/related-notices.ts).
 // Same semantics as TRIAGE_SKIP_CLASSES: UNSET = code default; SET — even
 // the empty string — is the exact enabled relation set ("" = feature off,
 // "reference,sibling" = both resolvers on).
@@ -198,7 +198,12 @@ const configSchema = z
     OPENAI_TRIAGE_REASONING_EFFORT: reasoningEffortEnvSchema.default("none"),
     OPENAI_REFERENCE_REASONING_EFFORT: reasoningEffortEnvSchema.default("medium"),
     OPENAI_REVIEW_REASONING_EFFORT: reasoningEffortEnvSchema.default("medium"),
+    // /sak first drafts read whole reports and write 2–5k chars; revisions and
+    // the repair pass run one notch lower (medium) unless the user asks for xhigh.
+    OPENAI_SAK_REASONING_EFFORT: reasoningEffortEnvSchema.default("high"),
+    OPENAI_SAK_TIMEOUT_MS: z.coerce.number().int().min(1000).default(360000),
     OPENAI_PROMPT_CACHE_MODE: promptCacheModeEnvSchema.default("implicit"),
+    OPENAI_PROMPT_CACHE_MODE_SAK: promptCacheModeEnvSchema.optional(),
     OPENAI_PROMPT_CACHE_MODE_TRIAGE: promptCacheModeEnvSchema.optional(),
     OPENAI_PROMPT_CACHE_MODE_EDITORIAL_REVIEW: promptCacheModeEnvSchema.optional(),
     OPENAI_PROMPT_CACHE_MODE_REWRITE_REGULAR: promptCacheModeEnvSchema.optional(),
@@ -223,7 +228,8 @@ export function parseWorkerConfig(env: NodeJS.ProcessEnv): WorkerConfig {
     parsed.OPENAI_DEFAULT_REASONING_EFFORT,
     parsed.OPENAI_REPORT_REASONING_EFFORT,
     parsed.OPENAI_REFERENCE_REASONING_EFFORT,
-    parsed.OPENAI_REVIEW_REASONING_EFFORT
+    parsed.OPENAI_REVIEW_REASONING_EFFORT,
+    parsed.OPENAI_SAK_REASONING_EFFORT
   ]) {
     validateOpenAIModelReasoningEffort(parsed.OPENAI_MODEL, effort);
   }

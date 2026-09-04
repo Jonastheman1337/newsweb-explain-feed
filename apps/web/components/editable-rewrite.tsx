@@ -17,6 +17,7 @@ import { createNoticeClipboardPlainText } from "../lib/ai-disclosure";
 import { useEditorialTelemetry } from "../lib/editorial-telemetry";
 import {
   createNoticeClipboardHtml,
+  createSakClipboard,
   normalizeLinkHref,
   plainTextToRichHtml,
   richHtmlToPlainText,
@@ -32,9 +33,15 @@ import {
 import { useTitleSuggestions } from "./title-suggestions";
 
 type EditableRewriteProps = {
-  messageId: number;
+  messageId: number | string;
   originalTitle: string;
   originalBody: string;
+  // Pre-sanitised HTML for the original body (sak articles carry <h3> and
+  // <a href> that plain text cannot express). Defaults to plainTextToRichHtml.
+  originalBodyHtml?: string;
+  // "sak": no title suggestions, no edit-log POST, sak clipboard (no AI
+  // disclosure). Defaults to the notice behaviour.
+  variant?: "notice" | "sak";
   activeVersion?: number;
   rewriteId?: string;
   publicationRevision?: number;
@@ -52,7 +59,7 @@ type EditableRewriteProps = {
 };
 
 type DraftState = {
-  messageId: number;
+  messageId: number | string;
   version?: number | null;
   title: string;
   body: string;
@@ -261,6 +268,8 @@ export function EditableRewrite({
   messageId,
   originalTitle,
   originalBody,
+  originalBodyHtml: originalBodyHtmlProp,
+  variant = "notice",
   activeVersion,
   rewriteId,
   publicationRevision,
@@ -275,11 +284,13 @@ export function EditableRewrite({
 }: EditableRewriteProps) {
   const originalBodyHtml = useMemo(
     () =>
-      sourceLinks
+      originalBodyHtmlProp ??
+      (sourceLinks
         ? linkSourceAttributions(plainTextToRichHtml(originalBody), sourceLinks)
-        : plainTextToRichHtml(originalBody),
-    [originalBody, sourceLinks]
+        : plainTextToRichHtml(originalBody)),
+    [originalBody, originalBodyHtmlProp, sourceLinks]
   );
+  const isSak = variant === "sak";
   const [editedTitle, setEditedTitle] = useState(originalTitle);
   const [editedBody, setEditedBody] = useState(originalBody);
   const [editedBodyHtml, setEditedBodyHtml] = useState(originalBodyHtml);
@@ -735,8 +746,10 @@ export function EditableRewrite({
     });
     const nextTitle = draft?.title ?? originalTitle;
     const nextBody = draft?.body ?? originalBody;
+    // No draft: show the original HTML (keeps links and subheads). A legacy
+    // draft without bodyHtml is rebuilt from its plain text.
     const nextBodyHtml = sanitizeRichHtml(
-      draft?.bodyHtml ?? plainTextToRichHtml(nextBody)
+      draft?.bodyHtml ?? (draft ? plainTextToRichHtml(nextBody) : originalBodyHtml)
     );
 
     setStoredDraftValue(draft);
@@ -811,16 +824,22 @@ export function EditableRewrite({
       viewMode
     });
 
-    const text = createNoticeClipboardPlainText(editedTitle, currentBody.body);
-    const html = createNoticeClipboardHtml(editedTitle, currentBody.bodyHtml);
+    const clipboard = isSak
+      ? createSakClipboard(editedTitle, currentBody.bodyHtml)
+      : {
+          text: createNoticeClipboardPlainText(editedTitle, currentBody.body),
+          html: createNoticeClipboardHtml(editedTitle, currentBody.bodyHtml)
+        };
     try {
-      await copyNoticeToClipboard(text, html);
+      await copyNoticeToClipboard(clipboard.text, clipboard.html);
     } catch {
       setCopyStateWithReset("failed");
       return;
     }
 
     setCopyStateWithReset("copied");
+
+    if (isSak) return;
 
     const hasEdits =
       editedTitle !== originalTitle ||
@@ -861,7 +880,7 @@ export function EditableRewrite({
       const nextTitle = draft?.title ?? originalTitle;
       const nextBody = draft?.body ?? originalBody;
       const nextBodyHtml = sanitizeRichHtml(
-        draft?.bodyHtml ?? plainTextToRichHtml(nextBody)
+        draft?.bodyHtml ?? (draft ? plainTextToRichHtml(nextBody) : originalBodyHtml)
       );
 
       setStoredDraftValue(draft);
@@ -926,6 +945,8 @@ export function EditableRewrite({
 
   const hasDraft = storedDraft != null;
   const showingOriginal = viewMode === "original";
+  const titleSuggestButton = isSak ? null : titleSuggestions.button;
+  const titleSuggestDropdown = isSak ? null : titleSuggestions.dropdown;
   const titleEditor = (
     <h2
       ref={titleRef}
@@ -946,16 +967,16 @@ export function EditableRewrite({
       {panelTitle && (
         <div className="panelTitleRow">
           <p className="noticePanelTitle">{panelTitle}</p>
-          {titleSuggestions.button}
+          {titleSuggestButton}
         </div>
       )}
-      {panelTitle ? titleEditor : (
+      {panelTitle || isSak ? titleEditor : (
         <div className="editableTitleRow">
           {titleEditor}
-          <span className="titleSuggestWrap">{titleSuggestions.button}</span>
+          <span className="titleSuggestWrap">{titleSuggestButton}</span>
         </div>
       )}
-      {titleSuggestions.dropdown}
+      {titleSuggestDropdown}
       {dateline}
       <div
         ref={bodyRef}
@@ -964,7 +985,7 @@ export function EditableRewrite({
         suppressContentEditableWarning
         role="textbox"
         aria-multiline="true"
-        aria-label="Rediger notistekst"
+        aria-label={isSak ? "Rediger sakstekst" : "Rediger notistekst"}
         tabIndex={0}
         spellCheck
         onInput={handleBodyInput}

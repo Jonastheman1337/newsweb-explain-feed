@@ -225,6 +225,14 @@ function cleanNode(node: Node, doc: Document): Node | null {
     return fragment.childNodes.length ? fragment : null;
   }
 
+  // Subheadings (sak articles). Every heading level collapses to <h3>; the
+  // notice flow never produces headings, so it is unaffected.
+  if (tag === "h2" || tag === "h3" || tag === "h4") {
+    const heading = doc.createElement("h3");
+    appendCleanChildren(element, heading, doc);
+    return nodeHasContent(heading) ? heading : null;
+  }
+
   const fragment = doc.createDocumentFragment();
   appendCleanChildren(element, fragment, doc);
   return fragment.childNodes.length ? fragment : null;
@@ -246,7 +254,7 @@ function nodeHasContent(node: Node): boolean {
 function isBlockElement(node: Node): boolean {
   if (node.nodeType !== Node.ELEMENT_NODE) return false;
   const tag = (node as Element).tagName.toLowerCase();
-  return tag === "p" || tag === "ul" || tag === "ol";
+  return tag === "p" || tag === "ul" || tag === "ol" || tag === "h3";
 }
 
 function normalizeRoot(container: HTMLElement, doc: Document): string {
@@ -291,7 +299,12 @@ export function sanitizeRichHtml(html: string): string {
   return normalizeRoot(cleaned, document);
 }
 
-function inlineText(node: Node): string {
+export type RichHtmlToPlainTextOptions = {
+  // Render <a href> as "text (href)" so links survive a plain-text paste.
+  linkUrls?: boolean;
+};
+
+function inlineText(node: Node, options: RichHtmlToPlainTextOptions): string {
   if (node.nodeType === Node.TEXT_NODE) {
     return node.textContent ?? "";
   }
@@ -301,16 +314,32 @@ function inlineText(node: Node): string {
   }
 
   const element = node as Element;
-  if (element.tagName.toLowerCase() === "br") {
+  const tag = element.tagName.toLowerCase();
+  if (tag === "br") {
     return "\n";
   }
 
-  return Array.from(element.childNodes).map(inlineText).join("");
+  const text = Array.from(element.childNodes)
+    .map((child) => inlineText(child, options))
+    .join("");
+
+  if (tag === "a" && options.linkUrls) {
+    const href = element.getAttribute("href");
+    if (href && text.trim()) {
+      return `${text} (${href})`;
+    }
+  }
+
+  return text;
 }
 
-function blockText(node: Node, orderedIndex?: number): string {
+function blockText(
+  node: Node,
+  options: RichHtmlToPlainTextOptions,
+  orderedIndex?: number
+): string {
   if (node.nodeType !== Node.ELEMENT_NODE) {
-    return inlineText(node).trim();
+    return inlineText(node, options).trim();
   }
 
   const element = node as Element;
@@ -320,7 +349,7 @@ function blockText(node: Node, orderedIndex?: number): string {
     return Array.from(element.children)
       .filter((child) => child.tagName.toLowerCase() === "li")
       .map((child, index) =>
-        blockText(child, tag === "ol" ? index + 1 : undefined)
+        blockText(child, options, tag === "ol" ? index + 1 : undefined)
       )
       .filter(Boolean)
       .join("\n");
@@ -328,13 +357,16 @@ function blockText(node: Node, orderedIndex?: number): string {
 
   if (tag === "li") {
     const prefix = orderedIndex == null ? "- " : `${orderedIndex}. `;
-    return `${prefix}${inlineText(element).trim()}`;
+    return `${prefix}${inlineText(element, options).trim()}`;
   }
 
-  return inlineText(element).trim();
+  return inlineText(element, options).trim();
 }
 
-export function richHtmlToPlainText(html: string): string {
+export function richHtmlToPlainText(
+  html: string,
+  options: RichHtmlToPlainTextOptions = {}
+): string {
   if (typeof document === "undefined") {
     return stripTags(html).trim();
   }
@@ -342,7 +374,7 @@ export function richHtmlToPlainText(html: string): string {
   const template = document.createElement("template");
   template.innerHTML = sanitizeRichHtml(html);
   return Array.from(template.content.childNodes)
-    .map((node) => blockText(node))
+    .map((node) => blockText(node, options))
     .filter(Boolean)
     .join("\n\n");
 }
@@ -357,4 +389,21 @@ export function createNoticeClipboardHtml(title: string, bodyHtml: string): stri
   return `<article><h2>${escapeHtml(title)}</h2>${sanitizeRichHtml(
     bodyHtml
   )}${createAiDisclosureHtml()}</article>`;
+}
+
+/**
+ * Clipboard payload for a /sak article: title + body with <h3> subheads and
+ * <a href> links kept, and a plain-text twin that writes links as
+ * "tekst (url)". No AI disclosure; the desk adds its own footer.
+ */
+export function createSakClipboard(
+  title: string,
+  bodyHtml: string
+): { html: string; text: string } {
+  const sanitized = sanitizeRichHtml(bodyHtml);
+  const body = richHtmlToPlainText(sanitized, { linkUrls: true });
+  return {
+    html: `<article><h2>${escapeHtml(title)}</h2>${sanitized}</article>`,
+    text: [title.trim(), body].filter(Boolean).join("\n\n")
+  };
 }

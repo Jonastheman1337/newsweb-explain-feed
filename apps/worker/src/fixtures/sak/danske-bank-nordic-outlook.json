@@ -1,0 +1,385 @@
+{
+  "id": "danske-bank-nordic-outlook",
+  "description": "E24 2026-09-03: Danske Banks Nordic Outlook Norge (PDF) plus Norges Bank, SSB and Nav pages as read URLs; five E24 archive links as paywalled (failed) materials. The owner's title and instruction from the chat session; the published article transcribed to blocks and markers.",
+  "sakId": "ckfixsakdanske",
+  "todayIso": "2026-09-03T12:00:00.000Z",
+  "titleOverride": "Danske Bank venter tre rentekutt i 2027",
+  "instruction": "Kort ingress, ingen tall først. Sitater fra Jullum tidlig og ofte. Ta med Nordea-sammenligningen. Dropp boligprisene.",
+  "targetChars": 5000,
+  "materials": [
+    {
+      "id": "ckfixdanske01",
+      "sourceId": "material_ckfixdanske01",
+      "kind": "pdf",
+      "title": "Nordic Outlook Norge september 2026",
+      "url": null,
+      "status": "ready",
+      "errorText": null,
+      "text": "Norge\r\n\r\nSvakere vekst\r\n· Rentene biter · Arbeidsledigheten stiger litt · Inflasjonsfall i sommer · Norges Bank nær eller på toppen · Kronekursen svinger med energiprisene\r\n3. september 2026 Viktige opplysninger og erklæringer finnes fra side 6 i analysen.\r\n\r\nBNP Vekst Inflasjon Ledighet Styrings-rente*\r\n\r\n2025 1,7% 3,0% 2,1% 4,00%\r\n\r\nPrognose 2026\r\n1,0% (1,0%)\r\n3,0% (3,1%)\r\n2,3% (2,3%)\r\n4,50% (4,50%)\r\n\r\nParantese er de tidligere prognosene (fra juni 2026) *Slutt på perioden Kilde: Danske Bank, Statistisk sentralbyrå, Arbeids- og velferdsforvaltningen (NAV), Norges Bank\r\n\r\n2027\r\n1,7% (1,5%)\r\n2,3% (2,1%)\r\n2,4% (2,4%)\r\n3,75% (3,50%)\r\n\r\nVeksten i norsk økonomi fortsetter å avta, delvis som følge av en strammere pengepolitikk og delvis på grunn av geopolitisk usikkerhet. Denne usikkerheten er fortsatt stor, og analysene denne rapporten er basert på at utviklingen i energiprisene vil falle i takt med terminprisene på olje og gass slik de lå ved publiseringen.\r\nFastlands-BNP steg 0,3 % i 2. kvartal, som var helt på linje med antagelsene fra vår forrige rapport. Detaljene var kanskje litt på nedsiden, ettersom både privat forbruk og bedriftsinvesteringer skuffet, mens offentlig etterspørsel og eksport fra Fastlands-Norge overrasket positivt. Det ser derfor ut til at rentesensitive sektorer blir rammet, mens «eksogene faktorer» holder økonomien flytende. Det eneste unntaket var boliginvesteringer, som var litt høyere enn forventet. Merk også at produktivitetsveksten avtok fra 0,5 % til 0,2 % å/å, noe som både er et kortsiktig problem fordi det betyr at veksten i enhetskostnadene øker (inflasjonært), og et langsiktig problem fordi det indikerer at trendveksten er avtagende.\r\n\r\nDanske Bank / Nordic Outlook 1\r\n\r\n\fNorge\r\n\r\nMild stagflasjon\"\r\nFrank Jullum, Sjeføkonom Norge\r\nNår det gjelder ledende indikatorer er den månedlige medlemsundersøkelsen fra NHO blitt den viktigste bidragsyteren. Medlemmenes vurdering av markedssituasjonen har bedret seg over sommeren i takt med de-eskaleringen av konflikten i Midt-Østen, og vi har ikke fått nye tall etter den siste økningen i energiprisene. Nettotallet (god minus dårlig) har steget fra -5 i mai til 0 i august, det høyeste nivået siden januar men peker fortsatt mot moderat vekst. Markedsutsiktene de neste seks månedene har også steget noe men er fortsatt på -10 som indikerer en ytterligere vekstavmatning.\r\nVi er fortsatt usikre på hvordan endringen i renteutsiktene vil påvirke de rentefølsomme delene av økonomien, som nevnt over utviklet de seg svakt i 2. kvartal. Lavere reallønnsvekst og høyere renter vil dempe veksten i privat forbruk og høyere renter ser ut til å dempe salget av nye boliger slik at boliginvesteringene mest sannsynlig vil holde seg lave. I tillegg har bedrifsinvesteringene utviklet seg svakere enn ventet hittil i år, som kan skyldes effekten av at renten (avkastningskravet) har økt men det kan selvsagt skyldes mer usikre utsikter og usikkerhet rundt rammebetingelsene i flere næringer. Fortsatt sterk aktivitet i deler av anleggsbransjen, blant annet som følge av infrastrukturprosjekter i offentlig regi samt høyere investeringer i energisektoren og datalagring nyanserer bildet noe.\r\nSiden forrige rapport har det tilsynelatende vært et oppsving i global økonomi som kan forklare at veksten i fastlands-eksporten tok seg opp i 2. kvartal. Høyere energipriser og høyere renter betyr at de finansielle forholdene er i ferd med å strammes til, så vi er usikre på hvor motstandsdyktig dette oppsvinget er. På den annen side er det ingen tegn til avmatning i investeringssykelen innenfor KI som holder både vekst og inflasjon oppe.\r\n\r\nVeksten vil ta seg opp neste år\r\n\r\n% å/å 1,75\r\n\r\n1,50\r\n\r\n1,25\r\n\r\n1,00\r\n\r\n0,75\r\n\r\n0,50\r\n\r\n0,25\r\n\r\n0,00\r\n\r\n2023\r\n\r\n2024\r\n\r\nFastlands-BNP, inkl. DBs anslag\r\n\r\n2025\r\n\r\nKilder: Macrobond og Danske Bank\r\n\r\n2026\r\n\r\nOffentlig etterspørsel driver veksten\r\n\r\n% å/å 3,0\r\n\r\n2,5\r\n\r\n2,0\r\n\r\n1,5\r\n\r\n1,0\r\n\r\n0,5\r\n\r\n0,0\r\n\r\n-0,5\r\n\r\n-1,0\r\n\r\n-1,5\r\n\r\n-2,0 2023\r\n\r\n2024\r\n\r\n2025\r\n\r\nFastlands-BNP Fastlands-BNP excl. offentlig etterspørsel\r\n\r\nKilder: Macrobond og Danske Bank\r\n\r\n% å/å 1,75\r\n\r\n1,50\r\n\r\n1,25\r\n\r\n1,00\r\n\r\n0,75\r\n\r\n0,50\r\n\r\n0,25\r\n\r\n2027\r\n\r\n0,00\r\n\r\n% å/å 3,0 2,5 2,0 1,5 1,0 0,5 0,0 -0,5 -1,0 -1,5 -2,0\r\n2026\r\n\r\nVi har ikke gjort noen endringer i anslagene for oljeinvesteringene i 2026 og 2027 siden forrige rapport, delvis fordi de store svingningene i energiprisene illustrerer hvor usikre utsiktene er, og delvis fordi breakeven-prisene for oljeselskapene uansett er mye lavere enn fremtidsprisene på olje og gass .Det var da også små endringer i investeringstellingen for 2. kvartal. Vi ser derimot at den globale energi- og sikkerhetssituasjonen er i ferd med å endre holdningene til utsiktene på lang sikt (frem mot 2040).\r\nVi har ikke gjort noen endringer i anslaget vårt for veksten i år på 1 %, men har oppjustert anslaget for neste år fra 1,5 % til 1,7 %. Når det er sagt har risikoen for flere renteøkninger avtatt i takt med at inflasjonen har avtatt over sommeren. Skulle det vise seg at dette innebærer at inflasjonstrenden har avtatt, og ikke bare er tilfeldige månedsutslag, kan det bety at renteutviklingen blir mer gunstig enn vi nå legger til grunn. I så fall vil den økonomiske veksten kunne ta seg opp mer enn vi venter fra slutten av året og inn i 2027.\r\n\r\nFærre ledige jobber\r\nantall 55000\r\n\r\nantall 55000\r\n\r\n50000\r\n\r\n50000\r\n\r\n45000\r\n\r\n45000\r\n\r\n40000\r\n\r\n40000\r\n\r\n35000\r\n\r\n35000\r\n\r\n30000\r\n\r\n30000\r\n\r\n25000\r\n\r\n25000\r\n\r\n2018 2019 2020 2021 2022 2023 2024 2025 2026\r\n\r\nNye. ledige stillinger\r\n\r\nKilder: Macrobond og Danske Bank\r\n\r\nArbeidsmarkedet marginalt svakere Arbeidsmarkedet ser noe svakere ut over sommeren. Ledighetsraten fra NAV spratt opp til 2,1 % igjen i juli, mens AKU-ledigheten har vært stabilt på et høyt nivå. Antall bruttoledige personer har økt hver måned hittil i år, og økningen ser ut til å tilta. Sysselsettingsveksten tok seg noe opp i 2. kvartal, men dette skyldtes at produktivitetsveksten avtok og varsler neppe et omslag i positiv\r\n\r\nretning om vi får rett i våre vekstanslag. At ledigheten ikke øker mer skyldes at også veksten i arbeidstilbudet har avtatt. Antall nye, ledige stillinger registrert av NAV har også falt de siste tre månedene etter å ha steget før sommeren. I tillegg viste regionalt nettverk at stadig færre bedrifter har problemer med å skaffe nødvendig arbeidskraft, og andelen falt fra 21 % til 18 % i 2. kvar-\r\n\r\nDanske Bank / Nordic Outlook 2\r\n\r\n\fNorge\r\n\r\ntal, den laveste siden pandemien. Det var særlig servicesektoren som bidro til dette. Forventningsundersøkelsen fra Norges Bank for 3. kvartal viste at bedriftslederne nå venter lavere sysselsettingsvekst fremover.\r\nVi har beholdt våre anslag for den registrerte ledigheten på 2,3 % i 2026 og 2,4 % i 2027. Tegn til noe svakere arbeidsmarked over sommeren har økt risikoen for at ledigheten øker mer enn vi venter, men på den annen side er oppsiderisikoen for rentene blitt noe lavere, noe som også vil redusere nedsiderisikoen for økonomien.\r\nOverraskende inflasjonsfall Inflasjonen falt overraskende mye i juni og juli og kjerneinflasjonen kom inn på 2,7 % som er det laveste siden oktober 2024. Det var særlig prisene på matvarer og elektronikk som trakk prisveksten ned i juni og juli, men også flere varer og tjenester som møbler, hotell/restaurant og forsikring bidro på nedsiden. Fallet i matvareinflasjonen er noe vi har etterlyst lenge, gitt at globale råvarepriser har falt, kronekursen har styrket seg og landbruksoppgjøret ble mindre gunstig enn i fjor. Vi tror derfor at det er noe mer å gå på også fremover for disse prisene, selv om de kan svinge noe på månedsbasis. Prisene på elektroniske varer inkludert IKT-utstyr er vanskeligere å spå. For det første svinger de svært mye fra måned til måned dessuten er det en stigende pristrend som følge av sterk global etterspørsel etter minnebrikker etc. Igjen har husleiene økt mindre enn ventet gitt den sterke veksten i markedsbaserte husleier mot slutten av fjoråret og inn i 1. kvartal. Det er vanligvis noe forsinkelser i gjennomslaget til KPI, så vi ser litt oppsiderisiko for husleiene utover året. Det mest slående med inflasjonstallene er nok at det ikke er noen tegn til andrerundeeffekter fra høyere energipriser.\r\nForventningsundersøkelsen fra Norges Bank viste at respondentenes (økonomer og arbeidslivsorganisasjoner) forventninger til inflasjonen om 12 måneder falt fra 3,3 % til 3,0 %, og fra 2,9 % til 2,7 % på 2 år sikt. På den annen side økte prisforventningene blant CEOs, og i følge Norges Bank er det denne gruppens forventninger som har hatt sterkest effekt på den faktiske inflasjonen. På den annen side har alle grupper av respondenter nå lavere lønnsanslag både for 2026 og 2027 enn Norges Bank la til grunn i pengepolitisk rapport i juni. Samlet tyder dermed forventningsundersøkelsen på at lønns- og prisforventningene er litt på vei ned.\r\nVi har justert anslaget for kjerneinflasjon i år ned fra 3,2 % til 3,0 %, mens for neste år venter vi at fortsatt at kjerneinflasjonen vil ende på 2,4 %.\r\nLønnsforhandlingene endte som ventet med sentrale tillegg som antas å gi en lønnsramme i år på 4,4 % når man legger til overheng inn i 2026 og forventet lønnsglidning ut året. Det vi har sett de siste årene er en tendens til at den endelige lønnsveksten har blitt en del høyere enn hva de sentrale tilleggene har indikert, noe som i første rekke skyldes at lønnsglidningen har vært høyere enn lagt til grunn. Et fortsatt stramt arbeidsmarked trekker i retning av høyere glidning også i år, mens noe lavere lønnsomhet i næringslivet trekker i motsatt retning. Særlig ser vi at lønnsandelen i industrien, som legger rammen for de sentrale tilleggene, nå er nærmere det historiske gjennomsnittet som kan bety at perioden med ekstraordinær høy lønnsvekst er bak oss. I tillegg har den samlede produktivitetsveksten avtatt videre, noe som også begrenser muligheten for høy lønnsvekst fremover.\r\n\r\nOverraskende inflasjonsfall\r\n\r\n% å/å 7,0 6,5 6,0 5,5 5,0 4,5 4,0 3,5 3,0 2,5\r\n2023 Kjerneinflasjon\r\n\r\n2024\r\n\r\nKilder: Macrobond og Danske Bank\r\n\r\n2025\r\n\r\n% å/å 7,0 6,5 6,0 5,5 5,0 4,5 4,0 3,5 3,0 2,5\r\n2026\r\n\r\nLønnsveksten avtar\r\n\r\n% å/å 6,5\r\n\r\n% å/å 6,5\r\n\r\n6,0\r\n\r\n6,0\r\n\r\n5,5\r\n\r\n5,5\r\n\r\n5,0\r\n\r\n5,0\r\n\r\n4,5\r\n\r\n4,5\r\n\r\n4,0\r\n\r\n4,0\r\n\r\n3,5\r\n\r\n3,5\r\n\r\n3,0\r\n\r\n3,0\r\n\r\n2,5\r\n\r\n2,5\r\n\r\n2,0\r\n\r\n2,0\r\n\r\n1,5\r\n\r\n1,5\r\n\r\n2017 2018 2019 2020 2021 2022 2023 2024 2025 2026\r\n\r\nLønnsvekst, totalt\r\n\r\nKilder: Macrobond og Danske Bank\r\n\r\nKronekursen drives av energiprisene\r\nEURNOK 11,9 11,8 11,7 11,6 11,5 11,4 11,3 11,2 11,1 11,0 10,9 10,8 10,7\r\njan feb mar apr mai jun 2026\r\nEURNOK, vs. Oljepris, hs.\r\nKilder: Macrobond og Danske Bank\r\n\r\nUSD/fat (rev.) 60\r\n\r\n70\r\n\r\n80\r\n\r\n90\r\n\r\n100\r\n\r\n110\r\n\r\n120\r\n\r\njul\r\n\r\naug\r\n\r\nDanske Bank / Nordic Outlook 3\r\n\r\n\fNorge\r\n\r\n'Norges Bank fast bestemt på å bekjempe inflasjonen''\r\nFrank Jullum, Sjeføkonom Norge\r\nDe faktiske lønnstallene for 2. kvartal viste da også at den løpende lønnsveksten avtok til 3,9 % å/å, dvs. en god del lavere enn rammen fra lønnsoppgjøret indikerte. Dette kan skyldes at lønnsglidningen er lavere enn antatt og/eller at lønnsveksten utenfor tariffområdene er lavere enn innenfor. Men det kan også skyldes periodiseringseffekter, dvs. at en større del av lønnstilleggene enn vanlig blir utbetalt i 3. kvartal istedenfor i 2. kvartal. Vi har derfor beholdt lønnsanslaget for i år på 4,4 %, men ser nå risikoen klart på nedsiden. For neste år venter vi nå fortsatt 3,7 % lønnsvekst, drevet av høyere ledighet, lavere prisvekst og lavere vekst i produktiviteten.\r\n\r\nMarkedsforventninger godt over Norges Bank\r\n\r\n% 5,0\r\n\r\n% 5,0\r\n\r\n4,5\r\n\r\n4,5\r\n\r\n4,0\r\n\r\n4,0\r\n\r\n3,5\r\n\r\n3,5\r\n\r\n3,0\r\n\r\n3,0\r\n\r\n2,5\r\n\r\n2,5\r\n\r\n2,0\r\n\r\n2,0\r\n\r\n1,5\r\n\r\n1,5\r\n\r\n1,0\r\n\r\n1,0\r\n\r\n0,5\r\n\r\n0,5\r\n\r\n0,0\r\n\r\n0,0\r\n\r\n2021 2022 2023 2024 2025 2026 2027 2028 2029\r\n\r\nNorges Banks rentebane, PPR 2/26 Markedsprising\r\n\r\nKilder: Macrobond og Danske Bank\r\n\r\nKronekursen drives av energiprisene Den importvektede kronekursen har svingt mye siden forrige rapport, men er nå nesten tilbake til nivået fra før sommeren. Den viktigste årsaken til svingningene i kronekursen er selvsagt volatile olje- og gasspriser, mens lavere renteforskjeller mot handelsparterne trekker i retning av en svakere krone, mens en svakere amerikansk dollar trekker i motsatt retning.\r\nDenne rapporten legger som nevnt til grunn at olje- og gassprisene vil avta omtrent i takt med fremtidsprisene i prognoseperioden. Det er naturlig å anta at dette vil bidra til en generell svekkelse av kronekursen utover året og inn i neste år. I tillegg tror vi at renteøkningene vil gi svakere vekst og høyere arbeidsledighet. Høyere rente for å dempe inflasjonen når økonomen svekkes vil neppe gi varig støtte til kronekursen, sannsynligvis vil det etter hvert bidra til svekkelsen. I tillegg har norsk økonomi en utfordring med at lønnsveksten er betydelig høyere enn produktivitetsveksten, noe som gjør det dyrere å produsere i Norge og legger et nedadgående press på kronen, Med mindre eksportprisene, inkludert energiprisene, holder seg oppe vil dette svekke kronen.\r\n\r\nDermed ligger det an til at inflasjonstallene for august vil bli avgjørende for om Norges Bank leverer en renteøkning på møtet i september. Vi tror kjerneinflasjonen stiger til 3,1 % i august, med risikoen tiltet til oppsiden. Det vil i så fall være marginalt lavere enn Norges Banks anslag på 3,3 %, og vi tror derfor de øker renten til 4,5 % i september og indikerer at rentetoppen nå er nådd. Vi tror samtidig at gradvis lavere energipriser og lavere kapasitetsutvikling i norsk økonomi vil bidra til å dempe inflasjonen slik at NB kan kutte renten tre ganger neste år og to ganger i 2028 slik at renten endre på 3,25 % ved utgangen av 2028.\r\nVi understreker imidlertid at usikkerheten er stor, og at det er et close call om de hiker eller ikke. Skulle inflasjonen bli lavere enn vi venter, eller andre faktorer som f.eks. vekstutsiktene (Regionalt nettverk) er klart svakere enn ventet vil NB sannsynligvis holde renten uendret også i september. I så fall vil de nøye seg med to rentekutt neste år.\r\n\r\nDet er flere risikofaktorer for vårt syn om en svakere kronekurs. Energiprisene kan holde seg høye, økonomien kan tåle høyere renter bedre enn vi forventer og dollaren kan svekke seg. Det kan dessuten ha skjedd et strukturelt skift i de globale kapitalmarkedene, der energiinvestorer søker muligheter utenfor Midtøsten. I så fall kan vi få en økt kapitalstrøm inn i Norge, slik vi så i årene fra 2001-14, som vil bidra til å holde kronekursen på disse nivåene, eller til og med sterkere.\r\n\r\nNorges Bank i tvil Norges Bank holdt renten uendret på møtene både i mai og august, men signalene om den videre renteutviklingen ble betydelig mindre aggressiv. Mens rentekomiteen i juni slo fast at det trolig ville bli nødvendig å sette opp renten på et av de nærmeste møtene, og indikerte at man så for seg 1-2 renteøkninger til, var tonen i august endret til at det kan bli nødvendig å øke renten ytterligere. Denne endringen henger selvsagt sammen med at inflasjonen overrasket betydelig på nedsiden både i juni og juli. Men ettersom man fortsatt ikke er sikre på om dette er tilfeldige utsalg eller om det varsler en varig, lavere inflasjon valgte Norges Bank å beholde signalene om en mulig innstramming.\r\n\r\nDanske Bank / Nordic Outlook 4\r\n\r\n\fNorge\r\nPrognosetabel\r\n\r\nMakroøkonomisk prognose - Norge\r\n\r\nNasjonalregnskap Privat konsum Offentlig konsum Faste Bruttoinvesteringer\r\nUtvinning og rørtransport Fastlands-Norge Boliger Næringer Offentlig forvaltning Eksport Tradisjonelle varer Import Tradisjonelle varer BNP BNP Fastlands-Norge\r\n\r\n2025 Mill. NOK (Løpende priser)\r\n2340,6 1255,0 1284,4\r\n281,4 1000,2\r\n208,7 504,9 286,5 2511,8 721,9 1861,4 1082,4 5511,3 4397,7\r\n\r\nØkonomiske nøkkeltall Sysselsetting, å/å ledighet Årslønn, å/å Kjerneinflasjon, å/å Forbrukerpriser, å/å Boligpriser, å/å\r\n\r\nFinansiell nøkkeltall Styringsrente*\r\n*Slutt på perioden Kilde: Danske Bank, Statistisk sentralbyrå, Eiendom Norge, Arbeids- og velferdsforvaltningen (NAV), Norges Bank\r\n\r\n2025 å/å\r\n2,6% 2,4% 0,8% 7,2% -0,2% -3,6% 2,7% -2,5% 2,7% 6,1% 2,6% 3,3% 1,1%\r\n1,7\r\n0,7% 2,1% 4,7% 3,1% 3,0% 5,9%\r\n4,00%\r\n\r\nPrognose 2026 å/å 1,0% 2,3% 1,5% -2,0% 3,0% 1,2% 2,5% -1,5% 1,5% 3,0% 1,4% 2,3% 0,9% 1,0%\r\n0,6% 2,3% 4,4% 3,0% 3,0% 3,3%\r\n4,50%\r\n\r\n2027 å/å\r\n3,0% 1,8% 1,5% -3,0% 3,5% 5,5% 4,0% 4,6% 2,0% 3,7% 1,8% 2,0% 1,0% 1,7%\r\n0,6% 2,4% 3,7% 2,4% 2,3% 6,0%\r\n3,75%\r\n\r\nDanske Bank / Nordic Outlook 5\r\n\r\n\fNorge\r\n\r\nFrank Jullum Sjeføkonom Norge fju@danskebank.com\r\nRedaksjonell deadline: 2. september 2026 kl. 16:00 CET Økonomisk analyse\r\nDenne publikasjonen finnes på www.danskebank.com/danskeresearch\r\n\r\nDer ingen andre kilder er oppgitt, er kildene: Danske Bank, Macrobond, EU-kommisjonen, IMF og andre nasjonale statistikkinstitutter samt opphavsrettsmessige beregninger.\r\n\r\nDisclosures\r\n\r\nDenne analyse er utarbeidet av Danske Bank A/S («Danske Bank»). Forfatteren av analysen er Frank Jullum, Sjeføkonom.\r\nAnalytikernes erklæring Hver enkelt analytiker som er ansvarlig for innholdet i analysen, erklærer at synspunktene som uttrykkes i analysen, nøyaktig avspeiler analytikerens personlige vurdering av de finansielle instrumentene og utstederne som er omfattet av analysen. Hver enkelt ansvarlig analytiker erklærer dessuten at ingen del av analytikerens lønn har vært, er eller vil være direkte eller indirekte relatert til de spesifikke anbefalingene som uttrykkes i analysen.\r\n\r\nAnalytikernes lønn er til en viss grad avhengig av det samlede regnskapsresultatet for Danske Bank, som omfatter inntekter fra investment bank-aktiviteter, men analytikerne mottar ikke bonusbetalinger eller andre vederlag med tilknytning til spesifikke corporate finance- eller kredittransaksjoner.\r\nFinansielle modeller og/eller metoder anvendt i analysen Beregninger og presentasjoner i analysen er basert på standard økonometriske modeller og metoder så vel som på offentlig tilgjengelige data på alle verdipapirer, utstedere og/eller land. Dokumentasjonen kan fås ved henvendelse til analysens forfattere.\r\n\r\nRegulering Danske Bank er autorisert og under tilsyn av det danske Finanstilsynet. Danske Bank er autorisert av Prudential Regulation Authority i Storbritannia og under tilsyn av det britiske finanstilsyn, Financial Conduct Authority, og begrenset tilsyn av Prudential Regulation Authority. Underlagt lover, regelverk og tilsyn i andre jurisdiksjoner hvor banken yter tjenester. Enkeltheter vedrørende omfanget at dette tilsyn kan fås ved henvendelse til banken.\r\nDanske Banks analyser utarbeides i overensstemmelse med anbefalinger gitt av Kapitalmarked Danmark og Verdipapirforetakenes Forbund der det er relevant.\r\n\r\nRisikoadvarsel Vesentlige risikofaktorer i forbindelse med anbefalingene eller holdningene i analysen, inkludert en følsomhetsanalyse av relevante forutsetninger, er oppgitt i analysen.\r\nForventede oppdateringer Kvartalsvis.\r\nFørste publiseringsdato Se forsiden av analysen for dato for første publisering.\r\n\r\nInteressekonflikter Danske Bank har utarbeidet prosedyrer som skal forhindre interessekonflikter og sikre at analysene som utarbeides, er av høy standard og basert på objektivt og uavhengig analysearbeid. Disse prosedyrene fremgår av Danske Banks Research Policy. Alle ansatte i Danske Banks analyseavdelinger er kjent med at enhver henvendelse som kan kompromittere analysens objektivitet og uavhengighet, skal henvises til analyseledelsen og bankens Compliance-avdeling. Danske Banks analyseavdelinger er organisert uavhengig av og rapporterer ikke til Danske Banks øvrige forretningsområder.\r\n\r\nDanske Bank / Nordic Outlook 6\r\n\r\n\fNorge\r\n\r\nGenerell disclaimer\r\n\r\nAnalysen er utarbeidet av Danske Bank A/S. Den er kun ment for informasjonsformål og skal ikke anses som investeringsrådgivning, juridisk eller skatterådgivning. Analysen er ikke beregnet som og er ikke en del av og skal under ingen omstendigheter betraktes som et tilbud om eller en oppfordring til å kjøpe eller selge eventuelle relevante finansielle instrumenter (dvs. finansielle instrumenter som er nevnt i analysen eller andre finansielle instrumenter fra andre utstedere nevnt i analysen og/eller opsjoner, warrants, rettigheter eller andre interesser med hensyn til slike finansielle instrumenter) («Relevante finansielle instrumenter»).\r\nAnalysen er utarbeidet uavhengig og utelukkende på grunnlag av offentlig tilgjengelig informasjon som Danske Bank anser for å være pålitelig. Selv om Danske Bank har utvist stor aktsomhet for å sikre at innholdet ikke er usant eller villedende, gir Danske Bank ingen garantier med hensyn til innholdets nøyaktighet eller fullstendighet, og Danske Bank, dets partnere og datterselskaper påtar seg intet ansvar for verken direkte eller indirekte tap, inkludert uten noen begrensninger ethvert tap av fortjeneste som følge av tillit til analysen.\r\nHoldningene som er uttrykt i analysen, er holdningene til analytikerne som er ansvarlige for analysen, og avspeiler deres vurderinger på det aktuelle tidspunkt. Disse holdningene kan endre seg, og Danske Bank påtar seg ikke å varsle noen mottaker av analysen om eventuelle slike endringer eller andre endringer knyttet til informasjonen som er gitt i analysen.\r\nAnalysen er ikke ment for og kan heller ikke videreformidles til personkunder i Storbritannia (se separat ansvarsfraskrivelse nedenfor) og personkunder i det europeiske økonomiske samarbeidsområde som definert i direktiv 2014/65/EU.\r\nAnalysen er beskyttet av opphavsrett og er utelukkende ment for den angitte adressaten. Analysen kan ikke reproduseres eller distribueres, helt eller delvis, av noen mottaker for et hvilket som helst formål uten Danske Banks skriftlige samtykke.\r\nDisclaimer i forbindelse med distribusjon i USA I Storbritannia skal meddelelsen kun distribueres til (I) personer som har profesjonell erfaring med investeringer som faller inn under artikkel 19(5) i den britiske loven om finanstjenester og finansmarkeder (Financial Services and Markets Act 2000 (Financial Promotion) Order 2005) («forordningen»), (II) enheter med høy formue som faller inn under artikkel 49(2)(a) til (d) i forordningen eller (III) personer som er selvvalgt profesjonell kunde eller som i seg selv er profesjonell kunde i henhold til kapittel 3 i det britiske finanstilsynets regelbok (FCA Conduct of Business Sourcebook) (alle slike personer benevnes samlet som «relevante personer»). I Storbritannia er meddelelsen kun rettet mot relevante personer, og andre personer bør ikke handle på grunnlag av eller støtte seg til meddelelsen eller dens innhold.\r\n\r\nAnsvarsfraskrivelse for distribusjon i Storbritannia Meddelelsen distribueres til og er kun rettet mot personer i medlemsstatene i Det europeiske økonomiske samarbeidsområdet («EØS») som er «profesjonelle investorer» innenfor betydningen av artikkel 2(e) i forordning (EU) 2017/1129 (prospektforordningen) («profesjonelle investorer»). En person i EØS som mottar meddelelsen, anses å ha bekreftet og samtykket i at han/hun er en profesjonell investor. En slik mottaker anses også å ha bekreftet og samtykket i at han/hun ikke har mottatt meddelelsen på vegne av andre personer i EØS enn profesjonelle investorer eller personer i Storbritannia og medlemsstater (der tilsvarende lovgivning finnes) som investoren har fullmakt til å treffe beslutninger for fullt ut etter eget skjønn. Danske Bank A/S legger til grunn at ovennevnte bekreftelser og samtykker er sannferdige og korrekte. En person i EØS som ikke er en profesjonell investor bør ikke handle på grunnlag av eller støtte seg til denne meddelelsen eller dens innhold.\r\nAnsvarsfraskrivelse for distribusjon i EØS Meddelelsen er utarbeidet av Danske Bank A/S og distribueres i USA av Danske Markets Inc., et meglerhus registrert i USA og datterselskap av Danske Bank A/S, i henhold til U.S. Securities and Exchange Commissions regel 15a-6 («SEC Rule 15a-6») og tilhørende tolkninger utstedt av U.S. Securities and Exchange Commission (SEC). Meddelelsen er ment for distribusjon i USA bare til «amerikanske institusjonelle investorer» («U.S. institutional investors») som definert i SECs regel 15a-6. Danske Markets Inc. tar ansvar for denne investeringsanbefalingen i forbindelse med distribusjon i USA bare til «amerikanske institusjonelle investorer».\r\nEnhver amerikansk investor som mottar meddelelsen, og som ønsker å kjøpe eller selge aktuelle finansielle instrumenter, kan gjøre dette ved å kontakte Danske Markets Inc. direkte og gjøres oppmerksom på at det kan være visse risikofaktorer knyttet til investering i ikke-amerikanske finansielle instrumenter. Finansielle instrumenter fra ikke-amerikanske utstedere vil normalt ikke være registrert i U.S. Securities and Exchange Commission og ikke underlagt U.S. Securities and Exchange Commissions rapporterings- og revisjonskrav.\r\nMeddelelsen er ment som generell informasjon til våre kunder og er å anse som en oppfordring («solicitation») bare slik begrepet er brukt i Commodity Futures Trading Commissions regel 23.605 («CFTC Rule 23.605») kunngjort i henhold til U.S. Commodity Exchange Act. Med mindre noe annet uttrykkelig er angitt, tar meddelelsen ikke hensyn til investeringsformålene eller den økonomiske situasjonen til noen bestemt person.\r\n\r\nAnalyse ferdigstilt: 2. september 2026 kl. 16:00 CET Analysen offentliggjort første gang: 3. september 2026 kl. 06:00 CET\r\n\r\nDanske Bank / Nordic Outlook 7\r\n\r\n\fNorge\r\n\r\nGlobal Danske Research\r\n\r\nHead of Research Heidi Schauman heidi.schauman@danskebank.com\r\n\r\nMacro\r\nHead of Las Olsen Denmark laso@danskebank.com\r\nAsger Wilhelm Dalsjö Denmark asdal@danskebank.dk\r\nBjørn Tangaa Sillemann Denmark, Japan bjsi@danskebank.com\r\nRune Thyge Johansen Euro Area rujo@danskebank.com\r\nAllan von Mehren China macro and CNY alvo@danskebank.com\r\nFrida Måhl Sweden fmh@danskebank.com\r\nSusanne Spector Sweden coordinator Sweden macro sspec@danskebank.com\r\nFrank Jullum Norway fju@danskebank.com\r\nKaisa Kivipelto Finland kakiv@danskebank.com\r\nOlavi Kaskisaari Finland okas@danskebank.com\r\nMinna Kuusisto Finland coordinator Global macro, geopolitics mkuus@danskebank.com\r\nMagnus Poulsen US magpo@.danskebank.com\r\n\r\nFI and FX Research\r\nCo-Head of Kristoffer Kjær Lomholt (paternity leave) Rates and FX Strategy klom@danskebank.com\r\nCo-Head of Filip Andersson Fixed income strategy fian@danskebank.com\r\nMohamad Al-Saraf JPY and NOK G10 FX moals@danskebank.com\r\nJesper Fjärstedt SEK, PLN, HUF and CZK jesppe@danskebank.com\r\nJens Nærvig Pedersen DKK, commodities, USD liquidity, Institutional FX jenpe@danskebank.com\r\nKirstine Grønborg Kundby-Nielsen EUR fixed income, GBP, CHF and Corporate FX kigrn@danskebank.com\r\nJoel Rossier (paternity leave) Fixed income strategy joero@danskebank.com\r\nJens Peter Sørensen Nordic and EUR fixed income jenssr@danskebank.com\r\nAntti Ilvonen US and US Fixed Income ilvo@danskebank.com\r\n\r\nCredit Research\r\nHead of Jakob Magnussen Utilities jakja@danskebank.com\r\nBrian Børsting Industrials & Transportation brbr@danskebank.com\r\nChristian Svanfeldt Real Estate and Industrials chrsv@danskebank.com\r\nLina Berg Industrials linab@danskebank.com\r\nMads Rosendal TMT and Industrials madros@danskebank.com\r\nMark Thybo Naur Financials and Strategy mnau@danskebank.com\r\nMarko Radman Norwegian HY mradm@danskebank.com\r\nOlli Eloranta Industrials and Real Estate oelo@danskebank.com\r\nRasmus Justesen Credit Portfolios rjus@danskebank.com\r\nSebastian Grindheim High-Yield sgrin@danskebank.com\r\nSivert Meland Gejl Trana Credit Portfolios sivt@danskebank.com\r\nMarcus Gustavsson Real Estate marcg@danskebank.com\r\nMille Opdahl Müller Norway coordinator Industrials & Real Estate mifj@danskebank.com\r\n\r\nCross Asset Strategy\r\nHead of Bjarne Breinholt Thomsen bt@danskebank.com\r\nPiet Haines Christiansen Chief strategist phai@danskebank.com\r\nMolly Guggenheimer Strategist mogu@danskebank.com\r\nMathias Christiansen Analyst mathch@danskebank.com\r\nSustainability Research\r\nHead of Louis Landeman Sustainability/ESG llan@danskebank.com\r\nEbba Edholm Sustainability/ESG eedh@danskebank.com\r\n\r\nDanske Bank / Nordic Outlook 8",
+      "textChars": 27992
+    },
+    {
+      "id": "ckfixdanske02",
+      "sourceId": "material_ckfixdanske02",
+      "kind": "url",
+      "title": "Norges Bank: Styringsrenten",
+      "url": "https://www.norges-bank.no/tema/pengepolitikk/Styringsrenten/",
+      "status": "ready",
+      "errorText": null,
+      "text": "Styringsrenten er 4,25 prosent. Neste rentebeslutning offentliggjøres torsdag 24. september 2026 klokken 10. Rentebeslutninger i 2026: 6. mai (styringsrenten satt opp fra 4 til 4,25 prosent), 17. juni (uendret på 4,25 prosent), 12. august (uendret på 4,25 prosent).",
+      "textChars": 265
+    },
+    {
+      "id": "ckfixdanske03",
+      "sourceId": "material_ckfixdanske03",
+      "kind": "url",
+      "title": "Danske Bank Research",
+      "url": "https://research.danskebank.com/research",
+      "status": "ready",
+      "errorText": null,
+      "text": "Danske Bank Research publiserer makroøkonomiske analyser og prognoser, deriblant Nordic Outlook for Norge, Sverige, Danmark og Finland. Nordic Outlook Norge, september 2026, er skrevet av sjeføkonom Frank Jullum. Redaksjonell deadline var 2. september 2026 kl. 16:00.",
+      "textChars": 267
+    },
+    {
+      "id": "ckfixdanske04",
+      "sourceId": "material_ckfixdanske04",
+      "kind": "url",
+      "title": "Nordea Markets: Ingen rentekutt før 2028",
+      "url": "https://e24.no/norsk-oekonomi/i/16wBnJ/nordea-markets-ingen-rentekutt-foer-2028",
+      "status": "failed",
+      "errorText": "Klarte ikke å hente lesbar tekst fra lenken (betalingsmur eller blokkering). Lim inn teksten som tekstmateriale i stedet.",
+      "text": "",
+      "textChars": 0
+    },
+    {
+      "id": "ckfixdanske05",
+      "sourceId": "material_ckfixdanske05",
+      "kind": "url",
+      "title": "Norges Bank: Rentebeslutning 6. mai 2026",
+      "url": "https://www.norges-bank.no/tema/pengepolitikk/Rentemoter/2026/mai-2026/",
+      "status": "ready",
+      "errorText": null,
+      "text": "Pengepolitisk oppdatering 6. mai 2026. På møtet 6. mai besluttet komiteen å sette styringsrenten opp fra 4 til 4,25 prosent. Prisveksten er høyere enn målet, og komiteen mener det er behov for en noe strammere pengepolitikk for å få inflasjonen ned mot målet på 2 prosent.",
+      "textChars": 272
+    },
+    {
+      "id": "ckfixdanske06",
+      "sourceId": "material_ckfixdanske06",
+      "kind": "url",
+      "title": "Norges Bank: Rentebeslutning 17. juni 2026",
+      "url": "https://www.norges-bank.no/tema/pengepolitikk/Rentemoter/2026/juni-2026/",
+      "status": "ready",
+      "errorText": null,
+      "text": "Rentebeslutning 17. juni 2026. Styringsrenten holdes uendret på 4,25 prosent. Slik komiteen nå vurderer utsiktene og risikobildet, vil det trolig bli behov for å sette renten videre opp på et av de nærmeste rentemøtene. Prognosen i Pengepolitisk rapport 2/26 innebærer en styringsrente i overkant av 4,5 prosent ved utgangen av året. Komiteen venter at kjerneinflasjonen (KPI-JAE) blir 3,3 prosent i august.",
+      "textChars": 407
+    },
+    {
+      "id": "ckfixdanske07",
+      "sourceId": "material_ckfixdanske07",
+      "kind": "url",
+      "title": "Norges Bank åpner for to rentehevinger i 2026",
+      "url": "https://e24.no/norsk-oekonomi/i/L4jJqV/her-er-norges-banks-nye-rentebane",
+      "status": "failed",
+      "errorText": "Klarte ikke å hente lesbar tekst fra lenken (betalingsmur eller blokkering). Lim inn teksten som tekstmateriale i stedet.",
+      "text": "",
+      "textChars": 0
+    },
+    {
+      "id": "ckfixdanske08",
+      "sourceId": "material_ckfixdanske08",
+      "kind": "url",
+      "title": "Norges Bank: Rentebeslutning 12. august 2026",
+      "url": "https://www.norges-bank.no/tema/pengepolitikk/Rentemoter/2026/august-2026/",
+      "status": "ready",
+      "errorText": null,
+      "text": "Rentebeslutning 12. august 2026. Styringsrenten holdes uendret på 4,25 prosent. Prisveksten har falt og vært lavere enn ventet, men det er for tidlig å fastslå at inflasjonsutsiktene frem i tid er vesentlig endret siden juni. Det kan derfor fortsatt bli nødvendig å heve renten. Komiteen vil følge utviklingen i inflasjonen og i det regionale nettverket frem mot rentemøtet i september.",
+      "textChars": 386
+    },
+    {
+      "id": "ckfixdanske09",
+      "sourceId": "material_ckfixdanske09",
+      "kind": "url",
+      "title": "Norges Bank holder renten uendret",
+      "url": "https://e24.no/norsk-oekonomi/i/L4akkq/norges-bank-holder-renten-uendret",
+      "status": "failed",
+      "errorText": "Klarte ikke å hente lesbar tekst fra lenken (betalingsmur eller blokkering). Lim inn teksten som tekstmateriale i stedet.",
+      "text": "",
+      "textChars": 0
+    },
+    {
+      "id": "ckfixdanske10",
+      "sourceId": "material_ckfixdanske10",
+      "kind": "url",
+      "title": "SSB: Konsumprisindeksen juli 2026",
+      "url": "https://www.ssb.no/priser-og-prisindekser/konsumpriser/statistikk/konsumprisindeksen",
+      "status": "ready",
+      "errorText": null,
+      "text": "Konsumprisindeksen juli 2026. KPI steg 3,0 prosent siste tolv måneder. KPI-JAE (kjerneinflasjonen, justert for avgiftsendringer og uten energivarer) var 2,7 prosent, uendret fra juni. I mai var KPI-JAE 3,4 prosent. Det er den laveste tolvmånedersveksten i KPI-JAE siden oktober 2024. Matvarer og elektronikk trakk ned. Neste publisering: 10. september 2026 klokken 08:00.",
+      "textChars": 371
+    },
+    {
+      "id": "ckfixdanske11",
+      "sourceId": "material_ckfixdanske11",
+      "kind": "url",
+      "title": "Kjerneinflasjonen endte på 2,7 prosent i juni",
+      "url": "https://e24.no/norsk-oekonomi/i/y5xrK2/kjerneinflasjonen-endte-paa-2-7-prosent-i-juni",
+      "status": "failed",
+      "errorText": "Klarte ikke å hente lesbar tekst fra lenken (betalingsmur eller blokkering). Lim inn teksten som tekstmateriale i stedet.",
+      "text": "",
+      "textChars": 0
+    },
+    {
+      "id": "ckfixdanske12",
+      "sourceId": "material_ckfixdanske12",
+      "kind": "url",
+      "title": "Prisveksten steg til 3 prosent i juli",
+      "url": "https://e24.no/norsk-oekonomi/i/k0B6Lj/prisveksten-steg-til-3-prosent-i-juli",
+      "status": "failed",
+      "errorText": "Klarte ikke å hente lesbar tekst fra lenken (betalingsmur eller blokkering). Lim inn teksten som tekstmateriale i stedet.",
+      "text": "",
+      "textChars": 0
+    },
+    {
+      "id": "ckfixdanske13",
+      "sourceId": "material_ckfixdanske13",
+      "kind": "url",
+      "title": "SSB: Nasjonalregnskap 2. kvartal 2026",
+      "url": "https://www.ssb.no/nasjonalregnskap-og-konjunkturer/nasjonalregnskap/statistikk/nasjonalregnskap",
+      "status": "ready",
+      "errorText": null,
+      "text": "Nasjonalregnskap 2. kvartal 2026, publisert 27. august 2026. BNP Fastlands-Norge steg 0,3 prosent fra 1. til 2. kvartal, sesongjustert. Husholdningenes konsum falt 0,2 prosent. Offentlig etterspørsel økte 1,4 prosent. Eksporten fra Fastlands-Norge økte, mens bedriftsinvesteringene falt.",
+      "textChars": 287
+    },
+    {
+      "id": "ckfixdanske14",
+      "sourceId": "material_ckfixdanske14",
+      "kind": "url",
+      "title": "Nav: Stabil arbeidsledighet i august",
+      "url": "https://www.nav.no/no/nav-og-samfunn/statistikk/arbeidssokere-og-stillinger-statistikk/nyheter/stabil-arbeidsledighet-i-august",
+      "status": "ready",
+      "errorText": null,
+      "text": "Stabil arbeidsledighet i august. Publisert fredag 28. august 2026. Ved utgangen av august var 62.164 personer registrert som helt ledige hos Nav, justert for sesongvariasjoner. Det tilsvarer 2,1 prosent av arbeidsstyrken, det samme som i juli. Antallet nye ledige stillinger har falt de siste tre månedene.",
+      "textChars": 306
+    }
+  ],
+  "article": {
+    "sources": [
+      {
+        "materialId": "material_ckfixdanske01",
+        "usedFor": "Danske Bank, Nordic Outlook Norge, 3. september 2026 (Frank Jullum, sjeføkonom Norge). Redaksjonell deadline 2. september kl. 16:00. Publisert på research.danskebank.com."
+      },
+      {
+        "materialId": "material_ckfixdanske08",
+        "usedFor": "Norges Bank, rentebeslutning 12. august 2026: «Prisveksten har falt og vært lavere enn ventet, men det er for tidlig å fastslå at inflasjonsutsiktene frem i tid er vesentlig endret siden juni.» «Det kan derfor fortsatt bli nødvendig å heve renten.»"
+      },
+      {
+        "materialId": "material_ckfixdanske06",
+        "usedFor": "Norges Bank, rentebeslutning 17. juni 2026: «vil det trolig bli behov for å sette renten videre opp på et av de nærmeste rentemøtene»; rentebane «i overkant av 4,5 prosent ved utgangen av året»."
+      },
+      {
+        "materialId": "material_ckfixdanske05",
+        "usedFor": "Norges Bank, rentebeslutning 6. mai 2026: «besluttet komiteen å sette styringsrenten opp fra 4 til 4,25 prosent». Neste rentebeslutning 24. september 2026."
+      },
+      {
+        "materialId": "material_ckfixdanske10",
+        "usedFor": "SSB, konsumprisindeksen juli 2026: KPI 3,0 prosent, KPI-JAE 2,7 prosent. Neste publisering 10. september 2026."
+      },
+      {
+        "materialId": "material_ckfixdanske13",
+        "usedFor": "SSB, nasjonalregnskap 2. kvartal 2026 (27. august): BNP Fastlands-Norge +0,3 prosent, husholdningskonsum -0,2 prosent, offentlig etterspørsel +1,4 prosent."
+      },
+      {
+        "materialId": "material_ckfixdanske14",
+        "usedFor": "Nav, «Stabil arbeidsledighet i august», 28. august 2026: 62.164 helt ledige (sesongjustert), 2,1 prosent."
+      },
+      {
+        "materialId": "material_ckfixdanske04",
+        "usedFor": "E24 02.09.2026: Nordea Markets: Ingen rentekutt før 2028. Sitat Kjetil Olsen: «Norges Bank er ikke i mål og har økt fokuset på å få inflasjonen ned.»"
+      },
+      {
+        "materialId": "material_ckfixdanske09",
+        "usedFor": "E24 13.08.2026: Norges Bank holder renten uendret."
+      },
+      {
+        "materialId": "material_ckfixdanske12",
+        "usedFor": "E24 10.08.2026: Prisveksten steg til 3 prosent i juli."
+      },
+      {
+        "materialId": "material_ckfixdanske11",
+        "usedFor": "E24 15.07.2026: Kjerneinflasjonen endte på 2,7 prosent i juni."
+      },
+      {
+        "materialId": "material_ckfixdanske07",
+        "usedFor": "E24 18.06.2026: Norges Bank åpner for to rentehevinger i 2026."
+      },
+      {
+        "materialId": "material_ckfixdanske02",
+        "usedFor": "lenke for neste rentebeslutning 24. september og gjeldende styringsrente"
+      },
+      {
+        "materialId": "material_ckfixdanske03",
+        "usedFor": "lenke til Danske Banks analyseportal der rapporten ligger"
+      }
+    ],
+    "source_spans": [
+      "material_ckfixdanske08: «Prisveksten har falt og vært lavere enn ventet, men det er for tidlig å fastslå at inflasjonsutsiktene frem i tid er vesentlig endret siden juni.»",
+      "material_ckfixdanske08: «Det kan derfor fortsatt bli nødvendig å heve renten.»",
+      "material_ckfixdanske06: «vil det trolig bli behov for å sette renten videre opp på et av de nærmeste rentemøtene»",
+      "material_ckfixdanske06: «i overkant av 4,5 prosent ved utgangen av året»",
+      "material_ckfixdanske05: «besluttet komiteen å sette styringsrenten opp fra 4 til 4,25 prosent»",
+      "material_ckfixdanske14: «Stabil arbeidsledighet i august»",
+      "material_ckfixdanske04: «Norges Bank er ikke i mål og har økt fokuset på å få inflasjonen ned.»",
+      "material_ckfixdanske01: «Vi tror samtidig at gradvis lavere energipriser og lavere kapasitetsutvikling i norsk økonomi vil bidra til å dempe inflasjonen slik at NB kan kutte renten tre ganger neste år og to ganger i 2028 slik at renten endre på 3,25 % ved utgangen av 2028.»",
+      "material_ckfixdanske01: «Fast bestemt på å bekjempe inflasjonen»",
+      "material_ckfixdanske01: «Norges Bank fast bestemt på å bekjempe inflasjonen»",
+      "material_ckfixdanske01: «Høyere rente for å dempe inflasjonen når økonomen [sic] svekkes vil neppe gi varig støtte til kronekursen, sannsynligvis vil det etter hvert bidra til svekkelsen.»",
+      "material_ckfixdanske01: «Norges Banks anslag på 3,3 prosent»",
+      "material_ckfixdanske01: «Vi tror kjerneinflasjonen stiger til 3,1 % i august, med risikoen tiltet til oppsiden»",
+      "material_ckfixdanske01: «Fallet i matvareinflasjonen er noe vi har etterlyst lenge»",
+      "material_ckfixdanske01: «Det mest slående med inflasjonstallene er nok at det ikke er noen tegn til andrerundeeffekter fra høyere energipriser»"
+    ],
+    "excluded_hype": [],
+    "title": "Danske Bank venter tre rentekutt i 2027",
+    "lead": "Norges Bank hever renten én siste gang i september, tror Danske Bank. Deretter venter banken tre rentekutt i 2027, ned til 3,75 prosent.",
+    "blocks": [
+      {
+        "kind": "paragraph",
+        "text": "Sjeføkonom Frank Jullum i Danske Bank tror Norges Bank hever renten fra 4,25 til 4,5 prosent på [[rentemøtet 24. september|material_ckfixdanske02]], og samtidig varsler at toppen er nådd. Sentralbanken er «fast bestemt på å bekjempe inflasjonen», skriver han i den ferske rapporten [[Nordic Outlook|material_ckfixdanske03]]."
+      },
+      {
+        "kind": "quote",
+        "text": "– Vi tror samtidig at gradvis lavere energipriser og lavere kapasitetsutnyttelse i norsk økonomi vil bidra til å dempe inflasjonen, skriver Jullum."
+      },
+      {
+        "kind": "paragraph",
+        "text": "Dermed kan Norges Bank «kutte renten tre ganger neste år og to ganger i 2028». Da ender renten på 3,25 prosent ved utgangen av 2028."
+      },
+      {
+        "kind": "paragraph",
+        "text": "Det er en annen konklusjon enn Nordea Markets kom til onsdag. Nordea venter også én heving i høst, men mener «Norges Bank er ikke i mål» og tror ikke på kutt før i 2028, [[skrev E24|material_ckfixdanske04]]."
+      },
+      {
+        "kind": "subheading",
+        "text": "«Et close call»"
+      },
+      {
+        "kind": "paragraph",
+        "text": "Norges Bank [[hevet renten til 4,25 prosent i mai|material_ckfixdanske05]]. Siden har den ligget stille. [[I juni|material_ckfixdanske06]] varslet sentralbanken at det trolig ville «bli behov for å sette renten videre opp på et av de nærmeste rentemøtene». [[Rentebanen pekte mot i overkant av 4,5 prosent|material_ckfixdanske07]] ved nyttår."
+      },
+      {
+        "kind": "paragraph",
+        "text": "[[I august|material_ckfixdanske08]] var tonen mykere. Prisveksten hadde [[falt mer enn ventet|material_ckfixdanske09]] gjennom sommeren, men komiteen mente det var for tidlig å fastslå at inflasjonsutsiktene var vesentlig endret. Det «kan derfor fortsatt bli nødvendig å heve renten», het det."
+      },
+      {
+        "kind": "paragraph",
+        "text": "Jullum understreker at usikkerheten er stor. Det er «et close call» om Norges Bank hever eller ikke, skriver han."
+      },
+      {
+        "kind": "paragraph",
+        "text": "Avgjørende blir inflasjonstallene for august, som [[SSB legger frem 10. september|material_ckfixdanske10]]."
+      },
+      {
+        "kind": "quote",
+        "text": "– Vi tror kjerneinflasjonen stiger til 3,1 prosent i august, med risikoen tiltet til oppsiden. Det vil i så fall være marginalt lavere enn Norges Banks anslag på 3,3 prosent, skriver Jullum."
+      },
+      {
+        "kind": "paragraph",
+        "text": "Blir tallet lavere, eller viser Norges Banks regionale nettverk klart svakere utsikter, holdes renten trolig uendret også i september, tror Danske Bank. Da blir det bare to kutt neste år."
+      },
+      {
+        "kind": "subheading",
+        "text": "Ingen andrerundeeffekter"
+      },
+      {
+        "kind": "paragraph",
+        "text": "Kjerneinflasjonen falt fra 3,4 prosent i mai til [[2,7 prosent i juni|material_ckfixdanske11]], og ble liggende der [[i juli|material_ckfixdanske12]]. Det er det laveste siden oktober 2024. Særlig matvarer og elektronikk trakk ned."
+      },
+      {
+        "kind": "quote",
+        "text": "– Fallet i matvareinflasjonen er noe vi har etterlyst lenge, skriver Jullum. Han peker på lavere råvarepriser, sterkere krone og et mindre gunstig landbruksoppgjør enn i fjor."
+      },
+      {
+        "kind": "quote",
+        "text": "– Det mest slående med inflasjonstallene er nok at det ikke er noen tegn til andrerundeeffekter fra høyere energipriser, skriver han videre."
+      },
+      {
+        "kind": "paragraph",
+        "text": "Det vil si at dyrere strøm og drivstoff ikke har smittet over på andre priser og lønninger."
+      },
+      {
+        "kind": "paragraph",
+        "text": "Danske Bank venter en kjerneinflasjon på 3,0 prosent i år og 2,4 prosent neste år."
+      },
+      {
+        "kind": "paragraph",
+        "text": "Lønnsveksten anslås til 4,4 prosent i år og 3,7 prosent neste år. Men lønnsveksten avtok til 3,9 prosent i andre kvartal, og banken ser risikoen «klart på nedsiden»."
+      },
+      {
+        "kind": "subheading",
+        "text": "Rentene biter"
+      },
+      {
+        "kind": "paragraph",
+        "text": "Danske Bank kaller utsiktene «mild stagflasjon»: Veksten avtar, ledigheten stiger litt, og prisveksten er fortsatt over målet."
+      },
+      {
+        "kind": "paragraph",
+        "text": "Fastlands-BNP [[steg 0,3 prosent i andre kvartal|material_ckfixdanske13]], viser tall fra SSB. Det var som Danske Bank ventet. Men privat forbruk og bedriftsinvesteringer skuffet. Offentlig etterspørsel og eksport overrasket positivt."
+      },
+      {
+        "kind": "paragraph",
+        "text": "Rentene biter i de rentefølsomme delene av økonomien, mens det offentlige og eksporten holder den flytende, skriver banken."
+      },
+      {
+        "kind": "paragraph",
+        "text": "Danske Bank venter 1,0 prosent vekst i år og 1,7 prosent neste år."
+      },
+      {
+        "kind": "paragraph",
+        "text": "Arbeidsmarkedet ser noe svakere ut etter sommeren. Den registrerte ledigheten var 2,1 prosent i august, viste [[tall fra Nav|material_ckfixdanske14]] forrige fredag. Antallet nye ledige stillinger har falt de siste tre månedene. Danske Bank venter at ledigheten stiger til 2,3 prosent i år og 2,4 prosent neste år."
+      },
+      {
+        "kind": "subheading",
+        "text": "Venter svakere krone"
+      },
+      {
+        "kind": "paragraph",
+        "text": "Kronen har svingt med olje- og gassprisene siden juni, men er nesten tilbake der den var før sommeren. Danske Bank legger til grunn at energiprisene faller fremover, slik markedet priser inn. Da svekker kronen seg trolig utover året og inn i 2027."
+      },
+      {
+        "kind": "paragraph",
+        "text": "Jullum tror ikke høyere rente vil hjelpe kronen når økonomien svekkes. Tvert imot vil det «etter hvert bidra til svekkelsen», skriver han."
+      },
+      {
+        "kind": "paragraph",
+        "text": "Kronen kan likevel holde seg sterk hvis energiprisene forblir høye. Det samme gjelder hvis energiinvestorer flytter penger fra Midtøsten til Norge, slik de gjorde fra 2001 til 2014, skriver banken."
+      }
+    ],
+    "desk_notes": [
+      "Rapporten skriver at Norges Bank holdt renten uendret «i mai og august». Norges Banks egen oversikt viser heving til 4,25 prosent 6. mai og uendret rente 17. juni og 12. august. Saken følger Norges Bank.",
+      "Sitatet om tre kutt lyder i rapporten: «Vi tror samtidig at gradvis lavere energipriser og lavere kapasitetsutvikling i norsk økonomi vil bidra til å dempe inflasjonen slik at NB kan kutte renten tre ganger neste år og to ganger i 2028 slik at renten endre på 3,25 % ved utgangen av 2028.»",
+      "Saken skriver «kapasitetsutnyttelse» (antatt skrivefeil), «Norges Bank» for «NB», og kutter etter «2028». Vurder om «kapasitetsutvikling» skal beholdes.",
+      "«Fast bestemt på å bekjempe inflasjonen» er rapportens egen uthevede mellomtittel («Norges Bank fast bestemt på å bekjempe inflasjonen»).",
+      "Kronesitatet i rapporten lyder i sin helhet: «Høyere rente for å dempe inflasjonen når økonomen [sic] svekkes vil neppe gi varig støtte til kronekursen, sannsynligvis vil det etter hvert bidra til svekkelsen.» Saken bruker bare slutten som «...»-sitat.",
+      "«Norges Banks anslag på 3,3 prosent» for kjerneinflasjonen i august er slik rapporten gjengir det. Ikke kontrollert mot PPR 2/26 direkte.",
+      "Ledighetsanslagene i rapporten gjelder registrert ledighet (Nav), ikke AKU.",
+      "Rapporten omtaler også boligpriser (3,3 prosent i år, 6,0 prosent neste år) og Norges Banks forventningsundersøkelse. Utelatt av plasshensyn.",
+      "Lenken på «Nordic Outlook» går til Danske Banks åpne analyseportal, ikke direkte til rapporten. Alle 13 lenker i saken svarte 200 ved kontroll 2. september."
+    ],
+    "change_note": "Første utkast"
+  },
+  "expected": {
+    "leadSentenceCountMax": 2,
+    "firstParagraphNoLeadingDigit": true,
+    "excludedHypeMin": 0,
+    "blockingCount": 0,
+    "visibleCharsWithinBand": true,
+    "deskNotesNonEmpty": true,
+    "numericGateDisplays": [
+      "3,75",
+      "4,25",
+      "4,5",
+      "3,25"
+    ]
+  }
+}

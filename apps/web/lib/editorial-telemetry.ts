@@ -37,6 +37,22 @@ function getStoredId(storage: Storage, key: string): string {
   return created;
 }
 
+let fallbackEditorId: string | null = null;
+
+/**
+ * Per-browser editor id (localStorage `newsweb_editor_id`). Minted on first
+ * use; scopes /sak drafts to this browser. Empty string on the server.
+ */
+export function getEditorId(): string {
+  if (typeof window === "undefined") return "";
+  try {
+    return getStoredId(window.localStorage, "newsweb_editor_id");
+  } catch {
+    fallbackEditorId ??= createId();
+    return fallbackEditorId;
+  }
+}
+
 export function createEditorialTelemetry(args: {
   version?: number;
   rewriteId?: string;
@@ -62,7 +78,7 @@ export function createEditorialTelemetry(args: {
 }
 
 export function useEditorialTelemetry(
-  messageId: number,
+  messageId: number | string,
   activeIdentity?: number | PublicationTelemetryIdentity
 ) {
   const baseIdentity: PublicationTelemetryIdentity =

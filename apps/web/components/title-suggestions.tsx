@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useEditorialTelemetry } from "../lib/editorial-telemetry";
 
 type TitleSuggestionsProps = {
-  messageId: number;
+  messageId: number | string;
   activeVersion?: number;
   rewriteId?: string;
   publicationRevision?: number;

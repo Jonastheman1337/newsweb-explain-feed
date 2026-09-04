@@ -32,7 +32,10 @@ const configSchema = z.object({
   // Mirrors of worker/container flags (same env on the same Render service);
   // deliberately worker-less deployments must not fail the health check.
   NEWSWEB_POLLING_ENABLED: z.string().optional(),
-  START_WORKER: z.string().optional()
+  START_WORKER: z.string().optional(),
+  // /sak drafts live this long from creation; the worker's expiry sweep
+  // deletes them (and their materials/versions) afterwards.
+  SAK_TTL_HOURS: z.coerce.number().positive().max(24 * 30).default(24)
 });
 
 type RawAppConfig = z.infer<typeof configSchema>;

@@ -18,6 +18,54 @@ export const evalCategoryIds = [
   "hard_other"
 ] as const;
 
+export function blindPipelineSignals(generation: {
+  validation: { valid: boolean } | null;
+  fatalStatus: { fatal: boolean };
+  referenceCheck: { checkerError: string | null };
+}): string[] {
+  return [
+    generation.fatalStatus.fatal ? "fatal" : "",
+    generation.validation?.valid === false ? "invalid" : "",
+    generation.referenceCheck.checkerError ? "checker error" : ""
+  ].filter(Boolean);
+}
+
+export function blindReviewSourceText(evalCase: {
+  payload: Pick<
+    PromptPayload,
+    | "title"
+    | "publishedAt"
+    | "bodyText"
+    | "pdfSupplementText"
+    | "supplementalMaterials"
+    | "relatedNotices"
+  >;
+}): string {
+  const primary = [
+    `Current notice | ${evalCase.payload.publishedAt} | ${evalCase.payload.title}`,
+    evalCase.payload.bodyText.trim()
+  ].join("\n\n");
+  const pdfText = evalCase.payload.pdfSupplementText?.trim()
+    ? `Current notice PDF text\n\n${evalCase.payload.pdfSupplementText.trim()}`
+    : "";
+  const supplementalText = (evalCase.payload.supplementalMaterials ?? [])
+    .map(
+      (material, materialIndex) =>
+        `Supplemental material ${materialIndex + 1} | ${material.kind} | ${material.title}\n\n${material.text}`
+    )
+    .join("\n\n");
+  const relatedText = (evalCase.payload.relatedNotices ?? [])
+    .map(
+      (notice, noticeIndex) =>
+        `Related notice ${noticeIndex + 1} | relation ${notice.relation} | ${notice.publishedAt} | ${notice.title}\n\n${notice.text}`
+    )
+    .join("\n\n");
+  return [primary, pdfText, supplementalText, relatedText]
+    .filter(Boolean)
+    .join("\n\n")
+    .trim();
+}
+
 export type EvalCategoryId = (typeof evalCategoryIds)[number];
 
 export const defaultEvalCategoryQuotas: Record<EvalCategoryId, number> = {

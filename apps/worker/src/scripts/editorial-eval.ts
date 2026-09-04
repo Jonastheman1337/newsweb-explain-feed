@@ -32,6 +32,8 @@ import {
 } from "../services/reference-check.js";
 import {
   assertReviewProtocolIntegrity,
+  blindPipelineSignals,
+  blindReviewSourceText,
   categorizeEvalPayload,
   createLegacyReviewProtocol,
   createReviewProtocol,
@@ -50,9 +52,15 @@ import {
 } from "../services/editorial-eval.js";
 import {
   collectGitSourceState,
+  assertLockedManualAbCorpus,
+  assertLockedManualAbPlan,
+  assertRetrospectiveBaselineArtifact,
+  assertRewriteExecutionParity,
   createArtifactSeed,
   createCorpusIdentity,
+  createLockedManualAbPlan,
   getEvalResponseSchemaProfile,
+  lockedManualAbGenerationId,
   promptHashes,
   resolveEvalArmRunProfile,
   resolveReferenceRunProfile,
@@ -63,6 +71,8 @@ import {
   type EvalArtifactIntegrity,
   type EvalPromptHashes,
   type EvalReferenceRunProfile,
+  type LockedManualAbPlanV1,
+  type RetrospectiveBaselineV1,
   type RunArtifactV3
 } from "../services/editorial-eval-artifact.js";
 import {
@@ -83,6 +93,7 @@ import {
   type OpenAIServiceTier
 } from "../services/openai-responses.js";
 import { sanitizeRewriteStyle } from "../services/style-sanitizer.js";
+import { applyImportanceHighBar } from "../services/importance.js";
 import {
   buildValidationSourceText,
   validateRewriteOutput
@@ -147,6 +158,7 @@ type EvalGeneration = EvalGenerationSummary & {
     warnings: string[];
   } | null;
   referenceCheck: {
+    correctionAttempts: 0;
     coveragePercent: number;
     unsupportedSentenceCount: number;
     blocking: boolean;
@@ -156,6 +168,11 @@ type EvalGeneration = EvalGenerationSummary & {
     checkerError: string | null;
   };
   styleSanitization: ReturnType<typeof sanitizeRewriteStyle>["stats"] | null;
+  importanceAdjustment: {
+    adjusted: boolean;
+    reason: string | null;
+  } | null;
+  validationRepair: { applied: false };
   promptChars: number;
   rewritePromptChars: number;
   referencePromptChars: number;
@@ -168,6 +185,8 @@ type EvalModelCall = Omit<OpenAIJsonResult, "content"> & {
   model: string;
   reasoningEffort: OpenAIReasoningEffort;
   serviceTierRequested: OpenAIServiceTier;
+  maxOutputTokens: number;
+  promptHashes: EvalPromptHashes | null;
 };
 
 type LegacyRunFile = {
@@ -222,6 +241,12 @@ async function main(): Promise<void> {
 
   if (parsed.command === "build-cases") {
     await buildCasesCommand(parsed.options);
+  } else if (parsed.command === "cases-from-baseline") {
+    await casesFromBaselineCommand(parsed.options);
+  } else if (parsed.command === "plan-locked-15") {
+    await planLocked15Command(parsed.options);
+  } else if (parsed.command === "run-locked-15") {
+    await runLocked15FromPlan(parsed.options);
   } else if (parsed.command === "run") {
     await runCommand(parsed.options);
   } else if (parsed.command === "review-html") {
@@ -307,7 +332,8 @@ async function buildCasesCommand(options: Map<string, string>): Promise<void> {
     where: {
       status: "published",
       userInstruction: null,
-      requestedAt: dateRange
+      requestedAt: dateRange,
+      messageId: { gt: 0 }
     },
     orderBy: { requestedAt: "desc" },
     take: Math.max(limit * 80, 2500),
@@ -1898,7 +1924,7 @@ async function buildSafetyFixturesCommand(
   }
 
   const failedRows = (await logPrisma.generationRun.findMany({
-    where: { status: "failed", requestedAt: dateRange },
+    where: { status: "failed", requestedAt: dateRange, messageId: { gt: 0 } },
     select: SAFETY_SEED_ROW_SELECT
   })) as SafetySeedRow[];
   const unresolvedIds = new Set(SAFETY_SEED_MESSAGE_IDS.numeric_unresolved ?? []);
@@ -2078,7 +2104,638 @@ async function buildSafetyFixturesCommand(
   );
 }
 
+async function casesFromBaselineCommand(options: Map<string, string>): Promise<void> {
+  const baselinePath = requiredOption(options, "baseline");
+  const outPath = requiredOption(options, "out");
+  const baseline = await readJson<RetrospectiveBaselineV1>(baselinePath);
+  assertRetrospectiveBaselineArtifact(baseline);
+  const cases: EvalCase[] = baseline.cases.map((stored) => {
+    const payload = stored.inputJson.sourcePayload as PromptPayload;
+    return {
+      caseId: stored.caseId,
+      messageId: stored.messageId,
+      company: payload.issuerName,
+      issuerSign: payload.issuerSign,
+      sourceTitle: payload.title,
+      publishedAt: payload.publishedAt,
+      category: categorizeEvalPayload(payload),
+      difficultyTags: [
+        "retrospective_v5_9_2_baseline",
+        ...difficultyTagsForPayload(payload)
+      ],
+      payload,
+      sourceSha256: stored.sourcePayloadSha256
+    };
+  });
+  const corpus = createCorpusIdentity(cases, outPath);
+  const output: CasesFile = {
+    schemaVersion: 2,
+    createdAt: new Date().toISOString(),
+    source: {
+      from: "retrospective-v5.9.2",
+      to: "retrospective-v5.9.2",
+      limit: cases.length,
+      selection: "curated_message_ids"
+    },
+    quotas: {} as Record<EvalCategoryId, number>,
+    totalCases: cases.length,
+    corpusId: corpus.corpusId,
+    corpusSha256: corpus.corpusSha256,
+    cases
+  };
+  await writeNewJsonArtifact(outPath, output);
+  console.log(
+    `Wrote ${cases.length} baseline-derived cases (${corpus.corpusId}) to ${outPath} (no model calls)`
+  );
+}
+
+async function planLocked15Command(options: Map<string, string>): Promise<void> {
+  const casesPath = requiredOption(options, "cases");
+  const baselinePath = requiredOption(options, "baseline");
+  const outPath = requiredOption(options, "out");
+  const challengerVariant = parseVariant(
+    options.get("challenger") ?? "regular_v5_11_candidate"
+  );
+  if (challengerVariant === "regular_v5_9_2_frozen") {
+    throw new Error("Locked 15-case A/B challenger cannot be the frozen control");
+  }
+  if (getRegularPromptVariantProfile(challengerVariant).stripRelatedNotices) {
+    throw new Error(
+      `Locked 15-case related-notice challenger ${challengerVariant} strips the feature under test`
+    );
+  }
+  const model =
+    options.get("model")?.trim() ||
+    process.env.OPENAI_MODEL?.trim() ||
+    "gpt-5.5";
+  const reasoningEffort = parseReasoningEffort(
+    options.get("effort") ?? process.env.OPENAI_DEFAULT_REASONING_EFFORT,
+    "medium"
+  );
+  const serviceTier = parseServiceTier(
+    options.get("service-tier") ?? process.env.OPENAI_SERVICE_TIER,
+    "default"
+  );
+  const referenceModel =
+    options.get("reference-model")?.trim() || "gpt-5.6-terra";
+  const referenceReasoningEffort = parseReasoningEffort(
+    options.get("reference-effort"),
+    "medium"
+  );
+  const referenceServiceTier = parseServiceTier(
+    options.get("reference-service-tier"),
+    "default"
+  );
+  const assignmentSeed = requiredOption(options, "assignment-seed").trim();
+  const orderingSeed = requiredOption(options, "ordering-seed").trim();
+  if (assignmentSeed === orderingSeed) {
+    throw new Error("--assignment-seed and --ordering-seed must be distinct");
+  }
+  const controlProfile = resolveEvalArmRunProfile({
+    arm: "control",
+    variantId: "regular_v5_9_2_frozen",
+    model,
+    reasoningEffort,
+    serviceTier
+  });
+  const challengerProfile = resolveEvalArmRunProfile({
+    arm: "challenger",
+    variantId: challengerVariant,
+    model,
+    reasoningEffort,
+    serviceTier
+  });
+  const referenceProfile = resolveReferenceRunProfile({
+    schema: referenceCheckJsonSchema as Record<string, unknown>,
+    model: referenceModel,
+    reasoningEffort: referenceReasoningEffort,
+    serviceTier: referenceServiceTier
+  });
+  const casesFile = await readJson<CasesFile>(casesPath);
+  const baseline = await readJson<RetrospectiveBaselineV1>(baselinePath);
+  assertRetrospectiveBaselineArtifact(baseline);
+  const corpus = assertLockedManualAbCorpus(casesFile, casesPath);
+  const casesWithRelated = casesFile.cases.filter(
+    (item) => (item.payload.relatedNotices?.length ?? 0) > 0
+  ).length;
+  if (casesWithRelated < 10) {
+    throw new Error(
+      `Locked 15-case prior-notice A/B requires at least 10 cases with attached related notices; found ${casesWithRelated}`
+    );
+  }
+  const caseInputs: LockedManualAbPlanV1["caseInputs"] = casesFile.cases.map(
+    (item) => {
+      const controlPayload = stripRelatedNoticesFromPayload(item.payload);
+      const controlMessages = createRegularPromptVariantMessages(
+        "regular_v5_9_2_frozen",
+        controlPayload
+      );
+      const challengerMessages = createRegularPromptVariantMessages(
+        challengerVariant,
+        item.payload
+      );
+      return {
+        caseId: item.caseId,
+        lockedSourceSha256: item.sourceSha256!,
+        controlPayloadSha256: sourcePayloadSha256(controlPayload),
+        challengerPayloadSha256: sourcePayloadSha256(item.payload),
+        controlPromptHashes: promptHashes(controlMessages),
+        challengerPromptHashes: promptHashes(challengerMessages)
+      };
+    }
+  );
+  const baselineByMessageId = new Map(
+    baseline.cases.map((item) => [item.messageId, item])
+  );
+  for (const [index, item] of casesFile.cases.entries()) {
+    const stored = baselineByMessageId.get(item.messageId);
+    const planned = caseInputs[index]!;
+    if (
+      !stored ||
+      stored.sourcePayloadSha256 !== planned.controlPayloadSha256 ||
+      sha256CanonicalJson(stored.promptHashes) !==
+        sha256CanonicalJson(planned.controlPromptHashes) ||
+      stored.model !== controlProfile.requestedModel ||
+      stored.rewriteCall.reasoningEffort !==
+        controlProfile.requestedReasoningEffort ||
+      stored.rewriteCall.requestedServiceTier !==
+        controlProfile.requestedServiceTier ||
+      baseline.profile.schemaSha256 !== controlProfile.schemaSha256 ||
+      baseline.profile.requestedModel !== controlProfile.requestedModel ||
+      baseline.profile.requestedReasoningEffort !==
+        controlProfile.requestedReasoningEffort ||
+      baseline.profile.requestedServiceTier !==
+        controlProfile.requestedServiceTier ||
+      baseline.profile.maxOutputTokens !== controlProfile.maxOutputTokens ||
+      baseline.profile.reference.requestedModel !==
+        referenceProfile.requestedModel ||
+      baseline.profile.reference.requestedReasoningEffort !==
+        referenceProfile.requestedReasoningEffort ||
+      baseline.profile.reference.requestedServiceTier !==
+        referenceProfile.requestedServiceTier ||
+      baseline.profile.reference.maxOutputTokens !==
+        referenceProfile.maxOutputTokens
+    ) {
+      throw new Error(
+        `Stored arm A does not exactly match the frozen control/source profile for ${item.caseId}`
+      );
+    }
+  }
+  const plannedGenerations: EvalGenerationSummary[] = casesFile.cases.flatMap(
+    (item) =>
+      (["control", "challenger"] as const).map((arm) => ({
+        id:
+          arm === "control"
+            ? baselineByMessageId.get(item.messageId)!.generationRunId
+            : lockedManualAbGenerationId({
+                corpusSha256: corpus.corpusSha256,
+                assignmentSeed,
+                caseId: item.caseId,
+                arm
+              }),
+        caseId: item.caseId,
+        arm,
+        variantId:
+          arm === "control" ? "regular_v5_9_2_frozen" : challengerVariant,
+        category: item.category,
+        fatalStatus: { fatal: false, reasons: [] }
+      }))
+  );
+  const reviewProtocol = createReviewProtocol(
+    plannedGenerations,
+    "regular_v5_9_2_frozen",
+    challengerVariant,
+    { assignmentSeed, orderingSeed }
+  );
+  const plan = createLockedManualAbPlan({
+    createdAt: new Date().toISOString(),
+    corpus,
+    control: controlProfile,
+    challenger: challengerProfile,
+    reference: referenceProfile,
+    baseline,
+    baselinePath,
+    caseInputs,
+    reviewProtocol
+  });
+  await writeNewJsonArtifact(outPath, plan);
+  console.log(
+    `Wrote locked 15-case A/B plan ${plan.planId} to ${outPath} (no model calls)`
+  );
+  console.log(
+    `Displayed-side assignment: challenger A=${plan.diagnostics.challengerOnA}, B=${plan.diagnostics.challengerOnB}; assignment=${plan.diagnostics.assignmentIdentitySha256}; order=${plan.diagnostics.displayedOrderSha256}`
+  );
+}
+
+async function runLocked15FromPlan(options: Map<string, string>): Promise<void> {
+  const allowedOptions = new Set(["plan", "cases", "baseline", "out"]);
+  const unexpected = [...options.keys()].filter((key) => !allowedOptions.has(key));
+  if (unexpected.length > 0) {
+    throw new Error(
+      `A locked plan owns all run settings; remove overrides: ${unexpected
+        .map((item) => `--${item}`)
+        .join(", ")}`
+    );
+  }
+  const planPath = requiredOption(options, "plan");
+  const outPath = requiredOption(options, "out");
+  const plan = await readJson<LockedManualAbPlanV1>(planPath);
+  assertLockedManualAbPlan(plan);
+  const baselinePath = options.get("baseline") ?? plan.baseline.sourcePath;
+  if (baselinePath !== plan.baseline.sourcePath) {
+    throw new Error(
+      `Locked plan requires its original baseline path ${plan.baseline.sourcePath}; received ${baselinePath}`
+    );
+  }
+  const baseline = await readJson<RetrospectiveBaselineV1>(baselinePath);
+  assertRetrospectiveBaselineArtifact(baseline);
+  if (
+    baseline.baselineId !== plan.baseline.baselineId ||
+    baseline.baselineSha256 !== plan.baseline.baselineSha256
+  ) {
+    throw new Error("Locked plan baseline artifact no longer matches");
+  }
+  const casesPath = options.get("cases") ?? plan.corpus.sourceCasesPath;
+  if (casesPath !== plan.corpus.sourceCasesPath) {
+    throw new Error(
+      `Locked plan requires its original cases path ${plan.corpus.sourceCasesPath}; received ${casesPath}`
+    );
+  }
+  const casesFile = await readJson<CasesFile>(casesPath);
+  const corpus = assertLockedManualAbCorpus(casesFile, casesPath);
+  if (
+    corpus.corpusId !== plan.corpus.corpusId ||
+    corpus.corpusSha256 !== plan.corpus.corpusSha256 ||
+    corpus.caseCount !== plan.corpus.caseCount
+  ) {
+    throw new Error("Locked plan corpus no longer matches the cases artifact");
+  }
+  const currentControl = resolveEvalArmRunProfile({
+    arm: "control",
+    variantId: plan.controlVariant,
+    model: plan.profiles.control.requestedModel,
+    reasoningEffort: plan.profiles.control.requestedReasoningEffort,
+    serviceTier: plan.profiles.control.requestedServiceTier
+  });
+  const currentChallenger = resolveEvalArmRunProfile({
+    arm: "challenger",
+    variantId: plan.challengerVariant,
+    model: plan.profiles.challenger.requestedModel,
+    reasoningEffort: plan.profiles.challenger.requestedReasoningEffort,
+    serviceTier: plan.profiles.challenger.requestedServiceTier
+  });
+  const currentReference = resolveReferenceRunProfile({
+    schema: referenceCheckJsonSchema as Record<string, unknown>,
+    model: plan.profiles.reference.requestedModel,
+    reasoningEffort: plan.profiles.reference.requestedReasoningEffort,
+    serviceTier: plan.profiles.reference.requestedServiceTier
+  });
+  if (
+    currentControl.profileSha256 !== plan.profiles.control.profileSha256 ||
+    currentChallenger.profileSha256 !== plan.profiles.challenger.profileSha256 ||
+    currentReference.profileSha256 !== plan.profiles.reference.profileSha256
+  ) {
+    throw new Error(
+      "Prompt/schema/checker profiles changed after the locked plan was created; create a new plan"
+    );
+  }
+  const plannedInputsByCase = new Map(
+    plan.caseInputs.map((item) => [item.caseId, item])
+  );
+  const baselineByMessageId = new Map(
+    baseline.cases.map((item) => [item.messageId, item])
+  );
+  for (const item of casesFile.cases) {
+    const planned = plannedInputsByCase.get(item.caseId);
+    const controlPayload = stripRelatedNoticesFromPayload(item.payload);
+    const current = {
+      caseId: item.caseId,
+      lockedSourceSha256: item.sourceSha256!,
+      controlPayloadSha256: sourcePayloadSha256(controlPayload),
+      challengerPayloadSha256: sourcePayloadSha256(item.payload),
+      controlPromptHashes: promptHashes(
+        createRegularPromptVariantMessages(plan.controlVariant, controlPayload)
+      ),
+      challengerPromptHashes: promptHashes(
+        createRegularPromptVariantMessages(plan.challengerVariant, item.payload)
+      )
+    };
+    if (!planned || sha256CanonicalJson(current) !== sha256CanonicalJson(planned)) {
+      throw new Error(
+        `Prompt or source material changed after planning for ${item.caseId}; create a new plan`
+      );
+    }
+  }
+  const expectedGenerations: EvalGenerationSummary[] = casesFile.cases.flatMap(
+    (item) => {
+      const stored = baselineByMessageId.get(item.messageId);
+      if (!stored) throw new Error(`Locked baseline is missing ${item.messageId}`);
+      return [
+        {
+          id: stored.generationRunId,
+          caseId: item.caseId,
+          arm: "control" as const,
+          variantId: plan.controlVariant,
+          category: item.category,
+          fatalStatus: { fatal: false, reasons: [] }
+        },
+        {
+          id: lockedManualAbGenerationId({
+            corpusSha256: corpus.corpusSha256,
+            assignmentSeed: plan.reviewProtocol.assignmentSeed!,
+            caseId: item.caseId,
+            arm: "challenger"
+          }),
+          caseId: item.caseId,
+          arm: "challenger" as const,
+          variantId: plan.challengerVariant,
+          category: item.category,
+          fatalStatus: { fatal: false, reasons: [] }
+        }
+      ];
+    }
+  );
+  assertReviewProtocolIntegrity(
+    plan.reviewProtocol,
+    expectedGenerations,
+    plan.controlVariant,
+    plan.challengerVariant
+  );
+  const apiKey = process.env.OPENAI_API_KEY?.trim();
+  if (!apiKey) {
+    throw new Error("OPENAI_API_KEY is required for eval run.");
+  }
+  const timeoutMs = Number(process.env.OPENAI_TIMEOUT_MS ?? 240000);
+  const client = createOpenAIClient(apiKey);
+  const startedAt = new Date().toISOString();
+  const generations: EvalGeneration[] = casesFile.cases.map((evalCase) => {
+    const stored = baselineByMessageId.get(evalCase.messageId);
+    if (!stored) {
+      throw new Error(`Locked baseline is missing ${evalCase.messageId}`);
+    }
+    return retrospectiveBaselineGeneration(evalCase, stored, currentControl);
+  });
+  for (const evalCase of casesFile.cases) {
+    for (const profile of [currentChallenger]) {
+      const generationId = lockedManualAbGenerationId({
+        corpusSha256: corpus.corpusSha256,
+        assignmentSeed: plan.reviewProtocol.assignmentSeed!,
+        caseId: evalCase.caseId,
+        arm: profile.arm
+      });
+      console.log(
+        `[eval] ${evalCase.caseId} ${profile.arm} ${profile.requestedModel} ${profile.requestedReasoningEffort}`
+      );
+      generations.push(
+        await runGeneration({
+          evalCase,
+          profile,
+          referenceProfile: currentReference,
+          timeoutMs,
+          client,
+          generationId
+        })
+      );
+    }
+  }
+  for (const generation of generations.filter(
+    (item) => item.arm === "challenger"
+  )) {
+    assertLockedOneShotExecutionParity(baseline, generation);
+  }
+  assertReviewProtocolIntegrity(
+    plan.reviewProtocol,
+    generations,
+    plan.controlVariant,
+    plan.challengerVariant
+  );
+  const repoRoot = await findRepoRoot();
+  const sourceState = await collectGitSourceState(repoRoot);
+  const integrity: EvalArtifactIntegrity = {
+    promotionEligible: false,
+    reasons: [
+      "retrospective_one_shot_selected_pilot",
+      "This manual pilot is not shipping evidence."
+    ],
+    warnings: [
+      "retrospective_one_shot_selected_pilot: manual pilot only; not shipping evidence.",
+      ...(sourceState.dirty
+        ? [
+            `Evaluation was generated from a dirty worktree (${sourceState.sourceStateSha256}).`
+          ]
+        : [])
+    ]
+  };
+  const output: RunArtifactV3<EvalCase, EvalGeneration> = {
+    schemaVersion: 3,
+    runId: `${plan.planId}_${timestampForFile(new Date())}`,
+    createdAt: startedAt,
+    startedAt,
+    completedAt: new Date().toISOString(),
+    sourceState,
+    corpus,
+    profiles: {
+      control: currentControl,
+      challenger: currentChallenger,
+      reference: currentReference
+    },
+    controlVariant: plan.controlVariant,
+    challengerVariant: plan.challengerVariant,
+    reviewProtocol: plan.reviewProtocol,
+    manualReviewPlan: {
+      planId: plan.planId,
+      planSha256: plan.planSha256,
+      diagnostics: plan.diagnostics
+    },
+    integrity,
+    cases: casesFile.cases,
+    generations
+  };
+  await writeNewJsonArtifact(outPath, output);
+  console.log(`Wrote locked 15-case eval run to ${outPath}`);
+}
+
+function retrospectiveBaselineGeneration(
+  evalCase: EvalCase,
+  stored: RetrospectiveBaselineV1["cases"][number],
+  profile: EvalArmRunProfile
+): EvalGeneration {
+  const validation = (stored.validationJson ?? {}) as Record<string, unknown>;
+  const reference = (validation.referenceCheck ?? {}) as Record<string, unknown>;
+  const finalCoverage = (reference.finalCoverage ?? null) as
+    | ReferenceCoverageReport
+    | null;
+  const issues = Array.isArray(validation.issues)
+    ? (validation.issues as Array<{ code: string; severity: string; message: string }>)
+    : [];
+  const blockingErrors = Array.isArray(validation.blockingErrors)
+    ? (validation.blockingErrors as string[])
+    : [];
+  const warnings = Array.isArray(validation.warnings)
+    ? (validation.warnings as string[])
+    : [];
+  const latencyMs =
+    stored.startedAt && stored.finishedAt
+      ? Math.max(0, Date.parse(stored.finishedAt) - Date.parse(stored.startedAt))
+      : 0;
+  return {
+    id: stored.generationRunId,
+    caseId: evalCase.caseId,
+    arm: "control",
+    variantId: "regular_v5_9_2_frozen",
+    category: evalCase.category,
+    fatalStatus: { fatal: false, reasons: [] },
+    promptVersion: stored.promptVersion,
+    model: stored.model,
+    reasoningEffort: profile.requestedReasoningEffort,
+    serviceTier: profile.requestedServiceTier,
+    startedAt: stored.startedAt ?? stored.requestedAt,
+    completedAt: stored.finishedAt ?? stored.requestedAt,
+    responseSchemaId: profile.responseSchemaId,
+    schemaSha256: profile.schemaSha256,
+    parserProfileId: profile.parserProfileId,
+    validationProfileId: profile.validationProfileId,
+    promptHashes: stored.promptHashes,
+    requestMetadata: {
+      requestedModel: profile.requestedModel,
+      requestedReasoningEffort: profile.requestedReasoningEffort,
+      requestedVerbosity: profile.requestedVerbosity,
+      requestedServiceTier: profile.requestedServiceTier,
+      reasoningContext: profile.reasoningContext,
+      maxOutputTokens: profile.maxOutputTokens,
+      modelGenerationSeed: null
+    },
+    modelCalls: stored.inputJson.modelCalls.map(storedEvalModelCall),
+    output: rewriteOutputSchema.parse(stored.outputJson),
+    validation: {
+      valid: validation.valid === true,
+      issues,
+      blockingErrors,
+      warnings
+    },
+    referenceCheck: {
+      correctionAttempts: 0,
+      coveragePercent:
+        typeof finalCoverage?.coveragePercent === "number"
+          ? finalCoverage.coveragePercent
+          : 0,
+      unsupportedSentenceCount: Array.isArray(finalCoverage?.unsupportedSentences)
+        ? finalCoverage.unsupportedSentences.length
+        : 0,
+      blocking: reference.blocking === true,
+      blockingReason:
+        typeof reference.blockingReason === "string"
+          ? reference.blockingReason
+          : null,
+      highRiskUnsupportedSentenceCount:
+        typeof reference.highRiskUnsupportedSentenceCount === "number"
+          ? reference.highRiskUnsupportedSentenceCount
+          : 0,
+      coverage: finalCoverage,
+      checkerError:
+        typeof reference.checkerError === "string" ? reference.checkerError : null
+    },
+    styleSanitization:
+      (validation.styleSanitization as EvalGeneration["styleSanitization"]) ?? null,
+    importanceAdjustment: {
+      adjusted: reference.importanceAdjusted === true,
+      reason:
+        typeof reference.importanceAdjustReason === "string"
+          ? reference.importanceAdjustReason
+          : null
+    },
+    validationRepair: { applied: false },
+    promptChars: stored.promptChars ?? Number(stored.rewriteCall.promptChars ?? 0),
+    rewritePromptChars: Number(stored.rewriteCall.promptChars ?? 0),
+    referencePromptChars: 0,
+    latencyMs,
+    errorText: null
+  };
+}
+
+function storedEvalModelCall(call: Record<string, unknown>): EvalModelCall {
+  const systemPrompt =
+    typeof call.systemPrompt === "string" ? call.systemPrompt : null;
+  const developerPrompt =
+    typeof call.developerPrompt === "string" ? call.developerPrompt : null;
+  const userPrompt = typeof call.userPrompt === "string" ? call.userPrompt : null;
+  return {
+    ...(call as Omit<EvalModelCall, "serviceTierRequested" | "promptHashes">),
+    serviceTierRequested: call.requestedServiceTier as OpenAIServiceTier,
+    promptHashes:
+      systemPrompt !== null && developerPrompt !== null && userPrompt !== null
+        ? promptHashes({
+            variantId: "regular_v5_9_2_frozen",
+            promptVersion: "stored_model_call",
+            systemPrompt,
+            developerPrompt,
+            userPrompt
+          })
+        : null
+  };
+}
+
+export function assertLockedOneShotExecutionParity(
+  baseline: RetrospectiveBaselineV1,
+  generation: EvalGeneration
+): void {
+  const rewriteCalls = generation.modelCalls.filter(
+    (call) => call.schemaName === "rewrite_output"
+  );
+  const referenceCalls = generation.modelCalls.filter(
+    (call) => call.schemaName === "reference_check_result"
+  );
+  if (rewriteCalls.length !== 1 || referenceCalls.length !== 1) {
+    throw new Error(
+      `Locked one-shot challenger ${generation.caseId} must contain exactly one rewrite and one reference-check call`
+    );
+  }
+  const rewriteCall = rewriteCalls[0]!;
+  const referenceCall = referenceCalls[0]!;
+  assertRewriteExecutionParity(
+    {
+      requestedModel: baseline.profile.requestedModel,
+      requestedReasoningEffort: baseline.profile.requestedReasoningEffort,
+      requestedServiceTier: baseline.profile.requestedServiceTier,
+      responseModel: baseline.profile.responseModel,
+      serviceTier: baseline.profile.serviceTier
+    },
+    rewriteCall as unknown as Record<string, unknown>,
+    `Locked one-shot challenger ${generation.caseId} rewrite call`
+  );
+  assertRewriteExecutionParity(
+    {
+      requestedModel: baseline.profile.reference.requestedModel,
+      requestedReasoningEffort:
+        baseline.profile.reference.requestedReasoningEffort,
+      requestedServiceTier: baseline.profile.reference.requestedServiceTier,
+      responseModel: baseline.profile.reference.responseModel,
+      serviceTier: baseline.profile.reference.serviceTier
+    },
+    referenceCall as unknown as Record<string, unknown>,
+    `Locked one-shot challenger ${generation.caseId} reference call`
+  );
+  if (
+    rewriteCall.maxOutputTokens !== baseline.profile.maxOutputTokens ||
+    referenceCall.maxOutputTokens !== baseline.profile.reference.maxOutputTokens ||
+    !rewriteCall.promptHashes ||
+    !referenceCall.promptHashes ||
+    generation.referenceCheck.correctionAttempts !== 0 ||
+    generation.validationRepair.applied !== false ||
+    !generation.styleSanitization ||
+    !generation.importanceAdjustment
+  ) {
+    throw new Error(
+      `Locked one-shot challenger ${generation.caseId} call limits, prompt hashes, or deterministic pipeline gates do not match the stored control`
+    );
+  }
+}
+
 async function runCommand(options: Map<string, string>): Promise<void> {
+  if (options.has("plan")) {
+    await runLocked15FromPlan(options);
+    return;
+  }
   const startedAt = new Date().toISOString();
   const casesPath = requiredOption(options, "cases");
   const controlVariant = parseVariant(requiredOption(options, "control"));
@@ -2223,13 +2880,15 @@ async function runGeneration({
   profile,
   referenceProfile,
   timeoutMs,
-  client
+  client,
+  generationId
 }: {
   evalCase: EvalCase;
   profile: EvalArmRunProfile;
   referenceProfile: EvalReferenceRunProfile;
   timeoutMs: number;
   client: ReturnType<typeof createOpenAIClient>;
+  generationId?: string;
 }): Promise<EvalGeneration> {
   const generationStartedAt = new Date().toISOString();
   const startedAt = Date.now();
@@ -2300,12 +2959,15 @@ async function runGeneration({
         profile.requestedModel,
         profile.requestedReasoningEffort,
         profile.requestedServiceTier,
+        profile.maxOutputTokens,
+        messages,
         rewriteResult
       )
     );
     const raw = rewriteResult.content;
     const parsed = rewriteOutputSchema.parse(clampRewriteArrays(JSON.parse(raw)));
-    const styleResult = sanitizeRewriteStyle(parsed);
+    const importanceResult = applyImportanceHighBar(parsed, armPayload);
+    const styleResult = sanitizeRewriteStyle(importanceResult.rewrite);
     const output = styleResult.rewrite;
     const validation = validateRewriteOutput(output, armPayload);
     const referencePayload = armPayload.pdfSupplementText
@@ -2331,7 +2993,7 @@ async function runGeneration({
     });
 
     return {
-      id: `${evalCase.caseId}:${profile.arm}`,
+      id: generationId ?? `${evalCase.caseId}:${profile.arm}`,
       caseId: evalCase.caseId,
       arm: profile.arm,
       variantId: profile.variantId,
@@ -2352,6 +3014,7 @@ async function runGeneration({
       },
       quoteTelemetry: validation.quoteTelemetry,
       referenceCheck: {
+        correctionAttempts: 0,
         coveragePercent: referenceResult.coverage.coveragePercent,
         unsupportedSentenceCount:
           referenceResult.coverage.unsupportedSentences.length,
@@ -2363,6 +3026,11 @@ async function runGeneration({
         checkerError: null
       },
       styleSanitization: styleResult.stats,
+      importanceAdjustment: {
+        adjusted: importanceResult.adjusted,
+        reason: importanceResult.reason
+      },
+      validationRepair: { applied: false },
       fatalStatus,
       promptChars: rewritePromptChars + referencePromptChars,
       rewritePromptChars,
@@ -2373,7 +3041,7 @@ async function runGeneration({
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return {
-      id: `${evalCase.caseId}:${profile.arm}`,
+      id: generationId ?? `${evalCase.caseId}:${profile.arm}`,
       caseId: evalCase.caseId,
       arm: profile.arm,
       variantId: profile.variantId,
@@ -2388,6 +3056,7 @@ async function runGeneration({
       output: null,
       validation: null,
       referenceCheck: {
+        correctionAttempts: 0,
         coveragePercent: 0,
         unsupportedSentenceCount: 0,
         blocking: true,
@@ -2397,6 +3066,8 @@ async function runGeneration({
         checkerError: message
       },
       styleSanitization: null,
+      importanceAdjustment: null,
+      validationRepair: { applied: false },
       fatalStatus: { fatal: true, reasons: [message] },
       promptChars: rewritePromptChars + referencePromptChars,
       rewritePromptChars,
@@ -2461,6 +3132,12 @@ async function runReferenceCheck({
       profile.requestedModel,
       profile.requestedReasoningEffort,
       profile.requestedServiceTier,
+      profile.maxOutputTokens,
+      {
+        systemPrompt: referencePrompt.systemPrompt,
+        developerPrompt: referencePrompt.developerPrompt,
+        userPrompt: referencePrompt.userPrompt
+      },
       result
     )
   };
@@ -2471,6 +3148,12 @@ function evalModelCall(
   model: string,
   reasoningEffort: OpenAIReasoningEffort,
   serviceTierRequested: OpenAIServiceTier,
+  maxOutputTokens: number,
+  prompts: {
+    systemPrompt: string;
+    developerPrompt: string;
+    userPrompt: string;
+  },
   result: OpenAIJsonResult
 ): EvalModelCall {
   const { content: _content, ...telemetry } = result;
@@ -2479,6 +3162,12 @@ function evalModelCall(
     model,
     reasoningEffort,
     serviceTierRequested,
+    maxOutputTokens,
+    promptHashes: promptHashes({
+      variantId: "regular_v5_9_2_frozen",
+      promptVersion: "eval_model_call",
+      ...prompts
+    }),
     ...telemetry
   };
 }
@@ -2500,7 +3189,7 @@ async function reviewHtmlCommand(options: Map<string, string>): Promise<void> {
     integrity = run.integrity;
   } else {
     const reviewsPath = requiredOption(options, "reviews");
-    const reviews = await readReviews(reviewsPath);
+    const reviews = await readReviews(reviewsPath, run);
     reviewProtocol = createLegacyReviewProtocol(
       run.generations,
       reviews,
@@ -2531,7 +3220,7 @@ async function summarizeCommand(options: Map<string, string>): Promise<void> {
   const reviewsPath = requiredOption(options, "reviews");
   const outPath = requiredOption(options, "out");
   const run = await readJson<RunFile>(runPath);
-  const reviews = await readReviews(reviewsPath);
+  const reviews = await readReviews(reviewsPath, run);
   const artifactIntegrity =
     run.schemaVersion === 3
       ? run.integrity
@@ -2568,11 +3257,39 @@ async function summarizeCommand(options: Map<string, string>): Promise<void> {
   console.log(`Wrote eval summary to ${outPath}`);
 }
 
-async function readReviews(filePath: string): Promise<EvalReview[]> {
+async function readReviews(filePath: string, run?: RunFile): Promise<EvalReview[]> {
   const rawReviews = await readJson<unknown>(filePath);
-  return Array.isArray(rawReviews)
+  const reviews = Array.isArray(rawReviews)
     ? (rawReviews as EvalReview[])
     : ((rawReviews as { reviews?: EvalReview[] }).reviews ?? []);
+  if (run?.schemaVersion !== 3 || !run.manualReviewPlan) return reviews;
+  const assignments = new Map(
+    run.reviewProtocol.assignments.map((item) => [item.caseId, item])
+  );
+  return reviews.map((review) => {
+    const assignment = assignments.get(review.caseId);
+    if (!assignment) throw new Error(`Blind review references unknown case ${review.caseId}`);
+    const expectedA = blindReviewGenerationId(run.runId, review.caseId, "A");
+    const expectedB = blindReviewGenerationId(run.runId, review.caseId, "B");
+    const expectedAssignment = blindReviewAssignmentId(
+      run.runId,
+      review.caseId,
+      assignment.presentationPosition
+    );
+    if (
+      (review as EvalReview & { assignmentId?: string }).assignmentId !==
+        expectedAssignment ||
+      review.aGenerationId !== expectedA ||
+      review.bGenerationId !== expectedB
+    ) {
+      throw new Error(`Blind review identity mismatch for ${review.caseId}`);
+    }
+    return {
+      ...review,
+      aGenerationId: assignment.aGenerationId,
+      bGenerationId: assignment.bGenerationId
+    };
+  });
 }
 
 function fatalStatusFor({
@@ -2783,7 +3500,31 @@ function clampRewriteArrays(raw: Record<string, unknown>): Record<string, unknow
   return raw;
 }
 
-function renderReviewHtml({
+function blindReviewGenerationId(
+  runId: string,
+  caseId: string,
+  side: "A" | "B"
+): string {
+  return `blind_output_${createHash("sha256")
+    .update(`blind_review_generation_v1\0${runId}\0${caseId}\0${side}`)
+    .digest("hex")
+    .slice(0, 24)}`;
+}
+
+function blindReviewAssignmentId(
+  runId: string,
+  caseId: string,
+  presentationPosition: number
+): string {
+  return `blind_assignment_${createHash("sha256")
+    .update(
+      `blind_review_assignment_v1\0${runId}\0${caseId}\0${presentationPosition}`
+    )
+    .digest("hex")
+    .slice(0, 24)}`;
+}
+
+export function renderReviewHtml({
   run,
   assignments,
   integrity
@@ -2792,7 +3533,53 @@ function renderReviewHtml({
   assignments: ReviewAssignment[];
   integrity: EvalArtifactIntegrity;
 }): string {
-  const payload = JSON.stringify({ run, assignments, integrity }).replace(
+  const lockedBlind = run.schemaVersion === 3 && run.manualReviewPlan;
+  const generationById = new Map(run.generations.map((item) => [item.id, item]));
+  const blindAssignments = lockedBlind
+    ? assignments.map((item) => ({
+        caseId: item.caseId,
+        aGenerationId: blindReviewGenerationId(run.runId, item.caseId, "A"),
+        bGenerationId: blindReviewGenerationId(run.runId, item.caseId, "B"),
+        assignmentId: blindReviewAssignmentId(
+          run.runId,
+          item.caseId,
+          item.presentationPosition
+        ),
+        presentationPosition: item.presentationPosition
+      }))
+    : assignments;
+  const blindRun = lockedBlind
+    ? {
+        runId: run.runId,
+        cases: run.cases.map((item) => ({
+          ...item,
+          blindSourceText: blindReviewSourceText(item)
+        })),
+        generations: assignments.flatMap((item) => {
+          const a = generationById.get(item.aGenerationId)!;
+          const b = generationById.get(item.bGenerationId)!;
+          return [
+            {
+              id: blindReviewGenerationId(run.runId, item.caseId, "A"),
+              output: a.output,
+              errorText: a.output ? null : "No output was produced.",
+              pipelineSignals: blindPipelineSignals(a)
+            },
+            {
+              id: blindReviewGenerationId(run.runId, item.caseId, "B"),
+              output: b.output,
+              errorText: b.output ? null : "No output was produced.",
+              pipelineSignals: blindPipelineSignals(b)
+            }
+          ];
+        })
+      }
+    : run;
+  const payload = JSON.stringify({
+    run: blindRun,
+    assignments: blindAssignments,
+    integrity
+  }).replace(
     /</g,
     "\\u003c"
   );
@@ -2987,6 +3774,7 @@ function renderReviewHtml({
       gap: 1rem;
       margin-bottom: 0.25rem;
     }
+    .pipelineStatus { color: var(--warning); font-size: 0.78rem; margin-bottom: 0.5rem; }
     .versionPanel h2 {
       margin: 0 0 0.4rem;
       font-size: 1.25rem;
@@ -3194,14 +3982,21 @@ function renderReviewHtml({
     }
     function articleHtml(label, generation) {
       const output = generation.output;
+      const signals = Array.isArray(generation.pipelineSignals)
+        ? generation.pipelineSignals
+        : [];
+      const status = signals.length
+        ? "<div class='pipelineStatus'>Pipeline status: " + escapeHtml(signals.join(", ")) + "</div>"
+        : "";
       if (!output) {
-        return "<div class='versionLabel'><div class='meta'>Version " + label + "</div></div><h2>No output</h2><div class='articleBody'><p>" + escapeHtml(generation.errorText || "No output") + "</p></div>";
+        return "<div class='versionLabel'><div class='meta'>Version " + label + "</div></div>" + status + "<h2>No output</h2><div class='articleBody'><p>" + escapeHtml(generation.errorText || "No output") + "</p></div>";
       }
       // Pipeline signals (fatal status, coverage, reference reasons) are
       // deliberately not shown: the blind review should reflect only what a
       // reader would see, without machine-check anchoring.
       return [
         "<div class='versionLabel'><div class='meta'>Version " + label + "</div></div>",
+        status,
         "<h2>" + escapeHtml(output.title) + "</h2>",
         "<div class='articleBody'>",
         "<p>" + escapeHtml(output.lead) + "</p>",
@@ -3209,8 +4004,41 @@ function renderReviewHtml({
         "</div>"
       ].join("");
     }
-    function sourceHtml(text) {
-      const trimmed = String(text || "").trim();
+    function sourceHtml(evalCase) {
+      if (typeof evalCase?.blindSourceText === "string") {
+        const trimmed = evalCase.blindSourceText.trim();
+        if (!trimmed) return "<p class='muted'>No source text.</p>";
+        return trimmed
+          .split(/\\n{2,}/)
+          .map(part => part.replace(/\\n/g, " ").replace(/ {2,}/g, " ").trim())
+          .filter(Boolean)
+          .map(part => "<p>" + escapeHtml(part) + "</p>")
+          .join("");
+      }
+      const primary = [
+        "Current notice | " + String(evalCase?.payload?.publishedAt || "") + " | " + String(evalCase?.payload?.title || ""),
+        String(evalCase?.payload?.bodyText || "").trim()
+      ].join("\n\n");
+      const pdfText = evalCase?.payload?.pdfSupplementText
+        ? "Current notice PDF text\n\n" + String(evalCase.payload.pdfSupplementText)
+        : "";
+      const supplemental = Array.isArray(evalCase?.payload?.supplementalMaterials)
+        ? evalCase.payload.supplementalMaterials
+        : [];
+      const supplementalText = supplemental.map((material, materialIndex) =>
+        "Supplemental material " + (materialIndex + 1) + " | " +
+        String(material.kind || "") + " | " + String(material.title || "") +
+        "\n\n" + String(material.text || "")
+      ).join("\n\n");
+      const related = Array.isArray(evalCase?.payload?.relatedNotices)
+        ? evalCase.payload.relatedNotices
+        : [];
+      const relatedText = related.map((notice, noticeIndex) =>
+        "Related notice " + (noticeIndex + 1) + " | relation " +
+        String(notice.relation || "") + " | " + String(notice.publishedAt || "") + " | " + String(notice.title || "") +
+        "\n\n" + String(notice.text || "")
+      ).join("\n\n");
+      const trimmed = [primary, pdfText, supplementalText, relatedText].filter(Boolean).join("\n\n").trim();
       if (!trimmed) return "<p class='muted'>No source text.</p>";
       return trimmed
         .split(/\\n{2,}/)
@@ -3256,7 +4084,7 @@ function renderReviewHtml({
       document.getElementById("case-meta").textContent = formatTime(evalCase.publishedAt) + " | " + evalCase.company + " (" + evalCase.issuerSign + ") | " + evalCase.category;
       document.getElementById("case-title").textContent = evalCase.sourceTitle;
       document.getElementById("case-tags").innerHTML = evalCase.difficultyTags.map(tag => "<span class='chip'>" + escapeHtml(tag.replaceAll("_", " ")) + "</span>").join("");
-      document.getElementById("source").innerHTML = sourceHtml(evalCase.payload.bodyText);
+      document.getElementById("source").innerHTML = sourceHtml(evalCase);
       document.getElementById("article-a").innerHTML = articleHtml("A", a);
       document.getElementById("article-b").innerHTML = articleHtml("B", b);
       document.getElementById("comment").value = review?.comment || "";
@@ -3279,6 +4107,7 @@ function renderReviewHtml({
       const issueTags = [...document.querySelectorAll("#tags input:checked")].map(input => input.value);
       const comment = document.getElementById("comment").value.trim();
       const nextReview = {
+        assignmentId: assignment.assignmentId || null,
         caseId: assignment.caseId,
         aGenerationId: assignment.aGenerationId,
         bGenerationId: assignment.bGenerationId,
@@ -3396,6 +4225,9 @@ function printUsage(): void {
   console.log([
     "Usage:",
     "  npm run eval:editorial -w apps/worker -- build-cases --from YYYY-MM-DD --to YYYY-MM-DD --limit 50 --out tmp/editorial-eval/cases.json",
+    "  npm run eval:editorial -w apps/worker -- cases-from-baseline --baseline tmp/editorial-eval/baseline-15.json --out tmp/editorial-eval/cases-15.json  (offline; exactly 15 pinned stored controls)",
+    "  npm run eval:editorial -w apps/worker -- plan-locked-15 --baseline tmp/editorial-eval/baseline-15.json --cases tmp/editorial-eval/cases-15-enriched.json --challenger regular_v5_11_candidate --model gpt-5.6-terra --effort medium --service-tier default --reference-model gpt-5.6-terra --reference-effort medium --reference-service-tier default --assignment-seed SIDES --ordering-seed ORDER --out tmp/editorial-eval/plan-15.json  (offline one-shot pilot; no model calls)",
+    "  npm run eval:editorial -w apps/worker -- run-locked-15 --plan tmp/editorial-eval/plan-15.json --out tmp/editorial-eval/run-15.json  (non-promotable pilot: 15 stored controls + one fresh rewrite/checker pair per case)",
     "  npm run eval:editorial -w apps/worker -- run --cases tmp/editorial-eval/cases.json --control regular_v5_6_control --challenger regular_v5_6_control --control-model gpt-5.5 --control-effort medium --challenger-model gpt-5.6-terra --challenger-effort medium --reference-model gpt-5.6-terra --reference-effort medium --service-tier flex [--assignment-seed SEED] [--ordering-seed SEED] --out tmp/editorial-eval/run.json",
     "  npm run eval:editorial -w apps/worker -- review-html --run tmp/editorial-eval/run.json --out tmp/editorial-eval/review.html",
     "  Legacy run schemas 1-2 require --reviews when rendering review HTML.",
