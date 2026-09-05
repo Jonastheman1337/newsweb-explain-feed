@@ -258,6 +258,31 @@ describe("report evidence completeness", () => {
     ]);
   });
 
+  it("permits a supported current brief without upgrading report evidence availability", () => {
+    const input: NoticePayload = { ...payload, title: "Halvårsrapport", hasAttachments: true, reportCompleteness: "insufficient" };
+    const evidence = buildNoticeEvidence(input);
+    expect(reportEvidenceIssues(input, "report", evidence, brief())).toEqual([]);
+    expect(input.reportCompleteness).toBe("insufficient");
+    expect(evidence.attachmentTextAvailable).toBe(false);
+    expect(evidence.sourceLimitations).toContain("Vedlegg er ikke tilgjengelige i kildegrunnlaget.");
+  });
+
+  it("does not treat a willing but ungrounded or historical-only brief as drafting evidence", () => {
+    const input: NoticePayload = { ...payload, title: "Halvårsrapport", hasAttachments: true, relatedNotices: [prior()] };
+    const evidence = buildNoticeEvidence(input);
+    const invalid = [
+      brief({ mustInclude: [] }),
+      brief({ mustInclude: [{ ...brief().mustInclude[0]!, sourceEvidence: "Ingen av disse ordene står i dagens kilde." }] }),
+      brief({ mustInclude: [{ id: "history", fact: prior().text, sourceId: "prior_900000", sourceEvidence: prior().text }] }),
+      brief({ newsworthy: false, mustInclude: [] })
+    ];
+    for (const proposal of invalid) {
+      expect(reportEvidenceIssues(input, "report", evidence, proposal)).toContain(
+        "INCOMPLETE_REPORT_SOURCE: The results notice has attachments but no report evidence was obtained."
+      );
+    }
+  });
+
   it("does not block an ordinary text notice just because it has an unavailable attachment", () => {
     const ordinary: NoticePayload = { ...payload, title: "Ny kontrakt", hasAttachments: true };
     expect(reportEvidenceIssues(ordinary, "regular", buildNoticeEvidence(ordinary))).toEqual([]);

@@ -94,11 +94,28 @@ describe("bounded report attachment selection", () => {
     expect(reportNeedsOpenAIPdfFallback(result!)).toBe(true);
   });
 
-  it("rejects a named quarterly branding file without report content", async () => {
+  it("retains a named readable PDF without certifying its branding as financial evidence", async () => {
     fixture.documents.set(1, [`Q2 investor branding presentation\n${padding}`]);
     const raw = { attachments: [{ id: 1, fileName: "Q2-report.pdf" }] };
-    expect(await extractReportContent(raw, 10)).toBeNull();
+    const result = await extractReportContent(raw, 10);
+    expect(result?.referenceText).toContain(`Q2 investor branding presentation\n${padding}`);
+    expect(result?.metrics).toEqual([]);
+    expect(result?.financialFacts).toEqual([]);
+    expect(result?.diagnostics.completeness).toBe("insufficient");
     expect(await downloadReportPdfAttachment(raw, 10)).toBeNull();
+  });
+
+  it("retains a readable named report with unrecognised financial rows and exact attachment provenance", async () => {
+    const source = ["Q1 2028 operating update", "Amounts in EUR million", "Q1 2028\tQ1 2027", "Contract backlog\t740\t620", "Net investments\t18\t23", padding].join("\n");
+    fixture.documents.set(1, [source]);
+    const result = await extractReportContent({ attachments: [{ id: 1, fileName: "Q1-report.pdf" }] }, 10);
+    expect(result).toMatchObject({ attachmentId: 1, attachmentName: "Q1-report.pdf" });
+    expect(result?.referenceText).toContain(`[PDF attachment 1: Q1-report.pdf]\n[PDF page 1]\n${source}`);
+    expect(result?.selectedPages).toEqual([expect.objectContaining({ pageNumber: 1, attachmentId: 1, attachmentName: "Q1-report.pdf" })]);
+    expect(result?.metrics).toEqual([]);
+    expect(result?.financialFacts).toEqual([]);
+    expect(result?.diagnostics.completeness).toBe("insufficient");
+    expect(result?.diagnostics.completenessReasons).toContain("no_usable_financial_facts");
   });
 
   it("allows visual fallback for a scanned named report and reuses a selected primary ID", async () => {

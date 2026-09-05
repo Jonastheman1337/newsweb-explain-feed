@@ -104,8 +104,17 @@ export function isResultsNotice(payload: PromptPayload, kind: NoticePromptKind):
     .test([payload.title, ...payload.categories].join(" "));
 }
 
-export function reportEvidenceIssues(payload: NoticePayload, kind: NoticePromptKind, evidence: NoticeEvidence): string[] {
+export function reportEvidenceIssues(
+  payload: NoticePayload,
+  kind: NoticePromptKind,
+  evidence: NoticeEvidence,
+  brief?: NoticeEditorialBrief
+): string[] {
   if (!isResultsNotice(payload, kind)) return [];
+  // Report-level extraction confidence is not a verdict on every current fact.
+  // A validated newsworthy brief may attempt a limited draft from the raw
+  // evidence that exists; the final article still needs every publication check.
+  if (brief?.newsworthy && validateBriefEvidence(brief, evidence).length === 0) return [];
   if (payload.reportCompleteness === "insufficient") return ["INCOMPLETE_REPORT_SOURCE: No usable financial evidence was obtained from the report."];
   if (!payload.hasAttachments) return [];
   if (!evidence.attachmentTextAvailable) return ["INCOMPLETE_REPORT_SOURCE: The results notice has attachments but no report evidence was obtained."];

@@ -320,10 +320,12 @@ describe("full notice-pipeline evaluation", () => {
   });
 
   it.each([
-    "Haugaland Kraft AS - Half-Year Report 2026", "H1 2026 Financial Report", "Q2 2026 results"
-  ])("blocks missing report evidence on a regular fallback: %s", async title => {
-    const reportPayload = { ...payload, title, hasAttachments: true, categories: ["Half yearly financial reports and audit reports"] };
-    const { call, requests } = mockPipelineCaller();
+    "Syntetisk foretak - Half-Year Report 2026", "H1 2026 Financial Report", "Q2 2026 results"
+  ])("keeps an attachment-only announcement unavailable instead of accepting an editorial skip: %s", async title => {
+    const bodyText = "Rapporten er publisert og ligger i vedlegget.";
+    const reportPayload = { ...payload, title, bodyText, sourceBodyChars: bodyText.length,
+      hasAttachments: true, categories: ["Half yearly financial reports and audit reports"] };
+    const { call, requests } = mockPipelineCaller({ skip: true });
     const result = await evaluateNoticePipelineCase({
       evalCase: { ...evalCase, payload: reportPayload, sourceSha256: sourcePayloadSha256(reportPayload) },
       call, pipelineOptions: { allowSkip: true }

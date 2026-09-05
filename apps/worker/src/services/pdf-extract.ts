@@ -41,6 +41,7 @@ export type ReportMetricKind =
 export type ReportPageReason =
   | "income_statement"
   | "financial_fallback"
+  | "report_overview"
   | "ceo_or_management"
   | "outlook_or_events"
   | "user_page"
@@ -828,6 +829,32 @@ function formatPageForContext(page: PdfPageText, maxChars: number): string {
   );
 }
 
+function buildReportOverviewText(
+  pages: PdfPageText[],
+  selected: Map<number, MutableSelectedPage>
+): { text: string; truncated: boolean } {
+  const overviewPages = [...selected.values()]
+    .filter(item => item.reasons.has("report_overview"))
+    .sort((left, right) => left.index - right.index)
+    .map(item => pages[item.index]);
+  let remaining = MAX_SECONDARY_PAGE_CHARS;
+  let truncated = false;
+  const excerpts = overviewPages.map((page, index) => {
+    const limit = Math.floor(remaining / (overviewPages.length - index));
+    let end = Math.min(page.text.length, limit);
+    if (end < page.text.length) {
+      const lineEnd = page.text.lastIndexOf("\n", end);
+      if (lineEnd > end / 2) end = lineEnd;
+      truncated = true;
+    }
+    remaining -= end;
+    // Preserve the original prefix, including physical table separators. This
+    // is raw source availability, not a new financial or management classifier.
+    return `[PDF page ${page.pageNumber}]\n${page.text.slice(0, end)}${end < page.text.length ? "\n[... page truncated ...]" : ""}`;
+  });
+  return { text: excerpts.join("\n\n"), truncated };
+}
+
 function metricDisplayName(kind: ReportMetricKind): string {
   return METRIC_LABELS[kind];
 }
@@ -903,7 +930,8 @@ function buildReportContextText(
   pages: PdfPageText[],
   selected: Map<number, MutableSelectedPage>,
   metrics: ReportMetricCandidate[],
-  financialFacts: ReportFinancialFact[]
+  financialFacts: ReportFinancialFact[],
+  overviewText: string
 ): string {
   const selectedItems = [...selected.values()];
   const hasReason = (item: MutableSelectedPage, reasons: ReportPageReason[]) =>
@@ -933,6 +961,7 @@ function buildReportContextText(
 
   const usableFacts = financialFacts.filter((fact) => fact.usable);
   const sections: string[] = [
+    ...(overviewText ? [`REPORT OVERVIEW (bounded raw page excerpts):\n\n${overviewText}`] : []),
     [
       "ALIGNED FINANCIAL FACTS (original units; no conversions):",
       ...(usableFacts.length ? usableFacts.map((fact) =>
@@ -1083,24 +1112,40 @@ export function buildReportContextFromPages(
       secondaryByIndex.set(next.index, { index: next.index, score: item.score - 1, reason: item.reason });
     }
   }
+  // Reserve part of the existing secondary-page allowance for early raw text.
+  // Useful context must not depend on recognising a metric or prose heading.
+  const overviewIndexes = pages
+    .filter(page => !selected.has(page.index) && page.text.trim() && !hasAnyTerm(page.normalized, CONTENTS_TERMS))
+    .slice(0, Math.floor(MAX_SECONDARY_PAGES / 2))
+    .map(page => page.index);
   const secondaryScores = [...secondaryByIndex.values()]
-    .sort((left, right) => right.score - left.score || left.index - right.index)
-    .slice(0, MAX_SECONDARY_PAGES);
+    .sort((left, right) => right.score - left.score || left.index - right.index);
+  const contextIndexes = new Set(overviewIndexes);
   for (const item of secondaryScores) {
-    addSelectedPage(selected, pages, item.index, item.reason, item.score);
+    if (contextIndexes.size >= MAX_SECONDARY_PAGES) break;
+    contextIndexes.add(item.index);
+  }
+  for (const index of contextIndexes) {
+    if (overviewIndexes.includes(index)) addSelectedPage(selected, pages, index, "report_overview", 0);
+    const secondary = secondaryByIndex.get(index);
+    if (secondary) addSelectedPage(selected, pages, index, secondary.reason, secondary.score);
   }
 
   const selectedPages = toSelectedPages(selected, pages);
-  const text = buildReportContextText(pages, selected, metrics, financialFacts);
+  const overview = buildReportOverviewText(pages, selected);
+  const text = buildReportContextText(pages, selected, metrics, financialFacts, overview.text);
   const evidenceRows = financialFacts.filter((fact, index) => financialFacts.findIndex((other) => other.pageNumber === fact.pageNumber && other.rowNumber === fact.rowNumber) === index);
   // Put the exact financial rows and their source headings before long pages so
   // truncation cannot leave only a derived value without its original evidence.
   const rawReferenceText = [
     ...evidenceRows.map((fact) => `[PDF page ${fact.pageNumber}, row ${fact.rowNumber}; original table headings and row]\n${[...fact.headerText, fact.rowText].join("\n")}`),
-    ...selectedPages.map((page) => `[PDF page ${page.pageNumber}]\n${rawPages[page.pageNumber - 1]}`)
+    ...(overview.text ? [overview.text] : []),
+    ...selectedPages.filter(page => page.reasons.some(reason => reason !== "report_overview"))
+      .map((page) => `[PDF page ${page.pageNumber}]\n${rawPages[page.pageNumber - 1]}`)
   ].join("\n\n");
-  const referenceTextTruncated = rawReferenceText.length > MAX_REPORT_REFERENCE_CHARS;
-  const referenceText = referenceTextTruncated ? `${rawReferenceText.slice(0, MAX_REPORT_REFERENCE_CHARS)}\n[... selected source pages truncated ...]` : rawReferenceText;
+  const referenceBudgetExceeded = rawReferenceText.length > MAX_REPORT_REFERENCE_CHARS;
+  const referenceTextTruncated = referenceBudgetExceeded || overview.truncated;
+  const referenceText = referenceBudgetExceeded ? `${rawReferenceText.slice(0, MAX_REPORT_REFERENCE_CHARS)}\n[... selected source pages truncated ...]` : rawReferenceText;
   const contextTruncated = text.includes("[... page truncated ...]") || text.includes("[... more selected report context omitted ...]");
   const usableFinancialFactCount = financialFacts.filter((fact) => fact.usable).length;
   const unresolvedFinancialFactCount = financialFacts.length - usableFinancialFactCount;
@@ -1149,7 +1194,7 @@ type InspectedReportDocument = {
   score: number;
 };
 
-/** Filename hints affect the bounded inspection order; content decides relevance. */
+/** Content recognition ranks reports; filename hints can also retain raw text. */
 function scoreReportDocument(pages: string[]): { relevant: boolean; score: number } {
   let bestScore = 0;
   let relevant = false;
@@ -1222,7 +1267,10 @@ export async function extractReportContent(
 ): Promise<ReportExtractionResult | null> {
   const attachments = normalizeAttachments(rawMessageJson);
   const inspection = await inspectReportAttachments(attachments, messageId);
-  const relevant = inspection.documents.filter((document) => document.relevant && document.pages.join("\n\n").trim().length >= MIN_TEXT_CHARS).sort((a, b) => b.score - a.score);
+  const relevant = inspection.documents.filter((document) =>
+    (document.relevant || REPORT_FILENAME_PATTERN.test(document.target.fileName ?? "")) &&
+    document.pages.join("\n\n").trim().length >= MIN_TEXT_CHARS
+  ).sort((a, b) => b.score - a.score);
   // Keep substantively different PDFs; exact duplicate language copies waste the
   // limited context without contributing a source or a missing financial fact.
   const unique = relevant.filter((document, index) => relevant.findIndex((other) => other.pages.join("\n").trim() === document.pages.join("\n").trim()) === index);

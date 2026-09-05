@@ -11,6 +11,10 @@ const table = [
 ].join("\n");
 const prose = "The group continued work on the existing properties during the quarter. The report describes changes in occupancy and rental income for the current reporting period.";
 
+const classifiedPages = (context: ReturnType<typeof buildReportContextFromPages>) => context.selectedPages
+  .filter(page => page.reasons.some(reason => reason !== "report_overview"))
+  .map(page => page.pageNumber);
+
 describe("material management report context", () => {
   it("retains management and financial results beside tables, including a prior-year property gain", () => {
     // Compact source-format regression based on the physical Carucel pages 3–5.
@@ -30,7 +34,7 @@ describe("material management report context", () => {
       "Note 1 - ACCOUNTING PRINCIPLES\nThe statements consist of income statement, balance sheet and notes. Management uses estimates.",
       "Revenue recognition\nNote 1 - ACCOUNTING PRINCIPLES\nRevenue is recognised in the income statement after delivery."
     ]);
-    expect(context.selectedPages.map(page => page.pageNumber)).toEqual([3, 4, 5]);
+    expect(classifiedPages(context)).toEqual([3, 4, 5]);
     expect(context.selectedPages.find(page => page.pageNumber === 5)?.reasons).toContain("income_statement");
     expect(context.text).toContain("NOK 46 million gain on property divestments");
     expect(context.text).toContain("Excluding this gain, EBITDA was broadly unchanged.");
@@ -74,8 +78,9 @@ describe("material management report context", () => {
       "Note 1 - Accounting policies\nManagement review\nIncome statement\nThe assumptions apply consistently to each period.",
       "Styrets erklæring\nEksempel Navn\nKonsernsjef\nVi bekrefter at halvårsregnskapet gir et rettvisende bilde av konsernets stilling."
     ]);
-    expect(context.selectedPages.map(page => page.pageNumber)).toEqual([1]);
-    expect(context.text).not.toContain("CEO approves");
+    expect(classifiedPages(context)).toEqual([1]);
+    expect(context.selectedPages.find(page => page.pageNumber === 2)?.reasons).toEqual(["report_overview"]);
+    expect(context.selectedPages.find(page => page.pageNumber === 3)?.reasons).toEqual(["report_overview"]);
   });
 
   it("recognises split statement and management headings without matching contents entries", () => {
@@ -94,7 +99,7 @@ describe("material management report context", () => {
       "Income statement for the period ended June 2026 is prepared using management estimates."
     ]);
     expect(context.diagnostics.incomeStatementFound).toBe(true);
-    expect(context.selectedPages.map(page => page.pageNumber)).toEqual([1]);
+    expect(classifiedPages(context)).toEqual([1]);
     expect(context.selectedPages[0].reasons).toContain("income_statement");
   });
 

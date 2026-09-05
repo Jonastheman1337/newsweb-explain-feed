@@ -16,7 +16,7 @@ function selectedReasons(
 }
 
 describe("buildReportContextFromPages", () => {
-  it("selects income statement pages instead of the first report pages", () => {
+  it("keeps income statement selection distinct from early raw report pages", () => {
     const context = buildReportContextFromPages([
       "UNRELATED FIRST PAGE with generic company branding.",
       "Table of contents\nConsolidated statement of comprehensive income 61",
@@ -34,7 +34,34 @@ describe("buildReportContextFromPages", () => {
     expect(selectedReasons(context, 4)).toContain("income_statement");
     expect(context.text).toContain("[PDF page 4]");
     expect(context.text).toContain("PRIMARY SOURCE");
-    expect(context.text).not.toContain("UNRELATED FIRST PAGE");
+    expect(selectedReasons(context, 1)).toEqual(["report_overview"]);
+    expect(context.text).toContain("REPORT OVERVIEW");
+    expect(context.metrics.every(metric => metric.pageNumber === 4)).toBe(true);
+  });
+
+  it("keeps a bounded unrecognised early overview beside a later financial table", () => {
+    const overview = "Review of our quarter\nDemand fell after the temporary distribution closure.\nBacklog\t740\t620\n";
+    const table = ["Consolidated income statement", "NOK million", "Q1 2028 Q1 2027", "Revenue 86 92", "Operating profit 8 11", "Profit before tax 6 9"].join("\n");
+    const context = buildReportContextFromPages([
+      "Report cover",
+      "Table of contents\nReview 3\nFinancial statements 12",
+      overview + "Further background on the distribution network.\n".repeat(2000) + "OVERVIEW END",
+      ...Array.from({ length: 8 }, () => "Illustration"),
+      table
+    ]);
+    expect(selectedReasons(context, 3)).toEqual(["report_overview"]);
+    expect(selectedReasons(context, 12)).toContain("income_statement");
+    expect(selectedReasons(context, 2)).toEqual([]);
+    expect(context.text).toContain(overview);
+    expect(context.text).toContain(table);
+    expect(context.referenceText).toContain(`[PDF page 3]\n${overview}`);
+    expect(context.referenceText).toContain(`[PDF page 12]\n${table}`);
+    expect(context.referenceText).not.toContain("OVERVIEW END");
+    expect(context.text.length).toBeLessThanOrEqual(24000);
+    expect(context.referenceText.length).toBeLessThanOrEqual(72000);
+    expect(context.diagnostics.referenceTextTruncated).toBe(true);
+    expect(context.financialFacts?.filter(fact => fact.usable)).toHaveLength(6);
+    expect(context.metrics.every(metric => metric.pageNumber === 12)).toBe(true);
   });
 
   it("extracts the three key metrics and does not prefer EBITDA over EBIT", () => {

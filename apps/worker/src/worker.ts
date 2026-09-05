@@ -89,6 +89,7 @@ import {
 } from "./services/stale-generation-recovery.js";
 import { runNoticePipeline } from "./services/notice-pipeline.js";
 import { noticeReferencePayload, type NoticePayload } from "./services/notice-evidence.js";
+import { deferUnavailableReportSkip } from "./services/notice-triage.js";
 import { buildReportPdfFallbackRequest, mergeReportPdfFallback, reportPdfFallbackJsonSchema } from "./services/report-pdf-fallback.js";
 import { setGenerationPhase } from "./services/generation-phase.js";
 import {
@@ -2208,15 +2209,17 @@ const rewriteWorker = new Worker<RewriteJobData>(
         triageEvaluation.candidateClassIds.filter(
           (classId) => !defaultEnabledTriageClasses.includes(classId)
         );
+      const reportSkipDeferred = deferUnavailableReportSkip(payload, triageEvaluation.enabledSkip);
       const triageTelemetryJson = {
         enabledClasses: [...activeTriageEnabledClasses],
         // Non-null only when an enabled skip was bypassed (manual reprocess)
         // or the run persisted despite a matching enabled class.
         bypassedSkipClassId: triageEvaluation.enabledSkip?.classId ?? null,
+        deferredSkipReason: reportSkipDeferred ? "report_attachment_unavailable" : null,
         shadowSkipClassIds: triageShadowSkipClassIds
       };
       if (job.data.reason !== "manual-reprocess") {
-        const deterministicSkip = triageEvaluation.enabledSkip;
+        const deterministicSkip = reportSkipDeferred ? null : triageEvaluation.enabledSkip;
         if (deterministicSkip) {
           console.log(
             `[triage] deterministic skip ${messageId} (${source.issuerSign}): ${deterministicSkip.reason}`

@@ -79,6 +79,12 @@ export type NoticePipelineAudit = {
   finalReferenceCoverage: ReferenceCoverageReport | null;
   referenceCheck: ReturnType<typeof referenceCheckValidationJson> | null;
   sourceLimitations: string[];
+  reportReadiness: {
+    reportCompleteness: NoticePayload["reportCompleteness"] | null;
+    attachmentTextAvailable: boolean;
+    sourceIssues: string[];
+    supportedLimitedDraft: boolean;
+  } | null;
   numericPublicationPolicy: { scope: string; unexpectedDisplays: string[]; corruptedSourceDisplays: string[]; disabledPaidOutflowDisplays: string[]; referenceGroundedOverrideApplied: boolean } | null;
 };
 export type NoticePipelineResult = {
@@ -145,7 +151,7 @@ export async function runNoticePipeline(options: NoticePipelineOptions): Promise
     version: NOTICE_PIPELINE_VERSION, promptVersion: NOTICE_EDITORIAL_PROMPT_VERSION,
     sourceSha256: "", brief: null, briefErrors: [], briefAttempts: [], iterations: [], repairAttempts: 0,
     finalCoverage: null, finalReferenceCoverage: null, referenceCheck: null,
-    sourceLimitations: [], numericPublicationPolicy: null
+    sourceLimitations: [], reportReadiness: null, numericPublicationPolicy: null
   };
   const result: NoticePipelineResult = {
     decision: "retry", rewrite: null, initialDraft: null, brief: null,
@@ -244,9 +250,24 @@ export async function runNoticePipeline(options: NoticePipelineOptions): Promise
       if (parsed.success && errors.length === 0) { brief = parsed.data; break; }
     }
     if (!brief) throw new Error("EDITORIAL_BRIEF_UNGROUNDED: No valid source-bound brief was produced.");
+    const sourceIssues = reportEvidenceIssues(payload, kind, evidence);
+    const sourceErrors = reportEvidenceIssues(payload, kind, evidence, brief);
+    const supportedLimitedDraft = sourceIssues.length > 0 && sourceErrors.length === 0;
+    audit.reportReadiness = {
+      reportCompleteness: payload.reportCompleteness ?? null,
+      attachmentTextAvailable: evidence.attachmentTextAvailable,
+      sourceIssues, supportedLimitedDraft
+    };
+    if (supportedLimitedDraft) {
+      // Preserve the model's original attempt in the audit and give the writer
+      // the server-observed limits without altering or inventing source facts.
+      brief = { ...brief, sourceLimitations: [...new Set([
+        ...brief.sourceLimitations, ...evidence.sourceLimitations
+      ])] };
+    }
     result.brief = audit.brief = brief;
-    // Readiness is independent of the model's willingness to write or skip.
-    const sourceErrors = reportEvidenceIssues(payload, kind, evidence);
+    // An unavailable source and a non-news verdict are different outcomes.
+    // Only a source-bound current brief can proceed despite the source issues.
     if (sourceErrors.length) { result.errors = sourceErrors; return result; }
     if (!brief.newsworthy && options.allowSkip === true) {
       result.decision = "skip";
@@ -277,11 +298,11 @@ export async function runNoticePipeline(options: NoticePipelineOptions): Promise
       }
       draft = ensureReportSourceLimitation(draft, referencePayload, options.reportExtraction);
       draft = { ...draft, source_limitations: [...new Set([
-        ...draft.source_limitations, ...evidence.sourceLimitations
+        ...evidence.sourceLimitations, ...draft.source_limitations
       ])].slice(0, 6) };
       // Passing sentence checks cannot establish completeness of a partial
       // report. Keep confidence consistent after every model repair as well.
-      if (payload.reportCompleteness === "partial" && draft.confidence === "high") {
+      if ((payload.reportCompleteness === "partial" || supportedLimitedDraft) && draft.confidence === "high") {
         draft = { ...draft, confidence: "medium" };
       }
       result.rewrite = draft;
