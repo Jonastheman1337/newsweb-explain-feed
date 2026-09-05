@@ -1,10 +1,12 @@
-import { noticeEditorialExamples, type NoticeEditorialBrief } from "@newsweb/prompt-kit";
+import { createNoticeKindInstructions, noticeEditorialExamples, type NoticeEditorialBrief } from "@newsweb/prompt-kit";
 import { describe, expect, it } from "vitest";
 import type { NoticeEvidenceSource } from "./notice-evidence.js";
 import {
   coverageUserPrompt,
+  createNoticeBriefRules,
   noticeCoverageSchema,
   noticeEditorialBriefSchema,
+  validateBriefEditorialScope,
   validateCoveragePartition,
   validateCoverageSemantics,
   type NoticeCoverage
@@ -29,7 +31,7 @@ const review: NoticeCoverage = {
   missingFactIds: [],
   statusAccurate: true,
   instructionCompliant: true,
-  semanticChecks: { actorAndPayment: "pass", metricAndMaterialScope: "pass", relativeQuantityContext: "not_applicable" },
+  semanticChecks: { actorAndPayment: "pass", metricAndMaterialScope: "pass", relativeQuantityContext: "not_applicable", materialEventCoverage: "pass" },
   semanticFindings: [],
   findings: [],
   repairInstruction: ""
@@ -71,6 +73,54 @@ describe("notice editorial brief schema", () => {
     { usefulQuote: { text: "Sitatet", speaker: "", sourceId: "primary", sourceEvidence: "Et kildeutdrag" } }
   ])("rejects malformed or unbounded planning output", (overrides) => {
     expect(noticeEditorialBriefSchema.safeParse({ ...brief, ...overrides }).success).toBe(false);
+  });
+});
+
+describe("annual brief topic boundary", () => {
+  function annual(fact: string, sourceEvidence = fact): NoticeEditorialBrief {
+    return { ...brief, eventType: "annual", mustInclude: [{ id: "annual_fact", fact, sourceId: "primary", sourceEvidence }] };
+  }
+
+  it("shares exactly the writer's topic instructions, with one active kind", () => {
+    for (const kind of ["regular", "report", "yearly"] as const) {
+      expect(createNoticeBriefRules(kind)).toContain(createNoticeKindInstructions(kind));
+    }
+    expect(createNoticeBriefRules("yearly")).not.toContain(createNoticeKindInstructions("report"));
+    expect(createNoticeBriefRules("report")).not.toContain(createNoticeKindInstructions("yearly"));
+  });
+
+  it("rejects a dividend or operating-result story substituted for remuneration", () => {
+    for (const fact of ["Morselskapet betalte 63 millioner euro i utbytte til aksjonærene.", "Konsernets inntekter var 780 millioner kroner."]) {
+      const rejected = annual(fact, `CEO remuneration is separately reported. ${fact}`);
+      expect(validateBriefEditorialScope(rejected, "yearly")).toEqual([expect.stringContaining("EDITORIAL_BRIEF_YEARLY_SCOPE_SUBSTITUTION")]);
+      expect(validateBriefEditorialScope(rejected, "report")).toEqual([]);
+      expect(validateBriefEditorialScope(rejected, "regular")).toEqual([]);
+    }
+  });
+
+  it("does not let a separate salary fact excuse an unrelated dividend requirement", () => {
+    const mixed = annual("Styret foreslo 63 millioner euro i utbytte.");
+    mixed.mustInclude.push({ id: "pay", fact: "Konsernsjefens godtgjørelse var 0,4 millioner euro.", sourceId: "primary", sourceEvidence: "CEO remuneration was EUR 0.4 million." });
+    expect(validateBriefEditorialScope(mixed, "yearly")).toEqual([expect.stringContaining("EDITORIAL_BRIEF_YEARLY_SCOPE_SUBSTITUTION")]);
+    expect(validateBriefEditorialScope(annual("Konsernsjefens bonus avhenger av konsernets driftsresultat."), "yearly")).toEqual([]);
+    expect(validateBriefEditorialScope(annual("Aksjebasert godtgjørelse gir direktøren rett til utbytte på de tildelte aksjene."), "yearly")).toEqual([]);
+  });
+
+  it.each([
+    "Konsernsjefens samlede godtgjørelse var 0,4 millioner euro mot 0,5 millioner året før.",
+    "The parent paid no remuneration directly; compensation was borne by other Group entities.",
+    "Styret mottok ingen godtgjørelse fra morselskapet.",
+    "The chief executive received no cash salary in the period.",
+    "Godtgjørelsestabellen er ikke lesbar i det tilgjengelige utdraget.",
+    "Den aktuelle noten er utilgjengelig i utdraget."
+  ])("does not mistake a role, nonpayment or unavailable disclosure for a scope substitution: %s", fact => {
+    expect(validateBriefEditorialScope(annual(fact), "yearly")).toEqual([]);
+  });
+
+  it("does not manufacture salary facts for an empty unavailable brief or a legitimate skip", () => {
+    const unavailable = { ...brief, mustInclude: [], sourceLimitations: ["Relevant remuneration pages could not be read."] };
+    expect(validateBriefEditorialScope(unavailable, "yearly")).toEqual([]);
+    expect(validateBriefEditorialScope({ ...unavailable, newsworthy: false }, "yearly")).toEqual([]);
   });
 });
 
@@ -129,6 +179,42 @@ describe("semantic coverage witnesses and verdicts", () => {
     expect(() => validateCoverageSemantics(check, output, sources)).not.toThrow();
   });
 
+  it("rejects a verdict demanding an optional comparison that is no longer visible", () => {
+    const shortened = { ...output, body: ["En jernbane er tatt i bruk og kan gi tilgang til tidligere utvunnet malm."] };
+    const check: NoticeCoverage = { ...review, semanticChecks: { ...review.semanticChecks, relativeQuantityContext: "fail" },
+      semanticFindings: [{ check: "relativeQuantityContext", kind: "material_omission", articleField: "body",
+        articleEvidence: shortened.body[0], sourceId: "primary", sourceEvidence: relative,
+        explanation: "Sammenligningen i briefen må legges tilbake." }], repairInstruction: "Legg til tilsvarende mengde." };
+    expect(() => validateCoverageSemantics(check, shortened, sources)).toThrow("EDITORIAL_SEMANTIC_RELATIVE_CLAIM_MISSING");
+    expect(() => validateCoverageSemantics(review, shortened, sources)).not.toThrow();
+    const resolved = { ...shortened, body: ["En jernbane kan gi tilgang til rundt 600 tonn tidligere utvunnet malm."] };
+    expect(() => validateCoverageSemantics(review, resolved, sources)).not.toThrow();
+  });
+
+  it.each(["Resten kan hentes ut.", "En like stor mengde kan hentes ut.", "Det dobbelte kan hentes ut.", "En fjerdedel kan hentes ut."])("keeps a real visible relative expression reviewable: %s", claim => {
+    const article = { ...output, body: [claim] };
+    const check: NoticeCoverage = { ...review, semanticChecks: { ...review.semanticChecks, relativeQuantityContext: "fail" },
+      semanticFindings: [{ check: "relativeQuantityContext", kind: "material_omission", articleField: "body", articleEvidence: claim,
+        sourceId: "primary", sourceEvidence: relative, explanation: "Sammenligningsgrunnlaget mangler i den synlige teksten." }],
+      repairInstruction: "Gjør sammenligningen kildefast med et synlig grunnlag, eller fjern den." };
+    expect(() => validateCoverageSemantics(check, article, sources)).not.toThrow();
+  });
+
+  it.each([
+    { title: "MillCo setter produksjonsrekord", lead: "Volumet var høyest siden gjenåpningen i 2024.",
+      body: [], source: "The May volume was the highest since the plant reopened in 2024.",
+      field: "title" as const, claim: "MillCo setter produksjonsrekord", explanation: "Tittelen fjerner rekordens dokumenterte tidsgrense." },
+    { title: "MillCo oppdaterer driften", lead: "MillCo opplyser om produksjonen i mai.",
+      body: ["Mengden metall som støpes, påvirkes av etterslep i prosessen."],
+      source: "The timing of the metal pour is influenced by processing lags.",
+      field: "body" as const, claim: "Mengden metall som støpes, påvirkes av etterslep i prosessen.", explanation: "Forklaringen gjelder tidspunktet, ikke mengden." }
+  ])("accepts literal metric-scope findings for a bounded record or timing-to-quantity change", item => {
+    const article = { ...output, title: item.title, lead: item.lead, body: item.body };
+    const check: NoticeCoverage = { ...scopeFailure, semanticFindings: [{ ...scopeFinding,
+      articleField: item.field, articleEvidence: item.claim, sourceEvidence: item.source, explanation: item.explanation }] };
+    expect(() => validateCoverageSemantics(check, article, [{ id: "primary", kind: "primary", text: item.source }])).not.toThrow();
+  });
+
   it("does not let a body quotation serve as evidence of what the title says", () => {
     const check = { ...scopeFailure, semanticFindings: [{ ...scopeFinding, articleEvidence: output.body[1] }] };
     expect(() => validateCoverageSemantics(check, output, sources)).toThrow("EDITORIAL_SEMANTIC_ARTICLE_EVIDENCE_MISMATCH");
@@ -181,12 +267,86 @@ describe("semantic coverage witnesses and verdicts", () => {
   it("requires all checklist decisions and keeps a clean short article valid", () => {
     const sparse = { ...noticeEditorialExamples.routine.output, title: "Nordtek sender invitasjon" };
     const clear: NoticeCoverage = { ...review, coveredFactIds: [], semanticChecks: {
-      actorAndPayment: "not_applicable", metricAndMaterialScope: "pass", relativeQuantityContext: "not_applicable" } };
+      actorAndPayment: "not_applicable", metricAndMaterialScope: "pass", relativeQuantityContext: "not_applicable", materialEventCoverage: "not_applicable" } };
     expect(() => validateCoverageSemantics(clear, sparse, [])).not.toThrow();
     expect(noticeCoverageSchema.safeParse({ ...review, semanticChecks: undefined }).success).toBe(false);
     expect(noticeCoverageSchema.safeParse({ ...review, semanticFindings: undefined }).success).toBe(false);
     expect(noticeCoverageSchema.safeParse({ ...review, semanticChecks: { actorAndPayment: "pass" } }).success).toBe(false);
     expect(noticeCoverageSchema.safeParse({ ...review, semanticChecks: { ...review.semanticChecks, actorAndPayment: true } }).success).toBe(false);
+  });
+});
+
+describe("decisive current event coverage beyond the selected brief", () => {
+  const article = { ...noticeEditorialExamples.results.output,
+    title: "Arvik øker inntektene", lead: "Arvik økte inntektene til 430 millioner kroner i andre kvartal.",
+    body: ["Styret har vedtatt et ordinært utbytte på 1,20 kroner per aksje."] };
+  const closure = "During the quarter the group closed its entire battery development business and terminated all remaining customer projects.";
+  const payout = "A separate NOK 0.65 special dividend will be paid by Arvik only if the disposal of the vessel completes.";
+
+  function omitted(sourceEvidence: string, sourceId = "primary"): NoticeCoverage {
+    return { ...review, semanticChecks: { ...review.semanticChecks, materialEventCoverage: "fail" },
+      semanticFindings: [{ check: "materialEventCoverage", kind: "material_omission", articleField: "lead",
+        articleEvidence: article.lead, sourceId, sourceEvidence,
+        explanation: "Artikkelen utelater en separat vesentlig hendelse som meldes i samme kvartal." }],
+      repairInstruction: "Ta med den utelatte hendelsen, dens omfang og det uttrykkelige vilkåret; behold resultatvinkelen." };
+  }
+
+  it.each([closure, payout])("accepts a current raw witness even when every selected brief fact passed", sourceEvidence => {
+    const check = omitted(sourceEvidence);
+    const raw = `${"Other report details.\n".repeat(100)}${sourceEvidence}`;
+    expect(check.coveredFactIds).toEqual(review.coveredFactIds);
+    expect(check.missingFactIds).toEqual([]);
+    expect(check.statusAccurate).toBe(true);
+    expect(() => validateCoverageSemantics(check, article, [{ id: "primary", kind: "primary", text: raw }], { kind: "report" })).not.toThrow();
+  });
+
+  it("allows a current editor-selected raw source without borrowing another source identity", () => {
+    const check = omitted(payout, "material_terms");
+    const sources: NoticeEvidenceSource[] = [{ id: "primary", kind: "primary", text: closure }, { id: "material_terms", kind: "material", text: payout }];
+    expect(() => validateCoverageSemantics(check, article, sources)).not.toThrow();
+    const wrongOwner = { ...check, semanticFindings: [{ ...check.semanticFindings[0], sourceId: "primary" }] };
+    expect(() => validateCoverageSemantics(wrongOwner, article, sources)).toThrow("EDITORIAL_SEMANTIC_SOURCE_EVIDENCE_MISMATCH");
+  });
+
+  it("rejects a claimed omission with no literal raw witness or an invented visible lead", () => {
+    expect(() => validateCoverageSemantics(omitted(payout), article, [{ id: "primary", kind: "primary", text: closure }])).toThrow("EDITORIAL_SEMANTIC_SOURCE_EVIDENCE_MISMATCH");
+    const invented = omitted(closure);
+    invented.semanticFindings[0].articleEvidence = "Arvik stenger en virksomhet.";
+    expect(() => validateCoverageSemantics(invented, article, [{ id: "primary", kind: "primary", text: closure }])).toThrow("EDITORIAL_SEMANTIC_ARTICLE_EVIDENCE_MISMATCH");
+  });
+
+  it.each([
+    { id: "prior_910000", kind: "prior" as const },
+    { id: "history", kind: "prior" as const },
+    { id: "prior_910000", kind: "primary" as const }
+  ])("does not promote prior-source material to a missing current event", owner => {
+    expect(() => validateCoverageSemantics(omitted(closure, owner.id), article, [{ ...owner, text: closure }])).toThrow("EDITORIAL_SEMANTIC_EVENT_SCOPE_MISMATCH");
+  });
+
+  it("keeps the extra axis omission-only; visible contradictions belong to existing checks", () => {
+    const check = omitted(closure);
+    check.semanticFindings[0].kind = "contradiction";
+    expect(() => validateCoverageSemantics(check, article, [{ id: "primary", kind: "primary", text: closure }])).toThrow("EDITORIAL_SEMANTIC_EVENT_SCOPE_MISMATCH");
+  });
+
+  it.each([
+    { kind: "yearly" as const },
+    { kind: "report" as const, instruction: "Rett bare tittelen.", previousOutput: article },
+    { kind: "regular" as const, instruction: "Fjern opplysningen om utbyttet.", previousOutput: article }
+  ])("cannot expand annual scope or an explicit editorial revision", options => {
+    const source: NoticeEvidenceSource = { id: "primary", kind: "primary", text: payout };
+    expect(() => validateCoverageSemantics(omitted(payout), article, [source], options)).toThrow("EDITORIAL_SEMANTIC_EVENT_SCOPE_DISABLED");
+    const clean: NoticeCoverage = { ...review, semanticChecks: { ...review.semanticChecks, materialEventCoverage: "not_applicable" } };
+    expect(() => validateCoverageSemantics(clean, article, [source], options)).not.toThrow();
+  });
+
+  it("still validates selected-claim contradictions during an explicit revision", () => {
+    const selectedPayout = { ...article, body: ["Arvik betaler et særutbytte på 0,65 kroner per aksje."] };
+    const check: NoticeCoverage = { ...review, semanticChecks: { ...review.semanticChecks, materialEventCoverage: "not_applicable", actorAndPayment: "fail" },
+      semanticFindings: [{ check: "actorAndPayment", kind: "material_omission", articleField: "body", articleEvidence: selectedPayout.body[0],
+        sourceId: "primary", sourceEvidence: payout, explanation: "Det valgte utbyttet har et vesentlig betalingsvilkår." }],
+      repairInstruction: "Behold betalingsvilkåret for det valgte beløpet." };
+    expect(() => validateCoverageSemantics(check, selectedPayout, [{ id: "primary", kind: "primary", text: payout }], { instruction: "Rett bare språket.", previousOutput: selectedPayout })).not.toThrow();
   });
 });
 
@@ -238,6 +398,8 @@ describe("coverage review sees the published surface", () => {
     expect(prompt.instruction).toBeNull();
     expect(prompt.previousArticle).toBeNull();
     expect(prompt.sources).toEqual([]);
+    expect(prompt.kind).toBe("regular");
+    expect(prompt.materialEventCoverageEnabled).toBe(true);
   });
 
   it("provides the actual revision instruction and the previous visible article", () => {
@@ -248,6 +410,14 @@ describe("coverage review sees the published surface", () => {
     expect(prompt.instruction).toBe(instruction);
     expect(prompt.previousArticle).toEqual({ title: previous.title, lead: previous.lead, body: previous.body });
     expect(prompt.brief).toEqual(brief);
+    expect(prompt.materialEventCoverageEnabled).toBe(false);
+  });
+
+  it("binds annual coverage to the same remuneration scope as planning and writing", () => {
+    const prompt = JSON.parse(coverageUserPrompt(brief, noticeEditorialExamples.remuneration.output, undefined, undefined, [], { kind: "yearly" }));
+    expect(prompt.kind).toBe("yearly");
+    expect(prompt.topicInstructions).toBe(createNoticeKindInstructions("yearly"));
+    expect(prompt.materialEventCoverageEnabled).toBe(false);
   });
 
   it("passes full raw evidence beyond the brief excerpt without changing source identities", () => {

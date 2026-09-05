@@ -100,7 +100,7 @@ function harness(options: {
       content = {
         coveredFactIds: complete ? ["approval", "finality"] : ["approval"], missingFactIds: complete ? [] : ["finality"],
         statusAccurate: true, instructionCompliant: true, findings: complete ? [] : ["Endelig avgjørelse mangler."],
-        semanticChecks: { actorAndPayment: "pass", metricAndMaterialScope: "pass", relativeQuantityContext: "not_applicable" }, semanticFindings: [],
+        semanticChecks: { actorAndPayment: "pass", metricAndMaterialScope: "pass", relativeQuantityContext: "not_applicable", materialEventCoverage: "pass" }, semanticFindings: [],
         repairInstruction: complete ? "" : `Ta med: ${finality}`
       };
     } else throw new Error(`Unexpected schema ${request.schemaName}`);
@@ -130,7 +130,7 @@ describe("notice reference metadata retry", () => {
         content = { coveredFactIds: complete ? ["approval", "finality", "historical_price"] : [],
           missingFactIds: complete ? [] : ["approval", "finality", "historical_price"], findings: [],
           statusAccurate: true, instructionCompliant: true,
-          semanticChecks: { actorAndPayment: "pass", metricAndMaterialScope: "pass", relativeQuantityContext: "not_applicable" }, semanticFindings: [],
+          semanticChecks: { actorAndPayment: "pass", metricAndMaterialScope: "pass", relativeQuantityContext: "not_applicable", materialEventCoverage: "pass" }, semanticFindings: [],
           repairInstruction: "" };
       } else {
         const marker = "SETNINGER SOM SKAL SJEKKES (indeks + tekst):\n";

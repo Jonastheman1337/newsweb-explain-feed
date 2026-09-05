@@ -85,12 +85,15 @@ function mockPipelineCaller(options: { repair?: boolean; failReference?: boolean
       }
       case "notice_editorial_coverage": {
         if (options.failCheckAfterRepair === "coverage" && rewriteCount > 1) throw Object.assign(new Error("SYNTHETIC_COVERAGE_OUTAGE"), { modelCall: callLog(request, true) });
-        const { article } = JSON.parse(request.userPrompt) as { article: { body: string[] } };
+        const { article, materialEventCoverageEnabled } = JSON.parse(request.userPrompt) as {
+          article: { body: string[] }; materialEventCoverageEnabled: boolean
+        };
         const complete = article.body.some(paragraph => paragraph.includes("myndighetsgodkjenning"));
         content = {
           coveredFactIds: complete ? ["price", "condition"] : ["price"], missingFactIds: complete ? [] : ["condition"],
           statusAccurate: true, instructionCompliant: true,
-          semanticChecks: { actorAndPayment: "pass", metricAndMaterialScope: "pass", relativeQuantityContext: "not_applicable" },
+          semanticChecks: { actorAndPayment: "pass", metricAndMaterialScope: "pass", relativeQuantityContext: "not_applicable",
+            materialEventCoverage: materialEventCoverageEnabled ? "pass" : "not_applicable" },
           semanticFindings: [],
           findings: complete ? [] : ["Det vesentlige vilkåret om myndighetsgodkjenning mangler."],
           repairInstruction: complete ? "" : "Ta med at avtalen er betinget av myndighetsgodkjenning. Behold resten."

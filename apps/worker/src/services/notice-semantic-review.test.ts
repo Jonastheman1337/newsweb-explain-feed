@@ -33,6 +33,26 @@ const scenarios = [
     corrected: "Jernbanen kan gi tilgang til ytterligere 100 tonn malm.",
     explanation: "Den relative mengden har ingen identifiserbar tidligere mengde i den synlige artikkelen.",
     repair: "Skriv ytterligere 100 tonn i ingressen slik at mengden er entydig."
+  },
+  {
+    check: "materialEventCoverage", field: "lead", findingKind: "material_omission",
+    source: "Omsetningen var 100 millioner kroner. Selskapet legger ned kjølevirksomheten og har stengt pilotanlegget.",
+    briefFact: "Omsetningen var 100 millioner kroner.",
+    title: "Selskapet hadde 100 millioner i omsetning",
+    lead: "Selskapet hadde en omsetning på 100 millioner kroner.", body: [],
+    corrected: "Selskapet hadde en omsetning på 100 millioner kroner. Det legger samtidig ned kjølevirksomheten og har stengt pilotanlegget.",
+    explanation: "Artikkelen utelater den varslede nedleggelsen selv om hele den begrensede briefen er dekket.",
+    repair: "Behold omsetningen og ta med den kildebelagte nedleggelsen av kjølevirksomheten."
+  },
+  {
+    check: "materialEventCoverage", field: "lead", findingKind: "material_omission",
+    source: "Styret har vedtatt et utbytte på 10 kroner per aksje. I tillegg blir det utbetalt 5 kroner per aksje dersom fartøysalget fullføres.",
+    briefFact: "Styret har vedtatt et utbytte på 10 kroner per aksje.",
+    title: "Selskapet vedtar utbytte",
+    lead: "Styret har vedtatt et utbytte på 10 kroner per aksje.", body: [],
+    corrected: "Styret har vedtatt et utbytte på 10 kroner per aksje. I tillegg blir det utbetalt 5 kroner per aksje dersom fartøysalget fullføres.",
+    explanation: "Den separat varslede betingede utbetalingen mangler, selv om det ordinære utbyttet er korrekt.",
+    repair: "Ta med tilleggsutbyttet på 5 kroner med vilkåret om fullført fartøysalg."
   }
 ] as const;
 
@@ -53,7 +73,8 @@ function harness(scenario: typeof scenarios[number], options: {
   };
   const brief: NoticeEditorialBrief = {
     newsworthy: true, reason: "En konkret ny hendelse.", eventType: "update", eventStatus: "Som beskrevet i kilden.",
-    angle: "Den nye hendelsen.", mustInclude: [{ id: "event", fact: scenario.source, sourceId: "primary", sourceEvidence: scenario.source }],
+    angle: "Den nye hendelsen.", mustInclude: [{ id: "event", fact: "briefFact" in scenario ? scenario.briefFact : scenario.source,
+      sourceId: "primary", sourceEvidence: "briefFact" in scenario ? scenario.briefFact : scenario.source }],
     usefulQuote: null, sourceLimitations: []
   };
   const initial: RewriteOutput = {
@@ -84,9 +105,9 @@ function harness(scenario: typeof scenarios[number], options: {
       const article = JSON.parse(request.userPrompt).article as { title: string; lead: string; body: string[] };
       const review: Record<string, unknown> = {
         coveredFactIds: ["event"], missingFactIds: [], statusAccurate: true, instructionCompliant: true,
-        semanticChecks: { actorAndPayment: "pass", metricAndMaterialScope: "pass", relativeQuantityContext: "pass",
+        semanticChecks: { actorAndPayment: "pass", metricAndMaterialScope: "pass", relativeQuantityContext: "pass", materialEventCoverage: "pass",
           [scenario.check]: repaired ? "pass" : "fail" },
-        semanticFindings: repaired ? [] : [{ check: scenario.check, kind: "contradiction", articleField: scenario.field,
+        semanticFindings: repaired ? [] : [{ check: scenario.check, kind: "findingKind" in scenario ? scenario.findingKind : "contradiction", articleField: scenario.field,
           articleEvidence: article[scenario.field], sourceId: "primary",
           sourceEvidence: options.malformed === "source" ? "This invented evidence does not occur in the source." : scenario.source,
           explanation: scenario.explanation }],

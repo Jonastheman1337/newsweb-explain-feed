@@ -121,15 +121,12 @@ verified extraction path. None of the three completed original-corpus worker
 arms called the removed general model fallback; both candidate arms used eight
 ordinary raw PDF supplements.
 
-The v3 validation harness and two frozen public-source archives were prepared
-and inspected locally. Automatic approval review rejected their SCP transfer
-because it required explicit user authorization for this payload and the
-existing UpCloud destination. The new remote validation directory is empty;
-no v3 archives, credentials, images or containers were transferred or started.
-Local validation and sealing may continue, but transfer remains pending that
-specific authorization. The rejection must not be bypassed with another
-transport. Previous runtime and editorial failures remain separate immutable
-records, and the heldout candidate remains undispatched.
+Automatic approval review initially rejected the prepared v3 transfer. The
+owner then explicitly approved uploading the code, test harness and public
+NewsWeb sources to the existing Autoweb server for validation and conditional
+release. The checksum-verified upload and isolated build completed after that
+approval. This resolved the transfer restriction; it did not waive the
+editorial release gates or authorize production credentials to be exported.
 
 Final local checks passed: 1,324 repository tests, eight signal tests, all five
 workspace builds, and the independently replayed annual source/availability
@@ -146,3 +143,69 @@ source/publication hashes, latency and token usage. This document records the
 plan and rejected first candidate; it does not declare the replacement passed.
 A successful release must use the maintained UpCloud archive/build/deploy path,
 a fresh verified backup, and exact deployed identity plus public behavior checks.
+
+## Third actual-worker regression and fourth correction
+
+Revision `9e8718384d86ee39f0ac213107c44af253eca472` completed all 24 original
+cases in the real isolated worker, with 132 model calls, no model errors and
+no unfrozen source requests. Seventeen notices published, four failed and
+three routine notices were skipped. The artifact SHA256 is
+`860ad451ce3567270929da39bbbc7f772acc783f86e4e608fe74ca2dc87abf5c`.
+All validation containers, the local relay and its SSH forwarding session
+were stopped; the exact private socket was removed. Production stayed on
+`fa7701e09a14c3b2ebe17d14691a0af10a5e9525`.
+
+Source review covered all 24 final publications or decisions. SFE and Elliptic
+recovered publication, and DNO preserved the dividend payer and completion
+condition. Servatur, Borgestad, Nordic Mining and Gold Road still failed to
+publish. Ocean omitted its carbon-capture closure, and Frontline omitted the
+separately announced conditional extra dividend. These six unresolved
+requirements kept the release and heldout-candidate gates closed.
+
+The next correction makes brief selection and writing share the same
+kind-specific scope, including the annual remuneration task. A fourth bounded
+semantic check looks for decisive current operating closures or separate
+shareholder payouts omitted from an otherwise complete automatic brief.
+Explicit editorial revisions and the annual remuneration scope cannot be
+expanded through this check. Literal source and article witnesses remain
+mandatory; these validations establish evidence identity and scope consistency,
+not a deterministic proof of semantic entailment.
+
+Reference checking and repair now use the same terminology, source-date,
+relative-quantity and record-scope rules. A historical date can carry across
+sentences only inside the same server-derived paragraph, through independently
+grounded statements tied to the same older source. A field, paragraph, source,
+date or current-status transition ends that inheritance. Corrections,
+same-day references and parallel notices retain sentence-local markers.
+
+The v4 harness retains the seven synthetic scenarios, both frozen corpora,
+model profile, publication ownership checks, network isolation and mandatory
+cleanup. Its only synthetic schema addition is the required material-event
+coverage verdict. The untouched heldout comparison may start only after a
+new sealed candidate resolves the original regression findings. Repeating or
+relabeling the rejected candidate is not a passing result.
+
+The fourth correction also preserves the direct raw statement-to-note unit
+link for annual remuneration. Signed cash outflows may be described as positive
+amounts paid only when the raw row establishes the matching payment, recipient,
+entity, year, currency and scale. The exception applies to that visible amount
+only. An unknown entity section resets ownership even when the heading has
+extra whitespace. Damaged numeric source rows cannot support a number or a
+report-checker override; the original source remains unchanged for review.
+
+Independent reviews passed 34 payment boundary cases and 20 checks against the
+complete original annual PDF. The first full-test attempt was superseded after
+four new integration-test mocks were corrected to provide their required
+literal evidence fields and the final payment boundary fixes were completed.
+The unchanged publication/failure assertions then passed. The final full suite
+passed 1,465 repository tests and eight signal tests, with all workspace builds
+passing. One inactive unseeded-corpus sentinel was skipped; the seeded safety
+corpus ran. These are local results, not an editorial release decision.
+
+The new payment rule is included in the shared rule IDs and default profile,
+while its matching remains confined to notice generation. Explicit rule lists
+can disable it, and a report reference check cannot restore a disabled payment
+conversion. Worker defaults and the evaluator's resolved defaults agree; the
+live worker has no numeric-rule override. The 34 frozen payment cases retain
+identical default outcomes. Final validation was repeated after this control
+fix, including actual-pipeline approval and rejection tests.

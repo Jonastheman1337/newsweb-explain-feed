@@ -1,4 +1,5 @@
-import type { PromptPayload } from "@newsweb/prompt-kit";
+import { readFileSync } from "node:fs";
+import { defaultEnabledDerivationRules, type NumberDerivationRuleId, type PromptPayload } from "@newsweb/prompt-kit";
 import {
   rewriteOutputJsonSchema,
   rewriteOutputSchema,
@@ -55,6 +56,221 @@ function createRewrite(overrides?: Partial<RewriteOutput>): RewriteOutput {
     ...overrides
   };
 }
+
+describe("notice paid accounting outflow presentation", () => {
+  const signedSource = "[PDF page 4]\nParent company financial statements\nTransactions with related parties\nEUR million\t2026\t2025\nDividends paid to shareholders\t-127.9\t-20.1";
+  const paid = "Selskapet betalte 127,9 millioner euro i utbytte.";
+  const validate = (text: string, source = signedSource, noticeSemantics = true) => validateRewriteOutput(
+    createRewrite({ title: "Utbytte til eierne", lead: text, body: [], key_facts: [], source_spans: [] }),
+    createPayload({ title: "Årsrapport", bodyText: source }), { noticeSemantics });
+  const unexpected = (result: ReturnType<typeof validate>) => result.publicationNumberAssessments
+    .filter(item => item.disposition === "unexpected").map(item => item.display);
+
+  it("uses the same paid-outflow default for bare worker options and the evaluator's resolved rule list", () => {
+    const rewrite = createRewrite({ title: "Utbytte til eierne", lead: paid, body: [], key_facts: [], source_spans: [] });
+    const payload = createPayload({ title: "Årsrapport", bodyText: signedSource });
+    const defaults = validateRewriteOutput(rewrite, payload, { noticeSemantics: true });
+    expect(defaultEnabledDerivationRules).toContain("paid_outflow_magnitude");
+    expect(validateRewriteOutput(rewrite, payload, { noticeSemantics: true, enabledDerivationRules: defaultEnabledDerivationRules })).toEqual(defaults);
+    expect(defaults.valid).toBe(true);
+  });
+
+  it.each([
+    { label: "all disabled", enabledDerivationRules: [] as NumberDerivationRuleId[] },
+    { label: "paid rule disabled", enabledDerivationRules: defaultEnabledDerivationRules.filter(rule => rule !== "paid_outflow_magnitude") }
+  ])("blocks the paid conversion with an exact override that omits its rule: $label", ({ enabledDerivationRules }) => {
+    const result = validateRewriteOutput(
+      createRewrite({ title: "Utbytte til eierne", lead: paid, body: [], key_facts: [], source_spans: [] }),
+      createPayload({ bodyText: signedSource }), { noticeSemantics: true, enabledDerivationRules });
+    expect(result.valid).toBe(false);
+    expect(result.publicationNumberAssessments).toEqual([{
+      display: "127,9", disposition: "unexpected", ruleId: null, candidateRuleId: "paid_outflow_magnitude", count: 1
+    }]);
+  });
+
+  it("accepts a paid-only override in notices while keeping legacy and Sak matching unchanged", () => {
+    const rewrite = createRewrite({ title: "Utbytte til eierne", lead: paid, body: [], key_facts: [], source_spans: [] });
+    const payload = createPayload({ bodyText: signedSource });
+    const enabledDerivationRules = ["paid_outflow_magnitude"] as const;
+    expect(validateRewriteOutput(rewrite, payload, { noticeSemantics: true, enabledDerivationRules }).valid).toBe(true);
+    expect(validateRewriteOutput(rewrite, payload, { enabledDerivationRules }).publicationNumberAssessments)
+      .toEqual([{ display: "127,9", disposition: "unexpected", ruleId: null, count: 1 }]);
+  });
+
+  it("retains ordinary numeric acceptance when the paid rule is disabled", () => {
+    const result = validateRewriteOutput(
+      createRewrite({ title: "Utbytte til eierne", lead: paid, body: [], key_facts: [], source_spans: [] }),
+      createPayload({ bodyText: signedSource + "\nThe paid dividend amount was EUR 127.9 million." }),
+      { noticeSemantics: true, enabledDerivationRules: [] });
+    expect(result.valid).toBe(true);
+    expect(result.publicationNumberAssessments).toEqual([
+      { display: "127,9", disposition: "matched", ruleId: "exact_source_match", count: 1 }
+    ]);
+  });
+
+  it("keeps disabled-rule shadow identity specific to the supported payment occurrence", () => {
+    const result = validateRewriteOutput(
+      createRewrite({ title: "Utbytte til eierne", lead: paid, body: ["Resultatet var 127,9 millioner euro."], key_facts: [], source_spans: [] }),
+      createPayload({ bodyText: signedSource }), { noticeSemantics: true, enabledDerivationRules: [] });
+    expect(result.publicationNumberAssessments.filter(item => item.display === "127,9")).toEqual([
+      { display: "127,9", disposition: "unexpected", ruleId: null, candidateRuleId: "paid_outflow_magnitude", count: 1 },
+      { display: "127,9", disposition: "unexpected", ruleId: null, count: 1 }
+    ]);
+  });
+
+  it("accepts the original signed paid-dividend row as a positive paid amount with literal evidence", () => {
+    const fixture = JSON.parse(readFileSync(new URL("../fixtures/reports/servatur-remuneration-raw-2026-09-05.json", import.meta.url), "utf8")) as { pages: Array<{ pageNumber: number; text: string }> };
+    const raw = fixture.pages.find(page => page.pageNumber === 66)!.text;
+    const result = validate(paid, `[PDF page 66]\n${raw}`);
+    expect(unexpected(result)).toEqual([]);
+    expect(result.publicationNumberAssessments).toContainEqual(expect.objectContaining({
+      display: "127,9", disposition: "derived", ruleId: "paid_outflow_magnitude", count: 1,
+      provenance: expect.objectContaining({ outflowKind: "dividend", currency: "EUR", sourceSignedCell: "-127.9",
+        sourceHeader: "EUR million\t2025/2026\t2024/2025", sourceRow: "Dividend paid to shareholders\t-127.9\t-" })
+    }));
+  });
+
+  it.each([
+    ["Interest paid", "Selskapet betalte 127,9 millioner euro i renter.", "interest"],
+    ["Income taxes paid", "Selskapet betalte skatt på 127,9 millioner euro.", "tax"],
+    ["Repayment of borrowings", "Selskapet tilbakebetalte 127,9 millioner euro i lån.", "debt_repayment"],
+    ["Utbetalt utbytte", "Selskapet har utbetalt utbytte på 127,9 millioner euro.", "dividend"]
+  ])("recognizes actual %s rows without treating accrual expenses as payments", (row, text, kind) => {
+    const result = validate(text, signedSource.replace("Dividends paid to shareholders", row));
+    expect(unexpected(result)).toEqual([]);
+    expect(result.publicationNumberAssessments).toContainEqual(expect.objectContaining({ ruleId: "paid_outflow_magnitude",
+      provenance: expect.objectContaining({ outflowKind: kind }) }));
+  });
+
+  it("permits exact unit scaling without accepting a rounded or different paid amount", () => {
+    const source = signedSource.replace("EUR million", "EUR thousands").replace("-127.9", "-127 900");
+    expect(unexpected(validate(paid, source))).toEqual([]);
+    expect(unexpected(validate(paid.replace("127,9", "128"), source))).toContain("128");
+    expect(unexpected(validate(paid.replace("127,9", "127,91"), source))).toContain("127,91");
+  });
+
+  it("never lets a supported payment occurrence clear the same unsigned number used as profit", () => {
+    for (const separator of [" Resultatet var ", " Men resultatet var "]) {
+      const result = validate(`${paid}${separator}127,9 millioner euro.`);
+      expect(result.publicationNumberAssessments).toContainEqual(expect.objectContaining({ display: "127,9", disposition: "derived", count: 1 }));
+      expect(result.publicationNumberAssessments).toContainEqual(expect.objectContaining({ display: "127,9", disposition: "unexpected", count: 1 }));
+    }
+    const sameClause = validate("Selskapet betalte 127,9 millioner euro i utbytte, og resultatet var 127,9 millioner euro.");
+    expect(unexpected(sameClause)).toContain("127,9");
+  });
+
+  it("keeps title and paragraph occurrences independent", () => {
+    const result = validateRewriteOutput(createRewrite({ title: "Resultatet var 127,9 millioner euro", lead: paid, body: [] }),
+      createPayload({ bodyText: signedSource }), { noticeSemantics: true });
+    expect(result.publicationNumberAssessments).toContainEqual(expect.objectContaining({ display: "127,9", disposition: "derived" }));
+    expect(unexpected(result)).toContain("127,9");
+  });
+
+  it.each([
+    "Selskapet fikk et overskudd på 127,9 millioner euro.",
+    "Selskapet fikk et underskudd på 127,9 millioner euro.",
+    "Selskapet mottok 127,9 millioner euro i utbytte.",
+    "Selskapet betalte 127,9 millioner euro i renter.",
+    "Selskapet har ikke betalt 127,9 millioner euro i utbytte.",
+    "Selskapet vil betale utbytte på 127,9 millioner euro.",
+    "Hvis eierne samtykker, blir det betalt 127,9 millioner euro i utbytte.",
+    "Selskapet kan ha betalt 127,9 millioner euro i utbytte.",
+    "Selskapet betalte 127,9 millioner amerikanske dollar i utbytte."
+  ])("does not reinterpret sign, direction, metric, currency or uncertain status: %s", text => {
+    expect(unexpected(validate(text))).toContain("127,9");
+  });
+
+  it.each([
+    signedSource.replace("Dividends paid to shareholders", "Profit for the year"),
+    signedSource.replace("Dividends paid to shareholders", "Dividend income from subsidiaries"),
+    signedSource.replace("Dividends paid to shareholders", "Dividends proposed to shareholders"),
+    signedSource.replace("EUR million", "USD million"),
+    signedSource.replace("EUR million\t2026\t2025\n", ""),
+    signedSource.replace("Dividends paid", "[PDF page 5]\nDividends paid"),
+    signedSource.replace("Dividends paid", "Parent company financial statements\nDividends paid"),
+    signedSource.replace("Dividends paid", "USD thousands\t2026\t2025\nDividends paid"),
+    signedSource.replace("Dividends paid", "2027\t2026\nDividends paid"),
+    signedSource.replace("Transactions with related parties", "Forecast transactions with related parties"),
+    signedSource.replace("-127.9", "-127.900"),
+    signedSource.replace("-127.9", "-127,900"),
+    signedSource.replace("-127.9", "\uE000127.9"),
+    signedSource.replace("EUR million", "$ million")
+  ])("requires a usable paid row and its own actual-period currency/unit header", source => {
+    expect(unexpected(validate(paid, source))).toContain("127,9");
+  });
+
+  it("never uses a corrupted numeric cell as a signed-payment witness", () => {
+    for (const cell of ["-\uE000127.9", "\uE000127.9", "-127.9\uE000"]) {
+      const result = validate(paid, signedSource.replace("-127.9", cell));
+      expect(result.publicationNumberAssessments.some(item => item.ruleId === "paid_outflow_magnitude")).toBe(false);
+      expect(result.publicationNumberAssessments).toContainEqual(expect.objectContaining({ display: "127,9", disposition: "unexpected",
+        provenance: { corruptedSourceMatchBlocked: true } }));
+    }
+  });
+
+  it("does not turn an interest expense into cash interest paid", () => {
+    const source = signedSource.replace("Dividends paid to shareholders", "Interest expense");
+    expect(unexpected(validate("Selskapet betalte 127,9 millioner euro i renter.", source))).toContain("127,9");
+  });
+
+  it("preserves explicit negative profit and the unchanged legacy sign behavior", () => {
+    const source = signedSource.replace("Dividends paid to shareholders", "Profit for the year");
+    expect(unexpected(validate("Resultatet var minus 127,9 millioner euro.", source))).toEqual([]);
+    expect(unexpected(validate("Resultatet var 127,9 millioner euro.", source))).toContain("127,9");
+    expect(unexpected(validate(paid, signedSource, false))).toContain("127,9");
+  });
+
+  it("binds the paid amount to its own table period", () => {
+    expect(unexpected(validate(paid.replace("127,9", "20,1")))).toContain("20,1");
+    expect(unexpected(validate(paid.replace("127,9", "20,1").replace(".", " i 2026.")))).toContain("20,1");
+    expect(unexpected(validate(paid.replace("127,9", "20,1").replace(".", " i 2025.")))).toEqual([]);
+    expect(unexpected(validate(paid.replace(".", " i 2025.")))).toContain("127,9");
+  });
+
+  it.each([
+    "Eierne betalte 127,9 millioner euro i utbytte til selskapet.",
+    "Selskapet betalte 127,9 millioner euro i utbytte til morselskapet.",
+    "Et annet selskap betalte 127,9 millioner euro i utbytte.",
+    "Konsernet betalte 127,9 millioner euro i utbytte."
+  ])("does not reverse payer/payee or transfer parent amounts to another scope: %s", text => {
+    expect(unexpected(validate(text))).toContain("127,9");
+  });
+
+  it("does not transfer a consolidated payment to the parent company", () => {
+    const group = signedSource.replace("Parent company financial statements", "Consolidated financial statements");
+    expect(unexpected(validate(paid.replace("Selskapet", "Morselskapet"), group))).toContain("127,9");
+    expect(unexpected(validate(paid.replace("Selskapet", "Konsernet"), group))).toEqual([]);
+  });
+
+  it("does not infer an owning scope from a later section heading", () => {
+    const unknown = signedSource.replace("Parent company financial statements\n", "");
+    expect(unexpected(validate(paid, unknown))).toContain("127,9");
+    expect(unexpected(validate(paid, unknown + "\nParent company financial statements"))).toContain("127,9");
+  });
+
+  it("preserves the exact recipient class instead of transferring a payout to another company's owners", () => {
+    expect(unexpected(validate(paid.replace(".", " til aksjonærene i Fjellfjord.")))).toContain("127,9");
+    const minority = signedSource.replace("to shareholders", "to non-controlling interests");
+    expect(unexpected(validate(paid.replace(".", " til aksjonærene i selskapet."), minority))).toContain("127,9");
+    expect(unexpected(validate(paid, minority))).toContain("127,9");
+    expect(unexpected(validate(paid.replace(".", " til minoritetsaksjonærene."), minority))).toEqual([]);
+    expect(unexpected(validate(paid.replace(".", " til minoritetsaksjonærene.")))).toContain("127,9");
+  });
+
+  it.each(["Parent financial statements", "Financial statements of subsidiary Fjellfjord", "  Parent financial statements", "Parent  financial statements"])(
+    "does not carry group scope through the new entity section %s", heading => {
+      const source = signedSource.replace("Parent company financial statements", `Consolidated financial statements\n${heading}`);
+      expect(unexpected(validate(paid.replace("Selskapet", "Konsernet"), source))).toContain("127,9");
+    }
+  );
+
+  it("uses the notice's Oslo calendar year at the UTC New Year boundary", () => {
+    const result = validateRewriteOutput(createRewrite({ title: "Utbytte til eierne", lead: paid, body: [] }),
+      createPayload({ bodyText: signedSource, publishedAt: "2025-12-31T23:30:00Z" }), { noticeSemantics: true });
+    expect(unexpected(result)).toEqual([]);
+    expect(result.publicationNumberAssessments).toContainEqual(expect.objectContaining({ ruleId: "paid_outflow_magnitude" }));
+  });
+});
 
 describe("countSentences", () => {
   it("counts punctuation-terminated sentences", () => {

@@ -9,11 +9,52 @@ import {
 const fixture = JSON.parse(readFileSync(new URL("../fixtures/reports/servatur-remuneration-raw-2026-09-05.json", import.meta.url), "utf8")) as {
   sourceSha256: string; pageCount: number; pages: YearlyRawPage[];
 };
+const statementFixture = JSON.parse(readFileSync(new URL("../fixtures/reports/servatur-remuneration-unit-link-raw-2026-09-05.json", import.meta.url), "utf8")) as {
+  sourceSha256: string; pageCount: number; pages: YearlyRawPage[];
+};
 const select = (...texts: string[]) => selectYearlyRemunerationPages(texts.map((text, i) => ({ pageNumber: i + 1, text })));
 const padding = "The company prepares its annual financial statements for the reporting year.";
 const pay = "Consolidated financial statements\nExecutive remuneration\nEUR million\n2026 CEO Board members\nBase salary\t1.2\t0.1\nTotal remuneration\t1.3\t0.1";
 
 describe("annual raw remuneration selection", () => {
+  it("retains the original same-scope statement that explicitly references the pay note and its totals", () => {
+    expect(statementFixture.sourceSha256).toBe(fixture.sourceSha256);
+    const raw = statementFixture.pages[0];
+    const result = selectYearlyRemunerationPages([...fixture.pages, raw], fixture.pageCount);
+    expect(result.status).toBe("available");
+    expect(result.selectedPages).toContainEqual({ pageNumber: 23, reasons: ["remuneration_statement_note_context"] });
+    expect(result.remunerationText).toContain(`[PDF page 23]\n${raw.text}`);
+    expect(result.remunerationText).toContain("EUR million\tNote\t2025/2026\t2024/2025");
+    expect(result.remunerationText).toContain("Employee benefits expense\t2.4\t-50.2\t-41.0");
+    // No synthesized salary values or row/person assignments are appended.
+    expect(result.remunerationText).toBe([...fixture.pages, raw].sort((a, b) => a.pageNumber - b.pageNumber)
+      .map(page => `[PDF page ${page.pageNumber}]\n${page.text}`).join("\n\n"));
+  });
+
+  it.each([
+    ["wrong note", "Employee benefits expense\t2.5\t-50.2\t-41.0"],
+    ["coincidental numeric value", "Employee benefits expense\t50.2\t2.4\t-41.0"],
+    ["intervening unit header", "USD thousands\tNote\t2025/2026\t2024/2025\nEmployee benefits expense\t2.4\t-50.2\t-41.0"],
+    ["narrative note mention", "Employee benefits expense refers to note 2.4 for further details."]
+  ])("does not label unrelated raw statement content as the note's unit context: %s", (_name, row) => {
+    const statement = statementFixture.pages[0];
+    const altered = { ...statement, text: statement.text.replace("Employee benefits expense\t2.4\t-50.2\t-41.0", row) };
+    const result = selectYearlyRemunerationPages([...fixture.pages, altered], fixture.pageCount);
+    expect(result.selectedPages.some(page => page.pageNumber === 23)).toBe(false);
+  });
+
+  it("keeps a note link within the same explicit entity, period and bounded page section", () => {
+    const raw = statementFixture.pages[0];
+    for (const altered of [
+      { ...raw, text: raw.text.replaceAll("Consolidated", "Separate").replaceAll("consolidated", "separate") },
+      { ...raw, text: raw.text.replaceAll("2025/2026", "2024/2025").replaceAll("2024/2025", "2023/2024") },
+      { ...raw, pageNumber: 10 }
+    ]) {
+      const result = selectYearlyRemunerationPages([...fixture.pages, altered], fixture.pageCount);
+      expect(result.selectedPages.some(page => page.reasons.includes("remuneration_statement_note_context"))).toBe(false);
+    }
+  });
+
   it("retains the frozen group table, fiscal basis and units as unaltered physical pages", () => {
     expect(fixture.sourceSha256).toBe("bf99c732a854844d4a34ac0b85e992ffb707e3b89d38a1d7de6aa48511d13121");
     const before = JSON.stringify(fixture.pages);

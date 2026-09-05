@@ -71,6 +71,38 @@ function hasPayRows(page: YearlyRawPage, hasCurrency: boolean): boolean {
   return false;
 }
 
+/** A note's own statement reference is useful raw context when its table omits
+ * the scale header. Retain the whole physical statement; do not annotate the
+ * note with an inferred unit or assign any column to a named person. */
+function remunerationStatementContext(page: YearlyRawPage, preceding: readonly YearlyRawPage[]): YearlyRawPage | undefined {
+  const pageScope = scope(page);
+  if (!pageScope || pageScope === "mixed") return undefined;
+  const lines = analysisLines(page);
+  const noteIds = new Set(lines.flatMap(line => {
+    const heading = /^\s*(?:note\s+)?(\d{1,2}(?:\.\d{1,2})*)\.?\s+(.+)$/i.exec(line);
+    return heading && payLanguage.test(heading[2]) ? [heading[1]] : [];
+  }));
+  const periods = [...new Set(lines.filter(line => role.test(line)).flatMap(line =>
+    [...line.matchAll(new RegExp(yearOrPeriod.source, "g"))].map(match => match[0])))];
+  if (!noteIds.size || !periods.length) return undefined;
+  return preceding.find(candidate => {
+    if (scope(candidate) !== pageScope || isToc(analysisLines(candidate))) return false;
+    const candidateLines = analysisLines(candidate);
+    if (!candidateLines.some(line => /^(?:consolidated\s+)?(?:statement of (?:comprehensive income|profit (?:or|and) loss)|income statement|resultat(?:regnskap|rekneskap))\b/i.test(line.trim()))) return false;
+    // Header and note reference must be physical table cells, not a note
+    // number mentioned in narrative or a coincidentally equal salary value.
+    const headerIndex = candidateLines.findIndex(line => currency.test(line) && /\b(?:note|noter?)\b/i.test(line) &&
+      periods.every(period => line.includes(period)));
+    if (headerIndex < 0) return false;
+    for (const line of candidateLines.slice(headerIndex + 1)) {
+      if (currency.test(line) || sectionHeading.test(line)) break;
+      const cells = line.split(/\t+| {2,}/).map(cell => cell.trim());
+      if (cells.length >= 3 && payLabel.test(cells[0]) && noteIds.has(cells[1])) return true;
+    }
+    return false;
+  });
+}
+
 /** Missing raw evidence is retryable, never evidence of no pay. */
 export function requireYearlyRemunerationSource<T extends YearlyRemunerationSelection>(selection: T | null): T {
   if (!selection || selection.status === "unavailable" ||
@@ -121,6 +153,8 @@ export function selectYearlyRemunerationPages(pages: readonly YearlyRawPage[], p
     if (disclosurePages.length > MAX_DISCLOSURE_PAGES) continue;
     add(page, hasExplicitNonpayment ? "scoped_nonpayment" : "remuneration_rows");
     if (unitPage) add(unitPage, "monetary_basis_context");
+    const statement = remunerationStatementContext(page, preceding);
+    if (statement) add(statement, "remuneration_statement_note_context");
     const basis = preceding.find(item => /basis of (?:preparation|consolidation)|reporting period|regnskapsprinsipper|rapporteringsperiode/i.test(item.text));
     if (basis) add(basis, "accounting_period_scope_context");
     const cover = ordered.find(item => item.pageNumber <= 3 && readable(item) && yearOrPeriod.test(item.text) && /annual report|[åa]rsrapport|fiscal year|financial year/i.test(item.text) && !isToc(analysisLines(item)));

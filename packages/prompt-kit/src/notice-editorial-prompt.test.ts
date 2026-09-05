@@ -6,6 +6,7 @@ import { createReportDeveloperPrompt } from "./report-prompt.js";
 import {
   NOTICE_EDITORIAL_PROMPT_VERSION,
   createNoticeDeveloperPrompt,
+  createNoticeKindInstructions,
   createNoticeSystemPrompt,
   createNoticeUserPrompt,
   noticeEditorialExamples,
@@ -150,11 +151,32 @@ describe("notice editorial examples", () => {
 
 describe("compact notice prompt contract", () => {
   it("versions the independent builders and cuts instruction volume substantially", () => {
-    expect(NOTICE_EDITORIAL_PROMPT_VERSION).toBe("v5.12.2");
+    expect(NOTICE_EDITORIAL_PROMPT_VERSION).toBe("v5.12.3");
     const regular = createNoticeSystemPrompt() + createNoticeDeveloperPrompt("regular", payload);
     const report = createNoticeSystemPrompt() + createNoticeDeveloperPrompt("report", payload);
     expect(regular.length).toBeLessThan(createDeveloperPrompt().length / 2);
     expect(report.length).toBeLessThan(createReportDeveloperPrompt().length / 2);
+  });
+
+  it.each(["regular", "report", "yearly"] as const)("uses the shared %s scope exactly once in the writer contract", kind => {
+    const scope = createNoticeKindInstructions(kind);
+    expect(scope.length).toBeGreaterThan(100);
+    expect(createNoticeDeveloperPrompt(kind, payload).split(scope)).toHaveLength(2);
+    for (const other of ["regular", "report", "yearly"] as const) {
+      if (other !== kind) expect(createNoticeDeveloperPrompt(kind, payload)).not.toContain(createNoticeKindInstructions(other));
+    }
+  });
+
+  it("keeps report completeness distinct from annual remuneration scope", () => {
+    const report = createNoticeKindInstructions("report");
+    const annual = createNoticeKindInstructions("yearly");
+    expect(report).toContain("avgjørende nedleggelse/endring i driften");
+    expect(report).toContain("separat vesentlig aksjonærutbetaling");
+    expect(annual).toContain("Hold bestilling og artikkel til lederlønn og godtgjørelse");
+    expect(annual).toContain("heller ikke ved tvungen generering");
+    expect(annual).toContain("manglende data er ikke null lønn");
+    expect(annual).toContain("lån ikke enheten fra en urelatert nabotabell");
+    expect(annual).toContain("rapportert total fremfor summen av avrundede delbeløp");
   });
 
   it("passes the structured brief and original evidence independently without mutating either", () => {
@@ -241,6 +263,26 @@ describe("compact notice prompt contract", () => {
     });
     expect(sources[0].text).not.toContain("USD");
     expect(context.relatedNotices[0].text).toBe(dated);
+    const rules = createNoticeDeveloperPrompt("regular", context);
+    expect(rules).toContain("fulle dato med år");
+    expect(rules).toContain("den samme ene prior-kilden");
+    expect(rules).toContain("Nytt avsnitt/felt, nåtidsopplysning, annen kilde eller tidsmarkør");
+  });
+
+  it("retains both raw parts of a relative source comparison without adding a derived source amount", () => {
+    const source = "About 850 tonnes of mined material remained underground. A reopened route may give access to a similar amount of stored material.";
+    const selected = { ...brief, mustInclude: [{ id: "route", fact: "En gjenåpnet rute kan gi tilgang til om lag 850 tonn lagret materiale.", sourceId: "primary", sourceEvidence: source }] };
+    const context = { ...payload, bodyText: source, sourceBodyChars: source.length };
+    const prompt = createNoticeUserPrompt(context, selected);
+    const sources = jsonSection<Array<{ text: string }>>(prompt, sourcesLabel);
+    expect(sources[0].text).toBe(source);
+    expect(sources[0].text.match(/850/g)).toHaveLength(1);
+    expect(sources[0].text).toContain("may give access to a similar amount");
+    const rules = createNoticeDeveloperPrompt("regular", context);
+    expect(rules).toContain("belegg må da dekke både grunnlaget og koblingen");
+    expect(rules).toContain("fjern hele den relative påstanden");
+    expect(rules).toContain("tidspunkt/forsinkelse er ikke en forklaring på mengdens størrelse");
+    expect(rules).toContain("behold tidsgrensen i tittelen");
   });
 
   it.each(["regular", "report", "yearly"] as NoticePromptKind[])("keeps a %s revision narrowly scoped while retaining all evidence", (kind) => {
@@ -273,5 +315,15 @@ describe("compact notice prompt contract", () => {
     expect(sources[1]).toMatchObject({ sourceId: "primary", kind: "remuneration_excerpt", pageCount: 120 });
     expect(sources[2]).toMatchObject({ sourceId: "material_a", kind: "editor_selected_material" });
     expect(createNoticeDeveloperPrompt("yearly", payload)).toContain("Skill regnskapsført/tildelt aksjeverdi fra realisert gevinst og kontantutbetaling");
+  });
+
+  it("preserves raw note/statement and parent boundaries instead of assigning units to the salary row", () => {
+    const raw = "[Page 18] Consolidated income statement. EUR million. FY ended 30 June 2028 | FY ended 30 June 2027. Employee benefits expense | note 4 | 32.8 | 30.1.\n[Page 25] Note 4. CEO | Employees. Total compensation | 0.4 | 32.4.\n[Page 61] Parent company: compensation was borne by other Group entities. Dividend paid to shareholders | -63.0.";
+    const prompt = createNoticeUserPrompt({ ...payload, remunerationText: raw }, null, { kind: "yearly" });
+    const sources = jsonSection<Array<{ text: string }>>(prompt, sourcesLabel);
+    expect(sources[1].text).toBe(raw);
+    expect(sources[1].text).not.toContain("CEO total: EUR 0.4 million");
+    expect(sources[1].text).toContain("Parent company");
+    expect(createNoticeKindInstructions("yearly")).toContain("samsvarende note, perioder og beløp");
   });
 });

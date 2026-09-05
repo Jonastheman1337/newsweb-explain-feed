@@ -1051,10 +1051,18 @@ export type NumberAssessmentRuleId =
 // legacy match, naming the underlying rule in provenance (via_rule).
 // Exact-key flips keep attributing to verbal_minus_match (earlier in the
 // registry, first match wins).
+//
+// paid_outflow_magnitude (2026-09-05): notice-only presentation of a signed
+// accounting payment as a positive paid amount. Its matcher needs source
+// ownership, period, unit and recipient evidence and lives in the worker's
+// notice-paid-outflows helper, never the generic/legacy matching chain.
+// Register it here so config overrides and evaluation artifacts include the
+// same enabled rule as the notice validator.
 export const numberDerivationRuleIds = [
   "source_cell_subrun",
   "verbal_minus_match",
-  "verbal_minus_composed"
+  "verbal_minus_composed",
+  "paid_outflow_magnitude"
 ] as const;
 
 export type NumberDerivationRuleId = (typeof numberDerivationRuleIds)[number];
@@ -1069,7 +1077,7 @@ export type NumberDerivationRuleId = (typeof numberDerivationRuleIds)[number];
 // genuine) under the replay-as-gate promotion model — see the plan doc.
 // Rollback: NUMERIC_ACCEPTANCE_RULES=source_cell_subrun,verbal_minus_match.
 export const defaultEnabledDerivationRules: readonly NumberDerivationRuleId[] =
-  ["source_cell_subrun", "verbal_minus_match", "verbal_minus_composed"];
+  ["source_cell_subrun", "verbal_minus_match", "verbal_minus_composed", "paid_outflow_magnitude"];
 
 export type NumberAssessmentDisposition = "matched" | "derived" | "unexpected";
 
@@ -1144,7 +1152,8 @@ function verbalMinusPrecedes(rewriteText: string, index: number): boolean {
   return /\bminus\s+$/i.test(before);
 }
 
-// Registry order must mirror numberDerivationRuleIds; first match wins.
+// Generic matchers retain numberDerivationRuleIds order; first match wins.
+// Notice-context-only rules are evaluated by the worker, not this chain.
 const numberDerivationRules: readonly NumberDerivationRule[] = [
   {
     id: "source_cell_subrun",

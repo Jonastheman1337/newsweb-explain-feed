@@ -949,14 +949,16 @@ describe("prior-context guards", () => {
     const explicitLegacy = buildReferenceCheckPrompt(payloadWithPrior, draft, { noticeSemantics: false });
     const notice = buildReferenceCheckPrompt(payloadWithPrior, draft, { noticeSemantics: true });
     expect(explicitLegacy).toEqual(legacy);
-    expect(notice.userPrompt).toBe(legacy.userPrompt);
+    expect(legacy.userPrompt).not.toContain("PUBLISERINGSMETADATA");
+    expect(notice.userPrompt).toContain("PUBLISERINGSMETADATA");
     expect(notice.systemPrompt).toBe(legacy.systemPrompt);
     expect(legacy.developerPrompt).not.toContain("ett sammenhengende, ordrett utdrag");
     expect(legacy.developerPrompt).not.toContain("En markør i forrige setning teller ikke");
     expect(notice.developerPrompt).toContain("ett sammenhengende, ordrett utdrag");
     expect(notice.developerPrompt).toContain("Ikke oversett, parafraser, sett sammen atskilte utdrag");
     expect(notice.developerPrompt).toContain("akkurat [prior_<priorMessageId>]");
-    expect(notice.developerPrompt).toContain("En markør i forrige setning teller ikke");
+    expect(notice.developerPrompt).toContain("SAMME paragraphIndex");
+    expect(notice.developerPrompt).toContain("correctionStatusMarker kan aldri arves");
     expect(notice.developerPrompt).toContain("Returner sentence nøyaktig som den oppgitte setningen");
   });
 

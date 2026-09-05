@@ -3,7 +3,6 @@ import {
   assessNumbersInText,
   formatNorwegianNoticeDate,
   isRelatedNoticeTimestampValid,
-  unexpectedNumberDisplays,
   type AssessNumbersOptions,
   type NumberAssessment,
   type NumberDerivationRuleId,
@@ -11,6 +10,7 @@ import {
 } from "@newsweb/prompt-kit";
 import type { RewriteOutput } from "@newsweb/shared";
 import { normalizeNoticeNumericRanges } from "./notice-numeric-ranges.js";
+import { isolatePaidOutflowMagnitudes, type NoticeNumberAssessment } from "./notice-paid-outflows.js";
 
 const MAX_ALLOWED_UNEXPECTED_NUMBERS = 0;
 export const MAX_TITLE_WORDS = 8;
@@ -496,9 +496,18 @@ function assessNoticeNumbersInText(
   text: string,
   sourceText: string,
   dates: readonly NumericSourceDate[],
+  identity: { issuerName: string; publishedAt: string },
   options?: AssessNumbersOptions
-): NumberAssessment[] {
+): NoticeNumberAssessment[] {
   const dateAssessments: NumberAssessment[] = [];
+  const corruptedRow = /[\uE000-\uF8FF\uFFFD]/;
+  const sourceLines = sourceText.split(/\r?\n/);
+  const hasCorruptedRows = sourceLines.some(line => corruptedRow.test(line));
+  // This is an internal numeric index only. Raw evidence, quotes and hashes
+  // remain untouched. A lost minus/decimal glyph cannot become an unsigned
+  // literal, and an unreadable unit row cannot donate a header to later rows.
+  const numericSource = hasCorruptedRows ? sourceLines.map(line => corruptedRow.test(line)
+    ? "[UNREADABLE NUMERIC SOURCE ROW]" : line).join("\n") : sourceText;
   let nonDateText = text;
   for (const source of dates) {
     const phrase = source.date.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/ /g, "[ \\t]+");
@@ -513,10 +522,33 @@ function assessNoticeNumbersInText(
       return match.replace(/\d/g, " ");
     });
   }
+  const outflows = isolatePaidOutflowMagnitudes(nonDateText, numericSource, identity, options);
+  const ordinaryAssessments: NoticeNumberAssessment[] = assessNumbersInText(
+    normalizeNoticeNumericRanges(outflows.text), normalizeNoticeNumericRanges(numericSource), options);
+  if (hasCorruptedRows && ordinaryAssessments.some(assessment => assessment.disposition === "unexpected")) {
+    // Counterfactual matches are used only to BLOCK an override, never to
+    // accept a number. Removing a lost sign/glyph here identifies the risk
+    // that a checker might repeat the damaged amount as supported.
+    const unsafeCounterfactual = sourceLines.map(line => corruptedRow.test(line)
+      ? line.replace(/[\uE000-\uF8FF\uFFFD]/g, "").replace(/[-−](?=\d)/g, "") : line).join("\n");
+    const unsafeMatches = new Set(assessNumbersInText(normalizeNoticeNumericRanges(outflows.text),
+      normalizeNoticeNumericRanges(unsafeCounterfactual), options)
+      .filter(assessment => assessment.disposition !== "unexpected").map(assessment => assessment.display));
+    for (const assessment of ordinaryAssessments) {
+      if (assessment.disposition === "unexpected" && unsafeMatches.has(assessment.display)) {
+        assessment.provenance = { ...assessment.provenance, corruptedSourceMatchBlocked: true };
+      }
+    }
+  }
   return [
-    ...assessNumbersInText(normalizeNoticeNumericRanges(nonDateText), normalizeNoticeNumericRanges(sourceText), options),
+    ...ordinaryAssessments,
+    ...outflows.assessments,
     ...dateAssessments
   ];
+}
+
+function unexpectedNumberDisplays(assessments: readonly Pick<NumberAssessment, "display" | "disposition">[]): string[] {
+  return [...new Set(assessments.filter(assessment => assessment.disposition === "unexpected").map(assessment => assessment.display))];
 }
 
 function hasAnyPattern(text: string, patterns: RegExp[]): boolean {
@@ -809,7 +841,7 @@ export function validateRewriteOutput(
   rewrite: RewriteOutput,
   payload: PromptPayload,
   options?: {
-    // Comparison-only opt-in; legacy and Sak numeric behavior is unchanged.
+    // Notice-only semantic normalization; legacy and Sak behavior is unchanged.
     noticeSemantics?: boolean;
     maxVisibleArticleChars?: number;
     reportExtraction?: ReportExtractionValidationContext;
@@ -827,8 +859,8 @@ export function validateRewriteOutput(
   blockingErrors: string[];
   warnings: string[];
   quoteTelemetry: QuoteTelemetry;
-  numberAssessments: NumberAssessment[];
-  publicationNumberAssessments: NumberAssessment[];
+  numberAssessments: NoticeNumberAssessment[];
+  publicationNumberAssessments: NoticeNumberAssessment[];
   markerLeaks: MarkerLeakMatch[];
 } {
   const issues: RewriteValidationIssue[] = [];
@@ -845,7 +877,7 @@ export function validateRewriteOutput(
   const sourceDates = options?.noticeSemantics ? noticeNumericSourceDates(payload) : [];
   const assessNumericText = (text: string, source: string, dates: readonly NumericSourceDate[] = sourceDates) =>
     options?.noticeSemantics
-      ? assessNoticeNumbersInText(text, source, dates, numberAssessmentOptions)
+      ? assessNoticeNumbersInText(text, source, dates, payload, numberAssessmentOptions)
       : assessNumbersInText(text, source, numberAssessmentOptions);
   // Keep the full-output assessment for telemetry, but only publication
   // fields may stop publication. Hidden planning/provenance fields are model
