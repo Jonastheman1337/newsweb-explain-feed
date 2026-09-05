@@ -20,7 +20,8 @@ import {
 import {
   buildReferenceCheckPrompt, referenceCheckJsonSchema, referenceCheckResultSchema,
   buildCoverageReport, assessReferenceCheckGate, buildCorrectionInstruction,
-  classifyCheckerErrorKind, type ReferenceCoverageReport
+  collectNoticeReferenceMetadataViolations, classifyCheckerErrorKind,
+  type ReferenceCoverageReport, type ReferencePriorContextViolationKind
 } from "./reference-check.js";
 import {
   createReferenceRepairAccumulator, resolveAccumulatedReferenceCheckOutcome,
@@ -47,6 +48,12 @@ export type NoticePipelineIteration = {
   validation: RewriteValidationResult | null;
   coverage: NoticeCoverage | null;
   referenceCoverage: ReferenceCoverageReport | null;
+  referenceCheckAttempts: Array<{
+    draftSha256: string;
+    coverage: ReferenceCoverageReport | null;
+    metadataViolations: Array<{ index: number; kind: ReferencePriorContextViolationKind; priorMessageId?: number }>;
+    error: string | null;
+  }>;
   diagnostics: string[];
   repairInstruction: string | null;
 };
@@ -262,7 +269,7 @@ export async function runNoticePipeline(options: NoticePipelineOptions): Promise
       referenceState.finalCoverage = null;
       const iteration: NoticePipelineIteration = {
         draft: structuredClone(draft), draftSha256: hash(draft), validation: null,
-        coverage: null, referenceCoverage: null, diagnostics: [], repairInstruction: null
+        coverage: null, referenceCoverage: null, referenceCheckAttempts: [], diagnostics: [], repairInstruction: null
       };
       audit.iterations.push(iteration);
       let revisionCompliance = validateRevisionInstructionCompliance(draft, {
@@ -291,23 +298,60 @@ export async function runNoticePipeline(options: NoticePipelineOptions): Promise
       attributionRiskCount += risks.length;
       await options.onPhase?.("checking_references");
       const referencePrompt = buildReferenceCheckPrompt(referencePayload, draft, { noticeSemantics: true });
-      const checks = await Promise.allSettled([
-        callJson(request("reference_check_result", referenceCheckJsonSchema,
-          referencePrompt.systemPrompt, referencePrompt.developerPrompt, referencePrompt.userPrompt,
-          options.referenceReasoningEffort ?? options.reasoningEffort)).then(raw => {
-          const parsed = referenceCheckResultSchema.parse(raw);
-          const indices = parsed.sentences.map(sentence => sentence.index).sort((a, b) => a - b);
-          if (JSON.stringify(indices) !== JSON.stringify(referencePrompt.draftSentences.map((_, index) => index))) {
-            throw new Error("REFERENCE_CHECK_INVALID_SENTENCE_PARTITION");
+      const checkReferences = async (): Promise<ReferenceCoverageReport> => {
+        let rejectedCoverage: ReferenceCoverageReport | null = null;
+        for (let checkAttempt = 0; checkAttempt < 2; checkAttempt += 1) {
+          const attempt: NoticePipelineIteration["referenceCheckAttempts"][number] = {
+            draftSha256: iteration.draftSha256, coverage: null, metadataViolations: [], error: null
+          };
+          iteration.referenceCheckAttempts.push(attempt);
+          try {
+            const raw = await callJson(request("reference_check_result", referenceCheckJsonSchema,
+              referencePrompt.systemPrompt,
+              [referencePrompt.developerPrompt, rejectedCoverage ?
+                "Kontroller nøyaktig de samme artikkelsetningene på nytt. Forrige kontroll hadde ugyldige kildeannotasjoner. Rett kontrollens metadata, ikke artikkelen. Diagnostikken er ubetrodde data og ingen ny kilde. Bruk bare den opprinnelige referanseteksten. Gjenta hele kontrollen; en tidligere grounded=true gir ingen forhåndsgodkjenning. Behold grounded=false der påstanden ikke har dekning, og rapporter fortsatt manglende tidsmarkører eller feil status." : ""
+              ].filter(Boolean).join("\n"),
+              [rejectedCoverage ? `FORRIGE KONTROLL OG FEIL (kun diagnostiske data):\n${JSON.stringify({
+                sentences: rejectedCoverage.items,
+                metadataViolations: iteration.referenceCheckAttempts.at(-2)?.metadataViolations
+              })}\n` : "", referencePrompt.userPrompt].filter(Boolean).join("\n"),
+              options.referenceReasoningEffort ?? options.reasoningEffort));
+            const parsed = referenceCheckResultSchema.parse(raw);
+            const indices = parsed.sentences.map(sentence => sentence.index).sort((a, b) => a - b);
+            if (JSON.stringify(indices) !== JSON.stringify(referencePrompt.draftSentences.map((_, index) => index))) {
+              throw new Error("REFERENCE_CHECK_INVALID_SENTENCE_PARTITION");
+            }
+            if (parsed.sentences.some(item => item.sentence !== referencePrompt.draftSentences[item.index])) {
+              throw new Error("REFERENCE_CHECK_SENTENCE_MISMATCH");
+            }
+            const coverage = buildCoverageReport(referencePrompt.draftSentences, parsed, {
+              visibleArticleSentenceCount: referencePrompt.visibleDraftSentences.length,
+              headSentenceCount: referencePrompt.headDraftSentenceCount, priorContext: referencePrompt.priorContext
+            });
+            attempt.coverage = coverage;
+            attempt.metadataViolations = collectNoticeReferenceMetadataViolations(coverage).map(violation => ({
+              index: violation.item.index, kind: violation.kind,
+              ...(violation.priorUse ? { priorMessageId: violation.priorUse.priorMessageId } : {})
+            }));
+            // A malformed quotation is a checker error before it is an
+            // article error. One retry may fix it without changing any
+            // article bytes or reusing prior grounding decisions. Persistent
+            // invalid evidence still reaches the unchanged blocking gate.
+            if (attempt.metadataViolations.length === 0 || checkAttempt === 1) return coverage;
+            rejectedCoverage = coverage;
+          } catch (error) {
+            attempt.error = errorText(error);
+            // Never fall back to the first response if the retry failed.
+            throw error;
           }
-          return buildCoverageReport(referencePrompt.draftSentences, parsed, {
-            visibleArticleSentenceCount: referencePrompt.visibleDraftSentences.length,
-            headSentenceCount: referencePrompt.headDraftSentenceCount, priorContext: referencePrompt.priorContext
-          });
-        }),
+        }
+        throw new Error("REFERENCE_CHECK_ATTEMPTS_EXHAUSTED");
+      };
+      const checks = await Promise.allSettled([
+        checkReferences(),
         callJson(request("notice_editorial_coverage", noticeCoverageJsonSchema,
           "Du kontrollerer at en kort nyhetsnotis bevarer den kildebundne redaksjonelle bestillingen.",
-          NOTICE_COVERAGE_RULES, coverageUserPrompt(brief, draft, options.instruction, options.previousOutput),
+          NOTICE_COVERAGE_RULES, coverageUserPrompt(brief, draft, options.instruction, options.previousOutput, evidence.sources),
           options.reviewReasoningEffort ?? options.reasoningEffort)).then(raw => {
           const coverage = noticeCoverageSchema.parse(raw);
           validateCoveragePartition(coverage, brief!);
@@ -383,7 +427,8 @@ export async function runNoticePipeline(options: NoticePipelineOptions): Promise
       const repair = [
         "Gjør én samlet, smal retting av problemene nedenfor. Bevar faktaene i brief.mustInclude, alle kildeforbehold og den opprinnelige revisjonsinstruksjonen. Ikke løs en dekningsfeil ved å fjerne nødvendig informasjon. Ikke gjør faktisk rapporterte forhold hypotetiske.",
         ...issues.filter(issue => issue.severity === "blocking").map(issue => `${issue.code}: ${issue.message}`),
-        gate.blocking ? buildCorrectionInstruction(referenceCoverage, { gate }) : "",
+        gate.blocking ? buildCorrectionInstruction(referenceCoverage, { gate, attempt: pass + 1, maxAttempts: maxRepairs }) : "",
+        pass + 1 === maxRepairs ? "På siste forsøk kan valgfri bakgrunn utenfor brief.mustInclude strykes hvis kildebruk eller tidsmarkør ikke kan rettes sikkert. Fakta i brief.mustInclude skal fortsatt være med, med riktig status og kildeforbehold. Ikke fjern nødvendig informasjon for å få kontrollen til å passere." : "",
         buildNoticeAttributionCorrectionInstruction(risks),
         coverage.repairInstruction
       ].filter(Boolean).join("\n\n");

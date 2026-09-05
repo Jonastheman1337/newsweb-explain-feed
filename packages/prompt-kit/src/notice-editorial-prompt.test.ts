@@ -116,6 +116,8 @@ describe("notice editorial examples", () => {
     ["regular", "Oppkjøp av Sensor", "acquisition"],
     ["regular", "Mandatory notification of trade", "routine"],
     ["regular", "Private placement", "financing"],
+    ["regular", "Liquidity update", "financing"],
+    ["regular", "Bondholder dialogue", "financing"],
     ["regular", "Avslag på søknad", "regulatory"],
     ["regular", "First quarter financial results", "results"],
     ["regular", "New customer contract", "contract"],
@@ -134,11 +136,21 @@ describe("notice editorial examples", () => {
     expect(noticeEditorialExamples.remuneration.output.company_sentence).toBe("");
     expect(noticeEditorialExamples.routine.output.company_sentence).toBe("");
   });
+
+  it("does not repeat business context already present in the example lead", () => {
+    for (const id of ["contract", "results", "regulatory"]) {
+      expect(noticeEditorialExamples[id].output.company_sentence).toBe("");
+    }
+    const acquisition = noticeEditorialExamples.acquisition;
+    expect(acquisition.source).toContain("Teknologiselskapet Nordtek");
+    expect(acquisition.output.lead).not.toMatch(/teknologiselskap/i);
+    expect(acquisition.output.company_sentence).toBe("Nordtek er et teknologiselskap.");
+  });
 });
 
 describe("compact notice prompt contract", () => {
   it("versions the independent builders and cuts instruction volume substantially", () => {
-    expect(NOTICE_EDITORIAL_PROMPT_VERSION).toBe("v5.12.0");
+    expect(NOTICE_EDITORIAL_PROMPT_VERSION).toBe("v5.12.1");
     const regular = createNoticeSystemPrompt() + createNoticeDeveloperPrompt("regular", payload);
     const report = createNoticeSystemPrompt() + createNoticeDeveloperPrompt("report", payload);
     expect(regular.length).toBeLessThan(createDeveloperPrompt().length / 2);
@@ -209,6 +221,26 @@ describe("compact notice prompt contract", () => {
     expect(prompt).not.toContain("Fremtidig kilde");
     expect(prompt).not.toContain("Ugyldig dato");
     expect(prompt).not.toContain("Feil dato for parallell melding");
+  });
+
+  it("keeps a dated liquidity estimate separate from a current unresolved financing update", () => {
+    const current = "Fjorden fortsetter dialogen om en finansieringsløsning de kommende dagene.";
+    const dated = "10 August 2026\r\nThe company estimated liquidity through 4 September and a funding need of USD 8-12 million through November.";
+    const context = {
+      ...payload,
+      title: "Liquidity update",
+      bodyText: current,
+      relatedNotices: [related({ text: dated, textChars: dated.length })]
+    };
+    const prompt = createNoticeUserPrompt(context);
+    const sources = jsonSection<Array<Record<string, unknown>>>(prompt, sourcesLabel);
+    expect(sources[0]).toMatchObject({ sourceId: "primary", kind: "current_notice", text: current });
+    expect(sources[1]).toMatchObject({
+      sourceId: "prior_900000", kind: "related_notice_background", text: dated,
+      publishedAt: "2026-08-10T10:00:00Z", recommendedTimeMarker: "i august"
+    });
+    expect(sources[0].text).not.toContain("USD");
+    expect(context.relatedNotices[0].text).toBe(dated);
   });
 
   it.each(["regular", "report", "yearly"] as NoticePromptKind[])("keeps a %s revision narrowly scoped while retaining all evidence", (kind) => {

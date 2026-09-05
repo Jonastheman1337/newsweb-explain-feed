@@ -47,7 +47,7 @@ export function extractReportNumberValues(text: string): string[] {
   return numbers;
 }
 
-function parseNumber(raw: string): { value: number | null; issue?: string } {
+function parseNumber(raw: string, grouping?: "," | "."): { value: number | null; issue?: string } {
   let value = raw.replace(/[\u00a0\u202f ]/g, "").replace(/[−–]/g, "-");
   if (/^\(.*\)$/.test(value)) value = `-${value.slice(1, -1)}`;
   const unsigned = value.replace(/^[-+]/, "");
@@ -67,7 +67,8 @@ function parseNumber(raw: string): { value: number | null; issue?: string } {
       else return { value: null, issue: "ambiguous_number_separators" };
     } else if (pieces[1].length === 3) {
       // 1,234 may mean 1234 or 1.234. Preserve the source token, not a guess.
-      return { value: null, issue: "ambiguous_number_separators" };
+      if (grouping && unsigned.includes(grouping) && pieces[0].length <= 3) value = value.replace(grouping, "");
+      else return { value: null, issue: "ambiguous_number_separators" };
     } else value = value.replace(",", ".");
   }
   const parsed = Number(value);
@@ -75,6 +76,7 @@ function parseNumber(raw: string): { value: number | null; issue?: string } {
 }
 
 function periodFromMatch(label: string): ReportFinancialPeriod | null {
+  label = label.replace(/\b([1-4])\s*\.\s*kv\./gi, "$1. kvartal").replace(/\bførste\s+halvår\b/gi, "1. halvår");
   const range = label.match(/^(\d{1,2})\.(\d{1,2})\.(?:(\d{4}))?\s*[-–—]\s*(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
   if (range) {
     const [, startDay, startMonth, startYear, endDay, endMonth, endYear] = range;
@@ -108,6 +110,7 @@ function periodFromMatch(label: string): ReportFinancialPeriod | null {
   const yearMatch = label.match(/\b(20\d{2}|19\d{2})\b/);
   if (!yearMatch) return null;
   const year = Number(yearMatch[1]);
+  if (/^pr\.\s*2\.\s*kvartal\b/i.test(label)) return { id: `${year}-H1`, label, kind: "half_year", year, half: 1 };
   const quarter = label.match(/(?:Q\s*([1-4])|([1-4])\s*Q|([1-4])\.?\s*(?:quarter|kvartal))/i);
   if (quarter) {
     const n = Number(quarter[1] ?? quarter[2] ?? quarter[3]);
@@ -123,6 +126,9 @@ function periodFromMatch(label: string): ReportFinancialPeriod | null {
 }
 
 function periodsInLine(line: string): ReportFinancialPeriod[] {
+  // The caption shares the header row in many financial PDFs. Its per-share
+  // exception does not describe a period and must not hide explicit columns.
+  line = line.replace(/\((?:amounts? in |in )?(?:NOK|SEK|DKK|EUR|USD|GBP|CHF|thousands of \$)[^)]*\)/gi, "");
   const explicit = /\b(?:\d{1,2}\.\d{1,2}\.(?:(?:20|19)\d{2})?\s*[-–—]\s*\d{1,2}\.\d{1,2}\.(?:20|19)\d{2}|(?:Q\s*[1-4]|[1-4]\s*Q|[1-4]\.?\s*(?:quarter|kvartal)|H\s*[12]|[12]\s*H|[12]\.?\s*(?:half(?:\s+year)?|halv[åa]r)|FY|full[ -]?year|year|hel[åa]r)\s*[-/]?\s*(?:20|19)\d{2}|\d{1,2}\.\d{1,2}\.(?:20|19)\d{2})\b/gi;
   const labels = [...line.matchAll(explicit)].map((match) => match[0]);
   const unitWords = /(?:NOK|SEK|DKK|EUR|USD|GBP|CHF|millions?|thousands?|billions?|mnok|msek|meur|amounts? in|notes?|noter?|unaudited|audited)/gi;
@@ -140,7 +146,41 @@ function periodsInLine(line: string): ReportFinancialPeriod[] {
 }
 
 function findHeader(lines: string[], rowIndex: number): { periods: ReportFinancialPeriod[]; text: string[] } {
+  // All supported header forms share one nearest-first search. An older
+  // reconstructed header must never override a later explicit period row.
   for (let i = rowIndex - 1; i >= 0; i--) {
+    if (/^(?:(?:pr\.\s*)?[1-4]\.\s*kv\.\s*20\d{2}|20\d{2})$/i.test(lines[i].trim()) && lines[i - 1]?.trim() === "IFRS") {
+      const stacked: { period: ReportFinancialPeriod; text: string }[] = [];
+      for (let j = i; j >= 1 && lines[j - 1].trim() === "IFRS"; j -= 2) {
+        if (!/^(?:(?:pr\.\s*)?[1-4]\.\s*kv\.\s*20\d{2}|20\d{2})$/i.test(lines[j].trim())) break;
+        const period = periodFromMatch(lines[j].trim());
+        if (period) stacked.unshift({ period, text: lines[j] });
+      }
+      return { periods: stacked.map(item => item.period), text: stacked.map(item => item.text) };
+    }
+    const dates = [...lines[i].matchAll(/\b(Jan\w*|Feb\w*|Mar\w*|Apr\w*|May|Jun\w*|Jul\w*|Aug\w*|Sep\w*|Oct\w*|Nov\w*|Dec\w*)\s+(\d{1,2}),?\s+(20\d{2})\b/gi)];
+    if (dates.length >= 2) {
+      let groupIndex = -1;
+      for (let j = i - 1; j >= Math.max(0, i - 4); j--) {
+        if (lines[j].includes("\t\t") && /months ended/i.test(lines[j])) { groupIndex = j; break; }
+      }
+      const groupsLine = groupIndex >= 0 ? lines[groupIndex] : "";
+      const cells = groupsLine.split("\t");
+      if (cells.at(-1) !== "" || cells.length !== dates.length + 1) return { periods: [], text: [lines[i]] };
+      let months = 0;
+      const periods = dates.map((match, index): ReportFinancialPeriod | null => {
+        if (cells[index]) months = ({ three: 3, six: 6, nine: 9, twelve: 12 } as Record<string, number>)[cells[index].trim().split(" ")[0].toLowerCase()] ?? 0;
+        const month = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"].indexOf(match[1].slice(0, 3).toLowerCase()) + 1;
+        const year = Number(match[3]), day = Number(match[2]);
+        if (day !== new Date(Date.UTC(year, month, 0)).getUTCDate()) return null;
+        const label = `${months} months ended ${match[0]}`;
+        if (months === 3 && month % 3 === 0) return { id: `${year}-Q${month / 3}`, label, year, kind: "quarter", quarter: month / 3 };
+        if (months === 6 && month === 6) return { id: `${year}-H1`, label, year, kind: "half_year", half: 1 };
+        if (months === 12 && month === 12) return { id: `${year}-FY`, label, year, kind: "year" };
+        return null;
+      });
+      return { periods: periods.every((period): period is ReportFinancialPeriod => period !== null) ? periods : [], text: [groupsLine, lines[i]] };
+    }
     const periods = periodsInLine(lines[i]);
     if (!periods.length) continue;
     if (periods.every((period) => period.kind === "unspecified") && i > 0) {
@@ -164,6 +204,7 @@ function findUnits(lines: string[], rowIndex: number): { currency: string | null
     const currencies = [...line.matchAll(/\b(?:[MT]?(?:NOK|SEK|DKK|EUR|USD|GBP|CHF))(?:m|bn)?\b/gi)].map((match) => match[0].toUpperCase().replace(/^[MT](?=[A-Z]{3}$)/, "").replace(/(?:BN|M)$/, ""));
     if (/\b(?:norske kroner|norwegian kroner)\b/i.test(line)) currencies.push("NOK");
     const unique = [...new Set(currencies)];
+    if (!unique.length && /^\s*\(in thousands of \$(?:[,)]|$)/i.test(line)) return { currency: "$", scale: "thousands", text: [line] };
     if (unique.length > 1) return { currency: null, scale: null, text: [line] };
     if (!unique.length) continue;
     let scale: ReportFinancialFact["scale"] = null;
@@ -185,7 +226,7 @@ function findScope(lines: string[], rowIndex: number): { scope: ReportFinancialF
 }
 
 function statementKind(line: string): "income" | "cash_flow" | "balance" | null {
-  if (/\b(?:income statement|statement of (?:comprehensive income|profit or loss)|resultatregnskap)\b/i.test(line)) return "income";
+  if (/\b(?:income statements?|statements? of (?:comprehensive income|profit or loss)|resultat(?:regn|rekne)skap)\b/i.test(line)) return "income";
   if (/\b(?:cash flow statement|statement of cash flows?)\b/i.test(line)) return "cash_flow";
   if (/\b(?:balance sheet|statement of financial position|balanse)\b/i.test(line)) return "balance";
   return null;
@@ -206,7 +247,8 @@ function tableStartBeforeRow(lines: string[], rowIndex: number): number {
   let preambleStart = start;
   let scopedPreamble = false;
   for (let i = start - 1; i >= Math.max(0, start - 4); i--) {
-    const scoped = /^\s*(?:consolidated|group|parent company)\s+(?:financial statements|accounts)\b/i.test(lines[i]);
+    const scoped = /^\s*(?:consolidated|group|parent company)\s+(?:financial statements|accounts)\b/i.test(lines[i]) ||
+      /^\s*(?:condensed\s+)?(?:consolidated|parent company)\s*$/i.test(lines[i]);
     if (!scoped && !isUnitCaption(lines[i])) break;
     scopedPreamble ||= scoped;
     preambleStart = i;
@@ -234,6 +276,101 @@ function isolatedTrailingUnits(lines: string[], rowIndex: number): ReturnType<ty
   return units.currency && units.scale ? { ...units, text: [lines[index - 1], ...units.text] } : null;
 }
 
+function linkedFinancialStatementScope(
+  pages: Array<{ pageNumber: number; text: string }>, pageNumber: number, tableLines: string[],
+  header: ReturnType<typeof findHeader>, units: ReturnType<typeof findUnits>, targetRowIndex: number
+): ReturnType<typeof findScope> {
+  // A later group heading alone cannot own earlier rows. Require an explicit
+  // note reference whose labelled amounts, units and period columns are repeated
+  // in the group note, through an uninterrupted financial-statement section.
+  if (header.periods.length < 2 || !units.currency || !units.scale ||
+      !tableLines.some(line => /^\s*(?:notes?|noter?)(?:\s+nr\.?)?\s*$/i.test(line))) return { scope: null, text: [] };
+  for (let offset = 1; offset <= 4; offset++) {
+    const previous = pages.find(item => item.pageNumber === pageNumber - offset);
+    if (!previous) break;
+    if (/\b(?:parent company|morselskap(?:et)?|morbanken)\b/i.test(previous.text)) return { scope: null, text: [] };
+  }
+  const evidence: string[] = [];
+  const labelKey = (label: string) => label.split("(")[0].toLowerCase().replace(/[^a-zæøå ]/g, " ").replace(/\s+/g, " ").trim();
+  for (let offset = 1; offset <= 4; offset++) {
+    const page = pages.find(item => item.pageNumber === pageNumber + offset);
+    if (!page) break;
+    const noteLines = page.text.split(/\r?\n/);
+    const heading = noteLines.find(line => line.trim())?.trim() ?? "";
+    if (/\b(?:parent company|morselskap(?:et)?|morbanken)\b/i.test(page.text)) break;
+    if (/^(?:notes? (?:to )?(?:the )?(?:consolidated|group)(?: financial statements)?|noter konsern)$/i.test(heading)) {
+      const links: string[][] = [];
+      for (const [sourceRowIndex, sourceRow] of tableLines.entries()) {
+        const sourceCells = sourceRow.split(/\t+/).map(cell => cell.trim());
+        if (sourceCells.length !== header.periods.length + 2 || !/^\d{1,2}$/.test(sourceCells[1])) continue;
+        const sourceHeader = findHeader(tableLines, sourceRowIndex);
+        const sourceUnits = findUnits(tableLines, sourceRowIndex);
+        const sourceScope = findScope(tableLines, sourceRowIndex);
+        if (sourceScope.scope !== null || sourceUnits.currency !== units.currency || sourceUnits.scale !== units.scale ||
+            JSON.stringify(sourceHeader.periods.map(period => period.id)) !== JSON.stringify(header.periods.map(period => period.id))) continue;
+        // The matching note row must belong to this exact local statement
+        // section. Even an identical repeated caption can open another table.
+        const between = tableLines.slice(Math.min(targetRowIndex, sourceRowIndex) + 1, Math.max(targetRowIndex, sourceRowIndex));
+        if (between.some(line => {
+          if (!line.trim()) return false;
+          const cells = line.split(/\t+/).map(cell => cell.trim());
+          const dataRow = cells.length >= 2 && cells.slice(1).every(cell => /^(?:\(?[-+−–]?\d[\d\s\u00a0\u202f.,]*\)?|[—–-])$/.test(cell));
+          return !dataRow || statementKind(line) !== null || periodsInLine(line).length > 0 ||
+            isUnitCaption(line) || findScope([line], 0).scope !== null;
+        })) continue;
+        const noteStarts = noteLines.flatMap((line, index) => new RegExp(`^Note ${sourceCells[1]}\\s+`, "i").test(line) ? [index] : []);
+        if (noteStarts.length !== 1) continue;
+        const noteStart = noteStarts[0];
+        if (!labelKey(sourceCells[0]) || !labelKey(noteLines[noteStart].replace(/^Note \d+\s+/i, "")).startsWith(labelKey(sourceCells[0]))) continue;
+        let noteEnd = noteLines.findIndex((line, index) => index > noteStart && /^Note \d+\s+/i.test(line));
+        if (noteEnd < 0) noteEnd = noteLines.length;
+        const section = noteLines.slice(noteStart, noteEnd);
+        for (const [rowIndex, noteRow] of section.entries()) {
+          const noteCells = noteRow.split(/\t+/).map(cell => cell.trim());
+          if (noteCells.length !== header.periods.length + 1 || labelKey(noteCells[0]) !== labelKey(sourceCells[0]) ||
+              sourceCells.slice(2).some((value, index) => value !== noteCells[index + 1])) continue;
+          const noteHeader = findHeader(section, rowIndex);
+          const noteUnits = findUnits(section, rowIndex);
+          if (noteUnits.currency !== units.currency || noteUnits.scale !== units.scale ||
+              JSON.stringify(noteHeader.periods.map(period => period.id)) !== JSON.stringify(header.periods.map(period => period.id))) continue;
+          links.push([...evidence, sourceRow, `[PDF page ${page.pageNumber}] ${heading}`, section[0], ...noteHeader.text, ...noteUnits.text, noteRow]);
+        }
+      }
+      if (links.length === 1) return { scope: "consolidated", text: links[0] };
+      break;
+    }
+    if (!/^(?:balance sheet|balanse|endring(?:er)? i egenkapital|kontantstrømoppstilling|cash flow statement)$/i.test(heading)) break;
+    evidence.push(`[PDF page ${page.pageNumber}] ${heading}`);
+  }
+  return { scope: null, text: [] };
+}
+
+function tableNumberFormat(lines: string[], columns: number, hasNoteColumn: boolean): { grouping?: "," | "."; text: string[] } {
+  const witnesses: { value: string; line: string }[] = [];
+  for (const line of lines) {
+    let cells = line.split(/\t+/).map(cell => cell.trim());
+    if (cells.length < 2) continue;
+    const label = cells[0];
+    // Matching cell counts do not make reference lists or arbitrary metadata
+    // financial data. Only recognizable amount/per-share rows witness locale.
+    if (/\b(?:notes?|references?|footnotes?|referanser?|henvisninger?|noter?)\b/i.test(label) ||
+        !/\b(?:revenues?|income|expenses?|costs?|earnings?|profit|loss|finance|depreciation|amorti[sz]ation|per share|salgsinntekter|driftsinntekter|driftsresultat|finansinntekter|finanskostnader|resultat|kostnader|avskrivninger|aksje)\b/i.test(label)) continue;
+    cells = cells.slice(1);
+    if (hasNoteColumn && cells.length === columns + 1 && /^\d{1,2}(?:\s*,\s*\d{1,2})*$/.test(cells[0])) cells = cells.slice(1);
+    if (cells.length !== columns) continue;
+    for (const value of cells) if (/^\(?[-+−–]?\d[\d.,]*\)?$/.test(value.replace(/^\$/, ""))) witnesses.push({ value: value.replace(/^\$/, ""), line });
+  }
+  const multiComma = witnesses.find(item => /^\(?[-+−–]?\d{1,3}(?:,\d{3}){2,}\)?$/.test(item.value));
+  const multiDot = witnesses.find(item => /^\(?[-+−–]?\d{1,3}(?:\.\d{3}){2,}\)?$/.test(item.value));
+  const decimalDot = witnesses.find(item => /^\(?[-+−–]?\d+\.\d{1,2}\)?$/.test(item.value));
+  const decimalComma = witnesses.find(item => /^\(?[-+−–]?\d+,\d{1,2}\)?$/.test(item.value));
+  const explicitDecimalPoint = lines.some(line => /\bdecimal point\b|\bpunktum som desimalskilletegn\b/i.test(line));
+  const explicitDecimalComma = lines.some(line => /\bdecimal comma\b|\bkomma som desimalskilletegn\b/i.test(line));
+  if ((multiComma || decimalDot) && !multiDot && !decimalComma && !explicitDecimalComma) return { grouping: ",", text: [(multiComma ?? decimalDot)!.line] };
+  if ((multiDot || decimalComma) && !multiComma && !decimalDot && !explicitDecimalPoint) return { grouping: ".", text: [(multiDot ?? decimalComma)!.line] };
+  return { text: [] };
+}
+
 export function extractReportFinancialFacts(
   pages: Array<{ pageNumber: number; text: string }>,
   rows: ReportMetricCandidate[]
@@ -246,24 +383,36 @@ export function extractReportFinancialFacts(
     const rowIndex = row.rowNumber ? row.rowNumber - 1 : lines.findIndex((line) => line.trim() === row.rowText.trim());
     if (rowIndex < 0) continue;
     const tableStart = tableStartBeforeRow(lines, rowIndex);
+    let tableEnd = lines.findIndex((line, index) => index > rowIndex && statementKind(line) !== null);
+    if (tableEnd < 0) tableEnd = lines.length;
     const tableLines = lines.slice(tableStart, rowIndex + 1);
     const tableRowIndex = tableLines.length - 1;
     const header = findHeader(tableLines, tableRowIndex);
     let units = findUnits(tableLines, tableRowIndex);
     if (!units.currency && !units.scale) units = isolatedTrailingUnits(lines, rowIndex) ?? units;
     const scope = findScope(tableLines, tableRowIndex);
+    if (!scope.scope) Object.assign(scope, linkedFinancialStatementScope(pages, page.pageNumber, lines.slice(tableStart, tableEnd), header, units, tableRowIndex));
     const tableScope = scope.scope;
     const exactRow = lines[rowIndex];
     const labelOffset = exactRow.indexOf(row.label);
     const afterLabel = labelOffset >= 0 ? exactRow.slice(labelOffset + row.label.length) : exactRow;
-    const values = extractReportNumberValues(afterLabel);
+    let values = extractReportNumberValues(afterLabel);
+    const hasNoteColumn = tableLines.some(line => /^\s*(?:notes?|noter?)(?:\s+nr\.?)?\s*$/i.test(line)) ||
+      header.text.some(line => /\bnotes?\b|\bnoter?\b/i.test(line));
+    const cells = afterLabel.trim().split(/\t+/).map(cell => cell.trim()).filter(Boolean);
+    if (hasNoteColumn && cells.length === header.periods.length + 1 && /^\d{1,2}(?:\s*,\s*\d{1,2})*$/.test(cells[0])) {
+      // A physical note cell under an explicit Note heading is not a value.
+      // Never remove a leading number from a row with flattened cell boundaries.
+      values = extractReportNumberValues(cells.slice(1).join("\t"));
+    }
+    const format = tableNumberFormat(lines.slice(tableStart, tableEnd), header.periods.length, hasNoteColumn);
     // Notes, missing cells, percentages and narrative prose invalidate positional
     // alignment. Never shift periods to make the number count fit.
     const residue = afterLabel.replace(/(?:\(\s*)?[-+−–]?\d+(?:[\s\u00a0\u202f.,]\d+)*(?:\s*\))?/g, "").trim();
-    const numericTableRow = !/[A-Za-zÆØÅæøå%]/.test(residue) && !/(?:^|\s)[–—-](?:\s|$)/.test(residue) && !/\b(?:was|were|is|are|grew|fell|increased|decreased|amounted|var|ble|økte|falt|utgjorde)\b/i.test(row.label);
+    const numericTableRow = !/[A-Za-zÆØÅæøå%\uE000-\uF8FF]/.test(residue) && !/(?:^|\s)[–—-](?:\s|$)/.test(residue) && !/\b(?:was|were|is|are|grew|fell|increased|decreased|amounted|var|ble|økte|falt|utgjorde)\b/i.test(row.label);
     const aligned = numericTableRow && header.periods.length > 0 && values.length === header.periods.length && new Set(header.periods.map((period) => period.id)).size === header.periods.length;
     for (const [index, rawValue] of values.entries()) {
-      const parsed = parseNumber(rawValue);
+      const parsed = parseNumber(rawValue, format.grouping);
       const period = aligned ? header.periods[index] : null;
       const unresolved: string[] = [];
       if (parsed.issue) unresolved.push(parsed.issue);
@@ -286,7 +435,7 @@ export function extractReportFinancialFacts(
         pageNumber: row.pageNumber,
         rowNumber: rowIndex + 1,
         rowText: exactRow,
-        headerText: [...new Set([...scope.text, ...units.text, ...header.text])],
+        headerText: [...new Set([...scope.text, ...units.text, ...header.text, ...format.text])],
         usable: unresolved.length === 0,
         unresolved
       });

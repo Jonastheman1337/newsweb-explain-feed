@@ -188,6 +188,72 @@ export async function downloadAttachmentPdf(
 /**
  * Extract text from each page of a PDF independently.
  */
+export type PdfTextItem = { str: string; width: number; transform: number[] };
+
+export function renderPdfTextItems(items: PdfTextItem[]): string {
+  // PDF.js represents a visual column gap as a single space with a large width.
+  // Measuring from that space's end erases the gap; measure visible glyphs only.
+  const visible = items.filter(item => item.str.trim());
+  const replacements = new Map<number, string>();
+  const omitted = new Set<number>();
+  for (let i = 0; i < visible.length; i++) {
+    if (!/^(?:three|six|nine|twelve) months ended$/i.test(visible[i].str.trim())) continue;
+    const groups: number[] = [];
+    for (let j = i; j < visible.length && Math.abs(visible[j].transform[5] - visible[i].transform[5]) <= 2; j++) {
+      if (!/^(?:three|six|nine|twelve) months ended$/i.test(visible[j].str.trim())) break;
+      groups.push(j);
+    }
+    if (groups.length < 2 || groups.length > 3) continue;
+    const dates: PdfTextItem[] = [];
+    let dateY: number | undefined;
+    for (let j = groups.at(-1)! + 1; j < Math.min(visible.length, groups.at(-1)! + 16); j++) {
+      const item = visible[j];
+      if (!/^(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+\d{1,2},?\s+20\d{2}$/i.test(item.str.trim())) {
+        if (dates.length || !/^(?:\(in (?:thousands|millions) of .+|share data\)|notes?|unaudited)$/i.test(item.str.trim())) break;
+        continue;
+      }
+      const verticalGap = visible[i].transform[5] - item.transform[5];
+      if (verticalGap <= 0 || verticalGap > Math.abs(visible[i].transform[0]) * 4) break;
+      if (dateY !== undefined && Math.abs(item.transform[5] - dateY) > 2) break;
+      dateY = item.transform[5]; dates.push(item);
+    }
+    if (dates.length < groups.length || dates.length > 8 || dates.some((item, index) => index > 0 && item.transform[4] <= dates[index - 1].transform[4])) continue;
+    const partitions: number[][] = [];
+    const visit = (sizes: number[], offset: number) => {
+      if (sizes.length === groups.length) { if (offset === dates.length) partitions.push(sizes); return; }
+      const heading = visible[groups[sizes.length]];
+      const headingCenter = heading.transform[4] + heading.width / 2;
+      for (let count = 1; count <= dates.length - offset - (groups.length - sizes.length - 1); count++) {
+        const subset = dates.slice(offset, offset + count);
+        const center = subset.reduce((sum, item) => sum + item.transform[4] + item.width / 2, 0) / count;
+        if (Math.abs(center - headingCenter) <= Math.max(8, Math.abs(heading.transform[0]) * 2)) visit([...sizes, count], offset + count);
+      }
+    };
+    visit([], 0);
+    if (partitions.length !== 1) continue;
+    // Empty tab cells retain the uniquely aligned visual span. Original words
+    // appear once; no inferred period labels or amounts are added to raw text.
+    replacements.set(i, groups.map((index, g) => visible[index].str + "\t".repeat(partitions[0][g])).join(""));
+    groups.slice(1).forEach(index => omitted.add(index));
+    i = groups.at(-1)!;
+  }
+  let lastY: number | undefined;
+  let lastEndX: number | undefined;
+  let text = "";
+  for (const [index, item] of visible.entries()) {
+    if (omitted.has(index)) continue;
+    const value = replacements.get(index) ?? item.str;
+    if (lastY !== undefined && Math.abs(lastY - item.transform[5]) > 2) text += "\n";
+    else if (lastEndX !== undefined && item.transform[4] - lastEndX >= Math.max(12, Math.abs(item.transform[0]) * 1.2)) text += "\t";
+    else if (lastEndX !== undefined && item.transform[4] - lastEndX > Math.max(.3, Math.abs(item.transform[0]) * .08) &&
+      text && !/\s$/.test(text) && !/^[\s,.;:%)]/.test(value)) text += " ";
+    text += value;
+    lastY = item.transform[5];
+    lastEndX = item.transform[4] + item.width;
+  }
+  return text;
+}
+
 export async function extractPagesFromPdf(
   buffer: Buffer,
   options?: { maxPages?: number }
@@ -201,31 +267,7 @@ export async function extractPagesFromPdf(
     for (let i = 1; i <= Math.min(pageCount, options?.maxPages ?? pageCount); i++) {
       const page = await doc.getPage(i);
       const content = await page.getTextContent();
-      let lastY: number | undefined;
-      let lastEndX: number | undefined;
-      let pageText = "";
-      for (const item of content.items) {
-        if ("str" in item) {
-          if (lastY !== undefined && Math.abs(lastY - item.transform[5]) > 2) {
-            pageText += "\n";
-          } else if (lastEndX !== undefined && item.transform[4] - lastEndX >= Math.max(12, Math.abs(item.transform[0]) * 1.2)) {
-            // Preserve actual column gaps. A single ordinary space cannot tell a
-            // thousands separator from two adjacent values once geometry is lost.
-            pageText += "\t";
-          } else if (
-            pageText &&
-            item.str &&
-            !/\s$/.test(pageText) &&
-            !/^[\s,.;:%)]/.test(item.str)
-          ) {
-            pageText += " ";
-          }
-          pageText += item.str;
-          lastY = item.transform[5];
-          lastEndX = item.transform[4] + item.width;
-        }
-      }
-      pages.push(pageText);
+      pages.push(renderPdfTextItems(content.items.filter((item): item is typeof item & PdfTextItem => "str" in item)));
     }
   } finally {
     await doc.destroy();
@@ -358,8 +400,9 @@ export function reportNeedsOpenAIPdfFallback(
 
   return (
     context.diagnostics.totalExtractedChars < 1200 ||
-    context.metrics.length === 0 ||
-    (context.financialFacts !== undefined && !context.financialFacts.some((fact) => fact.usable)) ||
+    (context.financialFacts === undefined
+      ? context.metrics.length === 0
+      : !context.financialFacts.some((fact) => fact.usable)) ||
     requestedTopicMissing ||
     requestedPageMissing
   );
@@ -425,6 +468,7 @@ const INCOME_STATEMENT_TERMS: Array<{ term: string; weight: number }> = [
   { term: "consolidated income statement", weight: 16 },
   { term: "income statement", weight: 12 },
   { term: "resultatregnskap", weight: 14 },
+  { term: "resultatrekneskap", weight: 14 },
   { term: "oppstilling over totalresultat", weight: 18 },
   { term: "totalresultat", weight: 10 }
 ];
@@ -449,8 +493,8 @@ const NON_INCOME_STATEMENT_TERMS = [
 const SECONDARY_CONTEXT_HEADINGS: Array<{ pattern: RegExp; weight: number; reason: ReportPageReason }> = [
   { pattern: /^(?:(?:q[1-4]|h[12])\s+(?:20\d{2}\s+)?)?financial (?:results|review|performance)(?:\s+(?:q[1-4]|h[12]|20\d{2})[\d\s]*)?$/, weight: 12, reason: "ceo_or_management" },
   { pattern: /^(?:resultat(?:et)? per\s+\d{1,2}\.\d{1,2}\.20\d{2}|resultatutvikling|okonomisk utvikling)$/, weight: 12, reason: "ceo_or_management" },
-  { pattern: /^(?:management (?:report|review)|(?:board of )?directors['’]? report|report (?:of|from) the (?:board of )?directors|styrets beretning|halvarsberetning)(?:\s+(?:q[1-4]|h[12]|20\d{2})[\d\s]*)?$/, weight: 10, reason: "ceo_or_management" },
-  { pattern: /^(?:(?:letter|message|statement|review|report) from (?:the )?(?:ceo|chief executive(?: officer)?|konsernsjef(?:en)?|administrerende direktor)|(?:ceo|chief executive(?: officer)?|konsernsjef(?:en)?|administrerende direktor)(?:['’]s)?\s+(?:letter|message|statement|review|report|kommentar|har ordet))$/, weight: 8, reason: "ceo_or_management" },
+  { pattern: /^(?:management (?:report|review)|(?:board of )?directors['’]? report|report (?:of|from) the (?:board of )?directors|styrets beretning|styret si melding|halvarsberetning)(?:\s+(?:q[1-4]|h[12]|20\d{2})[\d\s]*)?$/, weight: 10, reason: "ceo_or_management" },
+  { pattern: /^(?:(?:letter|message|statement|review|report) from (?:the )?(?:(?:chair(?:man|woman)? and (?:the )?)?ceo|chief executive(?: officer)?|konsernsjef(?:en)?|administrerende direktor)|(?:ceo|chief executive(?: officer)?|konsernsjef(?:en)?|administrerende direktor)(?:['’]s)?\s+(?:letter|message|statement|review|report|kommentar|har ordet))$/, weight: 8, reason: "ceo_or_management" },
   { pattern: /^(?:outlook|guidance|utsikter|fremtidsutsikter)$/, weight: 6, reason: "outlook_or_events" },
   { pattern: /^(?:key events|highlights|subsequent events|events after (?:the )?reporting period|(?:viktige |vesentlige )?hendelser(?: etter balansedagen| i forste halvar(?: 20\d{2})?)?|hoydepunkter)$/, weight: 5, reason: "outlook_or_events" }
 ];
@@ -472,7 +516,7 @@ const METRIC_MATCHERS: Record<ReportMetricKind, RegExp[]> = {
     /\bebit\b(?!da)/
   ],
   earnings_before_tax: [
-    /\b(profit|loss|earnings|result).{0,35}before tax\b/,
+    /\b(profit|loss|earnings|result).{0,35}before (?:income )?tax(?:es)?\b/,
     /\bresultat.{0,35}for skatt\b/,
     /\bresultat.{0,35}skattekostnad\b/
   ]
@@ -543,6 +587,8 @@ function hasAnyTerm(text: string, terms: string[]): boolean {
 }
 
 function metricKindMatches(normalizedText: string, kind: ReportMetricKind): boolean {
+  if (kind === "operating_result" && /\bbefore\b.{0,45}\b(?:depreciation|amorti[sz]ation)\b/.test(normalizedText)) return false;
+  if (kind === "operating_result" && /\b(?:adjusted|underlying|normalis(?:ed|ert)|normaliz(?:ed|ert)|justert|cash)\b|\bbefore (?:special|exceptional|non.recurring)\b/.test(normalizedText)) return false;
   return METRIC_MATCHERS[kind].some((pattern) => pattern.test(normalizedText));
 }
 
@@ -581,7 +627,7 @@ function scoreTermWeights(
 function hasIncomeStatementHeading(page: PdfPageText): boolean {
   if (isContentsPage(page) || isAccountingPolicyPage(page)) return false;
   return possibleHeadingLines(page).some(line => {
-    const heading = line.match(/^(?:(?:condensed|consolidated|interim|unaudited|group|parent(?: company)?|konsern(?:ets)?)\s+)*(?:income statements?|statements? of (?:comprehensive income|profit (?:or|and) loss(?: and (?:other )?comprehensive income)?)|resultatregnskap(?:et)?(?: for konsernet)?|oppstilling over totalresultat|totalresultat)(?=$|\s|[(:–-])/);
+    const heading = line.match(/^(?:(?:condensed|consolidated|interim|unaudited|group|parent(?: company)?|konsern(?:ets)?)\s+)*(?:income statements?|statements? of (?:comprehensive income|profit (?:or|and) loss(?: and (?:other )?comprehensive income)?)|resultat(?:regn|rekne)skap(?:et)?(?: for konsernet)?|oppstilling over totalresultat|totalresultat)(?=$|\s|[(:–-])/);
     if (!heading) return false;
     const suffix = line.slice(heading[0].length).replace(/\([^)]{1,60}\)/g, "").trim();
     if (!suffix) return true;
@@ -826,9 +872,12 @@ function extractMetricsFromPages(
   const selected = new Set<ReportMetricCandidate>();
   const isRevenueTotal = (candidate: ReportMetricCandidate) =>
     /^(?:total\s+(?:(?:operating\s+)?revenues?|operating\s+income)|sum\s+(?:driftsinntekter|inntekter|omsetning))$/.test(normalizeForSearch(candidate.label));
+  const isOrdinaryOperatingResult = (candidate: ReportMetricCandidate) =>
+    /^(?:operating (?:profit|loss|result)(?:\s*[/()]?\s*(?:profit|loss)?\s*\(?-?\)?)?|driftsresultat|ebit)$/.test(normalizeForSearch(candidate.label));
   for (const kind of Object.keys(METRIC_MATCHERS) as ReportMetricKind[]) {
     const matching = candidates.filter(candidate => candidate.metric === kind);
     if (kind === "revenue") matching.sort((left, right) => Number(isRevenueTotal(right)) - Number(isRevenueTotal(left)));
+    if (kind === "operating_result") matching.sort((left, right) => Number(isOrdinaryOperatingResult(right)) - Number(isOrdinaryOperatingResult(left)));
     for (const candidate of matching.slice(0, 2)) selected.add(candidate);
   }
   return candidates.filter(candidate => selected.has(candidate));
@@ -892,7 +941,7 @@ function buildReportContextText(
     [
       "ALIGNED FINANCIAL FACTS (original units; no conversions):",
       ...(usableFacts.length ? usableFacts.map((fact) =>
-        `- ${fact.metric}: ${fact.rawValue} ${fact.currency} ${fact.scale}; ${fact.period?.label}; ${fact.tableScope}; PDF page ${fact.pageNumber}, row ${fact.rowNumber}; comparison column: ${fact.comparisonPeriodId ?? "none identified"}`
+        `- ${fact.metric} (${fact.label}): ${fact.rawValue} ${fact.currency} ${fact.scale}; ${fact.period?.label}; ${fact.tableScope}; PDF page ${fact.pageNumber}, row ${fact.rowNumber}; comparison column: ${fact.comparisonPeriodId ?? "none identified"}`
       ) : ["- None. Column periods, scale, currency or scope could not be resolved safely. Do not infer them from column order."])
     ].join("\n"),
     buildMetricSection(metrics)
@@ -1066,6 +1115,7 @@ export function buildReportContextFromPages(
   if (new Set(financialFacts.filter((fact) => fact.usable).map((fact) => fact.metric)).size < Object.keys(METRIC_MATCHERS).length) completenessReasons.push("key_financial_metrics_unresolved");
   if (!usableFinancialFactCount) completenessReasons.push("no_usable_financial_facts");
   if (unresolvedFinancialFactCount) completenessReasons.push("financial_fact_ambiguity");
+  if (selectedPages.some(page => /[\uE000-\uF8FF]/.test(rawPages[page.pageNumber - 1]))) completenessReasons.push("unmapped_pdf_glyphs");
   if (contextTruncated) completenessReasons.push("selected_context_truncated");
   if (referenceTextTruncated) completenessReasons.push("selected_reference_pages_truncated");
   if ([...secondaryByIndex.keys()].some(index => !selected.has(index))) completenessReasons.push("management_context_selection_budget");

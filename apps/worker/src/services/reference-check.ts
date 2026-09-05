@@ -497,6 +497,10 @@ export function buildReferenceCheckPrompt(
     "interpretation skal kort forklare hvorfor setningen er dekket eller ikke.",
     "sourceEvidence skal inneholde et kort tekstutdrag fra referansen; tom streng hvis ingenting dekker setningen.",
     ...(options.noticeSemantics ? [
+      "Returner sentence nøyaktig som den oppgitte setningen, med samme indeks, ordlyd og tegnsetting. Kontrollen skal vurdere artikkelen, ikke skrive den om.",
+      "sourceEvidence skal være ett sammenhengende, ordrett utdrag kopiert fra den opprinnelige kildeblokken. Ikke oversett, parafraser, sett sammen atskilte utdrag eller legg til sitattegn, tre prikker (...) eller utelatelsesmarkører som ikke står i selve kilden. Behold originalens ord, tall og tegnsetting; bare mellomrom og linjeskift kan samles.",
+      "For priorUses må sourceEvidence kopieres fra akkurat [prior_<priorMessageId>], ikke fra en annen blokk eller fra din egen interpretation. Velg et tilstrekkelig langt, entydig utdrag som dekker alle tall og navn i fact, utenom den eksplisitte tidsmarkøren. Ikke klipp sammen publiseringsdatoen med brødtekst. Når ingen slik kilde dekker påstanden, sett grounded=false og forklar mangelen; ikke konstruer evidens.",
+      "priorUses.fact skal være et sammenhengende, ordrett spenn i den samme utkastsetningen. historicalMarker og eventuell correctionStatusMarker skal være eksakte fraser inne i dette spennet. En markør i forrige setning teller ikke. Ikke finn på en markør for å reparere artikkelen i kontrollens metadata.",
       "Kontroller tall som en samlet opplysning: selskap/konsern, mål, beløp, valuta, skala, periode og sammenligningsperiode må høre sammen. At tallet finnes et annet sted i kilden er ikke dekning.",
       "Bevar sikkerhetsgrad i begge retninger: rapporterte tall og bekreftede hendelser skal ikke omskrives til 'kan ha', 'skal ha' eller 'hevdes det'. Prognoser, betingelser og planer skal heller ikke presenteres som gjennomført. En slik endring betyr grounded=false.",
       "Rapportert økning eller fall er ikke en usikker effektpåstand. En attribuert vurdering eller årsaksforklaring trenger ikke et ekstra 'kan' når kilden fremsetter den uten et slikt forbehold.",
@@ -1070,6 +1074,21 @@ export function assessReferenceCheckGate(
     highRiskUnsupportedSentences: base.highRiskUnsupportedSentences,
     priorContextViolations
   };
+}
+
+/** Notice-only retry hints. These never waive a source or article gate: the
+ * caller may ask the checker once to correct its annotations on the same
+ * article, then must evaluate the complete returned report normally.
+ */
+export function collectNoticeReferenceMetadataViolations(
+  report: ReferenceCoverageReport
+): ReferencePriorContextViolation[] {
+  const metadataKinds = new Set<ReferencePriorContextViolationKind>([
+    "prior_use_missing", "prior_message_unknown", "prior_fact_unmatched",
+    "prior_evidence_missing", "prior_evidence_mismatch", "prior_source_mismatch"
+  ]);
+  return collectPriorContextViolations(report).filter(violation =>
+    metadataKinds.has(violation.kind));
 }
 
 function priorContextCorrectionLines(

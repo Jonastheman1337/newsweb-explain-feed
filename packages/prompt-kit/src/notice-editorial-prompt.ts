@@ -10,7 +10,7 @@ import {
 import type { ReportPromptPayload } from "./report-prompt.js";
 
 /** Independent of the frozen v5 builders and the v6 research variants. */
-export const NOTICE_EDITORIAL_PROMPT_VERSION = "v5.12.0";
+export const NOTICE_EDITORIAL_PROMPT_VERSION = "v5.12.1";
 
 export type NoticePromptKind = "regular" | "report" | "yearly";
 
@@ -73,7 +73,7 @@ export const noticeEditorialExamples: Record<string, NoticeEditorialExample> = {
       body: [
         "Avtalen gjelder drift av kommunale datasystemer fra 1. januar 2027. Kunden har mulighet til å forlenge den i to år."
       ],
-      company_sentence: "Fjorddata er et programvareselskap.",
+      company_sentence: "",
       key_facts: ["Bindende avtale på minst 90 millioner kroner", "Tre års drift fra januar 2027, med opsjon på to år"],
       negative_or_surprising: [],
       excluded_hype: [],
@@ -93,7 +93,7 @@ export const noticeEditorialExamples: Record<string, NoticeEditorialExample> = {
     source: "Teknologiselskapet Nordtek har inngått en bindende avtale om å kjøpe alle aksjene i Sensor. Samlet vederlag er inntil 180 millioner kroner: 120 millioner betales kontant ved overtakelsen, og inntil 60 millioner avhenger av Sensors resultater i 2027 og 2028. Kjøpet krever konkurransemyndighetenes godkjennelse. Gjennomføring ventes i fjerde kvartal 2026.",
     output: {
       title: "Nordtek avtaler kjøp for inntil 180 millioner",
-      lead: "Teknologiselskapet Nordtek har avtalt å kjøpe Sensor for inntil 180 millioner kroner, ifølge en børsmelding.",
+      lead: "Nordtek har avtalt å kjøpe Sensor for inntil 180 millioner kroner, ifølge en børsmelding.",
       body: [
         "Av dette skal 120 millioner betales kontant ved overtakelsen. De resterende inntil 60 millionene avhenger av Sensors resultater i 2027 og 2028.",
         "Kjøpet krever godkjennelse fra konkurransemyndighetene. Nordtek venter å gjennomføre det i fjerde kvartal 2026."
@@ -148,7 +148,7 @@ export const noticeEditorialExamples: Record<string, NoticeEditorialExample> = {
         "Resultatet før skatt falt til 45 millioner kroner i første halvår, fra 80 millioner i samme periode i fjor.",
         "Inntektene falt til 910 millioner kroner, fra én milliard. Selskapet forklarer nedgangen med lavere salgspriser og dyrere strøm."
       ],
-      company_sentence: "Nordverk er et industriselskap.",
+      company_sentence: "",
       key_facts: ["Resultatanslaget for 2026 senkes til 150–170 millioner kroner", "Resultat før skatt falt fra 80 til 45 millioner", "Inntekter falt fra én milliard til 910 millioner"],
       negative_or_surprising: ["Kutter resultatanslaget etter svakere første halvår"],
       excluded_hype: [],
@@ -173,7 +173,7 @@ export const noticeEditorialExamples: Record<string, NoticeEditorialExample> = {
       body: [
         "Myndighetene mener effekten ikke er godt nok dokumentert. Mednova planlegger en ny studie i 2027."
       ],
-      company_sentence: "Mednova er et legemiddelselskap.",
+      company_sentence: "",
       key_facts: ["Avslag på søknad om markedsføringstillatelse", "Planlegger ny studie i 2027"],
       negative_or_surprising: ["Myndighetene mener dokumentasjonen av effekt er utilstrekkelig"],
       excluded_hype: ["Selskapets karakteristikk av avslaget som en normal utviklingsprosess"],
@@ -246,7 +246,7 @@ export function selectNoticeEditorialExample(
   if (/oppkjøp|kjøp av|acqui[rs]|merger|fusjon|overtak|takeover/i.test(subject)) {
     return noticeEditorialExamples.acquisition;
   }
-  if (/emisjon|finansiering|placement|financing|refinanc|obligasjon|bond issue/i.test(subject)) {
+  if (/emisjon|finansiering|placement|financing|refinanc|obligasjon|bond issue|likviditet|liquidity|bondholder|tap issue/i.test(subject)) {
     return noticeEditorialExamples.financing;
   }
   if (/avslag|søksmål|myndighet|regulator|authori[sz]ation|rejection|litigation/i.test(subject)) {
@@ -269,33 +269,34 @@ export function createNoticeSystemPrompt(): string {
 
 const NOTICE_EDITORIAL_CONTRACT = `REDAKSJONELT OPPDRAG
 - Velg nyhetsvinkel før du skriver: hva er nytt, hvilken status har det, og hva er den viktigste dokumenterte følgen? La vesentlig innhold styre, ikke kildens rekkefølge, PR-vinkel eller meldingskategori.
-- Briefens mustInclude angir vesentlige fakta, ikke ferdig formulert tekst. Kontroller kildebelegget, og bevar fakta som trengs for å forstå hendelsen i lead/body. Det holder ikke å gjemme dem i key_facts. Flett dem sammen uten gjentakelser. En ny redigeringsinstruksjon kan endre vinkel og utvalg innenfor kildegrunnlaget.
+- Briefens mustInclude angir vesentlige fakta, ikke ferdig formulert tekst eller hele kildegrunnlaget. Bevar også kildebelagte forbehold som presiserer disse faktaene selv om briefen utelater dem. Fakta som trengs for å forstå hendelsen må stå i lead/body, ikke bare key_facts. Flett dem sammen uten gjentakelser. En ny redigeringsinstruksjon kan endre vinkel og utvalg innenfor kildegrunnlaget.
 - Begynn med nyheten. Hvert avsnitt skal tilføre noe. En tynn rutinemelding kan ha tom body; en substansiell rapport eller avtale må bevare sentrale sammenligninger, beløp og vilkår. Fyll aldri ut manglende informasjon.
 
 FAKTA, STATUS OG TALL
 - Rapporter faktiske inntekter, resultater, vedtak og inngåtte avtaler direkte. «Inntektene falt» blir ikke «kan ha falt» fordi tallene kommer fra selskapet. Kildehenvisning og usikkerhet er to forskjellige ting.
 - Behold kildens grad av sikkerhet: forslag er foreslått, forventninger er ventet, en avtale er inngått, og en transaksjon er gjennomført bare når det er dokumentert. «Vil», «venter», «kan», betingelser og tidsfrister må ikke falle bort eller legges til uten grunnlag.
 - Attribuer subjektive vurderinger og årsaks-/effektpåstander til den som fremsetter dem. Ikke legg til et «kan» dersom kilden beskriver en faktisk målt utvikling. Kritikk og anklager må ikke bli fastslåtte forhold; ta med relevant avvisning eller tilsvar som finnes i kilden.
-- Ved oppkjøp og finansiering: skill totalpris, betaling nå, utsatt/resultatavhengig betaling, gjeld og aksjevederlag. Behold vesentlige godkjennelser og forbehold. Ikke gjør maksimal ramme eller mulig opsjonsverdi til sikker inntekt.
+- Ved oppkjøp og finansiering: skill samlet verdi, kjøperens betaling, utbytte fra målselskapet, utsatt/resultatavhengig betaling, gjeld og aksjevederlag. Oppgi hvem som betaler/mottar vesentlige deler, og hva som må skje før betaling. Erklæring av utbytte, gjennomføring og utbetaling er ulike hendelser; et utbytte kan være planlagt erklært før overtakelse og likevel bare utbetales hvis kjøpet gjennomføres. Behold vesentlige godkjennelser. Ikke gjør maksimal ramme eller mulig opsjonsverdi til sikker inntekt.
 - Bevar riktig måltall, periode, sammenligningsperiode, valuta og skala. Inntekter, EBIT, EBITDA, resultat før skatt og resultat etter skatt er ulike størrelser. Justert er ikke ujustert. Sammenlign like perioder og samme virksomhetsgrunnlag; bruk ikke nabokolonnen som automatisk fjorårstall.
 - Bruk norske tall: 1,5 millioner, 1.000 aksjer og prosent. Skriv beløp fra 1.000 millioner som milliarder. Valutaomregning krever kilde; enkel skalering og dokumenterbare regnestykker krever sikre inndata. Summer aldri beløp fra ulike meldinger til et nytt totalbeløp.
 
 SPRÅK OG SITATER
 - Maks åtte ord i title, med ett konkret poeng og selskapsnavn fremfor ticker. Bruk nøkterne verb, korte setninger og korrekt æ, ø og å. Utelat selskapsendelsen ASA. Lead er normalt én eller to setninger. Lead + body må holde tegngrensen i oppgaven; tittel og metadata teller ikke med.
 - Oppgi kilden naturlig i første eller andre setning: for eksempel «ifølge børsmeldingen» eller «halvårsrapporten viser». Bruk publiseringstidspunktet, ikke dagens dato, som anker for «i år» og «i fjor».
-- Forklar nødvendige fagord gjennom det de betyr her. EBITDA skal ved første bruk forklares som «resultat før renter, skatt, av- og nedskrivninger (ebitda)». EBIT er driftsresultat. Bruk enklere ord eller utelat måltallet når forklaringen ikke fortjener plassen.
+- Forklar nødvendige fagord gjennom det de betyr her, for eksempel utvidelse av et eksisterende obligasjonslån fremfor «tap issue». EBITDA skal ved første bruk forklares som «resultat før renter, skatt, av- og nedskrivninger (ebitda)». EBIT er driftsresultat. Bruk enklere ord eller utelat fagordet/måltallet når forklaringen ikke fortjener plassen.
+- Kontroller sammenhengen etter forkorting: «resten», «denne mengden», «halvparten» og lignende må vise til en størrelse og et måltall som faktisk står i artikkelen. Behold nødvendig grunnlag eller utelat hele den relative påstanden; ikke fyll inn et ukjent tall. Siste avsnitt skal tilføre noe, ikke gjenta at avtalen inngås, dialogen fortsetter eller kjøpet avbrytes.
 - Et nyttig sitat forklarer årsak, risiko, marked eller utsikter. Ta det med når det tilfører noe viktig; det er ingen plikt til sitat eller regnskap for alle navngitte uttalelser. Bruk sitatstrek for personutsagn, «» for kildefast ordlyd, og ingen anførselstegn rundt fri parafrase. Oversett naturlig og bevar mening, styrke, forbehold og avsender.
 - Ingen kursprognoser, kjøpsråd, kursmål eller investeringslogikk. Ingen tomme PR-fraser, påstått dramatikk eller generisk oppsummering til slutt. Ikke vis interne kilde-id-er, brief-felt, PDF-/vedleggsarbeid eller ekstraksjonsproblemer i artikkelen.
 
 METADATA
-- company_sentence: én kort, meningsfull virksomhetsbeskrivelse bare når kildene dokumenterer den. Ellers tom streng. Ikke gjett bransje fra navn/ticker og ikke skriv «X er et selskap». Selskapsbeskrivelse i lead er nyttig bare når den er dokumentert og relevant.
+- company_sentence: én kort, meningsfull virksomhetsbeskrivelse bare når kildene dokumenterer den og den tilfører kontekst utover lead/body. Ellers tom streng. Ikke gjett bransje fra navn/ticker, gjenta hendelsen eller fyll feltet med selskapsnavn, eierstruktur eller «X er et selskap». Selskapsbeskrivelse i lead er nyttig bare når den er dokumentert og relevant.
 - key_facts: korte sentrale fakta; negative_or_surprising: bare faktiske negative eller overraskende opplysninger; excluded_hype: bare PR-formuleringer som faktisk er valgt bort. Bruk tomme lister når det ikke er noe å føre.
 - source_limitations: reelle mangler i kildegrunnlaget. Utvalgte rapportsider er et utdrag; vedlegg som følger som tekst er analysert, ikke manglende. Ikke kopier eksemplets begrensninger automatisk. Manglende sammenligningstall eller udekket hovedtema må ikke skjules bak en kort, ellers korrekt sak.
 - confidence: high krever kildefaste fakta og dekning av den vesentlige hendelsen; medium ved begrenset utdrag/vesentlig usikkerhet; low når hovedtemaet mangler kildegrunnlag. importance: viktig for en klart vesentlig hendelse, medium for relevant nytt innhold, uviktig for rutine. Kjente navn og kategori alene avgjør ikke.
 - source_spans: korte ordrette utdrag med kilde-id: primary: for dagens melding/vedlegg/rapport, material-id for valgt tilleggsmateriale og prior_<id>: for tidligere melding. Ett utdrag tilhører én kilde. Dekk fakta og nødvendige forbehold; ikke siter briefen som kilde.`;
 
 const KIND_INSTRUCTIONS: Record<NoticePromptKind, string> = {
-  regular: "VANLIG MELDING: Velg den viktigste nye hendelsen. Ved en avtale må hva den gjelder, beløpets betydning og gjennomføringsstatus komme frem når kilden gir opplysningene.",
+  regular: "VANLIG MELDING: Velg den viktigste nye hendelsen eller materielle statusoppdateringen. Pågående arbeid med en nært forestående finansierings-, likviditets- eller driftsfrist kan være vesentlig selv om ingen avtale eller nytt beløp er meldt. Behold pågående/uløst status. Ved en avtale må hva den gjelder, beløpets betydning og gjennomføringsstatus komme frem når kilden gir opplysningene.",
   report: "RESULTATRAPPORT: Velg den materielle utviklingen, en endret prognose eller annen vesentlig hendelse som vinkel. Bevar relevante inntekter og resultatlinje med samme periode i fjor når de finnes, samt kildefast forklaring eller vesentlig utsikt. Bruk resultatoppstillingens måltall og kolonneoverskrifter. Ikke la en kort melding om at rapporten er publisert erstatte selve rapportinnholdet. Ikke gjør helår til kvartal eller beregn manglende kvartal ved subtraksjon.",
   yearly: "ÅRSRAPPORT, LEDERLØNN: Hold saken til lederlønn og godtgjørelse. Prioriter navngitt leder, samlet godtgjørelse, sammenligning og vesentlig fordeling på fastlønn, bonus og aksjer. Skill regnskapsført/tildelt aksjeverdi fra realisert gevinst og kontantutbetaling. Drift og resultater skal ikke fylle hullet hvis lønnstall mangler; noter i stedet mangelen i source_limitations og sett importance til uviktig."
 };
@@ -303,6 +304,7 @@ const KIND_INSTRUCTIONS: Record<NoticePromptKind, string> = {
 const RELATED_EVIDENCE_INSTRUCTION = `KILDEEIER OG TID
 - Dagens melding, aktuelle vedlegg/rapport og redaktørvalgt tilleggsmateriale utgjør dagens kildepakke. Sekundærkilder må attribueres når de brukes. Ved motstrid: ikke velg eller bland tall uten dekning; gjør kilde og status tydelig eller utelat punktet.
 - [prior_*] er separat bakgrunn. Dagens kildepakke styrer title, lead og dagens status. Bruk tidligere fakta først i body, bare når de forklarer dagens nyhet, med anbefalt tidsmarkør fra kildeblokken. Sibling er en parallell melding samme dag, ikke en historisk hendelse.
+- En tidligere oppgitt likviditetsfrist eller et finansieringsbehov kan forklare hvorfor dagens fortsatt uavklarte prosess er viktig. Oppgi når anslaget ble gitt og hvilken periode/fristen det gjaldt. Ikke presenter gammelt anslag som ny bekreftelse eller trekk slutningen at pengene nå er brukt opp.
 - En uttrykkelig oppdatering/korrigering i dagens melding styrer dagens verdi/status. Skill gammelt fra nytt, og bruk eget source_span per kilde. Avslutt med en relevant opplysning fra dagens kildepakke; ikke legg til en repetitiv oppsummering for å få dette til.`;
 
 export function createNoticeDeveloperPrompt(

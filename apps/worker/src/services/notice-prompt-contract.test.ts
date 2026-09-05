@@ -25,10 +25,10 @@ describe("notice prompts and publication validators agree", () => {
     expect(findNoticeAttributionRisks(example.output)).toEqual([]);
   });
 
-  it("does not reject empty company descriptions where the source supplies none", () => {
-    const unclassified = Object.values(noticeEditorialExamples).filter(example => example.output.company_sentence === "");
-    expect(unclassified.map(example => example.id).sort()).toEqual(["financing", "remuneration", "routine"]);
-    for (const example of unclassified) {
+  it("accepts omitted company context when unavailable or already conveyed", () => {
+    const withoutCompanyContext = Object.values(noticeEditorialExamples).filter(example => example.output.company_sentence === "");
+    expect(withoutCompanyContext.map(example => example.id)).toEqual(expect.arrayContaining(["financing", "remuneration", "routine"]));
+    for (const example of withoutCompanyContext) {
       expect(rewriteOutputSchema.safeParse(example.output).success).toBe(true);
     }
   });
