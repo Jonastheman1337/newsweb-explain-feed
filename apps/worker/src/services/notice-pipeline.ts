@@ -54,6 +54,15 @@ export type NoticePipelineIteration = {
     metadataViolations: Array<{ index: number; kind: ReferencePriorContextViolationKind; priorMessageId?: number }>;
     error: string | null;
   }>;
+  editorialCheckAttempts: Array<{
+    draftSha256: string;
+    sourceSha256: string;
+    coverage: NoticeCoverage | null;
+    responseSha256: string | null;
+    invalidResponse: { preview: string; truncated: boolean } | null;
+    validationCode: string | null;
+    error: string | null;
+  }>;
   diagnostics: string[];
   repairInstruction: string | null;
 };
@@ -107,6 +116,14 @@ const HIGH_RISK_CODES = new Set([
 ]);
 const errorText = (error: unknown) => error instanceof Error ? error.message : String(error);
 const hash = (value: unknown) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
+const EDITORIAL_METADATA_CODES = new Set([
+  "EDITORIAL_COVERAGE_INVALID_FACT_PARTITION", "EDITORIAL_SEMANTIC_VERDICT_MISMATCH",
+  "EDITORIAL_SEMANTIC_REPAIR_MISSING", "EDITORIAL_SEMANTIC_EVENT_SCOPE_DISABLED",
+  "EDITORIAL_SEMANTIC_ARTICLE_EVIDENCE_MISMATCH", "EDITORIAL_SEMANTIC_SOURCE_EVIDENCE_MISMATCH",
+  "EDITORIAL_SEMANTIC_EVENT_SCOPE_MISMATCH", "EDITORIAL_SEMANTIC_RELATIVE_CLAIM_MISSING",
+  "EDITORIAL_SEMANTIC_DUPLICATE_FINDING"
+]);
+const MAX_INVALID_EDITORIAL_RESPONSE_CHARS = 4096;
 
 function withIssues(validation: RewriteValidationResult, issues: RewriteValidationIssue[]): RewriteValidationResult {
   return {
@@ -149,7 +166,7 @@ export async function runNoticePipeline(options: NoticePipelineOptions): Promise
     revisionPlan.intents[0].type === "title_only" && narrowTitleRequest;
   const revisionChecklist = buildRevisionChecklist(revisionPlan.intents.filter(intent =>
     intent.type !== "title_only" || narrowTitleRequest));
-  const callJson = async (request: NoticeJsonRequest): Promise<unknown> => {
+  const callContent = async (request: NoticeJsonRequest): Promise<string> => {
     let response;
     try {
       response = await options.call(request);
@@ -163,8 +180,9 @@ export async function runNoticePipeline(options: NoticePipelineOptions): Promise
     }
     result.modelCalls.push(response.modelCall);
     result.promptChars += response.promptChars;
-    return JSON.parse(response.content);
+    return response.content;
   };
+  const callJson = async (request: NoticeJsonRequest): Promise<unknown> => JSON.parse(await callContent(request));
   const request = (schemaName: string, schema: Record<string, unknown>, systemPrompt: string,
     developerPrompt: string, userPrompt: string, reasoningEffort = options.reasoningEffort): NoticeJsonRequest => ({
     schemaName, schema, systemPrompt, developerPrompt, userPrompt, reasoningEffort,
@@ -273,7 +291,8 @@ export async function runNoticePipeline(options: NoticePipelineOptions): Promise
       referenceState.finalCoverage = null;
       const iteration: NoticePipelineIteration = {
         draft: structuredClone(draft), draftSha256: hash(draft), validation: null,
-        coverage: null, referenceCoverage: null, referenceCheckAttempts: [], diagnostics: [], repairInstruction: null
+        coverage: null, referenceCoverage: null, referenceCheckAttempts: [], editorialCheckAttempts: [],
+        diagnostics: [], repairInstruction: null
       };
       audit.iterations.push(iteration);
       let revisionCompliance = validateRevisionInstructionCompliance(draft, {
@@ -352,20 +371,66 @@ export async function runNoticePipeline(options: NoticePipelineOptions): Promise
         }
         throw new Error("REFERENCE_CHECK_ATTEMPTS_EXHAUSTED");
       };
-      const checks = await Promise.allSettled([
-        checkReferences(),
-        callJson(request("notice_editorial_coverage", noticeCoverageJsonSchema,
-          "Du kontrollerer at en kort nyhetsnotis bevarer den kildebundne redaksjonelle bestillingen.",
-          NOTICE_COVERAGE_RULES, coverageUserPrompt(brief, draft, options.instruction, options.previousOutput, evidence.sources, { kind: options.kind }),
-          options.reviewReasoningEffort ?? options.reasoningEffort)).then(raw => {
-          const coverage = noticeCoverageSchema.parse(raw);
-          validateCoveragePartition(coverage, brief!);
-          validateCoverageSemantics(coverage, draft, evidence.sources, {
-            kind: options.kind, instruction: options.instruction, previousOutput: options.previousOutput
-          });
-          return coverage;
-        })
-      ]);
+      const checkEditorialCoverage = async (): Promise<NoticeCoverage> => {
+        // Retry checker metadata against these exact bytes, never a rewritten
+        // article or a source assembled from the rejected review.
+        const userPrompt = coverageUserPrompt(brief!, draft, options.instruction, options.previousOutput,
+          evidence.sources, { kind: options.kind });
+        let rejectedValidationCode: string | null = null;
+        for (let checkAttempt = 0; checkAttempt < 2; checkAttempt += 1) {
+          const attempt: NoticePipelineIteration["editorialCheckAttempts"][number] = {
+            draftSha256: iteration.draftSha256, sourceSha256: evidence.sha256,
+            coverage: null, responseSha256: null, invalidResponse: null, validationCode: null, error: null
+          };
+          iteration.editorialCheckAttempts.push(attempt);
+          let content: string | null = null;
+          try {
+            content = await callContent(request("notice_editorial_coverage", noticeCoverageJsonSchema,
+              "Du kontrollerer at en kort nyhetsnotis bevarer den kildebundne redaksjonelle bestillingen.",
+              [NOTICE_COVERAGE_RULES, rejectedValidationCode ?
+                "Forrige kontroll kunne ikke valideres. Kontroller den samme uendrede artikkelen mot de samme kildene på nytt. Rett kontrollens format, kildekobling eller valg av kontrollakse. Gi en fullstendig, kildebelagt vurdering; en reell feil skal fortsatt få et gyldig negativt funn under riktig kontrollakse. Ikke endre artikkelen, legg til kilder eller anta at den skal godkjennes.\nValideringskode: " + rejectedValidationCode : ""
+              ].filter(Boolean).join("\n"), userPrompt,
+              options.reviewReasoningEffort ?? options.reasoningEffort));
+            attempt.responseSha256 = createHash("sha256").update(content).digest("hex");
+            let raw: unknown;
+            try { raw = JSON.parse(content); } catch (error) {
+              attempt.validationCode = "EDITORIAL_COVERAGE_INVALID_JSON";
+              throw error;
+            }
+            const parsed = noticeCoverageSchema.safeParse(raw);
+            if (!parsed.success) {
+              attempt.validationCode = "EDITORIAL_COVERAGE_INVALID_SCHEMA";
+              throw parsed.error;
+            }
+            // The schema bounds every retained field, including rejected
+            // witnesses. A valid negative verdict returns without a retry.
+            attempt.coverage = parsed.data;
+            try {
+              validateCoveragePartition(parsed.data, brief!);
+              validateCoverageSemantics(parsed.data, draft, evidence.sources, {
+                kind: options.kind, instruction: options.instruction, previousOutput: options.previousOutput
+              });
+            } catch (error) {
+              const code = errorText(error).split(":", 1)[0]!;
+              if (EDITORIAL_METADATA_CODES.has(code)) attempt.validationCode = code;
+              throw error;
+            }
+            return parsed.data;
+          } catch (error) {
+            attempt.error = errorText(error).slice(0, 1500);
+            if (content !== null && attempt.coverage === null) {
+              attempt.invalidResponse = { preview: content.slice(0, MAX_INVALID_EDITORIAL_RESPONSE_CHARS),
+                truncated: content.length > MAX_INVALID_EDITORIAL_RESPONSE_CHARS };
+            }
+            // Transport errors and unexpected internal failures are not bad
+            // checker metadata. A second malformed response also fails closed.
+            if (!attempt.validationCode || checkAttempt === 1) throw error;
+            rejectedValidationCode = attempt.validationCode;
+          }
+        }
+        throw new Error("EDITORIAL_CHECK_ATTEMPTS_EXHAUSTED");
+      };
+      const checks = await Promise.allSettled([checkReferences(), checkEditorialCoverage()]);
       referenceState.absorbedStages += 1;
       const [referenceCheck, editorialCheck] = checks;
       if (referenceCheck.status === "fulfilled") {

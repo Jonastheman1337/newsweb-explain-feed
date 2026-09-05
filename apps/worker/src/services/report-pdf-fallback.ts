@@ -16,6 +16,52 @@ const monetaryAmountPattern = new RegExp(
   `\\b${monetaryNumber}\\)?\\s*(?:${monetaryScale}\\s+)?${monetaryCurrency}\\b`, "i"
 );
 const hasReadableMonetaryAmount = (value: string) => monetaryAmountPattern.test(normalize(value));
+const captionCurrency = new RegExp(`\\b${monetaryCurrency}\\b|[$€£]`, "i");
+const captionScale = new RegExp(`\\b${monetaryScale}\\b`, "i");
+const yearColumn = /^(?:(?:Q[1-4]|H[12])\s*)?(?:19|20)\d{2}$/i;
+const tableNumber = "[−+–-]?\\d+(?:[., \\u00a0\\u202f]\\d+)*";
+const readableTableCell = new RegExp(`^(?:${tableNumber}|\\(${tableNumber}\\)|[—–-])$`);
+
+/** Readability permits a draft; it does not assign a value, period or entity.
+ * Inspect the original physical table, never line breaks supplied by the model.
+ * The entire caption/row block must be included in one literal source excerpt.
+ */
+function hasReadableFinancialTable(referenceText: string, excerpt: string): boolean {
+  const needle = normalize(excerpt);
+  if (!needle || excerpt.length > MAX_EVIDENCE_CHARS) return false;
+  const source = referenceText.normalize("NFKC").replace(/\u00ad/g, "");
+  const escapedWords = needle.split(" ").map(word => word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  const pattern = new RegExp(escapedWords.join("\\s+"), "gu");
+  for (const match of source.matchAll(pattern)) {
+    const start = match.index;
+    const end = start + match[0].length;
+    const lineEnd = source.indexOf("\n", end);
+    // A partial line could hide a different label, scope or trailing cells.
+    if (source.slice(source.lastIndexOf("\n", start - 1) + 1, start).trim() ||
+        source.slice(end, lineEnd < 0 ? source.length : lineEnd).trim()) continue;
+    let captionAvailable = false;
+    for (const physicalLine of match[0].split(/\r?\n/)) {
+      const line = physicalLine.trim();
+      if (!line) { captionAvailable = false; continue; }
+      const cells = line.split(/\t+| {2,}/).map(cell => cell.trim()).filter(Boolean);
+      const caption = cells[0] ?? "";
+      if (!/\d/.test(caption) && captionCurrency.test(caption) && captionScale.test(caption) &&
+          cells.slice(1).every(cell => yearColumn.test(cell))) {
+        captionAvailable = true;
+        continue;
+      }
+      if (!captionAvailable) continue;
+      const numericRow = cells.length >= 2 && cells.slice(1).every(cell => readableTableCell.test(cell)) &&
+        cells.slice(1).some(cell => /\d/.test(cell) && !/^(?:19|20)\d{2}$/.test(cell));
+      if (numericRow && hasFinancialLanguage(cells[0])) return true;
+      // Keep only physical data rows or explicit year-column headers between
+      // caption and target. A new heading, prose, page marker or blank breaks it.
+      const yearHeader = cells.length >= 2 && cells.every(cell => yearColumn.test(cell));
+      if (!numericRow && !yearHeader) captionAvailable = false;
+    }
+  }
+  return false;
+}
 
 export type ReportPdfFallbackRequestDiagnostics = {
   version: "report-pdf-raw-evidence-v1";
@@ -24,7 +70,7 @@ export type ReportPdfFallbackRequestDiagnostics = {
 };
 
 export type ReportPdfFallbackDiagnostics = {
-  version: "report-pdf-fallback-readiness-v2";
+  version: "report-pdf-fallback-readiness-v3";
   attachmentId: number;
   confidence: "high" | "medium" | "low";
   contextChars: number;
@@ -49,6 +95,7 @@ export type ReportPdfFallbackDiagnostics = {
     matchesRawReference: boolean;
     hasFinancialLanguage: boolean;
     hasReadableMonetaryAmount: boolean;
+    hasReadableFinancialTable: boolean;
     hasUnmappedGlyphs: boolean;
     qualifies: boolean;
   }>;
@@ -89,6 +136,7 @@ export function buildReportPdfFallbackRequest({ source, rawReferenceText = "", u
       "sourceEvidence must contain short, continuous excerpts copied VERBATIM from rawReferenceText, including its spelling, punctuation and unusual characters; only whitespace may be combined.",
       "Do not translate, paraphrase, repair broken glyphs, join separated spans, add quotation marks, ellipses or page/section references inside sourceEvidence. Put page references and extraction problems in limitations instead.",
       "Prefer wholly readable financial narrative with an explicit amount, unit and reporting period. A PDF image may help you understand context but cannot replace an exact raw text excerpt.",
+      "For a readable financial table, quote its currency/unit caption, column headings and financial rows together in one continuous raw-text excerpt. Do not join separate tables/pages or borrow a caption from another section.",
       "If rawReferenceText is absent or cannot support a readable financial excerpt, return sourceEvidence: [], confidence: low, and explain the limitation. Do not invent a quote from the rendered PDF.",
       "The primary notice body is supplied only to identify disagreements with the report. Preserve those disagreements in limitations; do not silently choose or reconcile conflicting figures or quote the notice body as report sourceEvidence."
     ].join("\n"),
@@ -121,18 +169,19 @@ export function mergeReportPdfFallback(
     const financialLanguage = hasFinancialLanguage(excerpt);
     const readableAmount = hasReadableMonetaryAmount(excerpt);
     const hasUnmappedGlyphs = /[\uE000-\uF8FF]/.test(excerpt);
+    const readableTable = matchesRawReference && !hasUnmappedGlyphs && hasReadableFinancialTable(referenceText, excerpt);
     return {
       sourceEvidence: excerpt.slice(0, MAX_EVIDENCE_CHARS), sourceEvidenceChars: excerpt.length,
       sourceEvidenceSha256: sha256(excerpt), truncated: excerpt.length > MAX_EVIDENCE_CHARS,
       sufficientLength, matchesRawReference, hasFinancialLanguage: financialLanguage,
-      hasReadableMonetaryAmount: readableAmount, hasUnmappedGlyphs,
+      hasReadableMonetaryAmount: readableAmount, hasReadableFinancialTable: readableTable, hasUnmappedGlyphs,
       qualifies: sufficientLength && excerpt.length <= MAX_EVIDENCE_CHARS && matchesRawReference &&
-        financialLanguage && readableAmount && !hasUnmappedGlyphs
+        financialLanguage && (readableAmount || readableTable) && !hasUnmappedGlyphs
     };
   });
   const supportedExcerptCount = evidence.filter(item => item.sufficientLength && item.matchesRawReference).length;
-  // A readable narrative can establish limited financial evidence even when
-  // column extraction failed. Confidence or model-generated prose alone cannot.
+  // Readable narrative or a source table can establish limited writer readiness
+  // when typing failed. Neither becomes a typed fact or factual approval.
   const hasFinancialExcerpt = evidence.some(item => item.qualifies);
   const hasReportYear = /\b(?:20\d{2}|19\d{2})\b/.test(raw);
   const hasReportPeriod = /quarter|half.year|interim|kvartal|halvår|\b[QH][1-4]\b/i.test(raw);
@@ -146,7 +195,7 @@ export function mergeReportPdfFallback(
   const sufficient = priorSufficient || (hasContext && confidenceAccepted && hasFinancialExcerpt &&
     hasReportYear && hasReportPeriod && requestMatchesReference !== false && fallback.sourceEvidence.length <= MAX_EVIDENCE_EXCERPTS);
   const fallbackDiagnostics: ReportPdfFallbackDiagnostics = {
-    version: "report-pdf-fallback-readiness-v2", attachmentId: pdf.attachmentId,
+    version: "report-pdf-fallback-readiness-v3", attachmentId: pdf.attachmentId,
     confidence: fallback.confidence, contextChars: fallback.context.length,
     rawReferenceChars: referenceText.length, rawReferenceSha256: sha256(referenceText),
     rawEvidenceRequest: fallback.rawEvidenceRequest ?? null, requestMatchesReference,

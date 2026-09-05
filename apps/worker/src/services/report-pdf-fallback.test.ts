@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { buildReportPdfFallbackRequest, mergeReportPdfFallback, reportPdfFallbackJsonSchema } from "./report-pdf-fallback.js";
-import { buildReportContextFromPages, type ReportExtractionResult } from "./pdf-extract.js";
+import { buildReportContextFromPages, renderPdfTextItems, type ReportExtractionResult } from "./pdf-extract.js";
 
 const raw = "Q2 2026. Revenue was NOK 120 million, compared with NOK 100 million in Q2 2025.";
 const pdf = { attachmentId: 2, attachmentName: "report.pdf", pageCount: 10 };
@@ -203,5 +203,96 @@ describe("synthetic fallback acceptance and rejection diagnostics", () => {
     expect(result.diagnostics.pdfFallback).toMatchObject({ readinessBasis: "existing_extraction", confidence: "low", hasFinancialExcerpt: false });
     expect(result.diagnostics.completenessReasons).toContain("no_usable_financial_facts");
     expect(result.diagnostics.completenessReasons).not.toContain("no_verified_financial_source_evidence");
+  });
+});
+
+describe("synthetic raw-table writer readiness", () => {
+  const table = "H1 2029 financial report\nAmounts in EUR million\nH1 2029\tH1 2028\nRevenue\t87.6\t81.3\nOperating profit\t6.4\t5.7";
+  const merge = (referenceText: string, sourceEvidence = referenceText, overrides: { confidence?: "high" | "medium" | "low" } = {}) =>
+    mergeReportPdfFallback(pdf, { ...fallback, ...overrides, sourceEvidence: [sourceEvidence] }, { ...existing, referenceText });
+
+  it.each([
+    table,
+    "H1 2029 financial report\nEUR million  H1 2029  H1 2028\nNet income  (4.1)  2.0"
+  ])("allows a separate unit caption in the original table without creating facts %#", referenceText => {
+    // Flattening whitespace in a quote must not erase the independently read table.
+    const result = merge(referenceText, referenceText.replace(/\s+/g, " "));
+    expect(result.diagnostics.completeness).toBe("partial");
+    expect(result.referenceText).toBe(referenceText);
+    expect(result.financialFacts).toEqual([]);
+    expect(result.metrics).toEqual([]);
+    expect(result.diagnostics.pdfFallback).toMatchObject({
+      version: "report-pdf-fallback-readiness-v3", readinessBasis: "verified_raw_excerpt", failedPredicates: []
+    });
+    expect(result.diagnostics.pdfFallback?.evidence[0]).toMatchObject({
+      matchesRawReference: true, hasReadableMonetaryAmount: false, hasReadableFinancialTable: true, qualifies: true
+    });
+    expect(result.referenceText).not.toContain(fallback.context);
+  });
+
+  it("accepts the physical separators retained by production PDF rendering and reference construction", () => {
+    const item = (str: string, x: number, y: number) => ({ str, width: str.length * 5, transform: [10, 0, 0, 10, x, y] });
+    const rawPage = renderPdfTextItems([
+      item("H1 2029 financial report", 30, 700), item("Amounts in EUR million", 30, 680),
+      item("H1 2029", 260, 660), item("H1 2028", 380, 660),
+      item("Revenue", 30, 640), item("87.6", 260, 640), item("81.3", 380, 640)
+    ]);
+    expect(rawPage).toContain("Revenue\t87.6\t81.3");
+    const context = buildReportContextFromPages([rawPage]);
+    expect(context.referenceText).toContain(rawPage);
+    expect(context.financialFacts?.filter(fact => fact.usable)).toEqual([]);
+    const result = mergeReportPdfFallback(pdf, { ...fallback, sourceEvidence: [rawPage] }, { ...existing, ...context });
+    expect(result.diagnostics.completeness).toBe("partial");
+    expect(result.referenceText).toBe(context.referenceText);
+    expect(result.financialFacts).toEqual(context.financialFacts);
+    expect(result.diagnostics.pdfFallback?.evidence[0]?.hasReadableFinancialTable).toBe(true);
+  });
+
+  it("keeps ordinary narrative qualification separate from table recognition", () => {
+    const narrative = "In H1 2029 revenue was EUR 87 million, compared with EUR 81 million in H1 2028.";
+    const result = merge(narrative);
+    expect(result.diagnostics.completeness).toBe("partial");
+    expect(result.diagnostics.pdfFallback?.evidence[0]).toMatchObject({
+      hasReadableMonetaryAmount: true, hasReadableFinancialTable: false, qualifies: true
+    });
+  });
+
+  it.each([
+    table.replace("Amounts in EUR million", "Amounts in EUR"),
+    table.replace("87.6", "8\uE001.6"),
+    "H1 2029 profit reporting policy\nEUR million\n2029\t2028\nEmployees\t120\t110",
+    "H1 2029 revenue report\nEUR million\n2029\t2028"
+  ])("does not treat missing units, damaged cells, nonfinancial rows or years as monetary data %#", referenceText => {
+    const result = merge(referenceText);
+    expect(result.diagnostics.completeness).toBe("insufficient");
+    expect(result.diagnostics.pdfFallback?.evidence[0]?.qualifies).toBe(false);
+  });
+
+  it.each(["\n", "Parent financial statements\n", "[PDF page 4]\n"])("does not carry a caption across a table or page boundary %#", boundary => {
+    const referenceText = `H1 2029 financial report\nEUR million\n${boundary}Revenue\t87.6\t81.3`;
+    expect(merge(referenceText).diagnostics.completeness).toBe("insufficient");
+  });
+
+  it("does not let model-created layout or omitted physical-line text establish a table", () => {
+    const flattenedSource = table.replace(/\s+/g, " ");
+    const result = merge(flattenedSource, table);
+    expect(result.diagnostics.pdfFallback?.evidence[0]).toMatchObject({
+      matchesRawReference: true, hasReadableFinancialTable: false, qualifies: false
+    });
+    const suffix = "EUR million\nH1 2029\tH1 2028\nRevenue\t87.6\t81.3";
+    expect(merge(`Caption belongs to another section: ${suffix}`, suffix).diagnostics.completeness).toBe("insufficient");
+  });
+
+  it("retains exact-source, period, confidence and request-identity guards for tables", () => {
+    expect(merge(table, table.replace("87.6", "187.6")).diagnostics.completeness).toBe("insufficient");
+    expect(merge(table, table, { confidence: "low" }).diagnostics.pdfFallback?.failedPredicates).toContain("low_confidence");
+    const withoutPeriod = table.replaceAll("H1 ", "");
+    expect(merge(withoutPeriod).diagnostics.pdfFallback?.failedPredicates).toContain("report_period_missing");
+    const withoutYear = "H1 financial report\nEUR million\nRevenue\t87.6\t81.3";
+    expect(merge(withoutYear).diagnostics.pdfFallback?.failedPredicates).toContain("report_year_missing");
+    const request = buildReportPdfFallbackRequest({ source, rawReferenceText: "Unrelated raw source" });
+    const mismatched = mergeReportPdfFallback(pdf, { ...fallback, sourceEvidence: [table], rawEvidenceRequest: request.rawEvidenceRequest }, { ...existing, referenceText: table });
+    expect(mismatched.diagnostics.completeness).toBe("insufficient");
+    expect(mismatched.diagnostics.pdfFallback?.failedPredicates).toContain("request_reference_mismatch");
   });
 });
