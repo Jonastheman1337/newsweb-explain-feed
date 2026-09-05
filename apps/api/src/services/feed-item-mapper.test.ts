@@ -94,6 +94,20 @@ function feedItem(
 }
 
 describe("mapDbItemToFeedItem", () => {
+  it("keeps newer stored articles readable after rollback when company context is empty", () => {
+    const published = publishedRewrite(1);
+    published.rewriteJson.company_sentence = "";
+    const originalJson = JSON.stringify(published.rewriteJson);
+
+    const item = mapDbItemToFeedItem(feedItem([], published) as never);
+
+    expect(item?.isFinal).toBe(true);
+    expect(item?.title).toBe(published.rewriteJson.title);
+    expect(item?.body).toEqual(published.rewriteJson.body);
+    expect(item?.contentHash).toBe(published.contentHash);
+    expect(JSON.stringify(published.rewriteJson)).toBe(originalJson);
+  });
+
   it("keeps showing the latest published rewrite while a newer version is pending", () => {
     const item = mapDbItemToFeedItem(
       feedItem([

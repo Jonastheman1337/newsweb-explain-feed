@@ -5,26 +5,6 @@ import { analyze } from "./pull-signals.mjs";
 
 const timestamp = "2026-06-01T10:00:00.000Z";
 
-test("counts repair drafts for historical and notice pipelines without counting their checks", () => {
-  const row = (id, schemas) => ({
-    requested_at: timestamp, message_id: String(id), status: "published", prompt_version: "pipeline-test",
-    model_calls: JSON.stringify(schemas.map(schemaName => ({ schemaName, reasoningEffort: "medium" })))
-  });
-  const summary = analyze({ generations: [
-    row(1, ["rewrite_output", "reference_check", "rewrite_output"]),
-    row(2, ["notice_editorial_brief", "notice_rewrite_output", "reference_check_result", "notice_editorial_coverage"]),
-    row(3, ["notice_editorial_brief", "notice_rewrite_output", "reference_check_result", "notice_editorial_coverage", "notice_rewrite_output", "reference_check_result", "notice_editorial_coverage"]),
-    row(4, ["notice_rewrite_output", "notice_rewrite_output", "notice_rewrite_output", "notice_rewrite_output", "notice_rewrite_output"]),
-    row(5, ["notice_editorial_brief", "reference_check_result", "notice_editorial_coverage"])
-  ] }, "Europe/Oslo");
-  const stats = summary.qualityPipeline.modelCallsByPromptVersion[0];
-  assert.equal(stats.total_calls, 22);
-  assert.deepEqual(stats.rewrite_call_distribution, { "1": 1, "2": 2, "3": 0, "4+": 1 });
-  assert.equal(stats.runs_with_repair_calls, 3);
-  assert.equal(stats.repair_call_rate, 0.6);
-  assert.equal(stats.calls_by_schema_and_effort.find(row => row.key === "notice_rewrite_output:medium").count, 8);
-});
-
 test("groups engagement and article-shape signals by prompt version", () => {
   const summary = analyze(
     {

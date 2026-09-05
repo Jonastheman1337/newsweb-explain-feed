@@ -10,7 +10,6 @@
     "start": "node dist/worker.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "eval:editorial": "tsx src/scripts/editorial-eval.ts",
-    "eval:notice-pipeline": "tsx src/scripts/notice-pipeline-eval.ts",
     "eval:notice": "tsx src/scripts/targeted-notice-eval.ts",
     "eval:report-prompt": "tsx src/scripts/report-prompt-eval.ts",
     "smoke:model-storytelling": "tsx src/scripts/model-smoke-storytelling.ts",

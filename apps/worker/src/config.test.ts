@@ -172,17 +172,6 @@ describe("parseWorkerConfig", () => {
     expect(config.NUMERIC_ACCEPTANCE_RULES).toEqual([]);
   });
 
-  it("accepts the registered notice-only paid-outflow rule in the exact override", () => {
-    const config = parseWorkerConfig({
-      NODE_ENV: "development",
-      DATABASE_URL: "postgresql://newsweb:newsweb@localhost:5432/newsweb_explain?schema=public",
-      REDIS_URL: "redis://localhost:6379",
-      OPENAI_API_KEY: "sk-openai-test-key",
-      NUMERIC_ACCEPTANCE_RULES: "paid_outflow_magnitude"
-    });
-    expect(config.NUMERIC_ACCEPTANCE_RULES).toEqual(["paid_outflow_magnitude"]);
-  });
-
   it("normalizes NUMERIC_ACCEPTANCE_RULES whitespace and empty entries to all-off", () => {
     const config = parseWorkerConfig({
       NODE_ENV: "development",

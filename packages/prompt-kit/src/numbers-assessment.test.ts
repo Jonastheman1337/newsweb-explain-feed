@@ -348,14 +348,12 @@ describe("derivation slot", () => {
     expect([...numberDerivationRuleIds]).toEqual([
       "source_cell_subrun",
       "verbal_minus_match",
-      "verbal_minus_composed",
-      "paid_outflow_magnitude"
+      "verbal_minus_composed"
     ]);
     expect([...defaultEnabledDerivationRules]).toEqual([
       "source_cell_subrun",
       "verbal_minus_match",
-      "verbal_minus_composed",
-      "paid_outflow_magnitude"
+      "verbal_minus_composed"
     ]);
   });
 
@@ -363,15 +361,6 @@ describe("derivation slot", () => {
     expect(
       assessNumbers(rewrite, source, { enabledDerivationRules: [] })
     ).toEqual(assessNumbers(rewrite, source));
-  });
-
-  it("registers paid-outflow configuration without adding a generic magnitude matcher", () => {
-    const payment = createRewrite({ lead: "Selskapet betalte 127,9 millioner euro i utbytte." });
-    const raw = "Parent company financial statements\nEUR million\t2026\t2025\nDividends paid to shareholders\t-127.9\t-20.1";
-    const defaults = assessNumbers(payment, raw);
-    expect(defaults).toContainEqual({ display: "127,9", disposition: "unexpected", ruleId: null, count: 1 });
-    expect(assessNumbers(payment, raw, { enabledDerivationRules: [] })).toEqual(defaults);
-    expect(assessNumbers(payment, raw, { enabledDerivationRules: ["paid_outflow_magnitude"] })).toEqual(defaults);
   });
 
   it("accepts the options argument on findUnexpectedNumbers without behavior change", () => {

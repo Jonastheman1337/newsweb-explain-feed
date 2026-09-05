@@ -2,14 +2,6 @@ import type { RewriteOutput } from "@newsweb/shared";
 import { collectDraftSentences } from "./reference-check.js";
 import { normalizeGuardrailText } from "./text-normalization.js";
 
-// Sak retains its existing attribution contract. Notice generation uses the
-// source-certainty-preserving guard without changing the excluded Sak pipeline.
-export {
-  buildNoticeAttributionCorrectionInstruction,
-  findNoticeAttributionRisks,
-  type NoticeAttributionRisk
-} from "./notice-claim-precautions.js";
-
 export type AttributionRisk = {
   index: number;
   sentence: string;

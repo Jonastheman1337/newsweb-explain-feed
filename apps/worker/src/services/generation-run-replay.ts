@@ -8,7 +8,6 @@ import {
   type SupplementalMaterialPayload
 } from "@newsweb/prompt-kit";
 import { rewriteOutputSchema, type RewriteOutput } from "@newsweb/shared";
-import { buildNoticeEvidence, noticeReferencePayload, type NoticePayload } from "./notice-evidence.js";
 
 // Replaying a stored generation run against the current validators requires
 // reconstructing exactly what the worker validated at the time:
@@ -17,8 +16,7 @@ import { buildNoticeEvidence, noticeReferencePayload, type NoticePayload } from 
 //  - the validation payload, which for report flows is NOT the raw
 //    sourcePayload but the reportReferencePayload join (worker.ts), with
 //    validation_json.reportExtraction.validationSourceChars persisted as the
-//    per-row tripwire. Versioned notice pipelines instead use their shared
-//    source builder, with the stored audit hash checking source identity.
+//    per-row tripwire.
 // This module is the single implementation of both reconstructions; the
 // safety-fixture seeder and the offline replay-numbers harness share it.
 
@@ -242,64 +240,12 @@ export type ReplayValidationPayload = {
   validationSourceCharsMatch: boolean | null;
 };
 
-function noticePayloadFromSource(sourcePayload: Record<string, unknown>): NoticePayload | null {
-  const base = basePayloadFromSource(sourcePayload);
-  if (!base) return null;
-  for (const key of ["reportText", "reportReferenceText"] as const) {
-    if (sourcePayload[key] !== undefined && typeof sourcePayload[key] !== "string") return null;
-  }
-  for (const key of ["letterText", "remunerationText"] as const) {
-    if (sourcePayload[key] !== undefined && sourcePayload[key] !== null && typeof sourcePayload[key] !== "string") return null;
-  }
-  const completeness = sourcePayload.reportCompleteness;
-  if (completeness !== undefined && completeness !== "complete" && completeness !== "partial" && completeness !== "insufficient") return null;
-  return {
-    ...base,
-    ...(typeof sourcePayload.reportText === "string" ? { reportText: sourcePayload.reportText } : {}),
-    ...(typeof sourcePayload.reportReferenceText === "string" ? { reportReferenceText: sourcePayload.reportReferenceText } : {}),
-    ...(typeof sourcePayload.letterText === "string" || sourcePayload.letterText === null ? { letterText: sourcePayload.letterText } : {}),
-    ...(typeof sourcePayload.remunerationText === "string" || sourcePayload.remunerationText === null ? { remunerationText: sourcePayload.remunerationText } : {}),
-    ...(completeness !== undefined ? { reportCompleteness: completeness } : {})
-  };
-}
-
-function replayNoticePipelineV1(
-  sourcePayload: Record<string, unknown>, validationJson: unknown, audit: Record<string, unknown> | null
-): ReplayValidationPayload | null {
-  const source = noticePayloadFromSource(sourcePayload);
-  if (!source) return null;
-  try {
-    const evidence = buildNoticeEvidence(source);
-    if (audit?.sourceSha256 !== undefined && audit.sourceSha256 !== evidence.sha256) return null;
-    const payload = noticeReferencePayload(source);
-    const validationSourceChars = asRecord(asRecord(validationJson)?.reportExtraction)?.validationSourceChars;
-    return {
-      flow: isReportSourcePayload(sourcePayload) || "reportReferenceText" in sourcePayload ? "report" : "regular",
-      payload,
-      validationSourceCharsMatch: typeof validationSourceChars === "number" ? payload.bodyText.length === validationSourceChars : null
-    };
-  } catch {
-    // Duplicate source IDs or malformed source evidence must not silently
-    // fall back to the historical join and produce a misleading replay.
-    return null;
-  }
-}
-
 export function replayValidationPayloadFromRow(row: {
   sourcePayload?: unknown;
   validationJson?: unknown;
 }): ReplayValidationPayload | null {
   const sourcePayload = asRecord(row.sourcePayload);
   if (!sourcePayload) return null;
-
-  const noticeAudit = asRecord(asRecord(row.validationJson)?.noticePipeline);
-  const pipelineVersion = noticeAudit?.version;
-  if (pipelineVersion !== undefined || "reportReferenceText" in sourcePayload) {
-    // Pin reconstruction to the source semantics of this version. A future
-    // version needs its own explicit branch before historical rows are replayed.
-    if (pipelineVersion !== undefined && pipelineVersion !== "notice-pipeline-v1") return null;
-    return replayNoticePipelineV1(sourcePayload, row.validationJson, noticeAudit);
-  }
 
   if (!isReportSourcePayload(sourcePayload)) {
     const payload = basePayloadFromSource(sourcePayload);

@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import type { RewriteOutput } from "@newsweb/shared";
-import { buildNoticeEvidence, type NoticePayload } from "./notice-evidence.js";
 import {
   findDigitVariantInSource,
   hiddenDraftRewriteOutputFromRow,
@@ -173,87 +172,6 @@ describe("replayValidationPayloadFromRow", () => {
         })
       })
     ).toBeNull();
-  });
-});
-
-describe("versioned notice pipeline replay", () => {
-  const version = "notice-pipeline-v1";
-
-  it("keeps the title, short body, and raw PDF evidence used for regular notices", () => {
-    const result = replayValidationPayloadFromRow({
-      sourcePayload: createSourcePayload({ pdfSupplementText: "The final holding is 1,200 shares." }),
-      validationJson: { noticePipeline: { version } }
-    });
-    expect(result?.flow).toBe("regular");
-    expect(result?.payload.bodyText).toBe("Mandatory notification of trade\n\nThe board member acquired 500 shares in the company today.\n\nThe final holding is 1,200 shares.");
-    expect(result?.payload.sourceBodyChars).toBe(result?.payload.bodyText.length);
-    expect(result?.payload.pdfSupplementText).toBeUndefined();
-  });
-
-  it("uses raw report evidence instead of the writer summary and verifies full source length", () => {
-    const joined = "Quarterly report\n\nRevenue declined.\n\nRevenue 33,613 12,118";
-    const sourcePayload = createSourcePayload({
-      title: "Quarterly report", bodyText: "Revenue declined.", reportText: "Derived summary: revenue is 999.",
-      reportReferenceText: "Revenue 33,613 12,118", reportCompleteness: "partial"
-    });
-    const result = replayValidationPayloadFromRow({ sourcePayload,
-      validationJson: { noticePipeline: { version }, reportExtraction: { validationSourceChars: joined.length } }
-    });
-    expect(result?.flow).toBe("report");
-    expect(result?.payload.bodyText).toBe(joined);
-    expect(result?.payload.bodyText).not.toContain("999");
-    expect(result?.validationSourceCharsMatch).toBe(true);
-    expect(replayValidationPayloadFromRow({ sourcePayload,
-      validationJson: { noticePipeline: { version }, reportExtraction: { validationSourceChars: 5 } }
-    })?.validationSourceCharsMatch).toBe(false);
-  });
-
-  it("replays annual letter and remuneration fields without requiring reportText", () => {
-    const result = replayValidationPayloadFromRow({
-      sourcePayload: createSourcePayload({ bodyText: "Annual materials.", letterText: "The CEO received 3 million kroner.", remunerationText: "The bonus was 1 million kroner." }),
-      validationJson: { noticePipeline: { version } }
-    });
-    expect(result?.flow).toBe("report");
-    expect(result?.payload.bodyText).toContain("Annual materials.\n\nThe CEO received 3 million kroner.\n\nThe bonus was 1 million kroner.");
-  });
-
-  it("recognizes the new raw-evidence field before an audit exists and preserves deliberately empty raw evidence", () => {
-    const result = replayValidationPayloadFromRow({
-      sourcePayload: createSourcePayload({ reportText: "Derived summary contains 999.", reportReferenceText: "" })
-    });
-    expect(result?.flow).toBe("report");
-    expect(result?.payload.bodyText).toContain("Mandatory notification of trade");
-    expect(result?.payload.bodyText).not.toContain("999");
-  });
-
-  it("verifies the frozen source hash and rejects changed source ownership", () => {
-    const sourcePayload = createSourcePayload({ supplementalMaterials: [
-      { id: "doc", sourceId: "material_doc", kind: "text", title: "Background", text: "The shareholder holds 600 shares." }
-    ] });
-    const sourceSha256 = buildNoticeEvidence(sourcePayload as NoticePayload).sha256;
-    const validationJson = { noticePipeline: { version, sourceSha256 } };
-    const result = replayValidationPayloadFromRow({ sourcePayload, validationJson });
-    expect(result).not.toBeNull();
-    expect(result?.payload.bodyText).not.toContain("600 shares");
-    expect(result?.payload.supplementalMaterials?.[0].text).toContain("600 shares");
-    expect(replayValidationPayloadFromRow({ sourcePayload: { ...sourcePayload, title: "Changed title" }, validationJson })).toBeNull();
-    expect(replayValidationPayloadFromRow({ sourcePayload: { ...sourcePayload, supplementalMaterials: [
-      { id: "doc", sourceId: "material_other", kind: "text", title: "Background", text: "The shareholder holds 600 shares." }
-    ] }, validationJson })).toBeNull();
-  });
-
-  it("rejects unsupported versions rather than guessing their evidence rules", () => {
-    expect(replayValidationPayloadFromRow({
-      sourcePayload: createSourcePayload({ reportReferenceText: "Revenue 33,613" }),
-      validationJson: { noticePipeline: { version: "notice-pipeline-v2" } }
-    })).toBeNull();
-  });
-
-  it.each([
-    { reportReferenceText: null }, { reportText: 42 }, { letterText: {} }, { reportCompleteness: "unknown" },
-    { supplementalMaterials: [{ id: "doc", sourceId: "primary", kind: "text", title: "Duplicate owner", text: "Other evidence" }] }
-  ])("rejects malformed versioned evidence %#", fields => {
-    expect(replayValidationPayloadFromRow({ sourcePayload: createSourcePayload(fields), validationJson: { noticePipeline: { version } } })).toBeNull();
   });
 });
 

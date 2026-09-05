@@ -1,47 +1,5 @@
 # Production editorial integration plan
 
-## Notice-quality implementation amendment — 2026-09-04
-
-The owner requested implementation of all six notice-quality findings, with
-parallel agents permitted. This supersedes the historical E0-only next-action
-text for this work. `/sak`, model/provider changes, infrastructure changes,
-historical republication, and changes to numeric derivation tolerances are out
-of scope. Existing frozen prompt profiles and evaluation artifacts remain
-reproducible.
-
-Work packages and acceptance:
-
-1. **Q1 Attribution:** factual measurements and completed events retain their
-   certainty; opinions and causal claims retain attribution. Regression tests
-   cover the Carucel-style false hedge. Sak keeps its existing guard.
-2. **Q2 Report evidence:** separate table cells, bind usable amounts to period,
-   scale, currency and source evidence, inspect bounded relevant attachments,
-   and record unresolved extraction/completeness instead of guessing.
-3. **Q3 Editorial brief/completeness:** select the current event and essential
-   source-backed facts before writing; check omitted facts after every repair.
-   Inadequate report evidence cannot silently become a complete results story.
-4. **Q4 Triage:** ambiguous decisions see relevant source/attachment/related
-   evidence; short leading excerpts cannot silently discard later news.
-5. **Q5 Prompt consistency:** a new versioned compact prompt, source-paired
-   examples, aligned accounting language, optional empty company description,
-   and unchanged historical/sak builders.
-6. **Q6 Pipeline evaluation:** production and offline evaluation share the
-   actual writing/checking/repair implementation. Persist initial/final outputs,
-   completeness, repairs, source/protocol identities and model telemetry. Keep
-   teaching examples separate from held-out editorial/safety fixtures.
-
-Before release: focused regressions, full tests/typecheck/build, immutable
-offline/full-pipeline evidence and independent review. No gate passes merely
-because code exists. Model settings remain fixed so changes in copy can be
-attributed to this pipeline treatment. Release uses the exact validated SHA and
-the existing UpCloud backup/preflight/health/behavior checks.
-
-Local implementation and validation of Q1–Q6 are complete. The
-[implementation report](notice-quality-2026-09-04.md) records the tests, builds,
-public-source diagnostics, annual/manual-edit regressions and practical limits.
-The known-problem diagnostics are not blind editorial promotion evidence. No
-commit, push, historical republication or application deployment was performed.
-
 ## Status and authority
 
 - **Status:** E0 landed on `main` on 2026-08-13 (this commit) and revalidated in

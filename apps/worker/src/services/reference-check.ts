@@ -8,7 +8,6 @@ import {
 import type { RewriteOutput } from "@newsweb/shared";
 import { z } from "zod";
 import { findContextMarker, issuerAliases } from "./context-markers.js";
-import { normalizeNoticeNumericRanges } from "./notice-numeric-ranges.js";
 import { normalizeGuardrailText } from "./text-normalization.js";
 
 const sentenceBoundaryRegex = /(?<=[.!?])\s+/;
@@ -88,14 +87,6 @@ export type ReferenceCoverageItem = {
 export type ReferencePriorContext = {
   sourceIds: string[];
   issuerAliases: string[];
-  // Opt-in for notices; historical/Sak reports retain their existing contract.
-  noticeSemantics?: true;
-  // Locally derived from this exact draft, never returned by the checker.
-  // Separate visible fields and embedded newlines cannot share context.
-  draftParagraphIds?: number[];
-  // Internal binding; stripped after the paragraph map is matched to the
-  // exact sentences being checked, so a stale draft cannot lend context.
-  draftSentences?: readonly string[];
   // Relation-aware marker suggestions. The legacy property name is retained
   // in persisted reports even when a sibling marker is parallel, not historic.
   timeMarkers: string[];
@@ -106,8 +97,6 @@ export type ReferencePriorContext = {
     // Exact relation/time marker computed for this source. Optional so old
     // persisted reports remain readable.
     contextMarker?: string;
-    // Full calendar date of this source in Europe/Oslo, never model-supplied.
-    exactDateMarker?: string;
     // Internal only: buildCoverageReport removes this before returning the
     // persistable report after materializing an evidence-match boolean.
     normalizedEvidence?: string;
@@ -391,8 +380,7 @@ export function collectHeadDraftSentenceCount(rewrite: RewriteOutput): number {
 }
 
 export function buildReferencePriorContext(
-  payload: Pick<PromptPayload, "relatedNotices" | "publishedAt">,
-  options: { noticeSemantics?: boolean } = {}
+  payload: Pick<PromptPayload, "relatedNotices" | "publishedAt">
 ): ReferencePriorContext | null {
   const notices = payload.relatedNotices?.filter(
     (notice) =>
@@ -417,7 +405,6 @@ export function buildReferencePriorContext(
     );
   }
   return {
-    ...(options.noticeSemantics ? { noticeSemantics: true as const } : {}),
     sourceIds: notices.map((notice) => relatedNoticeSourceId(notice.messageId)),
     issuerAliases: [...aliases],
     timeMarkers: [...timeMarkers],
@@ -430,9 +417,6 @@ export function buildReferencePriorContext(
         notice.publishedAt,
         payload.publishedAt
       ),
-      ...(options.noticeSemantics ? {
-        exactDateMarker: formatNorwegianNoticeDate(notice.publishedAt).replace(/^\S+\s+/, "")
-      } : {}),
       normalizedEvidence: normalizeEvidenceText(
         `${notice.title}\n${notice.text}`
       )
@@ -440,58 +424,14 @@ export function buildReferencePriorContext(
   };
 }
 
-function noticeSourceMarkers(source: NonNullable<ReferencePriorContext["sources"]>[number]): string[] {
-  const sameDay = source.relation === "sibling" || source.contextMarker === "i en tidligere melding samme dag";
-  return [source.contextMarker, ...(!sameDay ? [source.exactDateMarker] : [])]
-    .filter((marker): marker is string => Boolean(marker));
-}
-
-function collectDraftParagraphIds(rewrite: RewriteOutput): number[] {
-  let nextParagraphId = 0;
-  return [rewrite.title, rewrite.lead, ...rewrite.body, rewrite.company_sentence].flatMap(section => {
-    const sentences = splitIntoSentences(section);
-    // A newline may be a new visible paragraph. Do not infer continuity from
-    // the sentence splitter, which intentionally normalizes whitespace.
-    if (/[\r\n]/.test(section)) return sentences.map(() => nextParagraphId++);
-    const paragraphId = nextParagraphId++;
-    return sentences.map(() => paragraphId);
-  });
-}
-
-function noticePriorMarkerInstructions(context: ReferencePriorContext | null | undefined): string[] {
-  if (!context?.noticeSemantics || !context.sources?.length) return [];
-  return [
-    "Kildespesifikke tidskrav: historicalMarker må være én av de eksakte frasene for den siterte kilden nedenfor. En full dato er kildens kalenderdato i Europe/Oslo, med dag, måned OG år. Når opprinnelig anslagsdato er et nødvendig faktum, behold hele denne datoen; ikke forkort den til bare dag/måned eller en måned alene. Ikke bytt dato eller lån markøren fra en annen kilde. Behold også faktaenes periode/frister. 'Da' og 'den gang' alene er ikke tilstrekkelig.",
-    "Avsnittskontekst: Normalt står historicalMarker inne i samme priorUses.fact. For en vanlig eldre reference-kilde kan den i stedet kopieres fra en tidligere kontrollert setning i SAMME paragraphIndex, når alle setningene fra ankeret til denne setningen er source='prior', bare bruker samme priorMessageId og har eget gyldig ordrett kildebelegg. Ankersetningens fact må selv inneholde riktig markør. Fortsettelsen må være tydelig historisk (for eksempel 'var', 'hadde', 'ble' eller 'skulle'), uten en ny tidsforankring. Setningens fact skal fortsatt kopieres fra denne setningen, ikke fra ankeret. Et nytt avsnitt, linjeskift, felt, en annen kilde eller overgang til dagens status bryter koblingen. Ved tvil gjentas riktig markør i den aktuelle klausulen. Correction, tidligere melding samme dag og sibling krever alltid markør i samme fact; correctionStatusMarker kan aldri arves.",
-    ...context.sources.map(source => `[${source.sourceId}]: ${noticeSourceMarkers(source).map(marker => JSON.stringify(marker)).join(" eller ")}.`)
-  ];
-}
-
-const NOTICE_REFERENCE_MEANING_RULES = [
-  "Tillatt språklig gjengivelse av kildebegreper er ikke et nytt faktum: når kilden omtaler en 'tap issue' i obligasjonskontekst (bonds/bondholders/obligasjonslån), kan dette gjengis som 'utvidelse av et eksisterende obligasjonslån'. Krev ikke at den norske forklaringen står ordrett i kilden. Behold potential/mulig, dialog, nødvendige samtykker og andre forbehold. Begrepet alene dokumenterer aldri at finansieringen er sikret, at utvidelsen er vedtatt/gjennomført, eller beløp, rente, forfall, sikkerhet eller andre lånevilkår. Uten kildebegrepet og denne konteksten er forklaringen ikke dekket.",
-  "Les kildekonteksten før du avviser en relativ mengde: 'a similar amount' eller 'tilsvarende mengde' kan vise til et entydig tall i foregående kildeavsnitt. Da kan artikkelen gjengi det som en omtrent tilsvarende mengde, med tallet og enheten og uendret possibly/kan-forbehold. sourceEvidence må være ett sammenhengende originalutdrag som inkluderer både antecedenten og den relative påstanden, ikke sammensydde utdrag. Flere mulige mengder eller ulike materialer/mål gjør referansen tvetydig. En bar 'tilsvarende mengde' uten tydelig foregående antecedent i selve artikkelen er ikke tilstrekkelig; et bestemt eller garantert beløp kan ikke erstatte en omtrentlig eller mulig mengde.",
-  "Kontroller mål og avgrensninger fra første kontroll, også i title: timing/tidspunkt/tidsforskyvning er ikke quantity/mengde. 'Høyeste siden omstart' dokumenterer bare rekord innen dette tidsrommet, ikke en generell rekord. Samlet feed av malm og avgangsmasser er ikke ren malm; behold skillet mellom gjennomstrømning, utvunnet mengde og produksjon. Hvis interpretation beskriver en slik betydningsendring, skal grounded være false, selv om tallet isolert finnes i kilden.",
-  "Skill manglende bekreftelse fra en negativ hendelsespåstand: når kilden bare sier at en transaksjon 'may proceed to completion', kan artikkelen si at meldingen ikke bekrefter/opplyser at den er fullført. Det påstår ikke at transaksjonen faktisk er ufullført eller har mislyktes. En slik faktisk negativ påstand trenger eget belegg. En kilde som bekrefter fullføring kan ikke omtales som ubekreftet."
-];
-
 export function buildReferenceCheckPrompt(
   payload: PromptPayload,
-  draftRewrite: RewriteOutput,
-  options: { noticeSemantics?: boolean } = {}
+  draftRewrite: RewriteOutput
 ): ReferenceCheckPrompt {
   const visibleDraftSentences = collectVisibleDraftSentences(draftRewrite);
   const draftSentences = collectDraftSentences(draftRewrite);
   const headDraftSentenceCount = collectHeadDraftSentenceCount(draftRewrite);
-  const priorContext = buildReferencePriorContext(payload, options);
-  const draftParagraphIds = options.noticeSemantics ? collectDraftParagraphIds(draftRewrite) : undefined;
-  if (priorContext && draftParagraphIds) {
-    priorContext.draftParagraphIds = draftParagraphIds;
-    priorContext.draftSentences = draftSentences;
-  }
-  const publicationMetadata = options.noticeSemantics && Number.isFinite(Date.parse(payload.publishedAt))
-    ? { sourceId: "primary", publishedAt: payload.publishedAt,
-      publishedAtOslo: formatNorwegianNoticeDate(payload.publishedAt), timeZone: "Europe/Oslo" }
-    : null;
+  const priorContext = buildReferencePriorContext(payload);
   const relatedNotices = priorContext
     ? (payload.relatedNotices ?? []).filter(
         (notice) =>
@@ -534,13 +474,9 @@ export function buildReferenceCheckPrompt(
     "Du er en streng referansesjekker som kun vurderer dekning mot oppgitt referansetekst.";
   const priorUseInstructions = priorContext
     ? [
-        options.noticeSemantics
-          ? "Returner priorUses for hver setning (tom liste når dagens kildepakke alene dekker hele setningen, selv om [prior_*] gjentar samme faktum). For hver distinkte klausul som krever en relatert melding, oppgi priorMessageId fra nøyaktig den [prior_<id>]-blokken, fact som den eksakte klausulen i denne utkastsetningen, sourceEvidence som ett ordrett utdrag fra den samme kilden, historicalMarker etter de kildespesifikke tids- og avsnittsreglene nedenfor, og correctionStatusMarker."
-          : "Returner priorUses for hver setning (tom liste når dagens kildepakke alene dekker hele setningen, selv om [prior_*] gjentar samme faktum). Bare for en distinkt klausul eller faktapåstand som faktisk krever en relatert melding, legg inn ett eget objekt med priorMessageId fra nøyaktig den [prior_<id>]-blokken som dekker påstanden, fact som den eksakte klausulen i utkastsetningen inkludert dens tids- eller relasjonsmarkør, sourceEvidence som et kort ordrett utdrag fra samme blokk, historicalMarker som den eksakte markørfrasen i fact, og correctionStatusMarker.",
+        "Returner priorUses for hver setning (tom liste når dagens kildepakke alene dekker hele setningen, selv om [prior_*] gjentar samme faktum). Bare for en distinkt klausul eller faktapåstand som faktisk krever en relatert melding, legg inn ett eget objekt med priorMessageId fra nøyaktig den [prior_<id>]-blokken som dekker påstanden, fact som den eksakte klausulen i utkastsetningen inkludert dens tids- eller relasjonsmarkør, sourceEvidence som et kort ordrett utdrag fra samme blokk, historicalMarker som den eksakte markørfrasen i fact, og correctionStatusMarker.",
         "Setninger med source='prior' eller source='both' må ha priorUses. Flere bakgrunnsfakta eller flere relaterte meldinger i samme setning krever separate priorUses; ikke slå sammen eller gjett hvilken melding som er kilden.",
-        options.noticeSemantics
-          ? "Feltet historicalMarker beholder navnet av skjemahensyn. Bruk bare markørene oppgitt for den eksakte kilden nedenfor. Sibling er parallell samme dag, aldri historisk. Et fortidsverb alene, selskapsnavn eller avsender er ikke et dato-/relasjonsanker."
-          : "Feltet historicalMarker beholder dette navnet av skjemahensyn. For relation=reference eller correction må det være den eksakte tids- eller tilbakepekingsfrasen som viser at faktumet er historisk, for eksempel 'i juni', 'tidligere', 'forrige uke' eller 'ifølge den tidligere meldingen'. For relation=sibling må det være den eksakte parallelle same-dag-markøren 'i en parallell melding samme dag'; sibling er ikke historisk. Et fortidsverb alene, ren nåtidsattribusjon som 'opplyser selskapet', selskapsnavn eller avsender er ikke en slik markør.",
+        "Feltet historicalMarker beholder dette navnet av skjemahensyn. For relation=reference eller correction må det være den eksakte tids- eller tilbakepekingsfrasen som viser at faktumet er historisk, for eksempel 'i juni', 'tidligere', 'forrige uke' eller 'ifølge den tidligere meldingen'. For relation=sibling må det være den eksakte parallelle same-dag-markøren 'i en parallell melding samme dag'; sibling er ikke historisk. Et fortidsverb alene, ren nåtidsattribusjon som 'opplyser selskapet', selskapsnavn eller avsender er ikke en slik markør.",
         "For reference- og sibling-meldinger skal correctionStatusMarker være tom streng. En [prior_*]-blokk merket KORRIGERT/ERSTATTET kan bare dokumentere hva som historisk ble oppgitt, aldri hva som gjelder nå. Slik bruk krever source='both', en historicalMarker for den gamle tilstanden og correctionStatusMarker som er den eksakte frasen i samme fact som tydelig sier at dagens melding korrigerer, erstatter eller oppdaterer den gamle tilstanden."
       ]
     : ["Ingen [prior_*]-blokker er vedlagt; returner priorUses=[] for hver setning."];
@@ -558,20 +494,7 @@ export function buildReferenceCheckPrompt(
     "Hvis en setning inneholder subjektive vurderinger eller verdisprak (f.eks. 'milepael', 'styrker posisjon', 'betydelig') uten tydelig attribusjon til kilden/selskapet, skal grounded settes til false.",
     "Paatander om effekt, betydning eller kommersiell verdi ma enten ha direkte dekning i kilden og attribusjon, eller markeres som ikke dekket.",
     "interpretation skal kort forklare hvorfor setningen er dekket eller ikke.",
-    "sourceEvidence skal inneholde et kort tekstutdrag fra referansen; tom streng hvis ingenting dekker setningen.",
-    ...(options.noticeSemantics ? [
-      ...noticePriorMarkerInstructions(priorContext),
-      "Returner sentence nøyaktig som den oppgitte setningen, med samme indeks, ordlyd og tegnsetting. Kontrollen skal vurdere artikkelen, ikke skrive den om.",
-      "sourceEvidence skal være ett sammenhengende, ordrett utdrag kopiert fra den opprinnelige kildeblokken. Ikke oversett, parafraser, sett sammen atskilte utdrag eller legg til sitattegn, tre prikker (...) eller utelatelsesmarkører som ikke står i selve kilden. Behold originalens ord, tall og tegnsetting; bare mellomrom og linjeskift kan samles.",
-      "For priorUses må sourceEvidence kopieres fra akkurat [prior_<priorMessageId>], ikke fra en annen blokk eller fra din egen interpretation. Velg et tilstrekkelig langt, entydig utdrag som dekker alle tall og navn i fact, utenom den eksplisitte tidsmarkøren. Ikke klipp sammen publiseringsdatoen med brødtekst. Når ingen slik kilde dekker påstanden, sett grounded=false og forklar mangelen; ikke konstruer evidens.",
-      "priorUses.fact skal være et sammenhengende, ordrett spenn i den samme utkastsetningen. historicalMarker følger de eksakte tids- og avsnittsreglene; correctionStatusMarker skal alltid finnes inne i samme fact. Ikke finn på en markør for å reparere artikkelen i kontrollens metadata.",
-      "PUBLISERINGSMETADATA er den faktiske publiseringstiden for [primary], med kalenderdato og ukedag i Europe/Oslo. Den kan dokumentere når denne meldingen ble publisert, også 'mandag' når brødteksten bare sier 'today'. Den dokumenterer aldri datoen for en annen hendelse, regnskapsperiode, frist eller beløp. Datoer i kildebrødteksten overstyrer ikke denne metadataen for publiseringen.",
-      ...NOTICE_REFERENCE_MEANING_RULES,
-      "Kontroller tall som en samlet opplysning: selskap/konsern, mål, beløp, valuta, skala, periode og sammenligningsperiode må høre sammen. At tallet finnes et annet sted i kilden er ikke dekning.",
-      "Bevar sikkerhetsgrad i begge retninger: rapporterte tall og bekreftede hendelser skal ikke omskrives til 'kan ha', 'skal ha' eller 'hevdes det'. Prognoser, betingelser og planer skal heller ikke presenteres som gjennomført. En slik endring betyr grounded=false.",
-      "Rapportert økning eller fall er ikke en usikker effektpåstand. En attribuert vurdering eller årsaksforklaring trenger ikke et ekstra 'kan' når kilden fremsetter den uten et slikt forbehold.",
-      "Skill samlet kjøpesum fra betaling ved overtakelse, bindende beløp fra opsjon/tak og kontantstrøm fra resultat. Behold vilkår som endrer betydningen."
-    ] : [])
+    "sourceEvidence skal inneholde et kort tekstutdrag fra referansen; tom streng hvis ingenting dekker setningen."
   ].join("\n");
 
   const userPrompt = [
@@ -580,13 +503,11 @@ export function buildReferenceCheckPrompt(
     referenceText,
     ">>>",
     "",
-    ...(publicationMetadata ? ["PUBLISERINGSMETADATA (kun publisering av dagens melding):", JSON.stringify(publicationMetadata), ""] : []),
     "SETNINGER SOM SKAL SJEKKES (indeks + tekst):",
     JSON.stringify(
       draftSentences.map((sentence, index) => ({
         index,
-        sentence,
-        ...(draftParagraphIds ? { paragraphIndex: draftParagraphIds[index] } : {})
+        sentence
       }))
     )
   ].join("\n");
@@ -663,7 +584,7 @@ export function buildCoverageReport(
                           normalizedSourceEvidence
                         ) &&
                         matchingSourceCount === 1 &&
-                        evidenceCoversFactAnchors(priorUse, options?.priorContext?.noticeSemantics)
+                        evidenceCoversFactAnchors(priorUse)
                     }
                   : {}),
                 ...(priorUse.correctionStatusMarker !== undefined
@@ -702,23 +623,17 @@ export function buildCoverageReport(
     ...(options?.priorContext
       ? {
           priorContext: {
-            ...(options.priorContext.noticeSemantics ? { noticeSemantics: true as const } : {}),
             sourceIds: options.priorContext.sourceIds,
             issuerAliases: options.priorContext.issuerAliases,
             timeMarkers: options.priorContext.timeMarkers,
-            ...(options.priorContext.draftParagraphIds &&
-                options.priorContext.draftSentences?.length === draftSentences.length &&
-                options.priorContext.draftSentences.every((sentence, index) => sentence === draftSentences[index])
-              ? { draftParagraphIds: [...options.priorContext.draftParagraphIds] } : {}),
             ...(options.priorContext.sources
               ? {
                   sources: options.priorContext.sources.map(
-                    ({ sourceId, messageId, relation, contextMarker, exactDateMarker }) => ({
+                    ({ sourceId, messageId, relation, contextMarker }) => ({
                       sourceId,
                       messageId,
                       relation,
-                      ...(contextMarker !== undefined ? { contextMarker } : {}),
-                      ...(exactDateMarker !== undefined ? { exactDateMarker } : {})
+                      ...(contextMarker !== undefined ? { contextMarker } : {})
                     })
                   )
                 }
@@ -751,11 +666,9 @@ function normalizeEvidenceText(value: string): string {
   return normalizeGuardrailText(value).replace(/\s+/g, " ").trim();
 }
 
-function numericEvidenceAnchors(value: string, noticeSemantics = false): string[] {
-  const normalized = normalizeEvidenceText(noticeSemantics ? normalizeNoticeNumericRanges(value) : value);
-  const pattern = noticeSemantics ? /[+-]?[ \t]*\d+(?:[.,]\d+)?/g : /\d+(?:[.,]\d+)?/g;
-  return (normalized.match(pattern) ?? []).map(
-    (anchor) => anchor.replace(/\s+/g, "").replace(/^\+/, "").replace(",", ".")
+function numericEvidenceAnchors(value: string): string[] {
+  return (normalizeEvidenceText(value).match(/\d+(?:[.,]\d+)?/g) ?? []).map(
+    (anchor) => anchor.replace(",", ".")
   );
 }
 
@@ -833,7 +746,7 @@ function hasSubstantiveQualitativeEvidence(value: string): boolean {
   return contentWords.length >= 2 || contentWords.some((word) => word.length >= 7);
 }
 
-function evidenceCoversFactAnchors(priorUse: ReferenceCheckPriorUse, noticeSemantics = false): boolean {
+function evidenceCoversFactAnchors(priorUse: ReferenceCheckPriorUse): boolean {
   let claimText = normalizeEvidenceText(priorUse.fact);
   for (const marker of [
     priorUse.historicalMarker,
@@ -844,9 +757,9 @@ function evidenceCoversFactAnchors(priorUse: ReferenceCheckPriorUse, noticeSeman
       claimText = claimText.replace(normalizedMarker, " ");
     }
   }
-  const claimAnchors = numericEvidenceAnchors(claimText, noticeSemantics);
+  const claimAnchors = numericEvidenceAnchors(claimText);
   const evidenceAnchors = new Set(
-    numericEvidenceAnchors(priorUse.sourceEvidence, noticeSemantics)
+    numericEvidenceAnchors(priorUse.sourceEvidence)
   );
   if (!claimAnchors.every((anchor) => evidenceAnchors.has(anchor))) {
     return false;
@@ -901,8 +814,7 @@ function hasExplicitRelatedNoticeMarker(
   markerText: string,
   aliases: readonly string[],
   relation: "reference" | "correction" | "sibling" | undefined,
-  expectedMarker?: string,
-  exactDateMarker?: string
+  expectedMarker?: string
 ): boolean {
   if (!sentenceContainsSpan(sentence, markerText)) {
     return false;
@@ -914,69 +826,11 @@ function hasExplicitRelatedNoticeMarker(
     if (expectedMarker === "i en tidligere melding samme dag") {
       return EARLIER_SAME_DAY_CONTEXT_PATTERN.test(markerText);
     }
-    // A precisely source-bound date is stronger than its relative month/day
-    // label. A date alone cannot distinguish earlier/parallel same-day news.
-    if (exactDateMarker && normalizedSpan(markerText) === normalizedSpan(exactDateMarker)) {
-      const phrase = normalizedSpan(exactDateMarker).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      // A checker annotation for the 7th cannot match article text for the
-      // 17th, or a longer year merely containing the trusted source date.
-      return new RegExp(`(?<![\\p{L}\\p{N}.,+\\-−])${phrase}(?![\\p{L}\\p{N}]|[.,]\\d)`, "u").test(normalizedSpan(sentence));
-    }
     if (normalizedSpan(markerText) !== normalizedSpan(expectedMarker)) {
       return false;
     }
   }
   return hasExplicitHistoricalMarker(sentence, markerText, aliases);
-}
-
-const HISTORICAL_CONTINUATION_PATTERN =
-  /\b(?:var|hadde|ble|skulle|oppga|oppgav|opplyste|anslo|ventet|planla|forutsatte|inngikk|meldte)\b/iu;
-const HISTORICAL_CONTEXT_RESET_PATTERN = new RegExp(
-  `(?<![\\p{L}\\p{N}])(?:nå|dagens|gjeldende|i dag|i går|i morgen|i år|for tiden|per i dag|senere|tidligere i dag|now|today|current)(?![\\p{L}\\p{N}])|\\b\\d{1,2}\\.[ \\t]+(?:${monthNamePattern})\\b|\\b(?:i|fra|den|per|siden)[ \\t]+(?:${monthNamePattern})\\b`, "iu"
-);
-
-function hasInheritedHistoricalMarker(
-  report: ReferenceCoverageReport,
-  item: ReferenceCoverageItem,
-  priorUse: ReferenceCheckPriorUse,
-  source: NonNullable<ReferencePriorContext["sources"]>[number] | undefined
-): boolean {
-  const context = report.priorContext;
-  const paragraphIds = context?.draftParagraphIds;
-  if (
-    !context?.noticeSemantics || !paragraphIds ||
-    paragraphIds.length !== report.items.length ||
-    source?.relation !== "reference" ||
-    source.contextMarker === "i en tidligere melding samme dag" ||
-    item.index < (report.headSentenceCount ?? 0) ||
-    item.index >= report.visibleArticleSentenceCount ||
-    sentenceContainsSpan(item.sentence, priorUse.historicalMarker)
-  ) return false;
-
-  const paragraphId = paragraphIds[item.index];
-  if (!Number.isInteger(paragraphId)) return false;
-  for (let index = item.index; index >= (report.headSentenceCount ?? 0); index -= 1) {
-    const candidate = report.items[index];
-    if (!candidate || candidate.index !== index || paragraphIds[index] !== paragraphId ||
-      !candidate.grounded || candidate.source !== "prior" || !candidate.priorUses?.length) return false;
-    // Inheritance never repairs a checker annotation. Every linked fact must
-    // independently match one exact, unique source before its date can carry.
-    if (!candidate.priorUses.every(use =>
-      use.priorMessageId === source.messageId &&
-      use.sourceEvidenceMatchesCitedSource === true &&
-      sentenceContainsSpan(candidate.sentence, use.fact) &&
-      normalizedSpan(use.historicalMarker) === normalizedSpan(priorUse.historicalMarker) &&
-      !(use.correctionStatusMarker ?? "").trim()
-    )) return false;
-    if (index < item.index && candidate.priorUses.every(use =>
-      sentenceContainsSpan(use.fact, use.historicalMarker) &&
-      hasExplicitRelatedNoticeMarker(candidate.sentence, use.historicalMarker,
-        context.issuerAliases, source.relation, source.contextMarker, source.exactDateMarker)
-    )) return true;
-    if (!HISTORICAL_CONTINUATION_PATTERN.test(candidate.sentence) ||
-      HISTORICAL_CONTEXT_RESET_PATTERN.test(candidate.sentence)) return false;
-  }
-  return false;
 }
 
 function hasExplicitCorrectionStatus(
@@ -1097,16 +951,16 @@ export function collectPriorContextViolations(
       } else if (priorUse.sourceEvidenceMatchesCitedSource === false) {
         violations.push({ item, kind: "prior_evidence_mismatch", priorUse });
       }
-      const localMarkerIsValid = sentenceContainsSpan(priorUse.fact, priorUse.historicalMarker) &&
-        hasExplicitRelatedNoticeMarker(
+      if (
+        !sentenceContainsSpan(priorUse.fact, priorUse.historicalMarker) ||
+        !hasExplicitRelatedNoticeMarker(
           item.sentence,
           priorUse.historicalMarker,
           priorContext.issuerAliases,
           relatedSource?.relation,
-          relatedSource?.contextMarker,
-          priorContext.noticeSemantics ? relatedSource?.exactDateMarker : undefined
-        );
-      if (!localMarkerIsValid && !hasInheritedHistoricalMarker(report, item, priorUse, relatedSource)) {
+          relatedSource?.contextMarker
+        )
+      ) {
         violations.push({ item, kind: "prior_unmarked", priorUse });
       }
     }
@@ -1211,21 +1065,6 @@ export function assessReferenceCheckGate(
   };
 }
 
-/** Notice-only retry hints. These never waive a source or article gate: the
- * caller may ask the checker once to correct its annotations on the same
- * article, then must evaluate the complete returned report normally.
- */
-export function collectNoticeReferenceMetadataViolations(
-  report: ReferenceCoverageReport
-): ReferencePriorContextViolation[] {
-  const metadataKinds = new Set<ReferencePriorContextViolationKind>([
-    "prior_use_missing", "prior_message_unknown", "prior_fact_unmatched",
-    "prior_evidence_missing", "prior_evidence_mismatch", "prior_source_mismatch"
-  ]);
-  return collectPriorContextViolations(report).filter(violation =>
-    metadataKinds.has(violation.kind));
-}
-
 function priorContextCorrectionLines(
   violation: ReferencePriorContextViolation,
   priorContext: ReferencePriorContext | undefined
@@ -1240,9 +1079,7 @@ function priorContextCorrectionLines(
       )
     : undefined;
   const isSibling = relatedSource?.relation === "sibling";
-  const markerExamples = (priorContext?.noticeSemantics && relatedSource
-    ? noticeSourceMarkers(relatedSource).map(marker => JSON.stringify(marker))
-    : isSibling
+  const markerExamples = (isSibling
     ? ["'i en parallell melding samme dag'"]
     : [
         ...(priorContext?.timeMarkers ?? [])
@@ -1254,7 +1091,7 @@ function priorContextCorrectionLines(
       ])
     .filter((example, index, all) => all.indexOf(example) === index)
     .slice(0, 4)
-    .join(priorContext?.noticeSemantics && relatedSource ? " eller " : ", ");
+    .join(", ");
   let problem: string;
   let requirement: string;
   switch (violation.kind) {
@@ -1309,9 +1146,7 @@ function priorContextCorrectionLines(
       problem = isSibling
         ? `Problem: Faktumet fra den parallelle meldingen [${citedSource}] mangler en eksplisitt relasjonsmarkør. Ren avsenderattribusjon er ikke nok.`
         : `Problem: Det historiske faktumet fra [${citedSource}] mangler en eksplisitt tids- eller tilbakepekingsmarkør. Ren avsenderattribusjon er ikke nok.`;
-      requirement = priorContext?.noticeSemantics && relatedSource
-        ? `Krav: Bruk én av markørene ${markerExamples} fra [${citedSource}] ordrett i det samme faktaspennet. Behold kildens opprinnelige dato og faktaenes periode/frister; ikke erstatt en nødvendig presis dato med bare en måned. Markører fra andre bakgrunnskilder kan ikke brukes her.`
-        : isSibling
+      requirement = isSibling
         ? `Krav: Legg til same-dag-markøren uten å endre faktumet, for eksempel ${markerExamples}. Ikke kall sibling-meldingen tidligere eller historisk.`
         : `Krav: Legg til en historisk markør uten å endre faktumet, for eksempel ${markerExamples}.`;
       break;
@@ -1329,7 +1164,6 @@ export function buildCorrectionInstruction(
     attempt?: number;
     maxAttempts?: number;
     gate?: ReferenceCheckGateResult;
-    noticeSemantics?: boolean;
   } = {}
 ): string | null {
   const priorContextViolations = options.gate?.priorContextViolations ?? [];
@@ -1359,7 +1193,6 @@ export function buildCorrectionInstruction(
   const isFinalAttempt = Boolean(
     options.attempt && options.maxAttempts && options.attempt >= options.maxAttempts
   );
-  const noticeSemantics = options.noticeSemantics ?? report.priorContext?.noticeSemantics ?? false;
 
   return [
     attempt,
@@ -1369,20 +1202,11 @@ export function buildCorrectionInstruction(
     "Gjør minste nødvendige inngrep for å rette de listede problemene. Setninger som ikke er listet, skal normalt beholde innhold og ordlyd, men kan flyttes eller justeres minimalt når det er nødvendig for grammatikk, sammenheng eller korrekt kildebruk.",
     "Beskytt dekkede sitater og personuttalelser mot unødvendig omskriving. Endre dem bare når kilden eller en listet feil krever det.",
     "Alle setninger i title, lead, body og company_sentence må ha tydelig dekning i kilden.",
-    noticeSemantics
-      ? "For hver setning uten dekning: kontroller hele den opprinnelige kilden og rett den faktiske feilen. 'Hva som finnes i kilden' er bare kontrollens utvalgte utdrag, ikke grensen for hvilke kildebelagte fakta som kan bevares. Behold nødvendig brief.mustInclude-innhold med korrekt dato, avsender, status og forbehold; fjern bare påstander som fortsatt mangler kildebelegg."
-      : "For hver setning uten dekning: slett faktaen helt, eller omskriv den kun med tekst/fakta som finnes i feltet 'Hva som finnes i kilden'.",
+    "For hver setning uten dekning: slett faktaen helt, eller omskriv den kun med tekst/fakta som finnes i feltet 'Hva som finnes i kilden'.",
     "Ikke bytt til en nær synonym formulering hvis dekningen fortsatt er indirekte.",
-    noticeSemantics
-      ? "Tillatt språklig gjengivelse av et kildebegrep skal bevares etter reglene nedenfor. Ikke legg til generell bransjeforklaring, lånevilkår eller konsekvenser som kilden ikke dekker."
-      : "Ikke forklar generelle begreper, bransjer eller konsekvenser med mindre dette står eksplisitt i kilden.",
+    "Ikke forklar generelle begreper, bransjer eller konsekvenser med mindre dette står eksplisitt i kilden.",
     "Hvis company_sentence er vanskelig å dekke nøyaktig, gjør den kortere eller mer generell, eller fjern den hvis skjemaet tillater det.",
     "Ikke legg til nye fakta.",
-    ...(noticeSemantics ? NOTICE_REFERENCE_MEANING_RULES : []),
-    ...noticePriorMarkerInstructions(report.priorContext),
-    ...(report.priorContext?.noticeSemantics ? [
-      "Rett kildebruk og plassering samlet: også når kontrollen har merket et bakgrunnsfaktum source='none', må en beholdt prior-påstand ha sin korrekte tidsforankring etter avsnittsreglene og stå før en avslutning fra dagens kildepakke. Hvis koblingen i avsnittet er uklar, gjenta kildens fulle dato i selve faktaspennet. Flytt bakgrunnsavsnittet tidligere og avslutt med en allerede kildebelagt, relevant opplysning om dagens status eller vilkår. Ikke legg til en repetitiv oppsummering, ikke fjern brief.mustInclude-fakta, og ikke anta at kildebelegget er godkjent før det nye utkastet er kontrollert."
-    ] : []),
     ...(isFinalAttempt
       ? [
           "Dette er siste reparasjonsforsøk: stryk udekkede påstander i stedet for å omformulere dem, og gjør ellers bare de minste endringene som er nødvendige for et kildekorrekt utkast."
