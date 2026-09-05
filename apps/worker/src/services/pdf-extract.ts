@@ -1,5 +1,7 @@
 // Use legacy build — the default build requires browser APIs (DOMMatrix)
 import { getDocument, type PDFDocumentProxy } from "pdfjs-dist/legacy/build/pdf.mjs";
+import type { ReportPdfFallbackDiagnostics } from "./report-pdf-fallback.js";
+import { selectYearlyRemunerationPages, type YearlyRemunerationSelection } from "./yearly-remuneration.js";
 import {
   extractReportFinancialFacts,
   extractReportNumberValues,
@@ -30,14 +32,6 @@ const REPORT_FILENAME_PATTERN =
 
 const YEARLY_REPORT_FILENAME_PATTERN =
   /(?:annual\s*report|[åa]rsrapport|[åa]rsmelding|annual\s*accounts|[åa]rs(?:regnskap|beretning))/i;
-
-/**
- * Section-heading keywords for remuneration/compensation tables.
- * Must match headings like "Godtgjørelse til ledende ansatte", "Remuneration report"
- * — NOT every mention of "godtgjørelse" or "remuneration" in running text.
- */
-const REMUNERATION_KEYWORDS =
-  /(?:godtgj[øo]relse\s*(?:til|og)\s*(?:ledende|styret|daglig)|lederl[øo]nn|remuneration\s*(?:report|to\s*(?:the\s*)?(?:board|senior|executive))|salary\s*and\s*(?:other\s*)?remuneration\s*to|executive\s*(?:compensation|pay)\s*(?:report|summary)|l[øo]nn\s*(?:og|til)\s*(?:ledende|daglig\s*leder))/i;
 
 export type ReportMetricKind =
   | "revenue"
@@ -87,6 +81,7 @@ export type ReportExtractionDiagnostics = {
   incomeStatementFound: boolean;
   fallbackUsed: boolean;
   openAIPdfFallback?: boolean;
+  pdfFallback?: ReportPdfFallbackDiagnostics;
   requestedPageNumbers: number[];
   requestedTopicTerms: string[];
   totalExtractedChars: number;
@@ -1305,15 +1300,10 @@ export async function extractReportContent(
 export async function extractYearlyReportSections(
   rawMessageJson: unknown,
   messageId: number
-): Promise<{
-  letterText: string | null;
-  remunerationText: string | null;
-  pageCount: number;
-  attachmentId: number;
-} | null> {
+): Promise<YearlyReportExtractionResult | null> {
   const attachments = normalizeAttachments(rawMessageJson);
 
-  // Prefer Norwegian annual report (better keyword matching, output is Norwegian)
+  // Keep the annual attachment preference; selection supports both languages.
   const yearlyPdfs = filterPdfs(attachments, YEARLY_REPORT_FILENAME_PATTERN);
   const norwegianReport = yearlyPdfs.find((att) =>
     /[åa]rsrapport/i.test(att.fileName ?? "")
@@ -1326,52 +1316,17 @@ export async function extractYearlyReportSections(
 
   const buffer = await downloadAttachmentPdf(messageId, target.id);
   const { pages, pageCount } = await extractPagesFromPdf(buffer);
-
-  if (pages.length === 0) return null;
-
-  // Scan pages for remuneration keyword matches.
-  // Skip first 3 pages (cover, TOC, summary) to avoid false positives.
-  const remunerationPages = new Set<number>();
-  const scanStart = Math.min(3, pages.length);
-  for (let i = scanStart; i < pages.length; i++) {
-    if (REMUNERATION_KEYWORDS.test(pages[i])) {
-      for (let j = i; j <= Math.min(pages.length - 1, i + 2); j++) {
-        remunerationPages.add(j);
-      }
-    }
-  }
-
-  let remunerationText: string | null = null;
-
-  if (remunerationPages.size > 0) {
-    // When hits are spread across the report (TOC refs, note refs, actual section),
-    // pick only the largest cluster of consecutive pages to avoid noise.
-    const sorted = [...remunerationPages].sort((a, b) => a - b);
-    const bestCluster = pickLargestCluster(sorted);
-    remunerationText = bestCluster.map((i) => pages[i]).join("\n\n");
-  }
-
-  if (!remunerationText) return null;
-
-  // Verify the extracted text contains actual salary/compensation amounts,
-  // not just policy descriptions. Look for Norwegian-style currency amounts
-  // (e.g. "20 694 474", "736 000 kroner", "15,6 mill.") or tabular salary data.
-  const hasSalaryAmounts =
-    /\d{1,3}[\s.]\d{3}[\s.]\d{3}/.test(remunerationText) ||      // e.g. "20 694 474"
-    /\d{3}[\s.]\d{3}\s*(?:kroner|kr)/i.test(remunerationText) ||  // e.g. "736 000 kroner"
-    /\d+[,.]\d\s*mill/i.test(remunerationText) ||                 // e.g. "15,6 mill."
-    /(?:grunnl[øo]nn|variabel\s*l[øo]nn|pensjon|bonus)\s.*\d/i.test(remunerationText);  // salary label + number
-  if (!hasSalaryAmounts) return null;
-
-  remunerationText = truncateText(remunerationText);
-
   return {
-    letterText: null,
-    remunerationText,
-    pageCount,
-    attachmentId: target.id
+    ...selectYearlyRemunerationPages(pages.map((text, index) => ({ pageNumber: index + 1, text })), pageCount),
+    attachmentId: target.id,
+    attachmentName: target.fileName ?? null
   };
 }
+
+export type YearlyReportExtractionResult = YearlyRemunerationSelection & {
+  attachmentId: number;
+  attachmentName: string | null;
+};
 
 // ---------------------------------------------------------------------------
 // TIER 3: General PDF extraction (any PDF not matching quarterly/yearly)

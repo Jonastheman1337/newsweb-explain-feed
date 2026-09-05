@@ -54,7 +54,11 @@ export const TRIAGE_CATEGORIES = new Set([
 ]);
 
 export const YEARLY_REPORT_CATEGORIES = new Set([
-  "ÅRSRAPPORTER OG REVISJONSBERETNINGER"
+  "ÅRSRAPPORTER OG REVISJONSBERETNINGER",
+  // Current NewsWeb category 1001 labels, alongside the legacy label.
+  // Route attachments to remuneration assessment before document-only triage.
+  "ÅRSRAPPORT",
+  "ANNUAL FINANCIAL REPORT"
 ]);
 
 export function isYearlyReportCategory(categories: string[]): boolean {

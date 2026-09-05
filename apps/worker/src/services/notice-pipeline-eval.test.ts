@@ -90,6 +90,8 @@ function mockPipelineCaller(options: { repair?: boolean; failReference?: boolean
         content = {
           coveredFactIds: complete ? ["price", "condition"] : ["price"], missingFactIds: complete ? [] : ["condition"],
           statusAccurate: true, instructionCompliant: true,
+          semanticChecks: { actorAndPayment: "pass", metricAndMaterialScope: "pass", relativeQuantityContext: "not_applicable" },
+          semanticFindings: [],
           findings: complete ? [] : ["Det vesentlige vilkåret om myndighetsgodkjenning mangler."],
           repairInstruction: complete ? "" : "Ta med at avtalen er betinget av myndighetsgodkjenning. Behold resten."
         };

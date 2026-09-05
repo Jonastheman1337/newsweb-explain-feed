@@ -8,6 +8,7 @@ import {
 import type { RewriteOutput } from "@newsweb/shared";
 import { z } from "zod";
 import { findContextMarker, issuerAliases } from "./context-markers.js";
+import { normalizeNoticeNumericRanges } from "./notice-numeric-ranges.js";
 import { normalizeGuardrailText } from "./text-normalization.js";
 
 const sentenceBoundaryRegex = /(?<=[.!?])\s+/;
@@ -87,6 +88,8 @@ export type ReferenceCoverageItem = {
 export type ReferencePriorContext = {
   sourceIds: string[];
   issuerAliases: string[];
+  // Opt-in for notices; historical/Sak reports retain their existing contract.
+  noticeSemantics?: true;
   // Relation-aware marker suggestions. The legacy property name is retained
   // in persisted reports even when a sibling marker is parallel, not historic.
   timeMarkers: string[];
@@ -97,6 +100,8 @@ export type ReferencePriorContext = {
     // Exact relation/time marker computed for this source. Optional so old
     // persisted reports remain readable.
     contextMarker?: string;
+    // Full calendar date of this source in Europe/Oslo, never model-supplied.
+    exactDateMarker?: string;
     // Internal only: buildCoverageReport removes this before returning the
     // persistable report after materializing an evidence-match boolean.
     normalizedEvidence?: string;
@@ -380,7 +385,8 @@ export function collectHeadDraftSentenceCount(rewrite: RewriteOutput): number {
 }
 
 export function buildReferencePriorContext(
-  payload: Pick<PromptPayload, "relatedNotices" | "publishedAt">
+  payload: Pick<PromptPayload, "relatedNotices" | "publishedAt">,
+  options: { noticeSemantics?: boolean } = {}
 ): ReferencePriorContext | null {
   const notices = payload.relatedNotices?.filter(
     (notice) =>
@@ -405,6 +411,7 @@ export function buildReferencePriorContext(
     );
   }
   return {
+    ...(options.noticeSemantics ? { noticeSemantics: true as const } : {}),
     sourceIds: notices.map((notice) => relatedNoticeSourceId(notice.messageId)),
     issuerAliases: [...aliases],
     timeMarkers: [...timeMarkers],
@@ -417,11 +424,28 @@ export function buildReferencePriorContext(
         notice.publishedAt,
         payload.publishedAt
       ),
+      ...(options.noticeSemantics ? {
+        exactDateMarker: formatNorwegianNoticeDate(notice.publishedAt).replace(/^\S+\s+/, "")
+      } : {}),
       normalizedEvidence: normalizeEvidenceText(
         `${notice.title}\n${notice.text}`
       )
     }))
   };
+}
+
+function noticeSourceMarkers(source: NonNullable<ReferencePriorContext["sources"]>[number]): string[] {
+  const sameDay = source.relation === "sibling" || source.contextMarker === "i en tidligere melding samme dag";
+  return [source.contextMarker, ...(!sameDay ? [source.exactDateMarker] : [])]
+    .filter((marker): marker is string => Boolean(marker));
+}
+
+function noticePriorMarkerInstructions(context: ReferencePriorContext | null | undefined): string[] {
+  if (!context?.noticeSemantics || !context.sources?.length) return [];
+  return [
+    "Kildespesifikke tidskrav: historicalMarker må være én av de eksakte frasene for den siterte kilden nedenfor og stå i samme fact. En full dato er kildens kalenderdato i Europe/Oslo. Ikke bytt dag, måned eller år, eller lån markøren fra en annen kilde. Behold også opprinnelig anslagsdato og perioden/fristen når disse er nødvendige fakta. 'Da' og 'den gang' alene er ikke tilstrekkelig.",
+    ...context.sources.map(source => `[${source.sourceId}]: ${noticeSourceMarkers(source).map(marker => JSON.stringify(marker)).join(" eller ")}.`)
+  ];
 }
 
 export function buildReferenceCheckPrompt(
@@ -432,7 +456,7 @@ export function buildReferenceCheckPrompt(
   const visibleDraftSentences = collectVisibleDraftSentences(draftRewrite);
   const draftSentences = collectDraftSentences(draftRewrite);
   const headDraftSentenceCount = collectHeadDraftSentenceCount(draftRewrite);
-  const priorContext = buildReferencePriorContext(payload);
+  const priorContext = buildReferencePriorContext(payload, options);
   const relatedNotices = priorContext
     ? (payload.relatedNotices ?? []).filter(
         (notice) =>
@@ -497,6 +521,7 @@ export function buildReferenceCheckPrompt(
     "interpretation skal kort forklare hvorfor setningen er dekket eller ikke.",
     "sourceEvidence skal inneholde et kort tekstutdrag fra referansen; tom streng hvis ingenting dekker setningen.",
     ...(options.noticeSemantics ? [
+      ...noticePriorMarkerInstructions(priorContext),
       "Returner sentence nøyaktig som den oppgitte setningen, med samme indeks, ordlyd og tegnsetting. Kontrollen skal vurdere artikkelen, ikke skrive den om.",
       "sourceEvidence skal være ett sammenhengende, ordrett utdrag kopiert fra den opprinnelige kildeblokken. Ikke oversett, parafraser, sett sammen atskilte utdrag eller legg til sitattegn, tre prikker (...) eller utelatelsesmarkører som ikke står i selve kilden. Behold originalens ord, tall og tegnsetting; bare mellomrom og linjeskift kan samles.",
       "For priorUses må sourceEvidence kopieres fra akkurat [prior_<priorMessageId>], ikke fra en annen blokk eller fra din egen interpretation. Velg et tilstrekkelig langt, entydig utdrag som dekker alle tall og navn i fact, utenom den eksplisitte tidsmarkøren. Ikke klipp sammen publiseringsdatoen med brødtekst. Når ingen slik kilde dekker påstanden, sett grounded=false og forklar mangelen; ikke konstruer evidens.",
@@ -595,7 +620,7 @@ export function buildCoverageReport(
                           normalizedSourceEvidence
                         ) &&
                         matchingSourceCount === 1 &&
-                        evidenceCoversFactAnchors(priorUse)
+                        evidenceCoversFactAnchors(priorUse, options?.priorContext?.noticeSemantics)
                     }
                   : {}),
                 ...(priorUse.correctionStatusMarker !== undefined
@@ -634,17 +659,19 @@ export function buildCoverageReport(
     ...(options?.priorContext
       ? {
           priorContext: {
+            ...(options.priorContext.noticeSemantics ? { noticeSemantics: true as const } : {}),
             sourceIds: options.priorContext.sourceIds,
             issuerAliases: options.priorContext.issuerAliases,
             timeMarkers: options.priorContext.timeMarkers,
             ...(options.priorContext.sources
               ? {
                   sources: options.priorContext.sources.map(
-                    ({ sourceId, messageId, relation, contextMarker }) => ({
+                    ({ sourceId, messageId, relation, contextMarker, exactDateMarker }) => ({
                       sourceId,
                       messageId,
                       relation,
-                      ...(contextMarker !== undefined ? { contextMarker } : {})
+                      ...(contextMarker !== undefined ? { contextMarker } : {}),
+                      ...(exactDateMarker !== undefined ? { exactDateMarker } : {})
                     })
                   )
                 }
@@ -677,9 +704,11 @@ function normalizeEvidenceText(value: string): string {
   return normalizeGuardrailText(value).replace(/\s+/g, " ").trim();
 }
 
-function numericEvidenceAnchors(value: string): string[] {
-  return (normalizeEvidenceText(value).match(/\d+(?:[.,]\d+)?/g) ?? []).map(
-    (anchor) => anchor.replace(",", ".")
+function numericEvidenceAnchors(value: string, noticeSemantics = false): string[] {
+  const normalized = normalizeEvidenceText(noticeSemantics ? normalizeNoticeNumericRanges(value) : value);
+  const pattern = noticeSemantics ? /[+-]?[ \t]*\d+(?:[.,]\d+)?/g : /\d+(?:[.,]\d+)?/g;
+  return (normalized.match(pattern) ?? []).map(
+    (anchor) => anchor.replace(/\s+/g, "").replace(/^\+/, "").replace(",", ".")
   );
 }
 
@@ -757,7 +786,7 @@ function hasSubstantiveQualitativeEvidence(value: string): boolean {
   return contentWords.length >= 2 || contentWords.some((word) => word.length >= 7);
 }
 
-function evidenceCoversFactAnchors(priorUse: ReferenceCheckPriorUse): boolean {
+function evidenceCoversFactAnchors(priorUse: ReferenceCheckPriorUse, noticeSemantics = false): boolean {
   let claimText = normalizeEvidenceText(priorUse.fact);
   for (const marker of [
     priorUse.historicalMarker,
@@ -768,9 +797,9 @@ function evidenceCoversFactAnchors(priorUse: ReferenceCheckPriorUse): boolean {
       claimText = claimText.replace(normalizedMarker, " ");
     }
   }
-  const claimAnchors = numericEvidenceAnchors(claimText);
+  const claimAnchors = numericEvidenceAnchors(claimText, noticeSemantics);
   const evidenceAnchors = new Set(
-    numericEvidenceAnchors(priorUse.sourceEvidence)
+    numericEvidenceAnchors(priorUse.sourceEvidence, noticeSemantics)
   );
   if (!claimAnchors.every((anchor) => evidenceAnchors.has(anchor))) {
     return false;
@@ -825,7 +854,8 @@ function hasExplicitRelatedNoticeMarker(
   markerText: string,
   aliases: readonly string[],
   relation: "reference" | "correction" | "sibling" | undefined,
-  expectedMarker?: string
+  expectedMarker?: string,
+  exactDateMarker?: string
 ): boolean {
   if (!sentenceContainsSpan(sentence, markerText)) {
     return false;
@@ -836,6 +866,14 @@ function hasExplicitRelatedNoticeMarker(
   if (expectedMarker) {
     if (expectedMarker === "i en tidligere melding samme dag") {
       return EARLIER_SAME_DAY_CONTEXT_PATTERN.test(markerText);
+    }
+    // A precisely source-bound date is stronger than its relative month/day
+    // label. A date alone cannot distinguish earlier/parallel same-day news.
+    if (exactDateMarker && normalizedSpan(markerText) === normalizedSpan(exactDateMarker)) {
+      const phrase = normalizedSpan(exactDateMarker).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      // A checker annotation for the 7th cannot match article text for the
+      // 17th, or a longer year merely containing the trusted source date.
+      return new RegExp(`(?<![\\p{L}\\p{N}.,+\\-−])${phrase}(?![\\p{L}\\p{N}]|[.,]\\d)`, "u").test(normalizedSpan(sentence));
     }
     if (normalizedSpan(markerText) !== normalizedSpan(expectedMarker)) {
       return false;
@@ -969,7 +1007,8 @@ export function collectPriorContextViolations(
           priorUse.historicalMarker,
           priorContext.issuerAliases,
           relatedSource?.relation,
-          relatedSource?.contextMarker
+          relatedSource?.contextMarker,
+          priorContext.noticeSemantics ? relatedSource?.exactDateMarker : undefined
         )
       ) {
         violations.push({ item, kind: "prior_unmarked", priorUse });
@@ -1105,7 +1144,9 @@ function priorContextCorrectionLines(
       )
     : undefined;
   const isSibling = relatedSource?.relation === "sibling";
-  const markerExamples = (isSibling
+  const markerExamples = (priorContext?.noticeSemantics && relatedSource
+    ? noticeSourceMarkers(relatedSource).map(marker => JSON.stringify(marker))
+    : isSibling
     ? ["'i en parallell melding samme dag'"]
     : [
         ...(priorContext?.timeMarkers ?? [])
@@ -1117,7 +1158,7 @@ function priorContextCorrectionLines(
       ])
     .filter((example, index, all) => all.indexOf(example) === index)
     .slice(0, 4)
-    .join(", ");
+    .join(priorContext?.noticeSemantics && relatedSource ? " eller " : ", ");
   let problem: string;
   let requirement: string;
   switch (violation.kind) {
@@ -1172,7 +1213,9 @@ function priorContextCorrectionLines(
       problem = isSibling
         ? `Problem: Faktumet fra den parallelle meldingen [${citedSource}] mangler en eksplisitt relasjonsmarkør. Ren avsenderattribusjon er ikke nok.`
         : `Problem: Det historiske faktumet fra [${citedSource}] mangler en eksplisitt tids- eller tilbakepekingsmarkør. Ren avsenderattribusjon er ikke nok.`;
-      requirement = isSibling
+      requirement = priorContext?.noticeSemantics && relatedSource
+        ? `Krav: Bruk én av markørene ${markerExamples} fra [${citedSource}] ordrett i det samme faktaspennet. Behold kildens opprinnelige dato og faktaenes periode/frister; ikke erstatt en nødvendig presis dato med bare en måned. Markører fra andre bakgrunnskilder kan ikke brukes her.`
+        : isSibling
         ? `Krav: Legg til same-dag-markøren uten å endre faktumet, for eksempel ${markerExamples}. Ikke kall sibling-meldingen tidligere eller historisk.`
         : `Krav: Legg til en historisk markør uten å endre faktumet, for eksempel ${markerExamples}.`;
       break;
@@ -1233,6 +1276,10 @@ export function buildCorrectionInstruction(
     "Ikke forklar generelle begreper, bransjer eller konsekvenser med mindre dette står eksplisitt i kilden.",
     "Hvis company_sentence er vanskelig å dekke nøyaktig, gjør den kortere eller mer generell, eller fjern den hvis skjemaet tillater det.",
     "Ikke legg til nye fakta.",
+    ...noticePriorMarkerInstructions(report.priorContext),
+    ...(report.priorContext?.noticeSemantics ? [
+      "Rett kildebruk og plassering samlet: også når kontrollen har merket et bakgrunnsfaktum source='none', må en beholdt prior-påstand ha sin egen korrekte tidsmarkør og stå før en avslutning fra dagens kildepakke. Flytt bakgrunnsavsnittet tidligere og avslutt med en allerede kildebelagt, relevant opplysning om dagens status eller vilkår. Ikke legg til en repetitiv oppsummering, ikke fjern brief.mustInclude-fakta, og ikke anta at kildebelegget er godkjent før det nye utkastet er kontrollert."
+    ] : []),
     ...(isFinalAttempt
       ? [
           "Dette er siste reparasjonsforsøk: stryk udekkede påstander i stedet for å omformulere dem, og gjør ellers bare de minste endringene som er nødvendige for et kildekorrekt utkast."

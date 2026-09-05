@@ -100,6 +100,7 @@ function harness(options: {
       content = {
         coveredFactIds: complete ? ["approval", "finality"] : ["approval"], missingFactIds: complete ? [] : ["finality"],
         statusAccurate: true, instructionCompliant: true, findings: complete ? [] : ["Endelig avgjørelse mangler."],
+        semanticChecks: { actorAndPayment: "pass", metricAndMaterialScope: "pass", relativeQuantityContext: "not_applicable" }, semanticFindings: [],
         repairInstruction: complete ? "" : `Ta med: ${finality}`
       };
     } else throw new Error(`Unexpected schema ${request.schemaName}`);
@@ -110,6 +111,49 @@ function harness(options: {
 }
 
 describe("notice reference metadata retry", () => {
+  it("publishes a complete source-dated range without consuming repair attempts", async () => {
+    const rangeEvidence = "The purchase price was estimated at NOK 50-60 million.";
+    const datedHistory = "4. juni 2026 var kjøpesummen anslått til 50–60 millioner kroner.";
+    const rangePayload = { ...payload, relatedNotices: [{ ...payload.relatedNotices![0]!, text: rangeEvidence, textChars: rangeEvidence.length }] };
+    const rangeBrief = { ...brief, mustInclude: [...brief.mustInclude, {
+      id: "historical_price", fact: datedHistory, sourceId: "prior_990049", sourceEvidence: rangeEvidence
+    }] };
+    const requests: NoticeJsonRequest[] = [];
+    const call: NoticeJsonCaller = async request => {
+      requests.push(request);
+      let content: unknown;
+      if (request.schemaName === "notice_editorial_brief") content = rangeBrief;
+      else if (request.schemaName === "notice_rewrite_output") content = { ...draft, body: [datedHistory, finality] };
+      else if (request.schemaName === "notice_editorial_coverage") {
+        const { article } = JSON.parse(request.userPrompt) as { article: { body: string[] } };
+        const complete = article.body.includes(datedHistory) && article.body.includes(finality);
+        content = { coveredFactIds: complete ? ["approval", "finality", "historical_price"] : [],
+          missingFactIds: complete ? [] : ["approval", "finality", "historical_price"], findings: [],
+          statusAccurate: true, instructionCompliant: true,
+          semanticChecks: { actorAndPayment: "pass", metricAndMaterialScope: "pass", relativeQuantityContext: "not_applicable" }, semanticFindings: [],
+          repairInstruction: "" };
+      } else {
+        const marker = "SETNINGER SOM SKAL SJEKKES (indeks + tekst):\n";
+        const sentences = JSON.parse(request.userPrompt.slice(request.userPrompt.lastIndexOf(marker) + marker.length)) as Array<{ index: number; sentence: string }>;
+        content = { sentences: sentences.map(item => ({ ...item, grounded: true, interpretation: "Dekket av syntetisk originalkilde.",
+          source: item.sentence === datedHistory ? "prior" : "primary", sourceEvidence: item.sentence === datedHistory ? rangeEvidence : primary,
+          priorUses: item.sentence === datedHistory ? [{ priorMessageId: 990049, fact: item.sentence, sourceEvidence: rangeEvidence,
+            historicalMarker: "4. juni 2026", correctionStatusMarker: "" }] : []
+        })) };
+      }
+      const modelCall = logFor(request);
+      return { content: JSON.stringify(content), promptChars: modelCall.promptChars, modelCall };
+    };
+    const result = await runNoticePipeline({ payload: rangePayload, kind: "regular", call, maxRepairAttempts: 0 });
+    expect(result.decision, JSON.stringify({ errors: result.errors, briefErrors: result.audit.briefErrors, validation: result.validation?.blockingErrors })).toBe("publish");
+    expect(result.rewrite?.body).toEqual([datedHistory, finality]);
+    expect(result.audit.repairAttempts).toBe(0);
+    expect(result.audit.finalCoverage?.missingFactIds).toEqual([]);
+    expect(result.validation?.publicationNumberAssessments).toContainEqual(expect.objectContaining({ display: "60", disposition: "matched" }));
+    expect(requests.filter(request => request.schemaName === "reference_check_result")).toHaveLength(1);
+    expect(result.audit.finalReferenceCoverage?.items[2]?.priorUses?.[0]?.sourceEvidenceMatchesCitedSource).toBe(true);
+  });
+
   it("corrects checker quotations on identical article bytes without consuming an article repair", async () => {
     const { call, requests } = harness();
     const result = await runNoticePipeline({ payload, kind: "regular", call, maxRepairAttempts: 0 });

@@ -1,12 +1,16 @@
 import {
   assessNumbers,
   assessNumbersInText,
+  formatNorwegianNoticeDate,
+  isRelatedNoticeTimestampValid,
   unexpectedNumberDisplays,
+  type AssessNumbersOptions,
   type NumberAssessment,
   type NumberDerivationRuleId,
   type PromptPayload
 } from "@newsweb/prompt-kit";
 import type { RewriteOutput } from "@newsweb/shared";
+import { normalizeNoticeNumericRanges } from "./notice-numeric-ranges.js";
 
 const MAX_ALLOWED_UNEXPECTED_NUMBERS = 0;
 export const MAX_TITLE_WORDS = 8;
@@ -476,6 +480,45 @@ export function buildNumericValidationSourceText(payload: PromptPayload): string
     .join("\n");
 }
 
+type NumericSourceDate = { sourceId: string; date: string };
+
+function noticeNumericSourceDates(payload: PromptPayload): NumericSourceDate[] {
+  return [
+    { sourceId: "primary", publishedAt: payload.publishedAt },
+    ...(payload.relatedNotices ?? [])
+      .filter(notice => notice.text.trim() && isRelatedNoticeTimestampValid(notice.publishedAt, payload.publishedAt))
+      .map(notice => ({ sourceId: `prior_${notice.messageId}`, publishedAt: notice.publishedAt }))
+  ].filter(source => Number.isFinite(new Date(source.publishedAt).getTime()))
+    .map(source => ({ sourceId: source.sourceId, date: formatNorwegianNoticeDate(source.publishedAt).replace(/^\S+\s+/, "") }));
+}
+
+function assessNoticeNumbersInText(
+  text: string,
+  sourceText: string,
+  dates: readonly NumericSourceDate[],
+  options?: AssessNumbersOptions
+): NumberAssessment[] {
+  const dateAssessments: NumberAssessment[] = [];
+  let nonDateText = text;
+  for (const source of dates) {
+    const phrase = source.date.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/ /g, "[ \\t]+");
+    const pattern = new RegExp(`(?<![\\p{L}\\p{N}.,+\\-−])${phrase}(?![\\p{L}\\p{N}]|[.,]\\d)`, "giu");
+    nonDateText = nonDateText.replace(pattern, match => {
+      // Only this complete source-bound date is backed by the timestamp.
+      // Its day/year never enter the general source pool: an unrelated
+      // amount using the same number must still be checked independently.
+      dateAssessments.push(...assessNumbersInText(source.date, source.date, options).map(assessment => ({
+        ...assessment, provenance: { ...assessment.provenance, sourceId: source.sourceId, sourceDate: source.date }
+      })));
+      return match.replace(/\d/g, " ");
+    });
+  }
+  return [
+    ...assessNumbersInText(normalizeNoticeNumericRanges(nonDateText), normalizeNoticeNumericRanges(sourceText), options),
+    ...dateAssessments
+  ];
+}
+
 function hasAnyPattern(text: string, patterns: RegExp[]): boolean {
   return patterns.some((pattern) => pattern.test(text));
 }
@@ -766,6 +809,8 @@ export function validateRewriteOutput(
   rewrite: RewriteOutput,
   payload: PromptPayload,
   options?: {
+    // Comparison-only opt-in; legacy and Sak numeric behavior is unchanged.
+    noticeSemantics?: boolean;
     maxVisibleArticleChars?: number;
     reportExtraction?: ReportExtractionValidationContext;
     // Kill-switch passthrough only; when absent the engine uses the code
@@ -797,19 +842,23 @@ export function validateRewriteOutput(
   const numberAssessmentOptions = options?.enabledDerivationRules
     ? { enabledDerivationRules: options.enabledDerivationRules }
     : undefined;
+  const sourceDates = options?.noticeSemantics ? noticeNumericSourceDates(payload) : [];
+  const assessNumericText = (text: string, source: string, dates: readonly NumericSourceDate[] = sourceDates) =>
+    options?.noticeSemantics
+      ? assessNoticeNumbersInText(text, source, dates, numberAssessmentOptions)
+      : assessNumbersInText(text, source, numberAssessmentOptions);
   // Keep the full-output assessment for telemetry, but only publication
   // fields may stop publication. Hidden planning/provenance fields are model
   // metadata and are neither rendered nor an editorial claim to the reader.
-  const numberAssessments = assessNumbers(
-    rewrite,
-    numericValidationSourceText,
-    numberAssessmentOptions
-  );
-  const publicationNumberAssessments = assessNumbersInText(
-    visibleText,
-    numericValidationSourceText,
-    numberAssessmentOptions
-  );
+  const numberAssessments = options?.noticeSemantics
+    ? assessNumericText(JSON.stringify(rewrite), numericValidationSourceText)
+    : assessNumbers(rewrite, numericValidationSourceText, numberAssessmentOptions);
+  // Dates and arithmetic context must belong to the actual visible field.
+  // Joining paragraphs can invent a source-backed date from an amount at
+  // one paragraph's end and a month/year at the next paragraph's start.
+  const publicationNumberAssessments = options?.noticeSemantics
+    ? collectVisibleArticleFields(rewrite).flatMap(field => assessNumericText(field, numericValidationSourceText))
+    : assessNumericText(visibleText, numericValidationSourceText);
   const numberErrors = unexpectedNumberDisplays(
     publicationNumberAssessments
   );
@@ -965,17 +1014,17 @@ export function validateRewriteOutput(
     const relatedSourceText = buildRelatedNoticesSourceText(payload);
     const primaryOnlyMisses = new Set(
       unexpectedNumberDisplays(
-        assessNumbersInText(
+        assessNumericText(
           rewrite.title,
           validationSourceText,
-          numberAssessmentOptions
+          sourceDates.filter(source => source.sourceId === "primary")
         )
       )
     );
-    const relatedOnlyTitleNumbers = assessNumbersInText(
+    const relatedOnlyTitleNumbers = assessNumericText(
       rewrite.title,
       relatedSourceText,
-      numberAssessmentOptions
+      sourceDates.filter(source => source.sourceId !== "primary")
     )
       .filter(
         (assessment) =>

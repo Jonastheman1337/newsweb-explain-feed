@@ -150,7 +150,7 @@ describe("notice editorial examples", () => {
 
 describe("compact notice prompt contract", () => {
   it("versions the independent builders and cuts instruction volume substantially", () => {
-    expect(NOTICE_EDITORIAL_PROMPT_VERSION).toBe("v5.12.1");
+    expect(NOTICE_EDITORIAL_PROMPT_VERSION).toBe("v5.12.2");
     const regular = createNoticeSystemPrompt() + createNoticeDeveloperPrompt("regular", payload);
     const report = createNoticeSystemPrompt() + createNoticeDeveloperPrompt("report", payload);
     expect(regular.length).toBeLessThan(createDeveloperPrompt().length / 2);

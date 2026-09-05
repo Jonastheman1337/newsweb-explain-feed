@@ -125,6 +125,10 @@ report fallback, a model-generated PDF summary cannot serve as its own source;
 raw financial excerpts are retained separately. The inherited general/yearly
 fallback is not redesigned here. Partial extraction is recorded as a limitation.
 
+The subsequent [5 September release validation](notice-quality-2026-09-05-release-plan.md)
+replaces annual extraction with raw remuneration pages and removes general-PDF
+model-summary promotion. The counts above describe the earlier local snapshot.
+
 The small diagnostics demonstrate specific fixes, not a population-wide
 quality, latency or cost improvement. A brief can still omit an important fact,
 so a clean completeness check alone does not establish editorial quality.
