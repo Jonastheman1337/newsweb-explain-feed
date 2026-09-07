@@ -80,9 +80,11 @@ type VersionRow = Record<string, unknown> & { status: string };
 function fakeDeps(options: {
   draft?: { id: string; activeGenerationRunId: string | null } | null;
   responses?: Array<SakArticle | Error | (() => SakArticle)>;
+  briefResponses?: Array<Error | unknown>;
   referenceResponse?: Error | ((input: SakModelCallInput) => unknown);
   editorialResponse?: Error | unknown;
 } = {}) {
+  const briefResponses = [...(options.briefResponses ?? [])];
   const versions = new Map<string, VersionRow>();
   const runUpdates: Array<Record<string, unknown>> = [];
   const releases: Array<{ id: string; activeGenerationRunId: string }> = [];
@@ -120,6 +122,11 @@ function fakeDeps(options: {
     callModelForJson: vi.fn(async (input: SakModelCallInput) => {
       allCalls.push(input);
       let checked: unknown;
+      if (input.schemaName === "sak_news_brief" && briefResponses.length) {
+        const next = briefResponses.shift();
+        if (next instanceof Error) throw next;
+        return { content: JSON.stringify(next), promptChars: input.userPrompt.length, modelCall: { model: "gpt-checker-test" } };
+      }
       if (input.schemaName === "sak_news_brief") checked = { angle: "Ny direkterute", news: [{ fact: "Ny rute", materialId: "material_ckm1", evidence: MATERIAL_TEXT }], essentialContext: [], omit: [], uncertainties: [] };
       if (input.schemaName === "sak_reference_check") {
         if (options.referenceResponse instanceof Error) throw options.referenceResponse;
@@ -185,17 +192,13 @@ describe("classifySakFailure", () => {
 });
 
 describe("sakReasoningEffort", () => {
-  const config = { OPENAI_SAK_REASONING_EFFORT: "high" as const, OPENAI_SAK_TIMEOUT_MS: 1 };
-
-  it("uses the configured effort for drafts and medium for revisions and repairs", () => {
-    expect(sakReasoningEffort({}, config, "draft")).toBe("high");
-    expect(sakReasoningEffort({}, config, "revision")).toBe("medium");
-    expect(sakReasoningEffort({}, config, "repair")).toBe("medium");
+  it("uses high reasoning by default", () => {
+    expect(sakReasoningEffort({})).toBe("high");
   });
 
   it("honours the xhigh override everywhere", () => {
-    expect(sakReasoningEffort({ reasoningEffortOverride: "xhigh" }, config, "draft")).toBe("xhigh");
-    expect(sakReasoningEffort({ reasoningEffortOverride: "xhigh" }, config, "repair")).toBe("xhigh");
+    expect(sakReasoningEffort({ reasoningEffortOverride: "xhigh" })).toBe("xhigh");
+    expect(sakReasoningEffort({ reasoningEffortOverride: "xhigh" })).toBe("xhigh");
   });
 });
 
@@ -272,7 +275,7 @@ describe("processSakDraft", () => {
     expect(fake.allCalls.map((call) => call.schemaName)).toEqual(["sak_news_brief", "sak_article", "sak_reference_check", "sak_editorial_review"]);
   });
 
-  it("uses the revision prompt at medium effort when there is a previous article and an instruction", async () => {
+  it("uses the revision prompt at high effort when there is a previous article and an instruction", async () => {
     const previous = article();
     const fake = fakeDeps({ responses: [article({ change_note: "Kortere lead" })] });
     await processSakDraft(
@@ -280,7 +283,7 @@ describe("processSakDraft", () => {
       fake.deps
     );
     const call = fake.calls[0];
-    expect(call?.reasoningEffort).toBe("medium");
+    expect(call?.reasoningEffort).toBe("high");
     expect(call?.userPrompt).toContain("FORRIGE VERSJON");
     expect(call?.userPrompt.indexOf("KILDEMATERIALE")).toBeLessThan(call?.userPrompt.indexOf("FORRIGE VERSJON") ?? 0);
     expect(call?.userPrompt).toContain("Kortere lead");
@@ -294,7 +297,7 @@ describe("processSakDraft", () => {
     await processSakDraft(job(), repaired.deps);
     expect(repaired.calls).toHaveLength(2);
     expect(repaired.allCalls.filter((call) => call.schemaName === "sak_reference_check")).toHaveLength(2);
-    expect(repaired.calls[1]?.reasoningEffort).toBe("medium");
+    expect(repaired.calls[1]?.reasoningEffort).toBe("high");
     expect(repaired.calls[1]?.userPrompt).toContain("KORRIGERINGSMODUS");
     expect(repaired.calls[1]?.userPrompt).toContain("900");
     expect(repaired.version()?.status).toBe("ready");
@@ -416,4 +419,35 @@ it("lets a complete semantic reference check resolve lexical attribution warning
   const failed = fakeDeps({ responses: [copy], referenceResponse: new Error("checker unavailable") });
   await processSakDraft(job(), failed.deps);
   expect((failed.version()?.validationJson as { issues: { code: string }[] }).issues.some((issue) => issue.code === "ATTRIBUTION_RISK")).toBe(true);
+});
+
+
+describe("brief recovery and Sak model routing", () => {
+  const invalidBrief = {
+    angle: "Ny rute", news: [{ fact: "Ny rute", materialId: "material_ckm1", evidence: MATERIAL_TEXT.replace("announces", "ann ounces") }],
+    essentialContext: [], omit: [], uncertainties: []
+  };
+
+  it("corrects miscopied evidence once before writing, using Sol high throughout", async () => {
+    const fake = fakeDeps({ briefResponses: [invalidBrief] });
+    // Sak's explicit policy must not fall back to the notice configuration.
+    fake.deps.config.OPENAI_SAK_REASONING_EFFORT = "low";
+    await processSakDraft(job(), fake.deps);
+    const briefCalls = fake.allCalls.filter((call) => call.schemaName === "sak_news_brief");
+    expect(briefCalls).toHaveLength(2);
+    expect(briefCalls[1]?.userPrompt).toContain("ann ounces");
+    expect(fake.allCalls.slice(0, 3).map((call) => call.schemaName)).toEqual(["sak_news_brief", "sak_news_brief", "sak_article"]);
+    expect(fake.allCalls.every((call) => call.model === "gpt-5.6-sol" && call.reasoningEffort === "high")).toBe(true);
+    expect(fake.version()?.validationJson).toMatchObject({ briefCheck: { attempts: 2, recovered: true } });
+    expect(JSON.stringify(fake.version()?.validationJson)).not.toContain("SAK_BRIEF_FAILED");
+  });
+
+  it("keeps a failed brief blocking after two invalid attempts, without an endless retry", async () => {
+    const fake = fakeDeps({ briefResponses: [invalidBrief, invalidBrief] });
+    await processSakDraft(job(), fake.deps);
+    expect(fake.allCalls.filter((call) => call.schemaName === "sak_news_brief")).toHaveLength(2);
+    expect(fake.version()?.status).toBe("needs_review");
+    expect(fake.version()?.validationJson).toMatchObject({ brief: null, briefCheck: { attempts: 2, recovered: false } });
+    expect(JSON.stringify(fake.version()?.validationJson)).toContain("SAK_BRIEF_FAILED");
+  });
 });

@@ -30,3 +30,16 @@ The existing 24-hour source retention and unrelated notice work were not changed
 This is one real editorial case and proves the specific credit, reversal and length behaviors. It does not establish general news judgment improvement across a representative article set. Additional model reviews add generation latency and API usage.
 
 Private evaluation artifacts are in ignored `tmp/sak-audit/`; they are not part of the code change.
+
+
+## Sol high and news-brief recovery (7 September 2026)
+
+A production generation on Terra failed the brief evidence check because its copied passage contained an extra space inside a word. The draft was correctly held for review, but no brief correction was attempted.
+
+All Sak model calls now explicitly select `gpt-5.6-sol` with high reasoning, including the brief, writing/revision, reference check, editorial review and article repair/recheck. The existing explicit xhigh request remains supported. The shared notice model routing and environment are unchanged. Sol high support was checked against the [official model documentation](https://developers.openai.com/api/docs/models/gpt-5.6-sol).
+
+A failed news brief now receives one bounded correction attempt before writing. The correction sees the validation failure and the original sources; copied evidence must still occur in the stated source. Two invalid attempts retain a blocking finding and save the draft for review. The validation audit records attempts, errors and recovery. There is no fuzzy evidence acceptance.
+
+The 53 focused worker tests passed, including recovery from an inserted space, persistent invalid evidence remaining blocking, and explicit Sol high routing despite a different shared configuration. The full production build passed. This release has no schema or migration changes.
+
+The approved saved Bloomberg/Liquid source was also evaluated with the real Sol API at high reasoning before release. The final 1,563-character article credited Bloomberg and passed both full reviews with zero findings after one article repair and recheck. The brief passed on its first attempt. This single case is a regression check, not a general quality benchmark.
