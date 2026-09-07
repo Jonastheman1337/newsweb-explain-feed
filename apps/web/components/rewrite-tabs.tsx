@@ -9,6 +9,7 @@ import {
   type RewriteDraftChangeDetail
 } from "../lib/rewrite-drafts";
 import type { SourceLinkTargets } from "../lib/source-links";
+import { getViewedRewrite, rememberViewedRewrite } from "../lib/viewed-rewrite";
 import { EditableRewrite } from "./editable-rewrite";
 import { InstructionInput } from "./instruction-input";
 
@@ -44,8 +45,16 @@ export function RewriteTabs({
   const { logEvent } = useEditorialTelemetry(messageId);
 
   useEffect(() => {
-    setActiveIndex(rewrites.length - 1);
-  }, [rewrites.length]);
+    const latest = rewrites[rewrites.length - 1];
+    if (!latest) return;
+    const viewed = getViewedRewrite(messageId);
+    const rememberedIndex = viewed?.latestVersion === latest.version
+      ? rewrites.findIndex((rewrite) => rewrite.rewriteId === viewed.item.rewriteId)
+      : -1;
+    const index = rememberedIndex >= 0 ? rememberedIndex : rewrites.length - 1;
+    setActiveIndex(index);
+    rememberViewedRewrite(messageId, rewrites[index], latest.version, publicationRevision);
+  }, [messageId, rewrites, publicationRevision]);
 
   const refreshDraftVersions = useCallback(() => {
     setDraftVersions(
@@ -106,6 +115,9 @@ export function RewriteTabs({
               className={`rewriteTab${i === activeIndex ? " active" : ""}`}
               onClick={() => {
                 setActiveIndex(i);
+                rememberViewedRewrite(
+                  messageId, r, rewrites[rewrites.length - 1].version, publicationRevision
+                );
                 void logEvent({
                   action: "rewrite_version_view",
                   version: r.version,

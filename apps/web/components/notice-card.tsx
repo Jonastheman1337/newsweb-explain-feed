@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import type { FeedItem } from "@newsweb/shared";
@@ -9,6 +9,7 @@ import { FeedProcessingIndicator } from "./feed-processing-indicator";
 import { EditableRewrite } from "./editable-rewrite";
 import { SplitViewPanel } from "./split-view-panel";
 import { formatCategoryList } from "../lib/format-category";
+import { applyViewedRewrite, VIEWED_REWRITE_CHANGE_EVENT } from "../lib/viewed-rewrite";
 
 function formatOsloTime(isoString: string): string {
   return new Intl.DateTimeFormat("nb-NO", {
@@ -147,8 +148,20 @@ function SourceOnlyCard({
   );
 }
 
-export function NoticeCard({ item }: NoticeCardProps) {
+export function NoticeCard({ item: feedItem }: NoticeCardProps) {
+  const [item, setItem] = useState(feedItem);
   const [showSplit, setShowSplit] = useState(false);
+
+  useEffect(() => {
+    const restoreViewedRewrite = () => setItem(applyViewedRewrite(feedItem));
+    restoreViewedRewrite();
+    window.addEventListener(VIEWED_REWRITE_CHANGE_EVENT, restoreViewedRewrite);
+    window.addEventListener("pageshow", restoreViewedRewrite);
+    return () => {
+      window.removeEventListener(VIEWED_REWRITE_CHANGE_EVENT, restoreViewedRewrite);
+      window.removeEventListener("pageshow", restoreViewedRewrite);
+    };
+  }, [feedItem]);
 
   function handleToggleSplit() {
     setShowSplit((prev) => !prev);
