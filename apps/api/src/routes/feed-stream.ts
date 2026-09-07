@@ -9,9 +9,10 @@ import type { FastifyPluginAsync } from "fastify";
 import { Redis } from "ioredis";
 import type { ServerResponse } from "node:http";
 import { getMutedCategories } from "../services/app-settings.js";
+import { loadFastDrafts } from "../services/fast-drafts.js";
 import { mapDbItemToFeedItem } from "../services/feed-item-mapper.js";
 
-type FeedUpdateState = "source" | "processing" | "published" | "failed";
+type FeedUpdateState = "source" | "processing" | "published" | "failed" | "fast-draft";
 
 export function parseFeedUpdate(message: string): {
   messageId: number;
@@ -26,6 +27,7 @@ export function parseFeedUpdate(message: string): {
   return {
     messageId: parsed.messageId,
     state:
+      parsed.state === "fast-draft" ||
       parsed.state === "source" ||
       parsed.state === "processing" ||
       parsed.state === "published" ||
@@ -119,7 +121,8 @@ export const feedStreamRoutes: FastifyPluginAsync = async (fastify) => {
   const processEpoch = Date.now();
   let seq = 0;
   const eventBuffer: BufferedFeedEvent[] = [];
-  const connections = new Set<ServerResponse>();
+  const v2Buffer: BufferedFeedEvent[] = [];
+  const connections = new Map<ServerResponse, boolean>();
 
   // One Redis subscription shared by every SSE connection.
   const subscriber = new Redis(fastify.config.REDIS_URL, {
@@ -163,6 +166,7 @@ export const feedStreamRoutes: FastifyPluginAsync = async (fastify) => {
 
   async function broadcastFeedUpdate(message: string): Promise<void> {
     const { messageId, state, phase } = parseFeedUpdate(message);
+    if (state === "fast-draft" && !fastify.config.FAST_DRAFT_ENABLED) return;
 
     const dbItem = await prisma.feedItem.findUnique({
       where: { messageId },
@@ -213,10 +217,13 @@ export const feedStreamRoutes: FastifyPluginAsync = async (fastify) => {
     const frame = `id: ${id}\ndata: ${JSON.stringify(
       applyFeedUpdateState(feedItem, state, phase)
     )}\n\n`;
-    appendToRingBuffer(eventBuffer, { id, frame });
+    const fastDraft = fastify.config.FAST_DRAFT_ENABLED ? (await loadFastDrafts([messageId])).get(messageId) : undefined;
+    const v2Frame = fastDraft ? `id: ${id}\ndata: ${JSON.stringify({ ...applyFeedUpdateState(feedItem, state, phase), fastDraft })}\n\n` : frame;
+    if (state !== "fast-draft") appendToRingBuffer(eventBuffer, { id, frame });
+    appendToRingBuffer(v2Buffer, { id, frame: v2Frame });
 
-    for (const raw of connections) {
-      writeToConnection(raw, frame);
+    for (const [raw, v2] of connections) {
+      if (v2 || state !== "fast-draft") writeToConnection(raw, v2 ? v2Frame : frame);
     }
   }
 
@@ -257,9 +264,10 @@ export const feedStreamRoutes: FastifyPluginAsync = async (fastify) => {
         writeToConnection(reply.raw, ": heartbeat\n\n");
       }, 30_000);
 
+      const v2 = (request.query as { ui?: string }).ui === "v2" && fastify.config.FAST_DRAFT_ENABLED;
       enqueue(() => {
         if (lastEventId) {
-          const missed = eventsAfter(eventBuffer, lastEventId);
+          const missed = eventsAfter(v2 ? v2Buffer : eventBuffer, lastEventId);
           if (missed) {
             writeToConnection(reply.raw, `event: control\ndata: {"type":"resumed"}\n\n`);
             for (const event of missed) {
@@ -269,7 +277,7 @@ export const feedStreamRoutes: FastifyPluginAsync = async (fastify) => {
             writeToConnection(reply.raw, `event: control\ndata: {"type":"reset"}\n\n`);
           }
         }
-        connections.add(reply.raw);
+        connections.set(reply.raw, v2);
       });
 
       request.raw.on("close", () => {

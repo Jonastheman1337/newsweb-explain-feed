@@ -29,6 +29,7 @@ export const passiveEditorialActionSchema = z.enum([
 export type EditorialTelemetryInput = z.infer<typeof editorialTelemetrySchema>;
 
 type RewriteContext = {
+  kind?: "fast";
   id: string;
   version: number;
   promptVersion: string;
@@ -53,6 +54,11 @@ async function resolveRewriteContext(
     contentHash?: string;
   }
 ): Promise<RewriteContext | null> {
+  if (identity.rewriteId?.startsWith("fast:")) {
+    const draft = await prisma.fastDraft.findFirst({ where: { id: identity.rewriteId.slice(5), messageId, status: "ready" }, select: { id: true, promptVersion: true, model: true } });
+    if (!draft || (identity.contentHash && identity.contentHash !== draft.id)) return null;
+    return { ...draft, id: `fast:${draft.id}`, contentHash: draft.id, version: 0, kind: "fast" };
+  }
   if (identity.rewriteId) {
     const exact = await prisma.publishedRewrite.findFirst({
       where: { id: identity.rewriteId, messageId },
@@ -120,7 +126,7 @@ export async function createUserActionEvent(args: {
     contentHash: telemetry?.contentHash
   });
   const renderedFinal = telemetry?.isFinal === true
-    ? Boolean(rewriteContext)
+    ? Boolean(rewriteContext && rewriteContext.kind !== "fast")
     : (telemetry?.isFinal ?? null);
   const payload =
     args.payload && typeof args.payload === "object" && !Array.isArray(args.payload)
@@ -132,7 +138,7 @@ export async function createUserActionEvent(args: {
   const event = await logPrisma.userActionEvent.create({
     data: {
       messageId: args.messageId,
-      version: version ?? rewriteContext?.version ?? null,
+      version: rewriteContext?.kind === "fast" ? null : version ?? rewriteContext?.version ?? null,
       clientEventId: telemetry?.clientEventId ?? null,
       editorIdHash: hashTelemetryId(args.sessionSecret, telemetry?.editorId),
       sessionIdHash: hashTelemetryId(args.sessionSecret, telemetry?.sessionId),
@@ -144,7 +150,7 @@ export async function createUserActionEvent(args: {
       model: rewriteContext?.model ?? null,
       action: args.action,
       actionSource: args.actionSource ?? telemetry?.actionSource ?? null,
-      payloadJson: toJsonValue(payload)
+      payloadJson: toJsonValue(rewriteContext?.kind === "fast" ? { ...payload, publicationKind: "fast" } : payload)
     }
   });
 

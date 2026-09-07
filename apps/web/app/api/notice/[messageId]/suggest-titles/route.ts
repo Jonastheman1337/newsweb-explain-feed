@@ -168,7 +168,10 @@ export async function POST(
   if (token) {
     headers.Authorization = `Bearer ${token}`;
   }
-  const noticeRes = await fetch(`${API_BASE_URL}/notice/${messageId}`, {
+  const selectedId = requestBody.telemetry && typeof requestBody.telemetry === "object" && "rewriteId" in requestBody.telemetry ? requestBody.telemetry.rewriteId : undefined;
+  const wantsFast = typeof selectedId === "string" && selectedId.startsWith("fast:");
+  const fastView = wantsFast && process.env.UI_V2_ENABLED === "true" && process.env.FAST_DRAFT_ENABLED === "true";
+  const noticeRes = await fetch(`${API_BASE_URL}/notice/${messageId}${fastView ? "?ui=v2" : ""}`, {
     headers
   });
   if (!noticeRes.ok) {
@@ -179,8 +182,12 @@ export async function POST(
   const requestedCurrentTitle =
     typeof requestBody.currentTitle === "string" ? requestBody.currentTitle.trim() : "";
   const currentTitle = requestedCurrentTitle || notice.rewrite?.title || notice.source?.title || "";
-  const lead = notice.rewrite?.lead ?? "";
-  const body = notice.rewrite?.body?.join("\n") ?? "";
+  if (wantsFast && (!fastView || notice.fastDraft?.status !== "ready" || `fast:${notice.fastDraft.id}` !== selectedId)) {
+    return NextResponse.json({ message: "Førsteutkastet er ikke tilgjengelig." }, { status: 409 });
+  }
+  const selectedRewrite = wantsFast ? notice.fastDraft.rewrite : notice.rewrite;
+  const lead = selectedRewrite?.lead ?? "";
+  const body = selectedRewrite?.body?.join("\n") ?? "";
   const issuerName = notice.source?.issuerName ?? "";
 
   const developerPrompt = [

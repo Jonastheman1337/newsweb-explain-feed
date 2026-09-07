@@ -22,6 +22,7 @@ type UseFeedStreamOptions = {
    */
   onReconnect?: () => void;
   enabled?: boolean;
+  view?: "v2";
   onConnectionChange?: (state: FeedConnectionState) => void;
   reconnectKey?: number;
 };
@@ -39,6 +40,7 @@ export function useFeedStream({
   onReconnect,
   onConnectionChange,
   reconnectKey = 0,
+  view,
   enabled = true
 }: UseFeedStreamOptions): void {
   const handlersRef = useRef({ onItem, onReconnect, onConnectionChange });
@@ -69,7 +71,7 @@ export function useFeedStream({
       const url = lastEventId
         ? `/api/feed/stream?lastEventId=${encodeURIComponent(lastEventId)}`
         : "/api/feed/stream";
-      const es = new EventSource(url);
+      const es = new EventSource(view === "v2" ? `${url}${url.includes("?") ? "&" : "?"}ui=v2` : url);
       source = es;
 
       es.onopen = () => {
@@ -150,5 +152,5 @@ export function useFeedStream({
       }
       source?.close();
     };
-  }, [enabled, reconnectKey]);
+  }, [enabled, reconnectKey, view]);
 }

@@ -9,6 +9,7 @@ import {
   type RelatedNoticeLink
 } from "@newsweb/shared";
 import { logPrisma, prisma } from "@newsweb/shared/db";
+import { loadFastDrafts } from "../services/fast-drafts.js";
 import { Readable } from "node:stream";
 import type { ReadableStream as NodeReadableStream } from "node:stream/web";
 import type { FastifyPluginAsync } from "fastify";
@@ -277,6 +278,8 @@ export const noticeRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.code(404).send({ message: "Notis ikke funnet." });
       }
 
+      const fastDraft = fastify.config.FAST_DRAFT_ENABLED && (request.query as { ui?: string }).ui === "v2" ? (await loadFastDrafts([messageId])).get(messageId) : undefined;
+      const draftFields = fastDraft ? { fastDraft } : {};
       const activePublishedRewrite = notice.feedItem?.activePublishedRewrite ?? null;
 
       // Find the latest rewrite by generatedAt for backward-compat status checks
@@ -294,18 +297,21 @@ export const noticeRoutes: FastifyPluginAsync = async (fastify) => {
         ) {
           return reply.send({
             source: buildSourcePayload(notice),
+            ...draftFields,
             processing: true
           });
         }
         if (latestRewrite.status === "failed") {
           return reply.send({
             source: buildSourcePayload(notice),
+            ...draftFields,
             failed: true
           });
         }
         if (latestRewrite.status === "skipped") {
           return reply.send({
             source: buildSourcePayload(notice),
+            ...draftFields,
             skipped: true
           });
         }
@@ -314,6 +320,7 @@ export const noticeRoutes: FastifyPluginAsync = async (fastify) => {
       if (!activePublishedRewrite || !notice.feedItem) {
         return reply.send({
           source: buildSourcePayload(notice),
+            ...draftFields,
           processing: true
         });
       }
@@ -339,6 +346,7 @@ export const noticeRoutes: FastifyPluginAsync = async (fastify) => {
       );
       const payload = {
         source: buildSourcePayload(notice),
+            ...draftFields,
         publication: {
           rewriteId: activePublishedRewrite.id,
           version: activePublishedRewrite.version,

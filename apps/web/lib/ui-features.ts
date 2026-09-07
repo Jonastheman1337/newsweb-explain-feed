@@ -2,7 +2,7 @@
 export function readUiFeatures(env: Record<string, string | undefined>) {
   return {
     uiV2: env.UI_V2_ENABLED === "true",
-    // Reserved for the separate fast-draft milestone; no generation consumer yet.
+    // The worker and API use this independent opt-in as well.
     fastDraft: env.FAST_DRAFT_ENABLED === "true"
   };
 }

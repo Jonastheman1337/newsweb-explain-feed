@@ -7,6 +7,7 @@ import { RefreshCard } from "./refresh-card";
 import { rememberSelection, restoreSelection, selectVersion } from "./selection";
 import { useFeedStreamSubscription } from "../feed-stream-provider";
 import {
+  fastDraftToFeedItem,
   initialFeedState,
   receiveFeedItem,
   revealIncoming,
@@ -76,10 +77,10 @@ export function RefreshFeed({
     onReconnect: refresh
   });
   const entries = state.entries.filter(
-    (entry) => isVisible(entry.latest) && (!importantOnly || entry.latest.importance === "viktig")
+    (entry) => isVisible(entry.latest) && (!importantOnly || (entry.latest.isFinal ? entry.latest : entry.current).importance === "viktig")
   );
   const incoming = state.incoming.filter(
-    (item) => isVisible(item) && (!importantOnly || item.importance === "viktig")
+    (item) => isVisible(item) && (!importantOnly || (item.isFinal ? item : fastDraftToFeedItem(item) ?? item).importance === "viktig")
   );
   return (
     <>

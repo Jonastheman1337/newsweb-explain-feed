@@ -47,7 +47,8 @@ export async function GET(request: Request) {
 
   let upstream: Response;
   try {
-    upstream = await fetch(`${API_BASE_URL}/feed/stream`, {
+    const variant = process.env.UI_V2_ENABLED === "true" && new URL(request.url).searchParams.get("ui") === "v2" ? "?ui=v2" : "";
+    upstream = await fetch(`${API_BASE_URL}/feed/stream${variant}`, {
       headers,
       cache: "no-store"
     });

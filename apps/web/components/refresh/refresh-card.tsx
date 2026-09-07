@@ -12,7 +12,7 @@ import { InstructionInput } from "../instruction-input";
 import { getGenerationPhaseLabel } from "../generation-steps";
 import { RefreshEditorActions, type WorkspacePanel } from "./editor-actions";
 import { FeedbackDialog } from "./feedback-dialog";
-import type { FeedEntry } from "./feed-state";
+import { fastDraftToFeedItem, type FeedEntry } from "./feed-state";
 import { versionToFeedItem } from "./selection";
 import styles from "./refresh.module.css";
 
@@ -26,6 +26,8 @@ export function RefreshCard({
   onVersion: (item: FeedItem) => void;
 }) {
   const { current: item, latest, pending } = entry;
+  const isFast = item.publicationKind === "fast";
+  const firstDraft = fastDraftToFeedItem(latest);
   const [panel, setPanel] = useState<WorkspacePanel | null>(null);
   const [opened, setOpened] = useState(false);
   const [versions, setVersions] = useState<RewriteVersion[]>([]);
@@ -95,7 +97,7 @@ export function RefreshCard({
     if (!opened) return;
     let cancelled = false;
     setLoadState("loading");
-    getNotice(null, item.messageId)
+    getNotice(null, item.messageId, "v2")
       .then((notice) => {
         if (cancelled) return;
         setDetails(notice);
@@ -165,6 +167,7 @@ export function RefreshCard({
           </time>
         </div>
         {item.importance === "viktig" && <div className={styles.importance}>Viktig</div>}
+        {isFast && <div className={styles.versionLink}>Førsteutkast</div>}
         {item.isFinal && item.rewriteId ? (
           <EditableRewrite
             key={`${item.rewriteId}:${item.contentHash}`}
@@ -209,7 +212,7 @@ export function RefreshCard({
         {(latest.processing || latest.regenerating) && (
           <div role="status" className={styles.progress}>
             <span />
-            {latest.phase ? getGenerationPhaseLabel(latest.phase) : "Notis lages"}
+            {isFast ? "Utfyllende versjon lages" : latest.phase ? getGenerationPhaseLabel(latest.phase) : "Notis lages"}
           </div>
         )}
         {latest.failed && (
@@ -222,7 +225,7 @@ export function RefreshCard({
         )}
         {pending && (
           <div className={styles.ready} role="status">
-            <span>Ny versjon klar</span>
+            <span>{isFast ? "Utfyllende versjon klar" : "Ny versjon klar"}</span>
             <button type="button" onClick={onSelect}>
               Vis versjon
             </button>
@@ -247,11 +250,11 @@ export function RefreshCard({
             <summary>Lag versjon</summary>
             <InstructionInput
               messageId={item.messageId}
-              activeVersion={item.rewriteVersion ?? undefined}
-              rewriteId={item.rewriteId ?? undefined}
-              publicationRevision={item.publicationRevision}
-              contentHash={item.contentHash ?? undefined}
-              isFinal={item.isFinal}
+              activeVersion={isFast ? latest.isFinal ? latest.rewriteVersion ?? undefined : undefined : item.rewriteVersion ?? undefined}
+              rewriteId={isFast ? latest.rewriteId ?? undefined : item.rewriteId ?? undefined}
+              publicationRevision={latest.publicationRevision}
+              contentHash={isFast ? latest.contentHash ?? undefined : item.contentHash ?? undefined}
+              isFinal={isFast ? latest.isFinal : item.isFinal}
               hasAttachments={item.hasAttachments}
               presentation="refresh"
             />
@@ -362,6 +365,12 @@ export function RefreshCard({
               </p>
             )}
             <div className={styles.versionList}>
+              {firstDraft && (
+                <button type="button" className={styles.versionRow} aria-pressed={isFast} onClick={() => onVersion(firstDraft)}>
+                  <span><strong>Førsteutkast</strong><small>{firstDraft.title}</small></span>
+                  <span>{hasRewriteDraft({ messageId: item.messageId, version: 1, rewriteId: firstDraft.rewriteId ?? undefined, originalTitle: firstDraft.title, originalBody: firstDraft.lead }) ? "Redigert" : isFast ? "Valgt" : ""}</span>
+                </button>
+              )}
               {[...versions]
                 .sort((a, b) => b.version - a.version)
                 .map((version) => (
@@ -386,7 +395,7 @@ export function RefreshCard({
                   >
                     <span>
                       <strong>
-                        {version.version === 1 ? "Første versjon" : `Versjon ${version.version}`}
+                        {version.version === 1 ? firstDraft ? "Utfyllende versjon" : "Første versjon" : `Versjon ${version.version}`}
                       </strong>
                       <time>
                         {new Intl.DateTimeFormat("nb-NO", {
@@ -409,7 +418,7 @@ export function RefreshCard({
                   </button>
                 ))}
             </div>
-            {loadState === "idle" && !versions.length && <p>Ingen versjoner ennå</p>}
+            {loadState === "idle" && !versions.length && !firstDraft && <p>Ingen versjoner ennå</p>}
           </div>
         </aside>
       )}

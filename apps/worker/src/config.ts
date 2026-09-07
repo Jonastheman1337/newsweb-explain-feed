@@ -191,6 +191,7 @@ const configSchema = z
     OPENAI_HARD_MODEL: z.string().default("gpt-5.6-sol"),
     OPENAI_SERVICE_TIER: serviceTierEnvSchema.default("default"),
     OPENAI_TIMEOUT_MS: z.coerce.number().int().min(1000).default(240000),
+    FAST_DRAFT_ENABLED: z.string().optional().transform((value) => value === "true"),
     OPENAI_FAST_TIMEOUT_MS: z.coerce.number().int().min(1000).default(15000),
     OPENAI_DEFAULT_REASONING_EFFORT: reasoningEffortEnvSchema.default("medium"),
     OPENAI_REPORT_REASONING_EFFORT: reasoningEffortEnvSchema.default("medium"),

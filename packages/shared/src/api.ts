@@ -16,6 +16,7 @@ export const passwordLoginInputSchema = z.object({
 });
 
 export const feedQuerySchema = z.object({
+  ui: z.literal("v2").optional(),
   cursor: z.string().datetime().optional(),
   cursorId: z.coerce.number().int().positive().optional(),
   limit: z.coerce
@@ -39,7 +40,17 @@ export const healthResponseSchema = z.object({
   modelLatencyP95: z.number().nonnegative()
 });
 
+export const fastDraftSchema = z.object({
+  id: z.string(),
+  status: z.enum(["pending", "ready", "failed", "skipped"]),
+  startedAt: z.string().datetime(),
+  finishedAt: z.string().datetime().nullable(),
+  rewrite: rewriteOutputSchema.optional()
+});
+
 export const feedItemSchema = z.object({
+  fastDraft: fastDraftSchema.optional(),
+  publicationKind: z.enum(["fast", "full"]).optional(),
   messageId: z.number().int(),
   publishedAt: z.string().datetime(),
   visibilityStatus: z.string(),
@@ -104,6 +115,7 @@ export const relatedNoticeLinkSchema = z.object({
 export type RelatedNoticeLink = z.infer<typeof relatedNoticeLinkSchema>;
 
 export const noticeResponseSchema = z.object({
+  fastDraft: fastDraftSchema.optional(),
   source: z.object({
     messageId: z.number().int(),
     title: z.string(),

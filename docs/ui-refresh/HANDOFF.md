@@ -113,3 +113,51 @@ invalid-session redirect, authenticated history GET, unauthenticated rejection a
 invalid notice-id validation. Route checks used `UI_VERIFY_PORT=3112` because 3102
 was already occupied; no process on the occupied port was stopped. This override
 is available for future checks. The final 61 web tests and 2 fixture tests passed.
+
+## 2026-09-07 — STARTED: fast drafts and production /next
+
+User authorized implementing fast drafts in V2 and making `/next` available on
+production alongside legacy. The live baseline and origin/main were verified at
+384e2d37c854e0dd84467fafa5d148a6c22b428c, with one healthy worker and queue lag 0.
+Merged those released Sak changes into the UI branch as 81e9f29; retained both
+V2 draft restoration and Sak's read-only/onDraftChange behavior. Web tests: 65 pass.
+
+Implementation boundaries:
+- One existing full-generation pipeline and one canonical published full version.
+- Separate fast-draft persistence and V2-only retrieval/events. No legacy feed or
+  full-generation prompt/model/validation changes.
+- Fast candidates use the existing importance high-bar signals and importance
+  rubric; final legacy classification remains with the full generation.
+- Bound concurrency and timeouts; deduplicate by notice; failures never block the
+  full worker path. Preserve separate edits and explicit full-version selection.
+- Verify real model latency and factual output, both event orders, retry/restart
+  handling and stored-output isolation before exact-SHA production release.
+- Production release requires migrations/backup/preflight and authenticated checks
+  on both routes, with one polling worker and live fast-draft evidence.
+
+## Fast-draft implementation
+
+V2 retrieves a separate FastDraft record; the canonical FeedItem and full rewrite
+version sequence remain shared with classic. The first draft is attempted once
+per freshly ingested important candidate, with two concurrent attempts maximum,
+a 35-second publication deadline, and no additional polling worker. It uses the
+existing fast model and the existing importance rubric. Source checks cover the
+headline and lead. Number-matcher findings remain warnings; passing reference
+coverage adjudicates them, following the report path and the user's direction.
+There is no fast-draft repair loop. Full generation proceeds independently.
+
+A first draft has its own editable identity and saved edits. Full completion is
+an explicit version choice. Late/replayed events and page reloads preserve the
+selected draft. Title suggestions use the selected first draft as context.
+
+Controlled live-model examples (fictional issuers, Luna, default tier): a checked
+bankruptcy draft took 5.748 seconds including writing and checking. A liquidity
+example was withheld because it invented a company description; fast prompting
+now takes only the headline portion of the shared title/lead instruction, so it
+does not request that description. Three less exceptional/routine cases skipped.
+These are smoke examples, not a production latency distribution or quality study.
+Raw local evidence is retained in tmp/fast-draft. No further tuning rounds planned.
+
+Validation so far: 69 web tests; focused worker/config tests; API mapper/stream
+checks. Next: final build, browser version switch, additive migration and normal
+production release verification. Original dirty checkout remains untouched.

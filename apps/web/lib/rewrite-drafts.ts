@@ -108,7 +108,7 @@ export function getRewriteDraft(args: {
   if (!key) return null;
 
   let storedValue = storage.getItem(key);
-  if (!storedValue && args.rewriteId && args.version != null) {
+  if (!storedValue && args.rewriteId && !args.rewriteId.startsWith("fast:") && args.version != null) {
     const legacyKey = getRewriteDraftKey(args.messageId, args.version);
     storedValue = legacyKey ? storage.getItem(legacyKey) : null;
     if (storedValue && legacyKey) {

@@ -3,6 +3,7 @@
 import { feedItemSchema, type FeedItem, type RewriteOutput } from "@newsweb/shared";
 
 const viewedRewriteSchema = feedItemSchema.pick({
+  publicationKind: true,
   rewriteId: true,
   rewriteVersion: true,
   publicationRevision: true,
@@ -94,7 +95,7 @@ export function rememberViewedFeedItem(item: FeedItem, latestVersion: number) {
 
 export function applyViewedRewrite(item: FeedItem): FeedItem {
   const viewed = getViewedRewrite(item.messageId);
-  if (!viewed) return item;
+  if (!viewed || viewed.item.publicationKind === "fast") return item;
   // A newly published generation must still reach the feed. Older cached feed
   // responses, however, must not replace the version just viewed in detail.
   if (

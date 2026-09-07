@@ -12,6 +12,7 @@ import {
   type FeedRewriteStateRecord
 } from "../services/feed-regeneration.js";
 import { mapDbItemToFeedItem } from "../services/feed-item-mapper.js";
+import { loadFastDrafts } from "../services/fast-drafts.js";
 import { GENERATION_RUN_STALE_MS } from "../services/generation-status.js";
 
 type FeedRegenerationState = {
@@ -212,6 +213,7 @@ export const feedRoutes: FastifyPluginAsync = async (fastify) => {
         rewritesByMessageId
       );
 
+      const drafts = fastify.config.FAST_DRAFT_ENABLED && query.ui === "v2" ? await loadFastDrafts(slice.map((item) => item.messageId)) : new Map();
       const responseItems = slice
         .map((item) => {
           let mapped = mapDbItemToFeedItem(item);
@@ -227,7 +229,8 @@ export const feedRoutes: FastifyPluginAsync = async (fastify) => {
               mapped = { ...mapped, phase };
             }
           }
-          return mapped;
+          const fastDraft = drafts.get(mapped.messageId);
+          return fastDraft ? { ...mapped, fastDraft } : mapped;
         })
         .filter((item): item is NonNullable<typeof item> => item !== null);
 

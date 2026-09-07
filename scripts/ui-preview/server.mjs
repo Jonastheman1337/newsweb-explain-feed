@@ -155,6 +155,16 @@ export function createFixtureServer() {
         timers.add(timer);
         return json(res, 202, { ok: true });
       }
+      if (pathname === "/__preview/fast" && req.method === "POST") {
+        const base = fixtureItem(900090, "Fjord ASA", "Fjord ASA begjærer seg konkurs", "Fjord ASA har begjært seg konkurs, ifølge en børsmelding. Tingretten har ennå ikke åpnet konkursbehandling.", [], { publishedAt: "2026-09-07T09:00:00.000Z", importance: "viktig" });
+        const fastDraft = { id: "preview-fast", status: "ready", startedAt: new Date().toISOString(), finishedAt: new Date().toISOString(), rewrite: rewriteFor(base) };
+        const waiting = { ...base, isFinal: false, rewriteId: null, contentHash: null, rewriteVersion: null, publicationRevision: 0, lead: "", body: [], processing: true, phase: "writing_notice" };
+        const full = { ...base, fastDraft, title: "Fjord begjærer oppbud etter finansieringssvikt", body: ["Styret opplyser at selskapet ikke har klart å sikre ny finansiering. Begjæringen er sendt til Oslo tingrett."], processing: false };
+        publish(body.fullFirst ? full : { ...waiting, fastDraft });
+        const timer = setTimeout(() => { timers.delete(timer); publish(body.fullFirst ? full : body.fail ? { ...waiting, fastDraft, processing: false, failed: true } : full); }, 12_000);
+        timers.add(timer);
+        return json(res, 202, { ok: true });
+      }
       const token = req.headers.authorization?.replace(/^Bearer /, "");
       if (!sessions.has(token)) return json(res, 401, { message: "Logg inn" });
       if (pathname === "/feed/stream") {

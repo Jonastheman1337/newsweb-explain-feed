@@ -143,3 +143,24 @@ it("restores the selected old version and only prompts for an unseen newer publi
   rememberSelection(selected.entries[0]);
   expect(restoreSelection(initialFeedState([v3]).entries[0]).pending).toBeUndefined();
 });
+
+it("restores a selected first draft after reload and offers the first full publication", () => {
+  const full = item(1);
+  const fastDraft: NonNullable<FeedItem["fastDraft"]> = { id: "short", status: "ready", startedAt: full.publishedAt, finishedAt: full.publishedAt, rewrite: { title: "Short title", lead: "Short checked lead", body: [], company_sentence: "", key_facts: ["Checked fact"], negative_or_surprising: [], excluded_hype: [], source_limitations: [], confidence: "high", importance: "viktig", source_spans: ["Source excerpt"] } };
+  const source = { ...full, isFinal: false, rewriteVersion: 1, rewriteId: null, publicationRevision: 0, fastDraft };
+  const initial = initialFeedState([source]).entries[0];
+  rememberSelection(initial);
+  expect(restoreSelection(initialFeedState([source]).entries[0]).current.publicationKind).toBe("fast");
+  const ready = { ...full, fastDraft };
+  const restored = restoreSelection(initialFeedState([ready]).entries[0]);
+  expect(restored.current.publicationKind).toBe("fast");
+  expect(restored.pending?.rewriteId).toBe(full.rewriteId);
+  // The flag can be turned off without restoring a cached first draft into the feed.
+  expect(restoreSelection(initialFeedState([full]).entries[0]).current.rewriteId).toBe(full.rewriteId);
+});
+it("stores edits independently for a first draft and full version one", async () => {
+  const { saveRewriteDraft, getRewriteDraft } = await import("../../lib/rewrite-drafts");
+  for (const id of ["fast:short", "full-one"]) saveRewriteDraft({ messageId: 123, version: 1, rewriteId: id, title: `Edited ${id}`, body: `Edited text for ${id}`, originalTitle: "Title", originalBody: "Body" });
+  expect(getRewriteDraft({ messageId: 123, version: 1, rewriteId: "fast:short" })?.body).toBe("Edited text for fast:short");
+  expect(getRewriteDraft({ messageId: 123, version: 1, rewriteId: "full-one" })?.body).toBe("Edited text for full-one");
+});

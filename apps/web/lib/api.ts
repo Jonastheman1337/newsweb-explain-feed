@@ -1,4 +1,5 @@
 import type {
+  FeedItem,
   FeedQuery,
   FeedResponse,
   NoticeMaterial,
@@ -73,6 +74,7 @@ export async function apiGet<T>(
 
 export async function getFeed(token: string | null | undefined, query: Partial<FeedQuery>) {
   return apiGet<FeedResponse>(token, "/feed", {
+    ui: query.ui,
     cursor: query.cursor,
     cursorId: query.cursorId != null ? String(query.cursorId) : undefined,
     limit: query.limit ? String(query.limit) : undefined,
@@ -132,7 +134,7 @@ type RelatedNoticeLink = {
   url: string;
 };
 
-type NoticeResponse =
+type NoticeResponse = { fastDraft?: FeedItem["fastDraft"] } & (
   | {
       source: NoticeSource;
       publication: PublicationIdentity;
@@ -144,10 +146,10 @@ type NoticeResponse =
     }
   | { source: NoticeSource; skipped: true }
   | { source: NoticeSource; failed: true }
-  | { source: NoticeSource; processing: true };
+  | { source: NoticeSource; processing: true });
 
-export async function getNotice(token: string | null | undefined, messageId: number) {
-  return apiGet<NoticeResponse>(token, `/notice/${messageId}`);
+export async function getNotice(token: string | null | undefined, messageId: number, ui?: "v2") {
+  return apiGet<NoticeResponse>(token, `/notice/${messageId}`, { ui });
 }
 
 export async function getNoticeStatus(

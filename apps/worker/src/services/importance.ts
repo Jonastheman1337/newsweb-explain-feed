@@ -111,6 +111,11 @@ function includesAny(text: string, keywords: string[]): boolean {
   return keywords.some((keyword) => text.includes(normalizeGuardrailText(keyword)));
 }
 
+export function hasImportantSourceSignals(payload: PromptPayload): boolean {
+  const text = normalizeGuardrailText(`${payload.title}\n${payload.bodyText}`);
+  return includesAny(text, SEVERE_EVENT_KEYWORDS) || includesAny(text, HIGH_READER_INTEREST_KEYWORDS);
+}
+
 export function applyImportanceHighBar(
   rewrite: RewriteOutput,
   payload: PromptPayload

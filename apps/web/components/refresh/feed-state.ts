@@ -10,8 +10,14 @@ export const sortItems = (items: FeedItem[]) =>
   [...items].sort(
     (a, b) => b.publishedAt.localeCompare(a.publishedAt) || b.messageId - a.messageId
   );
+export function fastDraftToFeedItem(item: FeedItem): FeedItem | undefined {
+  const draft = item.fastDraft;
+  if (draft?.status !== "ready" || !draft.rewrite) return undefined;
+  const rewrite = draft.rewrite;
+  return { ...item, publicationKind: "fast", rewriteId: `fast:${draft.id}`, rewriteVersion: 1, contentHash: draft.id, finalizedAt: draft.finishedAt, isFinal: true, title: rewrite.title, lead: rewrite.lead, body: rewrite.body, keyFacts: rewrite.key_facts, negativeOrSurprising: rewrite.negative_or_surprising, sourceLimitations: rewrite.source_limitations, confidence: rewrite.confidence, importance: rewrite.importance, notGenerated: false, skipped: false, failed: false, processing: false, regenerating: false };
+}
 export const initialFeedState = (items: FeedItem[]): FeedState => ({
-  entries: sortItems(items).map((item) => ({ current: item, latest: item })),
+  entries: sortItems(items).map((item) => ({ current: item.isFinal ? item : fastDraftToFeedItem(item) ?? item, latest: item })),
   incoming: []
 });
 
@@ -27,7 +33,7 @@ function receive(entry: FeedEntry, item: FeedItem): FeedEntry {
   if (changed && entry.current.isFinal && (newlyPublished || entry.pending)) {
     return { ...entry, latest: item, pending: item };
   }
-  if (!entry.current.isFinal) return { current: item, latest: item };
+  if (!entry.current.isFinal) return { current: item.isFinal ? item : fastDraftToFeedItem(item) ?? item, latest: item };
   // Keep the editor's publication props identical during progress events.
   return { ...entry, latest: item };
 }

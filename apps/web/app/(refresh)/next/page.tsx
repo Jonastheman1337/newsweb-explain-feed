@@ -26,6 +26,7 @@ export default async function RefreshPage({ searchParams }: { searchParams: Prom
     const [feed, filters, muted] = await Promise.all([
       getFeed(token, {
         ...params,
+        ui: "v2",
         cursorId: params.cursorId ? Number(params.cursorId) : undefined,
         limit: 30
       }),

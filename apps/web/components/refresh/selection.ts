@@ -6,6 +6,7 @@ import type { FeedEntry, FeedState } from "./feed-state";
 export function versionToFeedItem(version: RewriteVersion, latest: FeedItem): FeedItem {
   return {
     ...latest,
+    publicationKind: "full",
     title: version.rewrite.title,
     lead: version.rewrite.lead,
     body: version.rewrite.body,
@@ -31,14 +32,15 @@ export function restoreSelection(entry: FeedEntry): FeedEntry {
   const remembered = getViewedRewrite(entry.current.messageId);
   if (
     !remembered ||
-    !entry.latest.isFinal ||
+    (remembered.item.publicationKind === "fast" && `fast:${entry.latest.fastDraft?.id}` !== remembered.item.rewriteId) ||
+    (!entry.latest.isFinal && remembered.item.publicationKind !== "fast") ||
     !remembered.item.isFinal ||
-    (remembered.item.rewriteVersion ?? 0) > (entry.latest.rewriteVersion ?? 0)
+    (remembered.item.publicationKind !== "fast" && (remembered.item.rewriteVersion ?? 0) > (entry.latest.rewriteVersion ?? 0))
   )
     return entry;
   const current = { ...entry.latest, ...remembered.item };
   const pending =
-    (entry.latest.rewriteVersion ?? 0) > remembered.latestVersion &&
+    entry.latest.isFinal && (entry.latest.rewriteVersion ?? 0) > remembered.latestVersion &&
     entry.latest.rewriteId !== current.rewriteId
       ? entry.latest
       : undefined;
@@ -58,5 +60,5 @@ export function selectVersion(state: FeedState, selected: FeedItem): FeedState {
 
 export function rememberSelection(entry: FeedEntry) {
   if (entry.current.isFinal)
-    rememberViewedFeedItem(entry.current, entry.latest.rewriteVersion ?? 1);
+    rememberViewedFeedItem(entry.current, entry.latest.isFinal ? entry.latest.rewriteVersion ?? 1 : 0);
 }

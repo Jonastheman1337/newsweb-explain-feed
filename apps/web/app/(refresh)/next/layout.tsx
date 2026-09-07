@@ -13,7 +13,7 @@ export default async function RefreshLayout({ children }: { children: React.Reac
   if (!readUiFeatures(process.env).uiV2) notFound();
   if (!(await getSessionToken())) redirect("/login?next=/next");
   return (
-    <FeedStreamProvider>
+    <FeedStreamProvider view="v2">
       <div className={styles.shell}>
         <header className={styles.header}>
           <Link href="/next" className={styles.brand}>

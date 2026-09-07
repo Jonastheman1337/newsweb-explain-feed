@@ -54,6 +54,7 @@ import {
   buildNoticeAttributionCorrectionInstruction as buildAttributionCorrectionInstruction,
   findNoticeAttributionRisks as findAttributionRisks
 } from "./services/notice-claim-precautions.js";
+import { createFastDraftService } from "./services/fast-draft.js";
 import { applyImportanceHighBar } from "./services/importance.js";
 import {
   appendRevisionChecklist,
@@ -3740,6 +3741,14 @@ const ingestWorker = new Worker<IngestJobData>(
   }
 );
 
+const fastDrafts = createFastDraftService({
+  enabled: config.FAST_DRAFT_ENABLED,
+  apiKey: config.OPENAI_API_KEY,
+  model: config.OPENAI_FAST_MODEL,
+  notify: (messageId) => redisPub.publish(REDIS_CHANNELS.feedNewItem, JSON.stringify({ messageId, state: "fast-draft" })),
+  log: (message) => console.info(message)
+});
+
 const rewriteWorker = new Worker<RewriteJobData>(
   QUEUE_NAMES.rewrite,
   async (job: Job<RewriteJobData>) => {
@@ -4051,6 +4060,7 @@ const rewriteWorker = new Worker<RewriteJobData>(
             }
           }
           if (reportContent) {
+            fastDrafts.start({ ...payload, pdfSupplementText: reportContent.text }, generationRunId, job.data.reason === "new-message" && targetVersion === 1 && !job.data.instruction && Date.now() - source.ingestedAt.getTime() < 120_000);
             await processReportRewrite(
               messageId,
               source,
@@ -4282,6 +4292,8 @@ const rewriteWorker = new Worker<RewriteJobData>(
         await publishFeedUpdate(messageId, "failed");
         return;
       }
+
+      fastDrafts.start(payload, generationRunId, job.data.reason === "new-message" && targetVersion === 1 && !job.data.instruction && Date.now() - source.ingestedAt.getTime() < 120_000);
 
       // After triage (skipped notices never pay for a lookup), before the
       // first model call so the draft, the checker and the validator agree.
@@ -5400,6 +5412,7 @@ async function shutdown(): Promise<void> {
     rewriteQueue.close(),
     publishQueue.close()
   ]);
+  await fastDrafts.drain();
   await redisPub.quit();
   await Promise.all([
     prisma.$disconnect(),

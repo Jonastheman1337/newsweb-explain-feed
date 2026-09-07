@@ -49,3 +49,28 @@ describe("refresh feed publications", () => {
     expect(state.entries[0].pending).toBeUndefined();
   });
 });
+
+const fast = {
+  ...item, isFinal: false, rewriteId: null, contentHash: null, publicationRevision: 0,
+  fastDraft: { id: "short-1", status: "ready", startedAt: "2026-09-07T07:00:00Z", finishedAt: "2026-09-07T07:00:07Z", rewrite: { title: "First draft", lead: "First checked lead", body: [], company_sentence: "", excluded_hype: [], source_spans: ["Source excerpt"], key_facts: [], negative_or_surprising: [], source_limitations: [], confidence: "high", importance: "viktig" } }
+} as FeedItem;
+it("keeps a usable first draft through full completion, failure and late replay", () => {
+  let state = initialFeedState([fast]);
+  const selected = state.entries[0].current;
+  expect(selected.publicationKind).toBe("fast");
+  state = receiveFeedItem(state, { ...fast, failed: true });
+  expect(state.entries[0].current).toBe(selected);
+  state = receiveFeedItem(state, { ...item, fastDraft: fast.fastDraft });
+  expect(state.entries[0].current).toBe(selected);
+  expect(state.entries[0].pending?.rewriteId).toBe("v1");
+  state = receiveFeedItem(state, fast);
+  expect(state.entries[0].current).toBe(selected);
+  state = selectPending(state, 1);
+  expect(state.entries[0].current.rewriteId).toBe("v1");
+});
+it("never replaces a full article when the fast result arrives second", () => {
+  const state = receiveFeedItem(initialFeedState([item]), { ...item, fastDraft: fast.fastDraft });
+  expect(state.entries[0].current).toBe(item);
+  expect(state.entries[0].pending).toBeUndefined();
+  expect(state.entries[0].latest.fastDraft?.id).toBe("short-1");
+});

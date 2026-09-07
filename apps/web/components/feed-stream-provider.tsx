@@ -36,7 +36,7 @@ const FeedStreamContext = createContext<FeedStreamContextValue | null>(null);
  * notification bell each held their own connection (with matching per-client
  * cost on the API); now toggling a consumer only touches the registry.
  */
-export function FeedStreamProvider({ children }: { children: ReactNode }) {
+export function FeedStreamProvider({ children, view }: { children: ReactNode; view?: "v2" }) {
   const subscribersRef = useRef<Set<SubscriberEntry>>(new Set());
   const [connection, setConnection] = useState<FeedConnectionState>("connecting");
   const [reconnectKey, setReconnectKey] = useState(0);
@@ -44,6 +44,7 @@ export function FeedStreamProvider({ children }: { children: ReactNode }) {
 
   useFeedStream({
     reconnectKey,
+    view,
     onConnectionChange: setConnection,
     onItem: (item) => {
       for (const entry of subscribersRef.current) {
