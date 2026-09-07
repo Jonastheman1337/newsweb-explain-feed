@@ -161,3 +161,60 @@ Raw local evidence is retained in tmp/fast-draft. No further tuning rounds plann
 Validation so far: 69 web tests; focused worker/config tests; API mapper/stream
 checks. Next: final build, browser version switch, additive migration and normal
 production release verification. Original dirty checkout remains untouched.
+
+## 2026-09-07 — STARTED: simpler Next feed and complete datelines
+
+User accepted the live UX review and explicitly requested the classic feed's full
+date/time, issuer, ticker and category dateline in Next. Work is isolated in
+`codex/next-ux-20260907`, based on released origin/main `4c456fd`.
+
+Scope: compact feed chrome/cards, one-click title suggestions, inline source
+checking with optional focused work, searchable filters and visible exclusions,
+important-view persistence, and clear edit/save/retry feedback. Keep the classic
+presentation, generation policy, publication selection and clipboard contracts.
+
+Exit: focused interaction regressions, web tests/typecheck/build, both-route checks
+and in-app browser verification with the isolated fictional preview. This entry
+does not record a production deployment.
+
+## 2026-09-07 — DONE: simpler Next feed and complete datelines
+
+Implemented the accepted UX pass in `codex/next-ux-20260907`:
+
+- Compact header, search row and cards; retain understated controls and readable
+  touch targets. Every notice now links a complete Oslo date/time, issuer, ticker
+  and formatted category dateline to Newsweb, including notices without a rewrite.
+- Kilder opens beside the notice without hiding the other cards. Source text has
+  stronger contrast, attachments precede the source body, and long sources scroll
+  within a bounded pane. An explicit overflow action retains focused work mode.
+- Title suggestions open directly beside the headline. Less frequent actions stay
+  in the overflow menu. Failed generation has one retry plus a separate instruction
+  action. A first-use hint explains direct editing.
+- Searchable market/category/issuer selectors share one filter panel; issuer
+  search includes ticker. Active filters can be removed, hidden-category counts
+  remain visible, and the important view survives search and older-page links.
+  The important view still describes the current fetched page; no backend
+  importance filtering was introduced.
+- Edit feedback distinguishes saving, saved on this device, and failed storage.
+  Failed local writes remain retryable and retain any previous saved draft.
+
+Validation: 75 web tests, 2 fixture tests, web typecheck and the full workspace
+production build passed. Both UI flag states passed authenticated new/classic
+route checks, login/session checks and history authorization on loopback port
+3112. The build retains an existing autoprefixer warning in `app/globals.css`;
+that stylesheet was not changed.
+
+In-app browser verification used fictional preview data: desktop and 390/360px
+mobile layouts, light/dark themes, inline and focused sources, keyboard dismissal,
+title selection, local edits, hidden-category settings, ticker search and combined
+search/important filters. An SSE replay left the edit and selected version intact;
+explicitly switching versions and returning restored the edit. New arrivals waited
+for user selection. Mobile testing found and fixed a filter-panel overflow.
+
+Preview entry point: http://127.0.0.1:3101/next (`preview` / `ui-preview`), launched
+with `node scripts/ui-preview/dev.mjs` after production route verification. The
+preview uses the real editor with isolated fictional API data and no model calls.
+
+This is a local implementation checkpoint, not a production deployment. The
+original dirty checkout was left intact. Next: review this UX pass, then release
+the approved commit through the UpCloud deployment workflow when requested.

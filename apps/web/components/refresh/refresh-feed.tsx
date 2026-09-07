@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import type { FeedItem } from "@newsweb/shared";
 import { RefreshCard } from "./refresh-card";
 import { rememberSelection, restoreSelection, selectVersion } from "./selection";
@@ -27,7 +27,14 @@ export function RefreshFeed({
 }) {
   const router = useRouter();
   const [state, setState] = useState(() => initialFeedState(initialItems));
-  const [importantOnly, setImportantOnly] = useState(false);
+  const searchParams = useSearchParams();
+  const importantOnly = searchParams.get("important") === "1";
+  function setImportantOnly(important: boolean) {
+    const query = new URLSearchParams(searchParams.toString());
+    if (important) query.set("important", "1");
+    else query.delete("important");
+    router.replace(`/next${query.size ? `?${query}` : ""}`, { scroll: false });
+  }
   const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isVisible = (item: FeedItem) =>
     !item.categories.some((category) => mutedCategories.includes(category));
@@ -93,7 +100,10 @@ export function RefreshFeed({
             Viktige
           </button>
         </div>
-        <span>{entries.length} meldinger</span>
+        <span className={styles.feedCount}>
+          {entries.length} {importantOnly ? (entries.length === 1 ? "viktig på denne siden" : "viktige på denne siden") : (entries.length === 1 ? "melding" : "meldinger")}
+          {!!mutedCategories.length && <span>{mutedCategories.length} {mutedCategories.length === 1 ? "kategori skjult" : "kategorier skjult"}</span>}
+        </span>
       </div>
       <div className={styles.arrivals} aria-live="polite">
         {incoming.length > 0 && (
@@ -112,6 +122,7 @@ export function RefreshFeed({
           <RefreshCard
             key={entry.current.messageId}
             entry={entry}
+            showEditingHint={entry === entries.find((candidate) => candidate.current.isFinal)}
             onVersion={(selected) => {
               rememberSelection({ current: selected, latest: entry.latest });
               setState((previous) => selectVersion(previous, selected));
@@ -127,7 +138,7 @@ export function RefreshFeed({
           />
         ))}
       </div>
-      {!entries.length && <p className={styles.empty}>Ingen meldinger</p>}
+      {!entries.length && <p className={styles.empty}>{importantOnly ? "Ingen viktige meldinger på denne siden." : "Ingen meldinger som passer med søket og filtrene."}</p>}
     </>
   );
 }

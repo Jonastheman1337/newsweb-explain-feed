@@ -3,13 +3,13 @@
   --refresh-accent: #ad7927;
 }
 .header {
-  height: 76px;
+  height: 56px;
   max-width: 1120px;
   padding: 0 32px;
   margin: auto;
   display: flex;
   align-items: center;
-  gap: 48px;
+  gap: 32px;
   border-bottom: 1px solid var(--line);
 }
 .brand {
@@ -35,21 +35,19 @@
   margin-left: auto;
 }
 .main {
-  max-width: 700px;
-  padding: 42px 0 80px;
+  max-width: 1100px;
+  padding: 16px 24px 60px;
   margin: auto;
 }
-.heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 24px;
-}
-.heading h1 {
-  font-size: 24px;
-  font-weight: 700;
-  letter-spacing: -0.7px;
-  margin: 0;
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 .live {
   font-size: 12px;
@@ -82,19 +80,25 @@
   outline-offset: 4px;
 }
 .filters {
+  position: relative;
+  z-index: 30;
+}
+.filterToolbar {
   display: flex;
-  gap: 10px;
-  align-items: flex-start;
-  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
 }
 .search {
   display: flex;
   flex: 1;
   gap: 6px;
+  min-width: 0;
 }
 .search input {
-  width: 100%;
-  min-width: 80px;
+  flex: 1;
+  width: 0;
+  min-width: 0;
+  font-size: 14px;
 }
 .shell input,
 .shell select {
@@ -102,15 +106,16 @@
   background: var(--bg-panel);
   color: var(--ink);
   border-radius: 6px;
-  padding: 10px 12px;
+  padding: 7px 10px;
 }
 .shell button,
-.filters summary {
-  font-size: 13px;
+.filterPopover > summary {
+  font-size: 12px;
   font-weight: 500;
   border: 1px solid var(--line);
   border-radius: 6px;
-  padding: 9px 12px;
+  padding: 6px 10px;
+  min-height: 32px;
   background: transparent;
   color: var(--ink);
   box-shadow: none;
@@ -119,38 +124,100 @@
 .shell button:hover {
   background: var(--bg-soft);
 }
-.filters details {
-  display: contents;
+.filterPopover {
+  flex-shrink: 0;
 }
-.filters summary {
+.filterPopover > summary {
   cursor: pointer;
   list-style: none;
 }
-.filters summary::-webkit-details-marker {
+.filterPopover > summary::-webkit-details-marker {
   display: none;
 }
 .filterFields {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: min(360px, 100%);
+  padding: 16px;
+  display: grid;
+  gap: 10px;
+  background: var(--bg-panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px #0002;
+}
+.filterFields :global(.searchSelect) {
   width: 100%;
-  padding: 10px 0;
+  min-width: 0;
+}
+.filterFields :global(.searchSelectTrigger) {
+  width: 100%;
+  min-height: 36px;
+  text-align: left;
+}
+.filterFields :global(.searchSelectDropdown) {
+  min-width: 0;
+  width: 100%;
+  z-index: 2;
+}
+.filterFields :global(.searchSelectSearch) {
+  font-size: 14px;
+}
+.filterActions {
+  display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
-.filterFields select {
-  flex: 1;
-  min-width: 150px;
-  font-size: 13px;
+.filterActions a {
+  font-size: 12px;
+  color: var(--ink-soft);
+  text-decoration: underline;
 }
-.filterFields a {
-  font-size: 13px;
-  padding: 8px;
+.activeFilters {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.activeFilters a {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 4px 8px;
+  background: var(--bg-soft);
+  border-radius: 4px;
+  font-size: 12px;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.hiddenCategories {
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+.hiddenCategories > summary {
+  cursor: pointer;
+  font-size: 12px;
+  padding: 6px 0;
+}
+.hiddenCategories .form {
+  margin-top: 8px;
+  gap: 8px;
+}
+.filterHelp {
+  margin: 0;
+  font-size: 12px;
+  color: var(--ink-soft);
+  line-height: 1.5;
 }
 .viewBar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 18px;
+  margin-top: 8px;
+  margin-bottom: 12px;
+  gap: 12px;
   font-size: 12px;
   color: var(--ink-soft);
 }
@@ -163,8 +230,22 @@
   color: var(--ink);
   background: var(--bg-soft);
 }
+.viewBar > div {
+  display: flex;
+  flex-shrink: 0;
+}
+.feedCount {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  text-align: right;
+}
+.feedCount > span {
+  font-size: 11px;
+}
 .arrivals {
-  min-height: 28px;
   text-align: center;
 }
 .arrivals:has(button) {
@@ -187,45 +268,55 @@
 .important {
   border-top: 2px solid var(--refresh-accent);
 }
-.metadata {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
+.dateline {
   color: var(--ink-soft);
   font-size: 12px;
-  margin-bottom: 13px;
+  line-height: 1.5;
+  margin: 0 0 12px;
+  overflow-wrap: anywhere;
 }
-.metadata > span {
+.dateline a:hover {
   color: var(--ink);
-}
-.metadata .ticker {
-  margin-left: 8px;
-  color: var(--ink-soft);
+  text-decoration: underline;
 }
 .importance {
   display: inline-block;
   font-size: 11px;
   color: var(--refresh-accent);
-  margin-bottom: 9px;
+  margin-bottom: 6px;
 }
 .editor :global(.editableTitle),
 .waiting h2 {
-  font-size: 26px;
+  font-size: 22px;
   line-height: 1.25;
   font-weight: 700;
   letter-spacing: -0.65px;
-  margin: 0 0 14px;
+  margin: 0 0 8px;
 }
 .editor :global(.editableTitleRow) {
   gap: 10px;
+  align-items: flex-start;
+}
+.editor :global(.editableTitleRow) :global(.editableTitle) {
+  margin: 0 0 8px;
 }
 .editor :global(.editableBody) {
   font-size: 16px;
-  line-height: 1.6;
+  line-height: 1.55;
 }
 .editor :global(.editableBody) p {
-  margin: 0 0 14px;
+  margin: 0 0 12px;
+}
+.editor :global(.editableBody) p:last-child {
+  margin-bottom: 0;
+}
+.editor :global([contenteditable="true"]):hover {
+  outline: 1px solid var(--line);
+  outline-offset: 4px;
+}
+.editor :global([contenteditable="true"]):focus-visible {
+  outline: 1px solid var(--ink-soft);
+  outline-offset: 4px;
 }
 .editor :global(.editableActions) {
   margin-top: 20px;
@@ -249,20 +340,32 @@
   opacity: 0.85;
 }
 .editor :global(.titleSuggestBtn) {
-  padding: 3px 6px;
-  border: none;
+  padding: 5px;
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+  opacity: 1;
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid var(--line);
+}
+.editor :global(.titleSuggestBtn) svg {
+  width: 16px;
+  height: 16px;
 }
 .waitActions {
   display: flex;
   gap: 8px;
-  margin-top: 18px;
+  margin-top: 12px;
+  justify-content: space-between;
 }
 .progress,
 .failure {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-top: 15px;
+  flex-wrap: wrap;
+  margin-top: 12px;
   color: var(--ink-soft);
   font-size: 12px;
 }
@@ -333,12 +436,12 @@
 }
 @media (max-width: 760px) {
   .header {
-    height: 64px;
+    height: 56px;
     padding: 0 20px;
     gap: 26px;
   }
   .main {
-    padding: 28px 16px 60px;
+    padding: 14px 16px 48px;
   }
   .header nav {
     gap: 16px;
@@ -348,7 +451,7 @@
   }
   .editor :global(.editableTitle),
   .waiting h2 {
-    font-size: 23px;
+    font-size: 21px;
   }
 }
 @media (max-width: 420px) {
@@ -372,9 +475,6 @@
   .card {
     padding: 18px 16px 14px;
   }
-  .metadata .ticker {
-    display: none;
-  }
   .editor :global(.editableActions) {
     gap: 6px;
   }
@@ -382,12 +482,7 @@
     margin-left: auto;
   }
 }
-/* Focused source workspace. Narrow cards stay centred in the wider container. */
-.main {
-  max-width: 1100px;
-  padding-inline: 24px;
-}
-.heading,
+/* Cards expand independently; only deliberate focused work hides the feed. */
 .filters,
 .viewBar,
 .arrivals {
@@ -399,23 +494,23 @@
 }
 .card {
   width: min(700px, 100%);
-  margin: 0 auto 20px;
+  margin: 0 auto 14px;
   padding: 0;
 }
 .editorPane {
-  padding: 26px 28px 18px;
+  padding: 16px 20px 14px;
   min-width: 0;
 }
 .workspace {
   width: 100%;
   display: grid;
   grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  align-items: start;
 }
-.main:has(.workspace) > .heading,
-.main:has(.workspace) > .filters,
-.main:has(.workspace) .viewBar,
-.main:has(.workspace) .arrivals,
-.feed:has(.workspace) > .card:not(.workspace) {
+.main:has(.focused) > .filters,
+.main:has(.focused) .viewBar,
+.main:has(.focused) .arrivals,
+.feed:has(.focused) > .card:not(.focused) {
   display: none;
 }
 .editorActions {
@@ -423,8 +518,8 @@
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  margin-top: 22px;
-  padding-top: 14px;
+  margin-top: 14px;
+  padding-top: 10px;
   border-top: 1px solid var(--line);
 }
 .editorActionsLeft,
@@ -439,7 +534,7 @@
   margin-left: auto;
 }
 .editorActions button {
-  min-height: 36px;
+  min-height: 32px;
 }
 .shell .copy {
   background: var(--ink);
@@ -461,13 +556,22 @@
   gap: 5px;
   color: var(--ink-soft);
   font-size: 11px;
-  white-space: nowrap;
+  line-height: 1.4;
 }
 .edited > span {
   width: 4px;
   height: 4px;
   border-radius: 50%;
   background: currentColor;
+  flex-shrink: 0;
+}
+.edited[data-save-state="failed"] {
+  color: var(--warning);
+}
+.editHint {
+  color: var(--ink-soft);
+  font-size: 11px;
+  line-height: 1.4;
 }
 .actionMenu {
   position: relative;
@@ -475,8 +579,8 @@
 .actionMenu > summary {
   list-style: none;
   cursor: pointer;
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   border: 1px solid var(--line);
   border-radius: 6px;
   display: grid;
@@ -517,7 +621,7 @@
   background: var(--bg-soft);
 }
 .backToFeed {
-  margin: 0 0 24px;
+  margin: 0 0 12px;
 }
 .shell .backToFeed {
   border: 0;
@@ -526,10 +630,19 @@
 }
 .sourcePane {
   border-left: 1px solid var(--line);
-  padding: 26px 24px;
+  padding: 16px 20px;
   background: color-mix(in srgb, var(--bg-main) 50%, var(--bg-panel));
   min-width: 0;
   border-radius: 0 8px 8px 0;
+  max-height: var(--editor-pane-height, 520px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+.focused .sourcePane {
+  position: sticky;
+  top: 16px;
+  max-height: calc(100dvh - 96px);
 }
 .sourcePane[hidden],
 .generation[hidden] {
@@ -538,9 +651,23 @@
 .panelTabs {
   display: flex;
   gap: 6px;
-  padding-bottom: 15px;
+  min-width: 0;
+}
+.panelHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+  padding-bottom: 10px;
+  margin-bottom: 14px;
   border-bottom: 1px solid var(--line);
-  margin-bottom: 22px;
+}
+.shell .closeSource {
+  border: 0;
+  font-size: 20px;
+  width: 32px;
+  padding: 0;
+  flex-shrink: 0;
 }
 .shell .panelTabs button {
   border: 0;
@@ -555,9 +682,9 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--ink-soft);
-  margin-bottom: 18px;
+  margin-bottom: 12px;
 }
 .sourceHeading a {
   text-decoration: underline;
@@ -565,15 +692,18 @@
 .sourceText h3 {
   font-size: 17px;
   line-height: 1.35;
-  margin: 0 0 20px;
+  margin: 0 0 12px;
   overflow-wrap: anywhere;
 }
 .sourceText p {
   white-space: pre-wrap;
   font-size: 14px;
-  line-height: 1.7;
-  color: var(--ink-soft);
+  line-height: 1.6;
+  color: var(--ink);
   overflow-wrap: anywhere;
+}
+.sourceText :global(.attachments) {
+  margin: 0 0 14px;
 }
 .related {
   border-top: 1px solid var(--line);
@@ -633,9 +763,9 @@
   font-size: 11px;
 }
 .generation {
-  margin-top: 26px;
+  margin-top: 18px;
   border-top: 1px solid var(--line);
-  padding-top: 18px;
+  padding-top: 12px;
 }
 .generation > summary {
   cursor: pointer;
@@ -793,14 +923,28 @@
     border-left: 0;
     border-top: 1px solid var(--line);
     border-radius: 0 0 8px 8px;
+    max-height: 65dvh;
+    scroll-margin-top: 12px;
+  }
+  .focused .sourcePane {
+    position: static;
+    max-height: 65dvh;
   }
 }
 @media (max-width: 760px) {
   .main {
-    padding: 28px 16px 60px;
+    padding: 14px 16px 48px;
+  }
+  .filterFields {
+    max-height: calc(100dvh - 160px);
+    overflow-y: auto;
+  }
+  .filterFields :global(.searchSelectDropdown) {
+    position: static;
+    margin-top: 6px;
   }
   .editorPane {
-    padding: 22px 20px 16px;
+    padding: 16px 20px 14px;
   }
   .card {
     padding: 0;
@@ -809,7 +953,7 @@
 @media (max-width: 480px) {
   .editorPane,
   .sourcePane {
-    padding: 20px 16px 16px;
+    padding: 16px 14px 14px;
   }
   .shell button,
   .actionMenu > summary {
@@ -825,7 +969,7 @@
     gap: 5px;
   }
   .editorActions .edited {
-    font-size: 10px;
+    font-size: 11px;
   }
   .editorActionsLeft > button {
     padding-inline: 9px;
@@ -838,6 +982,35 @@
   }
   .header nav {
     gap: 12px;
+  }
+  .filterToolbar {
+    flex-wrap: wrap;
+  }
+  .filterToolbar .connection {
+    width: 100%;
+    justify-content: flex-end;
+  }
+  .search input,
+  .filterFields :global(.searchSelectSearch),
+  .hiddenCategories input[type="text"] {
+    font-size: 16px;
+  }
+  .filterPopover > summary,
+  .filterFields :global(.searchSelectTrigger),
+  .filterFields :global(.searchSelectOption) {
+    min-height: 44px;
+  }
+  .filterPopover > summary {
+    display: flex;
+    align-items: center;
+  }
+  .filterFields {
+    width: 100%;
+    padding: 14px;
+  }
+  .editor :global(.titleSuggestBtn) {
+    width: 44px;
+    height: 44px;
   }
 }
 .mobileBackToEditor {
@@ -852,7 +1025,6 @@
     color: var(--ink-soft);
   }
 }
-.headingTools,
 .connection {
   display: flex;
   align-items: center;
@@ -869,21 +1041,6 @@
 }
 .live[data-state="connecting"]::before {
   background: var(--ink-soft);
-}
-.shell .preferencesButton {
-  width: 36px;
-  height: 36px;
-  padding: 8px;
-  border: 0;
-}
-.preferencesButton svg {
-  width: 18px;
-  height: 18px;
-}
-.preferencesHeading {
-  font-size: 14px;
-  margin: 0;
-  font-weight: 500;
 }
 .categoryList {
   max-height: 300px;
@@ -903,6 +1060,8 @@
   accent-color: var(--ink);
   width: 17px;
   height: 17px;
+  padding: 0;
+  flex-shrink: 0;
 }
 .preferenceStatus {
   min-height: 20px;
@@ -910,18 +1069,8 @@
   color: var(--ink-soft);
 }
 @media (max-width: 480px) {
-  .headingTools {
-    gap: 4px;
-  }
-  .heading h1 {
-    font-size: 21px;
-  }
-  .heading .live {
-    font-size: 10px;
-  }
-  .shell .preferencesButton {
-    min-width: 36px;
-    padding: 8px;
+  .categoryList {
+    max-height: 32dvh;
   }
   .connection {
     gap: 4px;

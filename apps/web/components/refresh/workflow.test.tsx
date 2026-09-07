@@ -61,6 +61,7 @@ it("keeps the edited DOM through rerenders, copies visible text and can undo res
   await act(render);
   expect(body.textContent).toBe("My checked edit");
   expect(controls.hasDraft).toBe(true);
+  expect(controls.saveState).toBe("saved");
   const copied: Record<string, string> = {};
   Object.defineProperty(document, "execCommand", {
     configurable: true,
@@ -92,6 +93,25 @@ it("keeps the edited DOM through rerenders, copies visible text and can undo res
   expect(container.querySelector('[aria-label="Rediger notistekst"]')?.textContent).toBe(
     "My checked edit"
   );
+});
+it("reports a failed local save and retries it when copying without losing the edit", async () => {
+  await act(render);
+  const body = container.querySelector('[aria-label="Rediger notistekst"]') as HTMLElement;
+  const write = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+    throw new DOMException("Storage is full", "QuotaExceededError");
+  });
+  await act(() => {
+    body.innerHTML = "<p>Keep this edit even if storage is full.</p>";
+    body.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 400)); });
+  expect(controls.saveState).toBe("failed");
+  expect(body.textContent).toBe("Keep this edit even if storage is full.");
+  write.mockRestore();
+  await act(() => controls.copy());
+  expect(controls.saveState).toBe("saved");
+  const { getRewriteDraft } = await import("../../lib/rewrite-drafts");
+  expect(getRewriteDraft({ messageId: 123, version: 1, rewriteId: "v1" })?.body).toBe(body.textContent);
 });
 function item(version: number): FeedItem {
   return {

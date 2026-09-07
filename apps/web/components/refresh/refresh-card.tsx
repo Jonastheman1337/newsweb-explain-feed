@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { FeedItem } from "@newsweb/shared";
 import { getNotice, type RewriteVersion } from "../../lib/api";
+import { formatCategoryList } from "../../lib/format-category";
 import { hasRewriteDraft, REWRITE_DRAFT_CHANGE_EVENT } from "../../lib/rewrite-drafts";
 import { useEditorialTelemetry } from "../../lib/editorial-telemetry";
 import { EditableRewrite } from "../editable-rewrite";
@@ -16,19 +17,37 @@ import { fastDraftToFeedItem, type FeedEntry } from "./feed-state";
 import { versionToFeedItem } from "./selection";
 import styles from "./refresh.module.css";
 
+function RefreshDateline({ item }: { item: FeedItem }) {
+  const category = formatCategoryList(item.categories);
+  return (
+    <div className={styles.dateline}>
+      <a href={`https://newsweb.oslobors.no/message/${item.messageId}`} target="_blank" rel="noopener noreferrer">
+        <time dateTime={item.publishedAt}>{new Intl.DateTimeFormat("nb-NO", {
+          dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Oslo"
+        }).format(new Date(item.publishedAt))}</time>
+        {` | ${item.issuerName} (${item.issuerSign})${category ? ` | ${category}` : ""}`}
+      </a>
+    </div>
+  );
+}
+
 export function RefreshCard({
   entry,
   onSelect,
-  onVersion
+  onVersion,
+  showEditingHint = false
 }: {
   entry: FeedEntry;
   onSelect: () => void;
   onVersion: (item: FeedItem) => void;
+  showEditingHint?: boolean;
 }) {
   const { current: item, latest, pending } = entry;
   const isFast = item.publicationKind === "fast";
   const firstDraft = fastDraftToFeedItem(latest);
   const [panel, setPanel] = useState<WorkspacePanel | null>(null);
+  const [focused, setFocused] = useState(false);
+  const [editingHint, setEditingHint] = useState(false);
   const [opened, setOpened] = useState(false);
   const [versions, setVersions] = useState<RewriteVersion[]>([]);
   const [details, setDetails] = useState<Awaited<ReturnType<typeof getNotice>> | null>(null);
@@ -40,6 +59,14 @@ export function RefreshCard({
   const savedScroll = useRef(0);
   const generationRef = useRef<HTMLDetailsElement>(null);
   const wasOpen = useRef(false);
+  const wasFocused = useRef(false);
+  useEffect(() => {
+    try {
+      setEditingHint(showEditingHint && sessionStorage.getItem("newsweb:next-editing-hint") !== "seen");
+    } catch {
+      setEditingHint(showEditingHint);
+    }
+  }, [showEditingHint]);
   const { logEvent } = useEditorialTelemetry(item.messageId);
   const sourceLinks = useMemo(
     () => ({
@@ -60,38 +87,55 @@ export function RefreshCard({
     if (next === "generate")
       requestAnimationFrame(() => {
         if (generationRef.current) generationRef.current.open = true;
-        generationRef.current?.querySelector("textarea")?.focus({ preventScroll: true });
+        generationRef.current?.querySelector("textarea")?.focus();
       });
   }
   function closePanel() {
     setPanel(null);
+    setFocused(false);
   }
   useEffect(() => {
-    if (panel && !wasOpen.current) {
+    if (focused && !wasFocused.current) {
+      savedScroll.current = window.scrollY;
+      window.scrollTo({ top: 0, behavior: "instant" });
+    } else if (panel && !wasOpen.current) {
       if (window.innerWidth <= 850 && panel !== "generate")
         cardRef.current?.querySelector("aside")?.scrollIntoView({ block: "start" });
-      else window.scrollTo({ top: 0, behavior: "instant" });
     }
     if (!panel && wasOpen.current) {
-      window.scrollTo({ top: savedScroll.current, behavior: "instant" });
+      if (wasFocused.current || window.innerWidth <= 850)
+        window.scrollTo({ top: savedScroll.current, behavior: "instant" });
       cardRef.current
         ?.querySelector<HTMLButtonElement>("[data-source-trigger]")
         ?.focus({ preventScroll: true });
     }
     wasOpen.current = !!panel;
+    wasFocused.current = focused;
+  }, [panel, focused]);
+  useEffect(() => {
+    const card = cardRef.current;
+    const editor = card?.querySelector<HTMLElement>("[data-editor-pane]");
+    if (!panel || !card || !editor) return;
+    const measure = () => card.style.setProperty("--editor-pane-height", `${Math.max(260, editor.getBoundingClientRect().height)}px`);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(editor);
+    return () => observer.disconnect();
   }, [panel]);
   useEffect(() => {
     if (!panel) return;
+    const card = cardRef.current;
+    if (!card) return;
     const escape = (event: KeyboardEvent) => {
       if (
         event.key === "Escape" &&
         !document.querySelector("dialog[open]") &&
         !(event.target as HTMLElement)?.closest("details[open]")
       )
-        closePanel();
+        { event.stopPropagation(); closePanel(); }
     };
-    document.addEventListener("keydown", escape);
-    return () => document.removeEventListener("keydown", escape);
+    card.addEventListener("keydown", escape);
+    return () => card.removeEventListener("keydown", escape);
   }, [panel]);
   useEffect(() => {
     if (!opened) return;
@@ -140,32 +184,20 @@ export function RefreshCard({
     <article
       ref={cardRef}
       id={`notice-${item.messageId}`}
-      className={`${styles.card} ${item.importance === "viktig" ? styles.important : ""} ${panel ? styles.workspace : ""}`}
+      className={`${styles.card} ${item.importance === "viktig" ? styles.important : ""} ${panel ? styles.workspace : ""} ${focused ? styles.focused : ""}`}
       aria-label={item.issuerName}
+      onFocusCapture={(event) => {
+        if (!editingHint || !(event.target as HTMLElement).closest('[contenteditable="true"]')) return;
+        setEditingHint(false);
+        try { sessionStorage.setItem("newsweb:next-editing-hint", "seen"); } catch { /* Hint only. */ }
+      }}
     >
-      <div className={styles.editorPane}>
-        {panel && (
+      <div className={styles.editorPane} data-editor-pane>
+        {focused && (
           <button type="button" className={styles.backToFeed} onClick={closePanel}>
             ← Feed
           </button>
         )}
-        <div className={styles.metadata}>
-          <span>
-            {item.issuerName} <span className={styles.ticker}>{item.issuerSign}</span>
-          </span>
-          <time
-            dateTime={item.publishedAt}
-            title={new Date(item.publishedAt).toLocaleString("nb-NO", {
-              timeZone: "Europe/Oslo"
-            })}
-          >
-            {new Intl.DateTimeFormat("nb-NO", {
-              hour: "2-digit",
-              minute: "2-digit",
-              timeZone: "Europe/Oslo"
-            }).format(new Date(item.publishedAt))}
-          </time>
-        </div>
         {item.importance === "viktig" && <div className={styles.importance}>Viktig</div>}
         {isFast && <div className={styles.versionLink}>Førsteutkast</div>}
         {item.isFinal && item.rewriteId ? (
@@ -180,30 +212,34 @@ export function RefreshCard({
             contentHash={item.contentHash ?? undefined}
             isFinal={item.isFinal}
             className={styles.editor}
+            dateline={<RefreshDateline item={item} />}
+            showTitleButton
             sourceLinks={sourceLinks}
             renderActions={(controls) => (
               <RefreshEditorActions
                 controls={controls}
                 sourcesOpen={!!panel}
                 onPanel={openPanel}
+                onClosePanel={closePanel}
+                onWorkspace={() => { openPanel("sources"); setFocused(true); }}
                 onFeedback={() => setFeedback(true)}
+                showEditingHint={editingHint}
               />
             )}
           />
         ) : (
           <div className={styles.waiting}>
+            <RefreshDateline item={item} />
             <h2>{item.sourceTitle || item.title}</h2>
             <div className={styles.waitActions}>
-              {!panel && (
-                <button type="button" data-source-trigger onClick={() => openPanel("sources")}>
-                  Kilder
-                </button>
-              )}
-              {!latest.processing && (
+              <button type="button" data-source-trigger aria-expanded={!!panel} onClick={() => panel ? closePanel() : openPanel("sources")}>
+                {panel ? "Lukk kilder" : "Kilder"}
+              </button>
+              {!latest.processing && !latest.failed && (
                 <GenerateButton
                   messageId={item.messageId}
                   hasAttachments={item.hasAttachments}
-                  label={latest.failed ? "Prøv igjen" : "Lag notis"}
+                  label="Lag notis"
                 />
               )}
             </div>
@@ -218,8 +254,9 @@ export function RefreshCard({
         {latest.failed && (
           <div role="status" className={styles.failure}>
             Generering feilet{" "}
+            {!latest.processing && !latest.regenerating && <GenerateButton messageId={item.messageId} hasAttachments={item.hasAttachments} label="Prøv igjen" />}
             <button type="button" onClick={() => openPanel("generate")}>
-              Prøv igjen
+              Tilpass instruksjon
             </button>
           </div>
         )}
@@ -244,10 +281,10 @@ export function RefreshCard({
           <details
             ref={generationRef}
             className={styles.generation}
-            hidden={!panel}
+            hidden={!panel || (!focused && panel !== "generate")}
             open={panel === "generate"}
           >
-            <summary>Lag versjon</summary>
+            <summary>Lag ny versjon</summary>
             <InstructionInput
               messageId={item.messageId}
               activeVersion={isFast ? latest.isFinal ? latest.rewriteVersion ?? undefined : undefined : item.rewriteVersion ?? undefined}
@@ -270,6 +307,7 @@ export function RefreshCard({
           >
             ↑ Notis
           </button>
+          <div className={styles.panelHeader}>
           <div
             className={styles.panelTabs}
             role="tablist"
@@ -319,6 +357,8 @@ export function RefreshCard({
               Versjoner {versions.length || ""}
             </button>
           </div>
+          <button type="button" className={styles.closeSource} onClick={closePanel} aria-label="Lukk kildepanelet" title="Lukk kilder">×</button>
+          </div>
           <div
             role="tabpanel"
             id={`sources-panel-${item.messageId}`}
@@ -332,12 +372,12 @@ export function RefreshCard({
                 Newsweb ↗
               </a>
             </div>
-            <h3>{source?.title ?? item.sourceTitle}</h3>
-            <p>{source?.bodyText ?? item.sourceBodyText}</p>
             <AttachmentLinks
               messageId={item.messageId}
               attachments={source?.attachments ?? item.attachments}
             />
+            <h3>{source?.title ?? item.sourceTitle}</h3>
+            <p>{source?.bodyText ?? item.sourceBodyText}</p>
             {details && "relatedNotices" in details && !!details.relatedNotices?.length && (
               <div className={styles.related}>
                 <h4>Relaterte meldinger</h4>

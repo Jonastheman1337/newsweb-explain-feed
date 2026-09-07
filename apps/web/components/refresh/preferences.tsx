@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Modal } from "./controls";
+import { formatCategoryLabel } from "../../lib/format-category";
 import styles from "./refresh.module.css";
 
 export function Preferences({
@@ -12,7 +12,6 @@ export function Preferences({
   defaultMuted: string[];
 }) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [muted, setMuted] = useState(defaultMuted);
   const [status, setStatus] = useState<"idle" | "saving" | "error">("idle");
@@ -28,7 +27,7 @@ export function Preferences({
       ),
     [categories, mutedKey]
   );
-  const label = (name: string) => (name === "RENTEREGULERING" ? "Rentefastsettelser" : name);
+  const label = (name: string) => (name === "RENTEREGULERING" ? "Rentefastsettelser" : formatCategoryLabel(name));
   async function save(next: string[]) {
     const previous = muted;
     setMuted(next);
@@ -51,29 +50,10 @@ export function Preferences({
     }
   }
   return (
-    <>
-      <button
-        type="button"
-        className={styles.preferencesButton}
-        onClick={() => setOpen(true)}
-        aria-label="Innstillinger"
-        title="Innstillinger"
-      >
-        <svg
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.6"
-          aria-hidden="true"
-        >
-          <path d="M4 7h16M4 17h16" />
-          <circle cx="9" cy="7" r="3" fill="var(--bg-main)" />
-          <circle cx="15" cy="17" r="3" fill="var(--bg-main)" />
-        </svg>
-      </button>
-      <Modal open={open} onClose={() => setOpen(false)} title="Innstillinger">
+    <details className={styles.hiddenCategories}>
+      <summary>Skjulte kategorier{muted.length ? ` (${muted.length})` : ""}</summary>
         <div className={styles.form}>
-          <h3 className={styles.preferencesHeading}>Skjulte kategorier</h3>
+          <p className={styles.filterHelp}>Skjules i begge feeder. Valgene lagres automatisk.</p>
           <input
             aria-label="Søk i kategorier"
             placeholder="Søk"
@@ -120,7 +100,6 @@ export function Preferences({
             )}
           </div>
         </div>
-      </Modal>
-    </>
+    </details>
   );
 }

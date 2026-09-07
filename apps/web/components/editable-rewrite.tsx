@@ -29,6 +29,7 @@ import { linkSourceAttributions, type SourceLinkTargets } from "../lib/source-li
 import {
   deleteRewriteDraft,
   getRewriteDraft,
+  isSameAsOriginal,
   saveRewriteDraft,
   type RewriteDraft
 } from "../lib/rewrite-drafts";
@@ -37,6 +38,7 @@ import { useTitleSuggestions } from "./title-suggestions";
 export type RewriteActionControls = {
   hasDraft: boolean;
   showingOriginal: boolean;
+  saveState: "idle" | "saving" | "saved" | "failed";
   copyState: "idle" | "copied" | "failed";
   copy: () => Promise<void>;
   toggleOriginal: () => void;
@@ -66,6 +68,7 @@ type EditableRewriteProps = {
   extraActions?: ReactNode;
   panelTitle?: string;
   renderActions?: (controls: RewriteActionControls) => ReactNode;
+  showTitleButton?: boolean;
   className?: string;
   onDraftChange?: (draft: { title: string; body: string; bodyHtml: string }) => void;
   readOnly?: boolean;
@@ -306,6 +309,7 @@ export function EditableRewrite({
   extraActions,
   panelTitle,
   renderActions,
+  showTitleButton = false,
   className,
   sourceLinks,
   onDraftChange,
@@ -328,6 +332,7 @@ export function EditableRewrite({
     onDraftChange?.({ title: editedTitle, body: editedBody, bodyHtml: editedBodyHtml });
   }, [editedTitle, editedBody, editedBodyHtml, onDraftChange]);
   const [storedDraft, setStoredDraft] = useState<RewriteDraft | null>(null);
+  const [draftSaveFailed, setDraftSaveFailed] = useState(false);
   const [viewMode, setViewMode] = useState<"draft" | "original">("draft");
   const [resetSnapshot, setResetSnapshot] = useState<RewriteDraft | null>(null);
   const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle");
@@ -474,10 +479,13 @@ export function EditableRewrite({
       originalBody: state.originalBody,
       originalBodyHtml: state.originalBodyHtml
     });
+    const failed = !draft && !isSameAsOriginal(state);
     if (updateState) {
-      setStoredDraftValue(draft);
+      setDraftSaveFailed(failed);
+      if (!failed) setStoredDraftValue(draft);
     }
-    lastSavedValueRef.current = currentValue;
+    // A failed write must remain retryable (including the next copy attempt).
+    if (!failed) lastSavedValueRef.current = currentValue;
     return draft;
   }
 
@@ -808,6 +816,7 @@ export function EditableRewrite({
       viewMode: "draft"
     };
     setStoredDraftValue(draft);
+    setDraftSaveFailed(false);
     setViewMode("draft");
     hideToolbar();
     setDisplayedRewrite(nextTitle, nextBody, nextBodyHtml);
@@ -967,6 +976,7 @@ export function EditableRewrite({
   function handleResetDraft() {
     deleteRewriteDraft({ messageId, version: activeVersion, rewriteId });
     setStoredDraftValue(null);
+    setDraftSaveFailed(false);
     setViewMode("draft");
     hideToolbar();
     setDisplayedRewrite(originalTitle, originalBody, originalBodyHtml);
@@ -1017,6 +1027,17 @@ export function EditableRewrite({
 
   const hasDraft = storedDraft != null;
   const showingOriginal = viewMode === "original";
+  const hasEdits = !isSameAsOriginal({
+    title: editedTitle, body: editedBody, bodyHtml: editedBodyHtml,
+    originalTitle, originalBody, originalBodyHtml
+  });
+  const saveState: RewriteActionControls["saveState"] = showingOriginal || !hasEdits
+    ? "idle"
+    : draftSaveFailed
+      ? "failed"
+      : storedDraft && draftValue(editedTitle, editedBody, editedBodyHtml) === draftValue(storedDraft.title, storedDraft.body, storedDraft.bodyHtml ?? plainTextToRichHtml(storedDraft.body))
+        ? "saved"
+        : "saving";
   const titleSuggestButton = isSak ? null : titleSuggestions.button;
   const titleSuggestDropdown = isSak ? null : titleSuggestions.dropdown;
   const titleEditor = (
@@ -1044,7 +1065,7 @@ export function EditableRewrite({
           {titleSuggestButton}
         </div>
       )}
-      {panelTitle || isSak || renderActions ? (
+      {panelTitle || isSak || (renderActions && !showTitleButton) ? (
         titleEditor
       ) : (
         <div className="editableTitleRow">
@@ -1234,6 +1255,7 @@ export function EditableRewrite({
         renderActions({
           hasDraft,
           showingOriginal,
+          saveState,
           copyState,
           copy: handleCopy,
           toggleOriginal: handleToggleDraftView,
