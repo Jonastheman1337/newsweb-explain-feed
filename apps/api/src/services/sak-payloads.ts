@@ -1,6 +1,7 @@
 import {
   parseStoredSakArticle as parseStoredSakArticleLenient,
   sakMaterialKindSchema,
+  sakSourcePublisher,
   sakMaterialStatusSchema,
   sakVersionStatusSchema,
   type SakDraft,
@@ -81,6 +82,8 @@ export function sakMaterialPayload(material: SakMaterialRowFull): SakMaterial {
     fileName: material.fileName,
     fileSize: material.fileSize,
     extractedTextChars: material.textChars || material.extractedText.length,
+    extractedText: material.extractedText,
+    publisher: sakSourcePublisher({ title: material.title, url: material.url, text: material.extractedText, publisher: typeof (material.metadataJson as Record<string, unknown> | null)?.publisher === "string" ? (material.metadataJson as {publisher: string}).publisher : null }),
     status: status.success ? status.data : "failed",
     errorText: material.errorText,
     enabled: material.enabled,

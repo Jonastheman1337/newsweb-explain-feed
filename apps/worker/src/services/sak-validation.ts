@@ -17,6 +17,7 @@ import {
   type RewriteOutput,
   type SakArticle
 } from "@newsweb/shared";
+import { missingSakPublisherIssues } from "./sak-review.js";
 import { findAttributionRisks } from "./claim-precautions.js";
 import {
   validateRevisionInstructionCompliance,
@@ -49,6 +50,8 @@ export type SakValidationIssue = {
   code: string;
   severity: SakValidationSeverity;
   message: string;
+  location?: string;
+  passage?: string;
 };
 
 export type SakValidationContext = {
@@ -150,9 +153,6 @@ export function buildSakNumericSourceText(
       [`[${material.sourceId}] ${material.title}`, material.url ?? "", material.text].join("\n")
     );
   parts.push(payload.todayIso, formatNorwegianNoticeDate(payload.todayIso));
-  if (extra.titleOverride?.trim()) {
-    parts.push(extra.titleOverride.trim());
-  }
   return parts.join("\n");
 }
 
@@ -195,28 +195,6 @@ function normalizeLinks(
 
 function normalizeChangeNote(note: string): string {
   return note.replace(/\s*\n+\s*/g, " ").replace(/\s+/g, " ").trim();
-}
-
-function normalizeForOverlap(text: string): string[] {
-  return text
-    .toLowerCase()
-    .normalize("NFKD")
-    .replace(/[̀-ͯ]/g, "")
-    .replace(/[^a-z0-9æøå]+/gi, " ")
-    .split(" ")
-    .filter((token) => token.length >= 5);
-}
-
-function quoteHasSourceSpan(quote: string, spans: string[]): boolean {
-  const quoteTokens = new Set(normalizeForOverlap(quote));
-  if (quoteTokens.size === 0) return true;
-  const spanTokens = new Set(spans.flatMap(normalizeForOverlap));
-  let hits = 0;
-  for (const token of quoteTokens) {
-    if (spanTokens.has(token)) hits += 1;
-    if (hits >= 2) return true;
-  }
-  return hits >= Math.min(2, quoteTokens.size);
 }
 
 export function validateSakArticle(
@@ -362,7 +340,7 @@ export function validateSakArticle(
     addIssue(
       issues,
       "SAK_LENGTH_OUT_OF_BAND",
-      "warning",
+      visibleChars < lengthBand.min && article.desk_notes.some((note) => /kild|grunnlag|material/i.test(note) && /kort|lengd|mang|bær/i.test(note)) ? "warning" : "blocking",
       `Synlig tekst er ${visibleChars} tegn; målet er ${lengthBand.min}–${lengthBand.max}.`
     );
   }
@@ -440,19 +418,9 @@ export function validateSakArticle(
   }
 
   // (9) Ledger: every quote has a span, every read material has a sources row.
-  const quotesWithoutSpan = article.blocks.filter(
-    (block) =>
-      block.kind === "quote" &&
-      !quoteHasSourceSpan(sakBlockPlainText(block.text), article.source_spans)
-  ).length;
-  if (quotesWithoutSpan > 0) {
-    addIssue(
-      issues,
-      "SAK_QUOTE_WITHOUT_SOURCE_SPAN",
-      "warning",
-      `${quotesWithoutSpan} sitat(er) mangler original ordlyd i source_spans.`
-    );
-  }
+  // Semantic reference review checks each quote against its original source.
+  // Word overlap across English and Norwegian is not a valid quote test.
+  issues.push(...missingSakPublisherIssues(article, payload));
   const listedSources = new Set(article.sources.map((source) => source.materialId));
   const readyIds = payload.materials
     .filter((material) => material.status === "ready")
@@ -467,7 +435,7 @@ export function validateSakArticle(
     if (unknownSources.length > 0) {
       parts.push(`viser til ukjent materiale ${unknownSources.join(", ")}`);
     }
-    addIssue(issues, "SAK_SOURCE_LEDGER_INCOMPLETE", "warning", `sources ${parts.join("; ")}.`);
+    addIssue(issues, "SAK_SOURCE_LEDGER_INCOMPLETE", "blocking", `sources ${parts.join("; ")}.`);
   }
 
   // (9b) A source the user supplied WITH a link must be linked in the text the
@@ -552,9 +520,9 @@ export function validateSakArticle(
 export function buildSakRepairInstruction(issues: SakValidationIssue[]): string {
   const lines = issues
     .filter((issue) => issue.severity === "blocking")
-    .map((issue) => `- ${issue.message}`);
+    .map((issue) => `- ${issue.location ?? "article"}: ${issue.message}${issue.passage ? ` Tekst: «${issue.passage}»` : ""}`);
   return [
-    "KORRIGERINGSMODUS: Rett bare feilene under. Behold alt annet uendret: vinkel, rekkefølge, lenker, sitater, sources, excluded_hype og desk_notes.",
+    "KORRIGERINGSMODUS: Rett bare feilene under. Behold alt som ikke berøres av feilene: vinkel, rekkefølge, lenker, sitater, sources, excluded_hype og desk_notes. Ved lengdefeil kutter du sekundære detaljer eller tilfører vesentlig kildebelagt informasjon; aldri fyllstoff.",
     ...lines,
     "Returner hele JSON-strukturen. change_note: «Korrigert etter validering»."
   ].join("\n");

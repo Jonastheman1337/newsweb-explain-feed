@@ -17,6 +17,7 @@ export function SakList({ gone }: SakListProps) {
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [drafts, setDrafts] = useState<SakListItem[]>([]);
   const [creating, setCreating] = useState(false);
+  const [refresh, setRefresh] = useState(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -37,7 +38,7 @@ export function SakList({ gone }: SakListProps) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [refresh]);
 
   async function handleCreate() {
     setCreating(true);
@@ -66,22 +67,24 @@ export function SakList({ gone }: SakListProps) {
     }
   }
 
-  if (state === "loading") return null;
+  if (state === "loading") return <p className="sakHelp" role="status">Laster sakene dine …</p>;
 
   return (
-    <section>
+    <section className="sakWorkspace">
+      <header className="sakWorkspaceHeader"><div><h1>Saker</h1><p className="sakHelp">Fra kildemateriale til en ferdig redigert nyhetssak.</p></div></header>
       <div className="topBar">
         <button
-          className="ghostButton"
+          className="sakPrimaryButton"
           type="button"
           onClick={() => void handleCreate()}
           disabled={creating}
         >
-          Ny sak
+          {creating ? "Åpner arbeidsområdet …" : "+ Ny sak"}
         </button>
         {gone && <span className="muted">Saken er utløpt</span>}
-        {errorMessage && <span className="muted">{errorMessage}</span>}
+        {errorMessage && <span role="alert" className="sakError">{errorMessage} <button type="button" className="sakSecondaryButton" onClick={() => { setErrorMessage(null); setState("loading"); setRefresh((value) => value + 1); }}>Prøv igjen</button></span>}
       </div>
+      {state === "ready" && drafts.length === 0 && <div className="sakEmptyDraft"><h2>Hva vil du skrive om?</h2><p>Legg til artikler, lenker eller PDF-er. Velg vinkel og lengde, og jobb videre i teksten når utkastet er kontrollert.</p><p className="sakHelp">Sakene er knyttet til denne nettleseren. Utløpstid vises på hver sak.</p></div>}
       {drafts.length > 0 && (
         <div className="feedList">
           {drafts.map((item) => (

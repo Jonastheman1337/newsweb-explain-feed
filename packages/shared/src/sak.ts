@@ -355,6 +355,8 @@ export const sakMaterialSchema = z.object({
   fileName: z.string().nullable(),
   fileSize: z.number().int().nullable(),
   extractedTextChars: z.number().int().nonnegative(),
+  extractedText: z.string().optional(),
+  publisher: z.string().nullable().optional(),
   status: sakMaterialStatusSchema,
   errorText: z.string().nullable(),
   enabled: z.boolean(),
@@ -413,6 +415,7 @@ export const sakDraftResponseSchema = z.object({
   draft: sakDraftSchema,
   materials: z.array(sakMaterialSchema),
   versions: z.array(sakVersionSchema),
+  coverage: z.object({ included: z.array(z.string()), truncated: z.array(z.string()), dropped: z.array(z.string()), characters: z.record(z.number()), texts: z.record(z.string()).optional() }).optional(),
   activeGeneration: sakActiveGenerationSchema
 });
 export type SakDraftResponse = z.infer<typeof sakDraftResponseSchema>;
@@ -439,12 +442,29 @@ export const sakCreateRequestSchema = z.object({
 });
 export type SakCreateRequest = z.infer<typeof sakCreateRequestSchema>;
 
+// Only the visible copy comes from the editor. The API retains the source
+// ledger of the explicitly selected, owned version.
+export const sakEditedArticleSchema = z.object({
+  title: z.string().trim().min(4).max(140),
+  lead: z.string().trim().min(1).max(3000),
+  blocks: z.array(z.object({
+    kind: sakBlockKindSchema,
+    text: z.string().min(1).max(6000)
+  })).min(1).max(80)
+});
+export type SakEditedArticle = z.infer<typeof sakEditedArticleSchema>;
+
 export const sakGenerateRequestSchema = z.object({
   instruction: z.string().trim().max(4000).optional(),
   titleOverride: z.string().trim().max(140).optional(),
   targetChars: z.number().int().min(SAK_TARGET_CHARS_MIN).max(SAK_TARGET_CHARS_MAX).optional(),
   selectedMaterialIds: z.array(z.string()).max(20).optional(),
-  reasoningEffortOverride: z.enum(["xhigh"]).optional()
+  reasoningEffortOverride: z.enum(["xhigh"]).optional(),
+  baseVersionId: z.string().min(1).max(80).optional(),
+  editedArticle: sakEditedArticleSchema.optional(),
+  revisionAction: z.enum(["revise", "shorten", "angle", "lead"]).optional()
+}).refine((value) => !value.editedArticle || Boolean(value.baseVersionId), {
+  message: "Redigert tekst må tilhøre en valgt versjon.", path: ["baseVersionId"]
 });
 export type SakGenerateRequest = z.infer<typeof sakGenerateRequestSchema>;
 
@@ -478,6 +498,8 @@ export type SakMaterialSnapshot = {
   errorText: string | null;
   text: string;
   textChars: number;
+  publisher?: string | null;
+  truncated?: boolean;
 };
 
 export type SakDraftJobData = {
@@ -491,4 +513,7 @@ export type SakDraftJobData = {
   targetChars: number;
   reasoningEffortOverride?: "xhigh";
   todayIso: string;
+  baseVersionId?: string;
+  revisionAction?: "revise" | "shorten" | "angle" | "lead";
+  materialCoverage?: SakGenerateResponse["materials"];
 };

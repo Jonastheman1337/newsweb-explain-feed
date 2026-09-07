@@ -1,5 +1,6 @@
 import {
   sakMaterialKindSchema,
+  sakSourcePublisher,
   sakMaterialSourceId,
   sakMaterialStatusSchema,
   type SakMaterialSnapshot
@@ -41,6 +42,7 @@ export type SakMaterialRow = {
   errorText: string | null;
   extractedText: string;
   enabled: boolean;
+  metadataJson?: unknown;
 };
 
 export type SakMaterialSnapshotSet = {
@@ -72,7 +74,8 @@ export function buildSakMaterialSnapshots(
   const dropped: string[] = [];
   let remainingChars = caps.maxTotalChars;
 
-  for (const material of materials) {
+  const priority = (material: SakMaterialRow) => Number((material.metadataJson as { priority?: number } | null)?.priority ?? 0);
+  for (const material of [...materials].sort((a, b) => priority(b) - priority(a))) {
     if (!material.enabled) continue;
     const kind = sakMaterialKindSchema.safeParse(material.kind);
     const status = sakMaterialStatusSchema.safeParse(material.status);
@@ -133,7 +136,9 @@ export function buildSakMaterialSnapshots(
       status: "ready",
       errorText: null,
       text,
-      textChars: text.length
+      textChars: text.length,
+      publisher: sakSourcePublisher({ title: material.title, url: material.url, text, publisher: (material.metadataJson as { publisher?: string } | null)?.publisher }),
+      truncated: wasTruncated
     });
     included.push(material.id);
     if (wasTruncated) truncated.push(material.id);

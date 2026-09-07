@@ -56,6 +56,17 @@ describe("buildSakMaterialSnapshots", () => {
     expect(result.snapshots[2]?.text.endsWith(SAK_TOTAL_TRUNCATION_MARKER)).toBe(true);
   });
 
+  it("gives priority sources the text budget and preserves publication metadata", () => {
+    const result = buildSakMaterialSnapshots([
+      row({ id: "first", extractedText: "a".repeat(1000) }),
+      row({ id: "priority", extractedText: "b".repeat(1000), metadataJson: { priority: 100, publisher: "Bloomberg" } }),
+      row({ id: "last", extractedText: "c".repeat(1000) })
+    ], { maxMaterialChars: 1000, maxTotalChars: 1000 });
+    expect(result.included).toEqual(["priority"]);
+    expect(result.dropped).toEqual(["first", "last"]);
+    expect(result.snapshots[0]).toMatchObject({ publisher: "Bloomberg", textChars: 1000, truncated: false });
+  });
+
   it("keeps failed materials as empty coverage links and skips disabled or empty ones", () => {
     const result = buildSakMaterialSnapshots([
       row({ id: "paywall", kind: "url", url: "https://e24.no/x", status: "failed", errorText: "Betalingsmur", extractedText: "" }),
