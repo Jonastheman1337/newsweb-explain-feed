@@ -67,6 +67,8 @@ type EditableRewriteProps = {
   panelTitle?: string;
   renderActions?: (controls: RewriteActionControls) => ReactNode;
   className?: string;
+  onDraftChange?: (draft: { title: string; body: string; bodyHtml: string }) => void;
+  readOnly?: boolean;
   // Newsweb links for the first attribution phrase (primary notice) and the
   // first "meldte i juni" clause (earlier notice). Applied once when the
   // generated text is turned into HTML; stored drafts are never re-linked.
@@ -305,7 +307,9 @@ export function EditableRewrite({
   panelTitle,
   renderActions,
   className,
-  sourceLinks
+  sourceLinks,
+  onDraftChange,
+  readOnly = false,
 }: EditableRewriteProps) {
   const originalBodyHtml = useMemo(
     () =>
@@ -320,6 +324,9 @@ export function EditableRewrite({
   const [editedTitle, setEditedTitle] = useState(originalTitle);
   const [editedBody, setEditedBody] = useState(originalBody);
   const [editedBodyHtml, setEditedBodyHtml] = useState(originalBodyHtml);
+  useLayoutEffect(() => {
+    onDraftChange?.({ title: editedTitle, body: editedBody, bodyHtml: editedBodyHtml });
+  }, [editedTitle, editedBody, editedBodyHtml, onDraftChange]);
   const [storedDraft, setStoredDraft] = useState<RewriteDraft | null>(null);
   const [viewMode, setViewMode] = useState<"draft" | "original">("draft");
   const [resetSnapshot, setResetSnapshot] = useState<RewriteDraft | null>(null);
@@ -625,6 +632,7 @@ export function EditableRewrite({
   }
 
   function handleBodyKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
+    if (readOnly) return;
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
       event.preventDefault();
       openLinkInput();
@@ -646,6 +654,7 @@ export function EditableRewrite({
   ) {
     event.preventDefault();
     event.stopPropagation();
+    if (readOnly) return;
     toolbarActionHandledRef.current = true;
     isToolbarInteractingRef.current = true;
     action();
@@ -653,6 +662,7 @@ export function EditableRewrite({
 
   function handleToolbarActionClick(event: ReactMouseEvent<HTMLButtonElement>, action: () => void) {
     event.preventDefault();
+    if (readOnly) return;
     if (event.detail !== 0 && toolbarActionHandledRef.current) {
       toolbarActionHandledRef.current = false;
       return;
@@ -1013,7 +1023,7 @@ export function EditableRewrite({
     <h2
       ref={titleRef}
       className="editableTitle"
-      contentEditable
+      contentEditable={!readOnly}
       tabIndex={0}
       suppressContentEditableWarning
       onInput={(e) => {
@@ -1048,7 +1058,7 @@ export function EditableRewrite({
         ref={bodyRef}
         dangerouslySetInnerHTML={renderActions ? initialBodyMarkup.current : undefined}
         className="editableBody"
-        contentEditable
+        contentEditable={!readOnly}
         suppressContentEditableWarning
         role="textbox"
         aria-multiline="true"
@@ -1085,6 +1095,7 @@ export function EditableRewrite({
             />
             <button
               className="richEditToolButton"
+              disabled={readOnly}
               type="submit"
               title="Sett inn lenke"
               aria-label="Sett inn lenke"
@@ -1107,6 +1118,7 @@ export function EditableRewrite({
           <>
             <button
               className="richEditToolButton"
+              disabled={readOnly}
               type="button"
               title="Fet"
               aria-label="Fet"
@@ -1119,6 +1131,7 @@ export function EditableRewrite({
             </button>
             <button
               className="richEditToolButton"
+              disabled={readOnly}
               type="button"
               title="Kursiv"
               aria-label="Kursiv"
@@ -1131,6 +1144,7 @@ export function EditableRewrite({
             </button>
             <button
               className="richEditToolButton"
+              disabled={readOnly}
               type="button"
               title="Punktliste"
               aria-label="Punktliste"
@@ -1161,6 +1175,7 @@ export function EditableRewrite({
             </button>
             <button
               className="richEditToolButton"
+              disabled={readOnly}
               type="button"
               title="Nummerert liste"
               aria-label="Nummerert liste"
@@ -1191,6 +1206,7 @@ export function EditableRewrite({
             </button>
             <button
               className="richEditToolButton"
+              disabled={readOnly}
               type="button"
               title="Lenke"
               aria-label="Lenke"
@@ -1273,6 +1289,7 @@ export function EditableRewrite({
                 </button>
                 <button
                   className="draftIconButton"
+                  disabled={readOnly}
                   onClick={handleResetDraft}
                   title="Tilbakestill til AI-original"
                   aria-label="Tilbakestill til AI-original"

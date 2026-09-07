@@ -1,5 +1,5 @@
 import type { SakArticle, SakMaterialKind, SakMaterialStatus } from "@newsweb/shared";
-import { SAK_LENGTH_BAND } from "@newsweb/shared";
+import { SAK_LENGTH_BAND, sakSourcePublisher } from "@newsweb/shared";
 import { formatNorwegianNoticeDate } from "./prompt.js";
 import {
   SAK_FIELD_MAPPING,
@@ -26,7 +26,7 @@ import {
   EDITORIAL_WRITING_STYLE
 } from "./shared-editorial.js";
 
-export const SAK_PROMPT_VERSION = "sak-v1.1.0";
+export const SAK_PROMPT_VERSION = "sak-v2.0.0";
 
 export type SakMaterialPayload = {
   /** Prompt label, e.g. "material_ckabc" (see sakMaterialSourceId). */
@@ -38,6 +38,8 @@ export type SakMaterialPayload = {
   textChars: number;
   status: SakMaterialStatus;
   failureReason?: string | null;
+  publisher?: string | null;
+  truncated?: boolean;
 };
 
 export type SakPromptPayload = {
@@ -110,6 +112,9 @@ export function sakMaterialsPromptSection(materials: SakMaterialPayload[]): stri
       lines.push(`status: ikke lest (${reason})`);
     }
     lines.push(`title: ${material.title}`);
+    const publisher = sakSourcePublisher(material);
+    if (publisher) lines.push(`publikasjon: ${publisher} (attribuer brukt journalistikk i synlig tekst)`);
+    if (material.truncated) lines.push("dekning: AVKORTET – ikke hele dokumentet er lest");
     if (material.url) {
       lines.push(`url: ${material.url}`);
     }

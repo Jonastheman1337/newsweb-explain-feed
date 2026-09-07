@@ -84,9 +84,9 @@ const SAK_GENERATION_STEP_LABELS: Record<
   string
 > = {
   reading_notice: "Leser materiale",
-  analyzing_content: "Analyserer kilder",
+  analyzing_content: "Vurderer nyhetsvinkel",
   writing_notice: "Skriver utkast",
-  checking_references: "Sjekker tall og sitater",
+  checking_references: "Kontrollerer kilder og tekst",
   finalizing: "Ferdigstiller"
 };
 

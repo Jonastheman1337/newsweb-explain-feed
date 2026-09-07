@@ -135,7 +135,7 @@ export function addSakUrl(sakId: string, url: string): Promise<SakMaterial> {
 
 export function addSakText(
   sakId: string,
-  body: { title?: string; text: string }
+  body: { title?: string; text: string; url?: string; publisher?: string; replaceMaterialId?: string }
 ): Promise<SakMaterial> {
   return sakFetch<SakMaterial>(`/${id(sakId)}/materials/text`, jsonInit("POST", body));
 }
@@ -143,11 +143,11 @@ export function addSakText(
 export function patchSakMaterial(
   sakId: string,
   materialId: string,
-  enabled: boolean
+  update: boolean | { enabled?: boolean; publisher?: string; priority?: number }
 ): Promise<SakMaterial> {
   return sakFetch<SakMaterial>(
     `/${id(sakId)}/materials/${id(materialId)}`,
-    jsonInit("PATCH", { enabled })
+    jsonInit("PATCH", typeof update === "boolean" ? { enabled: update } : update)
   );
 }
 

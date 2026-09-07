@@ -214,18 +214,18 @@ describe("validateSakArticle", () => {
     expect(found).toContain("SAK_QUOTE_BLOCK_NO_DASH");
     expect(found).toContain("SAK_LENGTH_OUT_OF_BAND");
     expect(result.article.blocks[2]?.text.startsWith("– ")).toBe(true);
-    expect(result.blockingErrors).toEqual([]);
+    expect(result.blockingErrors.join(" ")).toContain("tegn");
   });
 
-  it("warns when a quote has no source span or a read material is missing from sources", () => {
+  it("blocks an incomplete source ledger without using word overlap as quote verification", () => {
     const result = validateSakArticle(
       article({ source_spans: ["material_ckm1: helt annen ordlyd om noe annet"], sources: [] }),
       payload(),
       firstDraft
     );
-    expect(codes(result)).toContain("SAK_QUOTE_WITHOUT_SOURCE_SPAN");
+    expect(codes(result)).not.toContain("SAK_QUOTE_WITHOUT_SOURCE_SPAN");
     expect(codes(result)).toContain("SAK_SOURCE_LEDGER_INCOMPLETE");
-    expect(result.warnings.join(" ")).toContain("material_ckm1");
+    expect(result.blockingErrors.join(" ")).toContain("material_ckm1");
   });
 
   it("blocks when a used source with a user-supplied link is never linked in the text", () => {
@@ -326,11 +326,11 @@ describe("helpers", () => {
     expect(shape.company_sentence).toBe("");
   });
 
-  it("builds the numeric source from read materials, today and the owner title", () => {
+  it("builds the numeric source from read materials and today, never the owner title", () => {
     const source = buildSakNumericSourceText(payload(), { titleOverride: "Tittel 99" });
     expect(source).toContain("A321XLR");
     expect(source).toContain("4. september 2026");
-    expect(source).toContain("Tittel 99");
+    expect(source).not.toContain("Tittel 99");
     expect(source).not.toContain("E24: SAS-sjefen");
   });
 
@@ -340,7 +340,7 @@ describe("helpers", () => {
       { code: "B", severity: "warning", message: "Bare en advarsel." }
     ]);
     expect(instruction.startsWith("KORRIGERINGSMODUS")).toBe(true);
-    expect(instruction).toContain("- Første feil.");
+    expect(instruction).toContain("- article: Første feil.");
     expect(instruction).not.toContain("advarsel");
   });
 });

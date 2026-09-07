@@ -78,11 +78,16 @@ const urlMaterialBodySchema = z.object({
 
 const textMaterialBodySchema = z.object({
   title: z.string().max(180).optional(),
-  text: z.string().min(1).max(SAK_MAX_TEXT_MATERIAL_INPUT_CHARS)
+  text: z.string().min(1).max(SAK_MAX_TEXT_MATERIAL_INPUT_CHARS),
+  url: z.string().url().refine((value) => /^https?:\/\//i.test(value)).optional(),
+  publisher: z.string().trim().max(120).optional(),
+  replaceMaterialId: z.string().min(1).max(80).optional()
 });
 
 const updateMaterialBodySchema = z.object({
-  enabled: z.boolean()
+  enabled: z.boolean().optional(),
+  publisher: z.string().trim().max(120).optional(),
+  priority: z.number().int().min(0).max(100).optional()
 });
 
 const generationRunSelect = {
@@ -237,6 +242,10 @@ export const sakRoutes: FastifyPluginAsync = async (fastify) => {
           draft: sakDraftPayload(draft),
           materials: materials.map(sakMaterialPayload),
           versions: versions.map(sakVersionPayload),
+          coverage: (() => {
+            const selection = buildSakMaterialSnapshots(materials);
+            return { included: selection.included, truncated: selection.truncated, dropped: selection.dropped, characters: Object.fromEntries(selection.snapshots.map((item) => [item.id, item.textChars])), texts: Object.fromEntries(selection.snapshots.map((item) => [item.id, item.text])) };
+          })(),
           activeGeneration
         })
       );
@@ -405,17 +414,25 @@ export const sakRoutes: FastifyPluginAsync = async (fastify) => {
       if (!text) {
         return reply.code(400).send({ message: "Teksten er tom." });
       }
-      const material = await prisma.sakMaterial.create({
-        data: {
-          sakId: draft.id,
-          kind: "text",
-          title: sanitizeMaterialTitle(body.title ?? "Tekstmateriale", "Tekstmateriale"),
-          extractedText: text,
-          textChars: text.length,
-          status: "ready",
-          enabled: true
-        }
-      });
+      const previous = body.replaceMaterialId ? await prisma.sakMaterial.findFirst({
+        where: { id: body.replaceMaterialId, sakId: draft.id }
+      }) : null;
+      if (body.replaceMaterialId && !previous) return reply.code(404).send({ message: MATERIAL_NOT_FOUND_MESSAGE });
+      const previousMetadata = previous?.metadataJson && typeof previous.metadataJson === "object" && !Array.isArray(previous.metadataJson) ? previous.metadataJson : {};
+      const materialData = {
+        kind: "text",
+        title: sanitizeMaterialTitle(body.title ?? previous?.title ?? "Tekstmateriale", "Tekstmateriale"),
+        url: body.url ?? previous?.url ?? null,
+        extractedText: text,
+        textChars: text.length,
+        status: "ready",
+        errorText: null,
+        enabled: true,
+        metadataJson: toJsonValue({ ...previousMetadata, ...(body.publisher !== undefined ? { publisher: body.publisher } : {}), originalTextChars: body.text.trim().length, pastedReplacement: Boolean(previous) })
+      };
+      const material = previous
+        ? await prisma.sakMaterial.update({ where: { id: previous.id }, data: materialData })
+        : await prisma.sakMaterial.create({ data: { sakId: draft.id, ...materialData } });
       await touchDraft(draft.id);
 
       return reply.code(201).send(sakMaterialPayload(material));
@@ -442,7 +459,7 @@ export const sakRoutes: FastifyPluginAsync = async (fastify) => {
       }
       const material = await prisma.sakMaterial.findFirst({
         where: { id: materialId, sakId: draft.id },
-        select: { id: true }
+        select: { id: true, metadataJson: true }
       });
       if (!material) {
         return reply.code(404).send({ message: MATERIAL_NOT_FOUND_MESSAGE });
@@ -450,7 +467,14 @@ export const sakRoutes: FastifyPluginAsync = async (fastify) => {
 
       const updated = await prisma.sakMaterial.update({
         where: { id: material.id },
-        data: { enabled: body.enabled }
+        data: {
+          ...(body.enabled !== undefined ? { enabled: body.enabled } : {}),
+          metadataJson: toJsonValue({
+            ...(material.metadataJson && typeof material.metadataJson === "object" && !Array.isArray(material.metadataJson) ? material.metadataJson : {}),
+            ...(body.publisher !== undefined ? { publisher: body.publisher } : {}),
+            ...(body.priority !== undefined ? { priority: body.priority } : {})
+          })
+        }
       });
       await touchDraft(draft.id);
 
@@ -527,6 +551,12 @@ export const sakRoutes: FastifyPluginAsync = async (fastify) => {
         });
       }
 
+      const baseVersion = body.baseVersionId ? await prisma.sakVersion.findFirst({
+        where: { id: body.baseVersionId, sakId: draft.id, status: { in: ["ready", "needs_review"] } }
+      }) : null;
+      if (body.baseVersionId && !baseVersion) return reply.code(400).send({ message: "Velg en tilgjengelig versjon som utgangspunkt." });
+      const baseArticle = baseVersion ? parseStoredSakArticle(baseVersion.articleJson) : null;
+      if (body.baseVersionId && !baseArticle) return reply.code(400).send({ message: "Versjonen har ingen lesbar tekst." });
       const phaseUpdatedAt = new Date();
       const generationRun = await logPrisma.generationRun.create({
         data: {
@@ -586,7 +616,10 @@ export const sakRoutes: FastifyPluginAsync = async (fastify) => {
         throw error;
       }
 
-      const previousArticle = parseStoredSakArticle(previousArticleJson);
+      const selectedArticle = baseArticle ?? parseStoredSakArticle(previousArticleJson);
+      const previousArticle = selectedArticle && body.editedArticle
+        ? { ...selectedArticle, ...body.editedArticle }
+        : selectedArticle;
       const todayIso = new Date().toISOString();
       let queuedJobId: string | null = null;
       try {
@@ -640,6 +673,9 @@ export const sakRoutes: FastifyPluginAsync = async (fastify) => {
           generationRunId: generationRun.id,
           targetVersion,
           materials: materials.snapshots,
+          materialCoverage: { included: materials.included, truncated: materials.truncated, dropped: materials.dropped },
+          ...(body.baseVersionId ? { baseVersionId: body.baseVersionId } : {}),
+          ...(body.revisionAction ? { revisionAction: body.revisionAction } : {}),
           ...(instruction ? { instruction } : {}),
           ...(previousArticle ? { previousArticleJson: previousArticle } : {}),
           titleOverride,
