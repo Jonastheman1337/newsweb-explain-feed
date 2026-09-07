@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { SakArticle } from "@newsweb/shared";
 import type { SakPromptPayload } from "@newsweb/prompt-kit";
-import { missingSakPublisherIssues, parseSakReferenceReview, sakReviewPassages, parseSakBrief } from "./sak-review.js";
+import { missingSakPublisherIssues, parseSakReferenceReview, sakReviewPassages, parseSakBrief, sakEvidenceExists } from "./sak-review.js";
 
 const text = "(Bloomberg) -- Liquid Network issues L-BTC against actual Bitcoin, which it locks up. With roughly 95% of reserves drained and the network paused, the incident exposes a critical weakness, Flynn said.";
 const payload: SakPromptPayload = { sakId: "s1", todayIso: "2026-09-07T10:00:00Z", targetChars: 1500, materials: [{ sourceId: "material_m1", kind: "text", title: "Tekstmateriale", text, textChars: text.length, status: "ready" }] };
@@ -51,5 +51,19 @@ describe("complete, source-bound semantic review", () => {
   it("requires the news brief's evidence to exist in the cited source", () => {
     const brief = { angle: "Reserver tappet", news: [{ fact: "Utsteder L-BTC", materialId: "material_m1", evidence: "Invented claim absent from the source" }], essentialContext: [], omit: [], uncertainties: [] };
     expect(() => parseSakBrief(JSON.stringify(brief), payload)).toThrow(/ikke finnes/);
+  });
+});
+
+
+describe("PDF evidence typography", () => {
+  it("matches an unchanged hyphenated word across a PDF line break", () => {
+    expect(sakEvidenceExists("company co-founded by cryptographer-turned-Bitcoin enthusiast", "company co-founded by cryptographer-\nturned-Bitcoin enthusiast")).toBe(true);
+    expect(sakEvidenceExists("a digital-asset lending platform", "a digital-\r\n  asset lending platform")).toBe(true);
+  });
+  it("does not hide inserted spaces, missing hyphens or changed words", () => {
+    expect(sakEvidenceExists("The t eam is working", "The team is working")).toBe(false);
+    expect(sakEvidenceExists("digitalasset lending platform", "digital-\nasset lending platform")).toBe(false);
+    expect(sakEvidenceExists("digital-asset lending platform", "digital- asset lending platform")).toBe(false);
+    expect(sakEvidenceExists("The network locks up bitcoin", "The network unlocks bitcoin")).toBe(false);
   });
 });

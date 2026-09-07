@@ -38,7 +38,9 @@ export function buildSakBriefPrompt(payload: SakPromptPayload, previous: SakArti
 }
 
 function normalizeEvidence(value: string): string {
-  return value.normalize("NFKC").replace(/[“”„]/g, '"').replace(/[‘’]/g, "'").replace(/\s+/g, " ").trim().toLowerCase();
+  // PDF wrapping can put a newline after a retained compound-word hyphen.
+  // Join that layout break only; never erase word-internal spaces or letters.
+  return value.normalize("NFKC").replace(/(\p{L}[-‐‑])[\t ]*\r?\n[\t ]*(?=\p{L})/gu, "$1").replace(/[“”„]/g, '"').replace(/[‘’]/g, "'").replace(/\s+/g, " ").trim().toLowerCase();
 }
 export function sakEvidenceExists(quote: string, text: string): boolean {
   const needle = normalizeEvidence(quote);
