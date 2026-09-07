@@ -1,0 +1,432 @@
+<div id="autoweb-proposal" aria-label="Autoweb design proposal">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500&family=Manrope:wght@400;500&display=swap');
+#autoweb-proposal { --nw-bg:light-dark(#f4f4f1,#1d1d1d); --nw-paper:light-dark(#fff,#282828); --nw-ink:light-dark(#242824,#f5f4ef); --nw-sub:light-dark(#646a63,#aaa9a3); --nw-line:light-dark(#dedfd8,#41413b); --nw-soft:light-dark(#eeefea,#33332e); --nw-green:light-dark(#236747,#99d2ae); --nw-green-bg:light-dark(#edf5ed,#28382d); --nw-amber:light-dark(#9d4828,#eab090); --nw-amber-bg:light-dark(#faf0e8,#3a2e27); --nw-red:light-dark(#a42d30,#ffa5a5); --nw-red-bg:light-dark(#fbebea,#402a2a); --nw-space:24px; color:var(--nw-ink); font:14px/1.55 'IBM Plex Sans',Arial,sans-serif; }
+#autoweb-proposal * { box-sizing:border-box; }
+#autoweb-proposal [hidden] { display:none!important; }
+#autoweb-proposal button,#autoweb-proposal input,#autoweb-proposal select,#autoweb-proposal textarea { font:inherit; }
+#autoweb-proposal button { display:inline-flex; align-items:center; justify-content:center; gap:7px; color:var(--nw-ink); background:var(--nw-paper); border:1px solid var(--nw-line); border-radius:6px; padding:7px 11px; cursor:pointer; line-height:1.35; white-space:normal; }
+#autoweb-proposal button:hover { background:var(--nw-soft); }
+#autoweb-proposal button:disabled { opacity:.5; cursor:default; }
+#autoweb-proposal button.nw-main { color:var(--nw-paper); background:var(--nw-ink); border-color:var(--nw-ink); }
+#autoweb-proposal button.nw-quiet { background:transparent; border-color:transparent; color:var(--nw-sub); }
+#autoweb-proposal button.nw-quiet:hover { color:var(--nw-ink); background:var(--nw-soft); }
+#autoweb-proposal button.nw-icon { padding:8px; min-width:34px; }
+#autoweb-proposal button[aria-pressed="true"] { color:var(--nw-ink); background:var(--nw-soft); border-color:var(--nw-line); }
+#autoweb-proposal svg { width:16px; height:16px; flex-shrink:0; }
+#autoweb-proposal input:not([type="checkbox"]),#autoweb-proposal select,#autoweb-proposal textarea { color:var(--nw-ink); background:var(--nw-paper); border:1px solid var(--nw-line); border-radius:6px; padding:9px 11px; min-width:0; width:100%; }
+#autoweb-proposal input::placeholder,#autoweb-proposal textarea::placeholder { color:var(--nw-sub); opacity:1; }
+#autoweb-proposal input[type="checkbox"] { accent-color:var(--nw-green); width:16px; height:16px; }
+#autoweb-proposal textarea { resize:vertical; }
+#autoweb-proposal label { display:grid; gap:7px; }
+#autoweb-proposal h1,#autoweb-proposal h2,#autoweb-proposal h3 { font-family:'Manrope','IBM Plex Sans',Arial,sans-serif; font-weight:500; letter-spacing:-.03em; }
+#autoweb-proposal h1 { font-size:25px; line-height:1.3; margin:0; }
+#autoweb-proposal h2 { font-size:25px; line-height:1.3; margin:12px 0; }
+#autoweb-proposal h3 { font-size:18px; line-height:1.4; margin:0 0 14px; }
+#autoweb-proposal p { margin:0 0 13px; }
+#autoweb-proposal .nw-muted { color:var(--nw-sub); }
+#autoweb-proposal .nw-tiny { font-size:12px; }
+#autoweb-proposal .nw-row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+#autoweb-proposal .nw-spread { justify-content:space-between; }
+#autoweb-proposal .nw-end { margin-left:auto; }
+#autoweb-proposal .nw-demo { display:flex; gap:12px; flex-wrap:wrap; align-items:center; justify-content:space-between; padding:0 0 12px; color:var(--nw-sub); font-size:12px; }
+#autoweb-proposal .nw-shell { position:relative; border:1px solid var(--nw-line); border-radius:10px; background:var(--nw-bg); overflow:clip; }
+#autoweb-proposal .nw-top { display:flex; align-items:center; flex-wrap:wrap; gap:24px; padding:15px 26px; background:var(--nw-paper); border-bottom:1px solid var(--nw-line); }
+#autoweb-proposal .nw-logo { font-family:'Manrope',sans-serif; font-size:21px; letter-spacing:-1px; padding:0; font-weight:500; }
+#autoweb-proposal .nw-nav { display:flex; gap:5px; }
+#autoweb-proposal .nw-nav button { border-color:transparent; background:transparent; color:var(--nw-sub); padding:7px 12px; }
+#autoweb-proposal .nw-nav button[aria-current="page"] { color:var(--nw-ink); background:var(--nw-soft); }
+#autoweb-proposal .nw-global { display:flex; align-items:center; gap:6px; margin-left:auto; }
+#autoweb-proposal .nw-live { display:inline-flex; align-items:center; gap:6px; margin-right:10px; color:var(--nw-green); font-size:12px; }
+#autoweb-proposal .nw-dot { display:inline-block; height:6px; width:6px; border-radius:50%; background:currentColor; flex-shrink:0; }
+#autoweb-proposal .nw-pop-wrap { position:relative; }
+#autoweb-proposal .nw-pop { position:absolute; top:calc(100% + 6px); right:0; z-index:10; min-width:190px; padding:5px; border:1px solid var(--nw-line); background:var(--nw-paper); border-radius:8px; box-shadow:0 7px 24px light-dark(#252b2320,#0004); }
+#autoweb-proposal .nw-pop button { display:flex; width:100%; justify-content:flex-start; border:0; text-align:left; padding:10px; background:transparent; }
+#autoweb-proposal .nw-page { padding:27px; min-height:660px; }
+#autoweb-proposal .nw-feed { width:100%; max-width:696px; margin:0 auto; }
+#autoweb-proposal .nw-heading { margin-bottom:20px; }
+#autoweb-proposal .nw-search-row { display:flex; gap:7px; margin:18px 0 16px; align-items:center; }
+#autoweb-proposal .nw-search { position:relative; flex:1; min-width:90px; }
+#autoweb-proposal .nw-search input { padding-left:34px; background:var(--nw-paper); }
+#autoweb-proposal .nw-search>i,#autoweb-proposal .nw-search>svg { position:absolute; left:11px; top:12px; color:var(--nw-sub); }
+#autoweb-proposal .nw-filter-tray { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; padding:0 0 16px; }
+#autoweb-proposal .nw-filter-tray label { font-size:12px; color:var(--nw-sub); }
+#autoweb-proposal .nw-card { background:var(--nw-paper); border:1px solid var(--nw-line); border-radius:8px; margin-bottom:14px; }
+#autoweb-proposal .nw-card.nw-important { border-top:3px solid var(--nw-amber); }
+#autoweb-proposal .nw-card-content { padding:var(--nw-space) var(--nw-space) 14px; }
+#autoweb-proposal .nw-meta { color:var(--nw-sub); font-size:12px; display:flex; align-items:center; flex-wrap:wrap; gap:8px; }
+#autoweb-proposal .nw-meta time { margin-left:auto; font-variant-numeric:tabular-nums; }
+#autoweb-proposal .nw-important-label { display:inline-flex; align-items:center; gap:6px; color:var(--nw-amber); font-weight:500; }
+#autoweb-proposal .nw-edit { border-radius:2px; cursor:text; overflow-wrap:anywhere; }
+#autoweb-proposal .nw-edit:hover { background:var(--nw-bg); }
+#autoweb-proposal .nw-edit:focus { outline:2px solid var(--nw-line); outline-offset:5px; }
+#autoweb-proposal .nw-body { font-size:15px; line-height:1.7; }
+#autoweb-proposal .nw-edit-label { font-size:12px; color:var(--nw-sub); margin-top:14px; display:flex; gap:8px; align-items:center; min-height:19px; }
+#autoweb-proposal .nw-edit-label .nw-local { margin-left:auto; }
+#autoweb-proposal .nw-card-actions { display:flex; align-items:center; gap:4px; padding:0 16px 13px; }
+#autoweb-proposal .nw-card-actions .nw-copy { margin-left:auto; }
+#autoweb-proposal .nw-status { display:flex; gap:12px; align-items:center; justify-content:space-between; flex-wrap:wrap; padding:13px var(--nw-space); background:var(--nw-amber-bg); color:var(--nw-amber); border-top:1px solid var(--nw-line); border-radius:0 0 7px 7px; font-size:12px; }
+#autoweb-proposal .nw-status.nw-ready { background:var(--nw-green-bg); color:var(--nw-green); }
+#autoweb-proposal .nw-status.nw-failed { background:var(--nw-red-bg); color:var(--nw-red); }
+#autoweb-proposal .nw-status.nw-finished { background:var(--nw-paper); color:var(--nw-sub); }
+#autoweb-proposal .nw-spinner { display:inline-block; width:12px; height:12px; border:2px solid var(--nw-line); border-top-color:currentColor; border-radius:50%; animation:nw-spin 1s linear infinite; flex-shrink:0; }
+#autoweb-proposal .nw-pulse { animation:nw-pulse 1.6s ease-in-out infinite; }
+#autoweb-proposal .nw-enter { animation:nw-enter .35s ease-out; }
+#autoweb-proposal .nw-new { margin:0 0 14px; text-align:center; }
+#autoweb-proposal .nw-simple { padding:18px var(--nw-space); }
+#autoweb-proposal .nw-simple h2 { font-size:19px; }
+#autoweb-proposal .nw-skeleton { height:9px; background:var(--nw-soft); border-radius:3px; margin:9px 0; width:94%; }
+#autoweb-proposal .nw-alert { padding:11px 14px; border-radius:6px; color:var(--nw-red); background:var(--nw-red-bg); margin-bottom:14px; }
+#autoweb-proposal .nw-empty { padding:70px 15px; text-align:center; }
+#autoweb-proposal .nw-empty h2 { font-size:21px; margin-bottom:18px; }
+#autoweb-proposal .nw-work-head { display:flex; align-items:center; flex-wrap:wrap; justify-content:space-between; gap:12px; margin-bottom:17px; }
+#autoweb-proposal .nw-work-grid { display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:20px; align-items:start; }
+#autoweb-proposal .nw-work-grid>div,#autoweb-proposal .nw-work-grid>aside { min-width:0; }
+#autoweb-proposal .nw-side { background:var(--nw-paper); border:1px solid var(--nw-line); border-radius:8px; }
+#autoweb-proposal .nw-side-nav { display:flex; gap:4px; padding:8px; border-bottom:1px solid var(--nw-line); }
+#autoweb-proposal .nw-side-nav button { flex:1; border:0; background:transparent; color:var(--nw-sub); padding:7px; }
+#autoweb-proposal .nw-side-nav button[aria-selected="true"] { background:var(--nw-soft); color:var(--nw-ink); }
+#autoweb-proposal .nw-side-content { padding:18px; }
+#autoweb-proposal .nw-source { font-size:13px; line-height:1.65; }
+#autoweb-proposal .nw-source h3 { font-size:17px; margin:12px 0; }
+#autoweb-proposal .nw-source mark { color:var(--nw-ink); background:var(--nw-amber-bg); }
+#autoweb-proposal .nw-source-choice { width:100%; text-align:left; justify-content:flex-start; margin-bottom:8px; }
+#autoweb-proposal .nw-source-choice small { color:var(--nw-sub); margin-left:auto; }
+#autoweb-proposal .nw-section-label { font-size:12px; color:var(--nw-sub); display:block; margin:15px 0 10px; }
+#autoweb-proposal .nw-composer { margin-top:16px; padding:18px; background:var(--nw-paper); border:1px solid var(--nw-line); border-radius:8px; }
+#autoweb-proposal .nw-composer textarea { border:0; padding:0; min-height:66px; }
+#autoweb-proposal .nw-composer .nw-row { margin-top:12px; }
+#autoweb-proposal .nw-composer select { width:auto; font-size:12px; padding:6px 8px; }
+#autoweb-proposal .nw-history { display:grid; gap:9px; }
+#autoweb-proposal .nw-history button { text-align:left; justify-content:space-between; padding:12px; }
+#autoweb-proposal .nw-history button span { display:block; }
+#autoweb-proposal .nw-proposal-title { text-align:left; width:100%; justify-content:flex-start; margin:0 0 8px; padding:12px; }
+#autoweb-proposal .nw-lines { display:grid; gap:0; }
+#autoweb-proposal .nw-line { display:flex; align-items:center; gap:12px; padding:17px 0; border-bottom:1px solid var(--nw-line); }
+#autoweb-proposal .nw-line:last-child { border-bottom:0; }
+#autoweb-proposal .nw-line-title { flex:1; min-width:0; }
+#autoweb-proposal .nw-line-title button { border:0; background:transparent; padding:0; justify-content:flex-start; text-align:left; font-size:16px; }
+#autoweb-proposal .nw-line-title .nw-tiny { margin-top:4px; }
+#autoweb-proposal .nw-paper { padding:var(--nw-space); background:var(--nw-paper); border:1px solid var(--nw-line); border-radius:8px; }
+#autoweb-proposal .nw-form-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin:15px 0; }
+#autoweb-proposal .nw-materials { display:grid; gap:8px; margin-bottom:14px; }
+#autoweb-proposal .nw-material { display:flex; align-items:center; gap:9px; padding:9px 0; border-bottom:1px solid var(--nw-line); }
+#autoweb-proposal .nw-material label { display:flex; align-items:center; gap:9px; flex:1; min-width:0; }
+#autoweb-proposal .nw-material span { overflow-wrap:anywhere; }
+#autoweb-proposal .nw-source-add { display:grid; gap:10px; padding-top:14px; }
+#autoweb-proposal .nw-drop { border:1px dashed var(--nw-line); border-radius:7px; text-align:center; padding:32px 16px; }
+#autoweb-proposal .nw-tabs { display:flex; flex-wrap:wrap; gap:5px; margin-bottom:16px; }
+#autoweb-proposal .nw-tabs button { background:transparent; border-color:transparent; color:var(--nw-sub); }
+#autoweb-proposal .nw-tabs button[aria-selected="true"] { color:var(--nw-ink); background:var(--nw-soft); }
+#autoweb-proposal .nw-table { width:100%; border-collapse:collapse; text-align:left; font-size:13px; }
+#autoweb-proposal .nw-table th { font-weight:400; color:var(--nw-sub); font-size:12px; }
+#autoweb-proposal .nw-table th,#autoweb-proposal .nw-table td { padding:13px 9px; border-bottom:1px solid var(--nw-line); vertical-align:top; }
+#autoweb-proposal .nw-table button { text-align:left; justify-content:flex-start; border:0; background:transparent; padding:0; }
+#autoweb-proposal .nw-table .nw-good { color:var(--nw-green); }
+#autoweb-proposal .nw-table .nw-bad { color:var(--nw-red); }
+#autoweb-proposal details { border-bottom:1px solid var(--nw-line); padding:12px 0; }
+#autoweb-proposal summary { cursor:pointer; color:var(--nw-sub); }
+#autoweb-proposal details[open]>summary { margin-bottom:13px; }
+#autoweb-proposal .nw-modal-layer { position:absolute; inset:0; z-index:30; background:light-dark(#20231d55,#0008); padding:58px 18px 18px; display:flex; align-items:flex-start; justify-content:center; }
+#autoweb-proposal .nw-modal { width:min(470px,100%); border-radius:10px; border:1px solid var(--nw-line); padding:24px; background:var(--nw-paper); box-shadow:0 15px 60px light-dark(#20231d30,#0008); }
+#autoweb-proposal .nw-modal-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:13px; }
+#autoweb-proposal .nw-modal-head h2 { font-size:21px; margin:0; }
+#autoweb-proposal .nw-setting { display:flex; align-items:center; justify-content:space-between; gap:20px; padding:15px 0; border-bottom:1px solid var(--nw-line); }
+#autoweb-proposal .nw-setting select { width:154px; }
+#autoweb-proposal .nw-check { display:flex; gap:10px; align-items:center; padding:8px 0; }
+#autoweb-proposal .nw-login { max-width:330px; padding:50px 0 80px; margin:auto; }
+#autoweb-proposal .nw-login form { display:grid; gap:18px; margin-top:30px; }
+#autoweb-proposal .nw-toast { position:absolute; bottom:18px; left:50%; transform:translateX(-50%); z-index:40; max-width:90%; padding:9px 16px; background:var(--nw-ink); color:var(--nw-paper); border-radius:7px; font-size:13px; text-align:center; }
+#autoweb-proposal[data-density="compact"] { --nw-space:18px; }
+#autoweb-proposal[data-motion="off"] * { animation:none!important; }
+#autoweb-proposal.nw-mobile { max-width:390px; margin:0 auto; }
+@keyframes nw-spin { to { transform:rotate(360deg); } }
+@keyframes nw-pulse { 50% { opacity:.35; } }
+@keyframes nw-enter { from { transform:translateY(5px); opacity:.4; } to { transform:translateY(0); opacity:1; } }
+@media(prefers-reduced-motion:reduce) { #autoweb-proposal * { animation:none!important; } }
+@container nw (max-width:700px) { #autoweb-proposal .nw-work-grid { grid-template-columns:minmax(0,1fr); } }
+#autoweb-proposal .nw-shell { container-type:inline-size; container-name:nw; }
+@container nw (max-width:520px) {
+ #autoweb-proposal .nw-top { gap:10px; padding:12px; }
+ #autoweb-proposal .nw-logo { font-size:19px; }
+ #autoweb-proposal .nw-nav { gap:0; }
+ #autoweb-proposal .nw-nav button { padding:7px 9px; }
+ #autoweb-proposal .nw-live { display:none; }
+ #autoweb-proposal .nw-page { padding:18px 12px; }
+ #autoweb-proposal h2 { font-size:23px; }
+ #autoweb-proposal .nw-filter-tray { grid-template-columns:1fr; }
+ #autoweb-proposal .nw-card-content { padding:18px 18px 10px; }
+ #autoweb-proposal .nw-status { padding:12px 18px; }
+ #autoweb-proposal .nw-search-row { flex-wrap:wrap; }
+ #autoweb-proposal .nw-search { flex-basis:100%; }
+ #autoweb-proposal .nw-form-grid { grid-template-columns:1fr; }
+ #autoweb-proposal .nw-table th,#autoweb-proposal .nw-table td { padding:12px 5px; }
+ #autoweb-proposal .nw-table .nw-optional { display:none; }
+ #autoweb-proposal .nw-modal { padding:18px; }
+ #autoweb-proposal .nw-setting { gap:8px; }
+ #autoweb-proposal .nw-setting select { width:138px; }
+}
+@media(pointer:coarse) { #autoweb-proposal button { min-height:44px; } #autoweb-proposal input,#autoweb-proposal textarea,#autoweb-proposal select { font-size:16px; } }
+</style>
+<div class="nw-demo"><span>Designforslag · Eksempeldata</span><button type="button" data-do="play"><i data-lucide="play" aria-hidden="true"></i>Spill nyhet</button></div>
+<div class="nw-shell">
+  <header class="nw-top">
+    <button class="nw-quiet nw-logo" type="button" data-do="feed">Autoweb</button>
+    <nav class="nw-nav" aria-label="Hovedmeny"><button type="button" data-do="feed" data-nav="feed" aria-current="page">Feed</button><button type="button" data-do="stories" data-nav="stories">Saker</button></nav>
+    <div class="nw-global"><span class="nw-live"><span class="nw-dot"></span><span data-ui="connection">Live</span></span><button type="button" class="nw-quiet nw-icon" data-do="notifications" aria-label="Varsler" data-tooltip="Varsler"><i data-lucide="bell" aria-hidden="true"></i></button><button type="button" class="nw-quiet nw-icon" data-do="settings" aria-label="Innstillinger" data-tooltip="Innstillinger"><i data-lucide="settings-2" aria-hidden="true"></i></button><div class="nw-pop-wrap"><button type="button" class="nw-quiet nw-icon" data-do="account" aria-label="Konto" aria-expanded="false"><i data-lucide="circle-user-round" aria-hidden="true"></i></button><div class="nw-pop" data-ui="account-menu" hidden><button type="button" data-do="signals">Signaler</button><button type="button" data-do="login">Logg ut</button></div></div></div>
+  </header>
+  <main class="nw-page" data-ui="page"></main>
+  <div class="nw-modal-layer" data-ui="modal-layer" hidden><section class="nw-modal" role="dialog" aria-modal="true" aria-labelledby="nw-modal-title"><div class="nw-modal-head"><h2 id="nw-modal-title"></h2><button type="button" class="nw-quiet nw-icon" data-do="close-modal" aria-label="Lukk"><i data-lucide="x" aria-hidden="true"></i></button></div><div data-ui="modal-body"></div></section></div>
+  <div class="nw-toast" role="status" data-ui="toast" hidden></div>
+</div>
+<script>
+(() => {
+ const root = document.getElementById('autoweb-proposal');
+ const ui = name => root.querySelector('[data-ui="'+name+'"]');
+ const esc = value => String(value ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const icon = name => '<i data-lucide="'+name+'" aria-hidden="true"></i>';
+ const paragraphs = value => value.split('\n\n').map(p=>'<p>'+esc(p)+'</p>').join('');
+ const button = (action,label,cls='',data='') => '<button type="button" class="'+cls+'" data-do="'+action+'" '+data+'>'+label+'</button>';
+ const originalTitle = 'Nordvik kjøper konkurrent for 2,4 milliarder kroner';
+ const firstBody = 'Nordvik Industri har inngått en avtale om å kjøpe svenske Bergström AB for 2,4 milliarder kroner. Oppkjøpet må godkjennes av konkurransemyndighetene.';
+ const fullBody = firstBody+'\n\nDet fremgår av en børsmelding mandag morgen. Selskapet venter å gjennomføre kjøpet i første kvartal neste år.\n\nBergström leverer utstyr til prosessindustrien og har 620 ansatte. Selskapet omsatte for 1,8 milliarder svenske kroner i fjor.\n\nKjøpet skal finansieres med tilgjengelige kontanter og en ny lånefasilitet, opplyser Nordvik.';
+ function version(label,title,body,time) { return {label,title,body,time,dirty:false,originalTitle:title,originalBody:body}; }
+ const articles = {
+  nordvik:{issuer:'Nordvik Industri',ticker:'NVI',time:'08:02',category:'Oppkjøp',important:true,selected:'first',versions:{first:version('Førsteutkast',originalTitle,firstBody,'08:02'),full:version('Utfyllende',originalTitle,fullBody,'08:03')}},
+  fjord:{issuer:'Fjordlogistikk',ticker:'FJL',time:'08:00',category:'Kontrakter',selected:'full',versions:{full:version('Notis','Fjordlogistikk forlenger avtale med svensk kunde','Fjordlogistikk forlenger transportavtalen med svenske Linde Handel med tre år. Avtalen har en samlet verdi på 180 millioner kroner, opplyser selskapet i en børsmelding.','08:01')}},
+  sak:{issuer:'Min sak',ticker:'3 kilder',time:'08:12',category:'',selected:'full',versions:{full:version('Utkast','Nordvik dobler satsingen i Sverige',fullBody+'\n\nOppkjøpet følger utvidelsen av Nordviks anlegg i Göteborg i juni. Selskapet har tidligere varslet at veksten i Sverige vil være en sentral del av strategien fremover.','08:12')}}
+ };
+ const state = {view:'feed',article:'nordvik',side:'sources',source:'notice',stage:'ready',scenario:'normal',query:'',important:false,filters:false,market:'Alle',category:'Alle',issuer:'Alle',newAdded:false,storyGenerated:false,storyBusy:false,regenerating:false,signalTab:'Genereringer',theme:'system',density:'comfortable',motion:true,mobile:false,notifications:'Av',muted:['Rentefastsettelser']};
+ const savedStories={nordvik:articles.sak,prices:{issuer:'Min sak',ticker:'2 kilder',time:'16:24',category:'',selected:'full',versions:{full:version('Utkast','Kraftprisene stiger i Sør-Norge','Kraftprisene stiger i Sør-Norge mandag. I prisområdet NO2 er gjennomsnittsprisen 84 øre per kilowattime, mot 61 øre søndag.','16:24')}}};
+ let timers = [], toastTimer, previousFocus;
+ let materials = [{title:'Børsmelding · Nordvik',kind:'Newsweb',enabled:true},{title:'Oppkjøpspresentasjon.pdf',kind:'PDF',enabled:true}];
+ let newMaterials = [];
+ let customInstruction = '', storyTitle = '', storyAngle = '', storyLength = '2500';
+ function current(id=state.article) { const a=articles[id]; return a.versions[a.selected]; }
+ function icons() { if(globalThis.lucide) globalThis.lucide.createIcons({attrs:{width:16,height:16}}); }
+ function moreMenu(id) {
+  return '<div class="nw-pop-wrap">'+button('more',icon('ellipsis'),'nw-quiet nw-icon','aria-label="Flere valg" aria-expanded="false" data-id="'+id+'"')+'<div class="nw-pop" data-menu="'+id+'" hidden>'+button('titles','Titler','','data-id="'+id+'"')+button('adjust','Ny versjon','','data-id="'+id+'"')+button('history','Versjoner','','data-id="'+id+'"')+button('original','AI-original','','data-id="'+id+'"')+button('feedback','Meld feil','','data-id="'+id+'"')+'</div></div>';
+ }
+ function noticeCard(id,desk=false) {
+  const a=articles[id],v=current(id),pending=id==='nordvik'&&state.stage==='pending',isFast=id==='nordvik';
+  const meta='<div class="nw-meta">'+(a.important?'<span class="nw-important-label"><span class="nw-dot '+(state.stage!=='ready'?'nw-pulse':'')+'"></span>Viktig</span>':'')+'<span>'+esc(a.issuer)+' · '+esc(a.ticker)+'</span><time>'+a.time+'</time></div>';
+  let status='';
+  if(isFast) {
+   if(pending||state.stage==='draft') status='<div class="nw-status"><span class="nw-row"><span class="nw-spinner"></span>'+(pending?'Førsteutkast lages':'Utfyllende versjon lages')+'</span><span>'+(pending?'Leser meldingen':'Førsteutkast klart')+'</span></div>';
+   else if(state.stage==='failed') status='<div class="nw-status nw-failed"><span>Utfyllende versjon feilet</span>'+button('retry','Prøv igjen')+'</div>';
+   else if(a.selected==='first') status='<div class="nw-status nw-ready"><span class="nw-row">'+icon('check')+'Utfyllende versjon klar</span>'+button('show-full','Vis versjon','nw-main')+'</div>';
+   else status='<div class="nw-status nw-finished"><span>'+esc(v.label)+' · '+v.time+'</span>'+button('show-first','Førsteutkast','nw-quiet')+'</div>';
+  }
+  if(state.regenerating&&id===state.article) status='<div class="nw-status"><span class="nw-row"><span class="nw-spinner"></span>Ny versjon lages</span></div>';
+  if(a.availableVersion&&a.availableVersion!==a.selected)status='<div class="nw-status nw-ready"><span>Ny versjon klar</span>'+button('new-version','Vis versjon','nw-main','data-id="'+id+'"')+'</div>';
+  return '<article class="nw-card '+(a.important?'nw-important':'')+'" data-feed-card="'+id+'" data-article="'+id+'"><div class="nw-card-content">'+meta+(pending?'<h2>Nordvik Industri: Acquisition agreement</h2><div class="nw-skeleton"></div><div class="nw-skeleton" style="width:70%"></div>':'<div class="nw-edit-label"><span>'+esc(v.label)+'</span><span class="nw-local" data-edit-status="'+id+'">'+(v.dirty?'● Redigert':'')+'</span></div><h2 class="nw-edit" contenteditable="true" role="textbox" aria-label="Tittel" data-edit="title" data-id="'+id+'">'+esc(v.title)+'</h2><div class="nw-edit nw-body" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Notistekst" data-edit="body" data-id="'+id+'">'+paragraphs(v.body)+'</div>')+'</div><div class="nw-card-actions">'+(desk?'':button('sources',icon('panel-right-open')+'Kilder','nw-quiet','data-id="'+id+'"'))+(pending?'':moreMenu(id)+button('copy',icon('copy')+'Kopier','nw-copy','data-id="'+id+'"'))+'</div>'+status+'</article>';
+ }
+ function feed() {
+  const filteredEmpty=state.scenario==='empty';
+  return '<div class="nw-feed"><div class="nw-row nw-spread nw-heading"><h1>Børsmeldinger</h1><span class="nw-muted nw-tiny">7. september</span></div><div class="nw-search-row"><div class="nw-search">'+icon('search')+'<input data-input="search" aria-label="Søk i feed" placeholder="Søk" value="'+esc(state.query)+'"></div>'+button('important','Viktige','','aria-pressed="'+state.important+'"')+button('filters',icon('sliders-horizontal')+'Filter','','aria-expanded="'+state.filters+'"')+'</div><div class="nw-filter-tray" '+(!state.filters?'hidden':'')+'><label>Marked<select data-change="market"><option>Alle</option><option>Oslo Børs</option><option>Euronext Growth</option></select></label><label>Kategori<select data-change="category"><option>Alle</option><option>Oppkjøp</option><option>Kontrakter</option><option>Resultater</option></select></label><label>Utsteder<select data-change="issuer"><option>Alle</option><option>Nordvik Industri</option><option>Fjordlogistikk</option></select></label></div>'+(state.scenario==='offline'?'<div class="nw-alert nw-row nw-spread" role="status"><span>Frakoblet · Sist oppdatert 08:03</span>'+button('reconnect','Koble til')+'</div>':'')+(state.scenario==='new'&&!state.newAdded?'<div class="nw-new">'+button('new-notices','2 nye meldinger')+'</div>':'')+(state.newAdded?'<article class="nw-card nw-simple nw-enter" data-feed-card="new"><div class="nw-meta"><span>Solstrand Energi · SOLE</span><time>08:04</time></div><h2>Solstrand Energi inngår avtale om nytt kraftverk</h2><span class="nw-row nw-muted nw-tiny"><span class="nw-spinner"></span>Skriver</span></article><article class="nw-card nw-simple nw-enter" data-feed-card="new2"><div class="nw-meta"><span>Havøy Shipping · HAVS</span><time>08:04</time></div><h2>Havøy Shipping kjøper to skip</h2><span class="nw-row nw-muted nw-tiny"><span class="nw-spinner"></span>Leser meldingen</span></article>':'')+(!filteredEmpty?noticeCard('nordvik')+noticeCard('fjord')+'<article class="nw-card nw-simple" data-feed-card="vestby"><div class="nw-meta"><span>Vestby Eiendom · VBE</span><time>07:58</time></div><h2>Vestby Eiendom selger lagerbygg i Drammen</h2><div class="nw-row nw-spread"><span class="nw-row nw-muted nw-tiny"><span class="nw-spinner"></span>Skriver</span>'+button('vestby-source','Kilde','nw-quiet')+'</div></article><article class="nw-card nw-simple" data-feed-card="routine"><div class="nw-meta"><span>Havøy Shipping · HAVS</span><time>07:54</time></div><h2>Havøy Shipping: Rentefastsettelse</h2><div class="nw-row nw-spread"><span class="nw-muted nw-tiny">Ikke generert</span>'+button('manual-generate','Lag notis','nw-quiet')+'</div></article>':'')+'<div class="nw-empty" data-ui="empty" '+(!filteredEmpty?'hidden':'')+'><h2>Ingen treff</h2>'+button('clear-filters','Nullstill filtre')+'</div><div class="nw-row nw-spread nw-muted nw-tiny"><span>Oslo-tid</span>'+button('older','Eldre meldinger','nw-quiet')+'</div></div>';
+ }
+ function sourcePanel(id) {
+  const a=articles[id];
+  if(state.side==='history') return '<div class="nw-history">'+Object.entries(a.versions).filter(([key])=>id!=='nordvik'||key==='first'||state.stage==='ready').map(([key,v])=>button('choose-version','<span>'+esc(v.label)+(v.dirty?'<span class="nw-muted nw-tiny">Redigert</span>':'')+'</span><span class="nw-muted nw-tiny">'+v.time+'</span>','','data-key="'+key+'" aria-pressed="'+(a.selected===key)+'"')).join('')+'</div><details><summary>Generering</summary><div class="nw-tiny nw-muted">Kilde lest 08:02:01<br>Førsteutkast 08:02:07<br>Utfyllende 08:02:48</div></details>';
+  if(id==='sak') return materialList(materials,false)+'<div class="nw-row">'+button('add-source','+ Kilde','nw-quiet')+'</div><details><summary>Merknader</summary><p class="nw-source">Oppkjøpet er avhengig av myndighetsgodkjenning.</p></details>';
+  if(id==='fjord') return '<div class="nw-source"><span class="nw-section-label">Børsmelding · 08:00</span><h3>Fjordlogistikk extends agreement</h3><p>Fjordlogistikk has extended its transport agreement with Linde Handel for three years.</p><p>The agreement has a total value of <mark>NOK 180 million</mark>.</p></div>';
+  return '<div class="nw-source">'+button('source-notice',icon('file-text')+'Børsmelding','nw-source-choice','aria-pressed="'+(state.source==='notice')+'"')+button('source-pdf',icon('file')+'Presentasjon <small>PDF</small>','nw-source-choice','aria-pressed="'+(state.source==='pdf')+'"')+(state.source==='notice'?'<span class="nw-section-label">Original · 08:02</span><h3>Nordvik Industri: Acquisition agreement</h3><p>Nordvik Industri has entered into an agreement to acquire Bergström AB for <mark>NOK 2.4 billion</mark>.</p><p>Completion is subject to regulatory approval and is expected in the first quarter of next year.</p><p>The acquisition will be financed through available cash and a new credit facility.</p>':'<span class="nw-section-label">Oppkjøpspresentasjon.pdf · Side 4</span><h3>Bergström AB</h3><p>Revenue: <mark>SEK 1.8 billion</mark><br>Employees: <mark>620</mark><br>Sector: Process equipment</p><p>Expected completion: Q1 next year.</p>')+'<details><summary>Flere kilder</summary>'+materialList(materials,false)+button('add-source','+ Kilde','nw-quiet')+'</details></div>';
+ }
+ function composer() {
+  return '<div class="nw-composer"><textarea data-input="instruction" aria-label="Instruksjon for ny versjon" placeholder="Ny vinkel eller endring…" rows="2">'+esc(customInstruction)+'</textarea><div class="nw-row"><select aria-label="Lengde"><option>Notis</option><option>Utvidet</option></select>'+button('add-source','+ Kilde','nw-quiet')+button('generate-version',state.regenerating?'Skriver…':'Lag versjon','nw-main nw-end',state.regenerating?'disabled':'')+'</div></div>';
+ }
+ function desk() {
+  return '<div class="nw-work-head">'+button('feed',icon('arrow-left')+'Feed','nw-quiet')+'<span class="nw-muted nw-tiny">'+esc(articles[state.article].issuer)+'</span></div><div class="nw-work-grid"><div>'+noticeCard(state.article,true)+composer()+'</div><aside class="nw-side"><div class="nw-side-nav" role="tablist" aria-label="Arbeidsrom">'+button('side-sources','Kilder','','role="tab" aria-selected="'+(state.side==='sources')+'"')+button('side-history','Versjoner','','role="tab" aria-selected="'+(state.side==='history')+'"')+'</div><div class="nw-side-content">'+sourcePanel(state.article)+'</div></aside></div>';
+ }
+ function materialList(list,isNew) {
+  return '<div class="nw-materials">'+list.map((m,i)=>'<div class="nw-material"><label><input type="checkbox" data-material="'+i+'" data-new="'+isNew+'" '+(m.enabled?'checked':'')+'><span>'+esc(m.title)+' <span class="nw-muted nw-tiny">'+esc(m.kind)+'</span></span></label>'+button('remove-material',icon('x'),'nw-quiet nw-icon','aria-label="Fjern kilde" data-index="'+i+'" data-new="'+isNew+'"')+'</div>').join('')+'</div>';
+ }
+ function stories() {
+  return '<div class="nw-feed"><div class="nw-row nw-spread nw-heading"><h1>Saker</h1>'+button('new-story',icon('plus')+'Ny sak','nw-main')+'</div><div class="nw-lines">'+Object.entries(savedStories).map(([key,a])=>'<div class="nw-line"><div class="nw-line-title">'+button('open-story',esc(a.versions[a.selected].title),'','data-key="'+key+'"')+'<div class="nw-muted nw-tiny">'+a.time+' · '+a.ticker+'</div></div><span class="nw-tiny nw-muted">'+(a.versions[a.selected].dirty?'Redigert':'Utkast')+'</span></div>').join('')+'</div></div>';
+ }
+ function storyEditor() {
+  if(state.storyGenerated) return '<div class="nw-work-head">'+button('stories',icon('arrow-left')+'Saker','nw-quiet')+'<span class="nw-muted nw-tiny">Min sak</span></div><div class="nw-work-grid"><div>'+noticeCard('sak',true)+composer()+'</div><aside class="nw-side"><div class="nw-side-nav" role="tablist" aria-label="Sak">'+button('side-sources','Kilder','','role="tab" aria-selected="'+(state.side==='sources')+'"')+button('side-history','Versjoner','','role="tab" aria-selected="'+(state.side==='history')+'"')+'</div><div class="nw-side-content">'+sourcePanel('sak')+'</div></aside></div>';
+  return '<div class="nw-feed"><div class="nw-work-head">'+button('stories',icon('arrow-left')+'Saker','nw-quiet')+'<h1>Ny sak</h1></div><div class="nw-paper"><h3>Kilder</h3>'+materialList(newMaterials,true)+(newMaterials.length?'':'<div class="nw-drop">'+button('add-source',icon('plus')+'Kilde')+'</div>')+(newMaterials.length?button('add-source','+ Kilde','nw-quiet'):'')+'<div class="nw-form-grid"><label>Tittel<input data-input="story-title" placeholder="Valgfri" value="'+esc(storyTitle)+'"></label><label>Lengde<select aria-label="Sakslengde" data-change="story-length"><option value="1500">1 500 tegn</option><option value="2500" selected>2 500 tegn</option><option value="3500">3 500 tegn</option><option value="5000">5 000 tegn</option></select></label></div><label>Vinkel<textarea data-input="story-angle" placeholder="Hva er nyheten?" rows="3">'+esc(storyAngle)+'</textarea></label><div class="nw-row" style="margin-top:18px">'+button('create-story',state.storyBusy?'<span class="nw-spinner"></span>Skriver':'Lag utkast','nw-main nw-end',!newMaterials.some(m=>m.enabled)||state.storyBusy?'disabled':'')+'</div></div></div>';
+ }
+ function signals() {
+  const isGen=state.signalTab==='Genereringer';
+  return '<div class="nw-row nw-spread nw-heading"><h1>Signaler</h1>'+button('export-signals',icon('download')+'Eksporter')+'</div><div class="nw-tabs" role="tablist" aria-label="Signaltype">'+['Genereringer','Endringer','Tilbakemeldinger','Titler'].map(t=>button('signal-tab',t,'','data-tab="'+t+'" role="tab" aria-selected="'+(state.signalTab===t)+'"')).join('')+'</div><div class="nw-row" style="margin-bottom:18px"><label class="nw-tiny nw-muted">Fra<input type="date" value="2026-09-07" aria-label="Fra"></label><label class="nw-tiny nw-muted">Til<input type="date" value="2026-09-07" aria-label="Til"></label></div><div class="nw-paper"><table class="nw-table"><thead><tr><th>Tid</th><th>Melding</th><th>'+(isGen?'Status':'Hendelse')+'</th><th class="nw-optional">Tid brukt</th></tr></thead><tbody><tr><td>08:02</td><td>'+button('signal-detail','Nordvik kjøper Bergström')+'</td><td class="nw-good">'+(isGen?'Klar':state.signalTab==='Endringer'?'Tittel endret':state.signalTab==='Titler'?'Forslag valgt':'Tallavvik')+'</td><td class="nw-optional">7 s / 48 s</td></tr><tr><td>08:00</td><td>'+button('signal-detail','Fjordlogistikk forlenger avtale')+'</td><td class="nw-good">'+(isGen?'Klar':'Registrert')+'</td><td class="nw-optional">31 s</td></tr><tr><td>07:58</td><td>'+button('signal-error','Vestby Eiendom selger lagerbygg')+'</td><td class="nw-bad">'+(isGen?'Feilet':'Meldt feil')+'</td><td class="nw-optional">—</td></tr></tbody></table><details><summary>Tallkontroll <span class="nw-tiny">· 1 til vurdering</span></summary><div class="nw-row nw-spread"><span>Nordvik · Beløp</span>'+button('numeric-detail','Se avvik')+'</div></details></div>';
+ }
+ function login() {
+  return '<div class="nw-login"><h1>Autoweb</h1><form data-form="login"><label>Brukernavn<input name="username" autocomplete="off" value="demo" required></label><label>Passord<input type="password" name="password" autocomplete="off" placeholder="••••••••"></label>'+button('sign-in','Logg inn','nw-main')+'</form></div>';
+ }
+ function draw() {
+  root.dataset.density=state.density;root.dataset.motion=state.motion?'on':'off';root.classList.toggle('nw-mobile',state.mobile);root.style.colorScheme=state.theme==='system'?'light dark':state.theme;
+  ui('page').innerHTML=state.view==='feed'?feed():state.view==='desk'?desk():state.view==='stories'?stories():state.view==='story'?storyEditor():state.view==='signals'?signals():login();
+  root.querySelector('.nw-top').hidden=state.view==='login';
+  const lengthField=root.querySelector('[data-change="story-length"]');if(lengthField)lengthField.value=storyLength;
+  root.querySelectorAll('[data-nav]').forEach(n=>{if((state.view==='feed'||state.view==='desk')&&n.dataset.nav==='feed'||(state.view==='stories'||state.view==='story')&&n.dataset.nav==='stories')n.setAttribute('aria-current','page');else n.removeAttribute('aria-current');});
+  ui('connection').textContent=state.scenario==='offline'?'Frakoblet':'Live';
+  if(state.view==='feed'){['market','category','issuer'].forEach(k=>{const f=root.querySelector('[data-change="'+k+'"]');if(f)f.value=state[k];});filterFeed();}
+  icons();
+ }
+ function filterFeed() {
+  if(state.view!=='feed'||state.scenario==='empty')return;
+  let count=0;
+  root.querySelectorAll('[data-feed-card]').forEach(node=>{const id=node.dataset.feedCard,a=articles[id];let visible=(!state.query||node.textContent.toLowerCase().includes(state.query.toLowerCase()))&&(!state.important||a?.important)&& (state.market!=='Euronext Growth')&&(state.category==='Alle'||a?.category===state.category)&&(state.issuer==='Alle'||a?.issuer===state.issuer);if(id==='routine'&&state.muted.includes('Rentefastsettelser'))visible=false;node.hidden=!visible;if(visible)count++;});
+  ui('empty').hidden=count>0;
+ }
+ function toast(text) {
+  clearTimeout(toastTimer);ui('toast').textContent=text;ui('toast').hidden=false;
+  toastTimer=setTimeout(()=>{ui('toast').hidden=true;},2500);
+ }
+ function modal(title,body) {
+  previousFocus=document.activeElement;root.querySelector('#nw-modal-title').textContent=title;ui('modal-body').innerHTML=body;ui('modal-layer').hidden=false;
+  ui('page').inert=true;root.querySelector('.nw-top').inert=true;icons();
+  const target=ui('modal-body').querySelector('input,textarea,select,button')||ui('modal-layer').querySelector('button');if(target)target.focus();
+ }
+ function closeModal() {
+  ui('modal-layer').hidden=true;ui('page').inert=false;root.querySelector('.nw-top').inert=false;
+  if(previousFocus?.isConnected)previousFocus.focus();
+ }
+ function navigate(view,id) { state.view=view;if(id)state.article=id;ui('account-menu').hidden=true;root.querySelector('[data-do="account"]').setAttribute('aria-expanded','false');draw(); }
+ function setSelected(id,key) { articles[id].selected=key;draw(); }
+ function refreshStatus(id) {
+  const existing=root.querySelector('[data-article="'+id+'"]');if(!existing)return;
+  const box=document.createElement('div');box.innerHTML=noticeCard(id,state.view!=='feed');const next=box.querySelector('.nw-status');const old=existing.querySelector('.nw-status');
+  if(next){next.setAttribute('role','status');next.setAttribute('aria-live','polite');if(old)old.replaceWith(next);else existing.append(next);next.classList.add('nw-enter');}else if(old)old.remove();
+  if(state.side==='history'&&state.article===id){const side=root.querySelector('.nw-side-content');if(side)side.innerHTML=sourcePanel(id);}icons();
+ }
+ function revealFirstDraft() {
+  const old=root.querySelector('[data-article="nordvik"]');if(!old)return;
+  const box=document.createElement('div');box.innerHTML=noticeCard('nordvik',state.view!=='feed');const next=box.firstElementChild;next.classList.add('nw-enter');old.replaceWith(next);icons();
+ }
+ function settings() {
+  modal('Innstillinger','<div class="nw-setting"><label for="nw-theme">Utseende</label><select id="nw-theme" data-change="theme"><option value="system">System</option><option value="light">Lyst</option><option value="dark">Mørkt</option></select></div><div class="nw-setting"><label for="nw-density">Avstand</label><select id="nw-density" data-change="density"><option value="comfortable">Normal</option><option value="compact">Tett</option></select></div><div class="nw-setting"><label for="nw-notifications">Varsler</label><select id="nw-notifications" data-change="notifications"><option>På</option><option>Av</option></select></div><span class="nw-section-label">Skjul kategorier</span>'+['Rentefastsettelser','Flagging','Innkallinger'].map(t=>'<label class="nw-check"><input type="checkbox" data-mute="'+t+'" '+(state.muted.includes(t)?'checked':'')+'>'+t+'</label>').join(''));
+  root.querySelector('#nw-theme').value=state.theme;root.querySelector('#nw-density').value=state.density;root.querySelector('#nw-notifications').value=state.notifications;
+ }
+ function sourcesModal(mode='url') {
+  const isNew=state.view==='story'&&!state.storyGenerated;
+  modal('Legg til kilde','<div class="nw-tabs" role="tablist" aria-label="Kildetype">'+[state.article==='sak'?'Lenke':'Newsweb','Tekst','PDF'].map((label,i)=>button('source-mode',label,'','data-mode="'+['url','text','pdf'][i]+'" role="tab" aria-selected="'+(mode===['url','text','pdf'][i])+'"')).join('')+'</div><div class="nw-source-add">'+(mode==='url'?'<label>Lenke<input data-field="source-url" type="url" placeholder="https://"></label>':mode==='text'?'<label>Tittel<input data-field="source-title"></label><label>Kildetekst<textarea data-field="source-text" rows="4"></textarea></label>':'<label class="nw-drop">'+icon('file-up')+'PDF<input data-field="source-file" type="file" accept="application/pdf"></label>')+'<div class="nw-row">'+button('demo-source','Eksempelkilde','nw-quiet','data-new="'+isNew+'"')+button('save-source','Legg til','nw-main nw-end','data-mode="'+mode+'" data-new="'+isNew+'"')+'</div></div>');
+ }
+ function addMaterial(material,isNew) { (isNew?newMaterials:materials).push(material);closeModal();draw(); }
+ function play() {
+  timers.forEach(clearTimeout);timers=[];state.scenario='normal';state.query='';state.important=false;state.category='Alle';state.issuer='Alle';state.market='Alle';state.view='feed';state.stage='pending';articles.nordvik.selected='first';draw();
+  const demoPlay=root.querySelector('[data-do="play"]');demoPlay.disabled=true;
+  timers.push(setTimeout(()=>{state.stage='draft';revealFirstDraft();},2000));
+  timers.push(setTimeout(()=>{state.stage='ready';refreshStatus('nordvik');demoPlay.disabled=false;},7500));
+ }
+ async function handleAction(target) {
+  const action=target.dataset.do,id=target.dataset.id||state.article;
+  if(action==='feed'){navigate('feed');return;}
+  if(action==='stories'){navigate('stories');return;}
+  if(action==='play'){play();return;}
+  if(action==='account'){ui('account-menu').hidden=!ui('account-menu').hidden;target.setAttribute('aria-expanded',String(!ui('account-menu').hidden));return;}
+  if(action==='settings'){settings();return;}
+  if(action==='notifications'){modal('Varsler','<div class="nw-history">'+['På','Av'].map(t=>button('set-notification',t,'','data-value="'+t+'" aria-pressed="'+(state.notifications===t)+'"')).join('')+'</div>');return;}
+  if(action==='set-notification'){state.notifications=target.dataset.value;closeModal();toast(state.notifications==='Av'?'Varsler av':'Varsler: '+state.notifications);return;}
+  if(action==='close-modal'){closeModal();return;}
+  if(action==='signals'){navigate('signals');return;}
+  if(action==='login'){navigate('login');return;}
+  if(action==='sign-in'){navigate('feed');return;}
+  if(action==='important'){state.important=!state.important;target.setAttribute('aria-pressed',String(state.important));filterFeed();return;}
+  if(action==='filters'){state.filters=!state.filters;root.querySelector('.nw-filter-tray').hidden=!state.filters;target.setAttribute('aria-expanded',String(state.filters));return;}
+  if(action==='clear-filters'){state.query='';state.important=false;state.market='Alle';state.category='Alle';state.issuer='Alle';state.scenario='normal';draw();return;}
+  if(action==='reconnect'){state.scenario='normal';draw();return;}
+  if(action==='new-notices'){state.newAdded=true;draw();return;}
+  if(action==='show-full'){setSelected('nordvik','full');return;}
+  if(action==='show-first'){setSelected('nordvik','first');return;}
+  if(action==='new-version'){const a=articles[id];a.selected=a.availableVersion;a.availableVersion=null;draw();return;}
+  if(action==='retry'){state.stage='draft';refreshStatus('nordvik');timers.push(setTimeout(()=>{state.stage='ready';refreshStatus('nordvik');},2800));return;}
+  if(action==='more'){const m=root.querySelector('[data-menu="'+id+'"]');const open=m.hidden;root.querySelectorAll('[data-menu]').forEach(n=>n.hidden=true);m.hidden=!open;target.setAttribute('aria-expanded',String(open));return;}
+  if(action==='sources'||action==='adjust'||action==='history'){state.side=action==='history'?'history':'sources';state.source='notice';state.article=id;if(id==='sak'){state.storyGenerated=true;navigate('story',id);}else navigate('desk',id);if(action==='adjust')root.querySelector('[data-input="instruction"]')?.focus();return;}
+  if(action==='side-sources'||action==='side-history'){state.side=action==='side-sources'?'sources':'history';draw();return;}
+  if(action==='source-notice'||action==='source-pdf'){state.source=action==='source-notice'?'notice':'pdf';draw();return;}
+  if(action==='choose-version'){setSelected(state.article,target.dataset.key);return;}
+  if(action==='titles'){
+   state.article=id;const choices=id==='fjord'?['Fjordlogistikk sikrer tre nye år med svensk kunde','Ny avtale verdt 180 millioner for Fjordlogistikk','Fjordlogistikk forlenger svensk kontrakt']:['Nordvik kjøper svensk konkurrent for 2,4 milliarder','Nordvik blar opp 2,4 milliarder for Bergström','Milliardoppkjøp for Nordvik i Sverige'];
+   modal('Titler',choices.map(t=>button('use-title',esc(t),'nw-proposal-title','data-title="'+esc(t)+'"')).join(''));return;
+  }
+  if(action==='use-title'){current().title=target.dataset.title;current().dirty=true;closeModal();draw();return;}
+  if(action==='original'){state.article=id;const v=current();modal('AI-original','<h3>'+esc(v.originalTitle)+'</h3><div class="nw-source">'+paragraphs(v.originalBody)+'</div><div class="nw-row">'+button('restore-original','Bruk original','nw-end')+'</div>');return;}
+  if(action==='restore-original'){const v=current();v.title=v.originalTitle;v.body=v.originalBody;v.dirty=false;closeModal();draw();return;}
+  if(action==='copy'){
+   const v=current(id),text=v.title+'\n\n'+v.body;
+   try { if(!navigator.clipboard?.writeText)throw Error('unavailable');await navigator.clipboard.writeText(text);target.textContent='Kopiert';setTimeout(()=>{if(target.isConnected){target.innerHTML=icon('copy')+'Kopier';icons();}},1800); }
+   catch { modal('Kopier','<textarea rows="9" aria-label="Tekst til kopiering" readonly>'+esc(text)+'</textarea>');ui('modal-body').querySelector('textarea').select(); }
+   return;
+  }
+  if(action==='feedback'){state.article=id;modal('Meld feil','<textarea data-field="feedback" aria-label="Feilbeskrivelse" placeholder="Hva er feil?" rows="4"></textarea><div class="nw-row" style="margin-top:16px">'+button('send-feedback','Send','nw-main nw-end')+'</div>');return;}
+  if(action==='send-feedback'){const field=root.querySelector('[data-field="feedback"]');if(!field.value.trim()){field.focus();return;}closeModal();toast('Registrert i demoen');return;}
+  if(action==='add-source'){sourcesModal();return;}
+  if(action==='source-mode'){sourcesModal(target.dataset.mode);return;}
+  if(action==='demo-source'){addMaterial({title:'Nordvik · Oppkjøpspresentasjon',kind:'PDF',enabled:true},target.dataset.new==='true');return;}
+  if(action==='save-source'){
+   const mode=target.dataset.mode;let title='';
+   if(mode==='url'){const field=root.querySelector('[data-field="source-url"]');if(!field.value.trim()||!field.checkValidity()){field.reportValidity();return;}title=field.value;}
+   if(mode==='text'){const field=root.querySelector('[data-field="source-text"]');if(!field.value.trim()){field.focus();return;}title=root.querySelector('[data-field="source-title"]').value||'Kildetekst';}
+   if(mode==='pdf'){const field=root.querySelector('[data-field="source-file"]');if(!field.files.length){field.click();return;}title=field.files[0].name;}
+   addMaterial({title,kind:mode==='pdf'?'PDF':mode==='text'?'Tekst':'Lenke',enabled:true},target.dataset.new==='true');return;
+  }
+  if(action==='remove-material'){(target.dataset.new==='true'?newMaterials:materials).splice(Number(target.dataset.index),1);draw();return;}
+  if(action==='generate-version'){
+   if(state.regenerating)return;const articleId=state.article;const base=current(articleId);const snap={title:base.title,body:base.body};state.regenerating=true;draw();
+   timers.push(setTimeout(()=>{const a=articles[articleId];const key='v'+Object.keys(a.versions).length;a.versions[key]=version('Ny versjon',snap.title,snap.body,'08:05');a.availableVersion=key;state.regenerating=false;refreshStatus(articleId);const b=root.querySelector('[data-do="generate-version"]');if(b){b.disabled=false;b.textContent='Lag versjon';}},2600));return;
+  }
+  if(action==='new-story'){state.storyGenerated=false;state.storyBusy=false;state.article='sak';newMaterials=[];storyTitle='';storyAngle='';storyLength='2500';navigate('story','sak');return;}
+  if(action==='open-story'){state.storyGenerated=true;state.side='sources';articles.sak=savedStories[target.dataset.key||'nordvik'];if(articles.sak.materials)materials=articles.sak.materials;else{materials=[{title:'Børsmelding',kind:'Newsweb',enabled:true},{title:'Bakgrunn',kind:'Tekst',enabled:true}];articles.sak.materials=materials;}navigate('story','sak');return;}
+  if(action==='create-story'){
+   if(!newMaterials.some(m=>m.enabled))return;const customTitle=root.querySelector('[data-input="story-title"]')?.value;state.storyBusy=true;draw();
+   timers.push(setTimeout(()=>{state.storyBusy=false;state.storyGenerated=true;materials=newMaterials.slice();articles.sak={issuer:'Min sak',ticker:materials.length+' kilder',time:'08:14',category:'',selected:'full',materials,versions:{full:version('Utkast',customTitle||'Nordvik kjøper svensk konkurrent',fullBody,'08:14')}};savedStories['new'+Object.keys(savedStories).length]=articles.sak;state.side='sources';draw();},2300));return;
+  }
+  if(action==='signal-tab'){state.signalTab=target.dataset.tab;draw();return;}
+  if(action==='signal-detail'){modal('Generering','<div class="nw-source"><p>'+esc(target.textContent)+'</p><div class="nw-row nw-spread"><span>Status</span><span>Klar</span></div><details><summary>Detaljer</summary><p>Kilde lest · Utkast generert · Kontroll fullført</p></details></div>');return;}
+  if(action==='numeric-detail'){modal('Nordvik · Tallkontroll','<div class="nw-source"><span class="nw-section-label">Kilde</span><p>Purchase price: <mark>NOK 2.4 billion</mark></p><span class="nw-section-label">Utkast</span><p>Oppkjøpet er verdt <mark>24 milliarder kroner</mark>.</p><span class="nw-section-label">Endret til</span><p>Oppkjøpet er verdt 2,4 milliarder kroner.</p><details><summary>Detaljer</summary><p>Beløp · Avvik mellom kilde og utkast<br>Registrert 08:03 · Redigering</p></details></div>');return;}
+  if(action==='signal-error'){modal('Generering feilet','<div class="nw-source"><p>Vestby Eiendom · 07:58</p><p>Tidsavbrudd</p><details><summary>Tekniske detaljer</summary><p>Fase: skriving<br>Kjøring: eksempel-035<br>Ny kjøring kan startes fra meldingen.</p></details></div>');return;}
+  if(action==='export-signals'){
+   const blob=new Blob([JSON.stringify({demo:true,date:'2026-09-07',type:state.signalTab,rows:[{issuer:'Nordvik Industri',firstDraftSeconds:7,fullVersionSeconds:48}]},null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='autoweb-signaler-demo.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);return;
+  }
+  if(action==='vestby-source'){modal('Kilde','<h3>Vestby Eiendom selger lagerbygg i Drammen</h3><p>Vestby Eiendom har inngått avtale om salg av et lagerbygg i Drammen for 120 millioner kroner.</p>');return;}
+  if(action==='manual-generate'){target.disabled=true;target.innerHTML='<span class="nw-spinner"></span>Skriver';timers.push(setTimeout(()=>{const card=target.closest('.nw-card');if(card){card.querySelector('h2').textContent='Havøy Shipping fastsetter rente på obligasjonslån';target.textContent='Klar';}},2100));return;}
+  if(action==='older'){const empty=ui('empty');const old=document.createElement('article');old.className='nw-card nw-simple';old.innerHTML='<div class="nw-meta"><span>Strand Finans · STRF</span><time>07:40</time></div><h2>Strand Finans fullfører tilbakekjøp</h2><p>Selskapet har kjøpt tilbake 45.000 egne aksjer.</p>';empty.before(old);target.textContent='Alle lastet';target.disabled=true;return;}
+ }
+ root.addEventListener('click',event=>{
+  const target=event.target.closest('[data-do]');
+  if(target&&root.contains(target)){event.preventDefault();void handleAction(target);}
+  else if(event.target===ui('modal-layer'))closeModal();
+  if(!event.target.closest('.nw-pop-wrap')){ui('account-menu').hidden=true;root.querySelectorAll('[data-menu]').forEach(n=>n.hidden=true);root.querySelector('[data-do="account"]').setAttribute('aria-expanded','false');}
+ });
+ root.addEventListener('input',event=>{
+  const target=event.target;
+  if(target.matches('[data-edit]')){const id=target.dataset.id,v=current(id);v[target.dataset.edit]=target.innerText;v.dirty=true;const label=root.querySelector('[data-edit-status="'+id+'"]');if(label)label.textContent='● Redigert';}
+  if(target.dataset.input==='search'){state.query=target.value;filterFeed();}
+  if(target.dataset.input==='instruction')customInstruction=target.value;
+  if(target.dataset.input==='story-title')storyTitle=target.value;
+  if(target.dataset.input==='story-angle')storyAngle=target.value;
+ });
+ root.addEventListener('change',event=>{
+  const target=event.target,key=target.dataset.change;
+  if(key==='story-length')storyLength=target.value;
+  if(key){state[key]=target.value;if(['market','category','issuer'].includes(key))filterFeed();else{root.style.colorScheme=state.theme==='system'?'light dark':state.theme;root.dataset.density=state.density;}}
+  if(target.dataset.mute){const name=target.dataset.mute;state.muted=state.muted.filter(m=>m!==name);if(target.checked)state.muted.push(name);filterFeed();}
+  if(target.dataset.material!=null){const list=target.dataset.new==='true'?newMaterials:materials;list[Number(target.dataset.material)].enabled=target.checked;if(state.view==='story'&&!state.storyGenerated){const b=root.querySelector('[data-do="create-story"]');if(b)b.disabled=!newMaterials.some(m=>m.enabled);}}
+  if(target.type==='date'){const dates=root.querySelectorAll('input[type="date"]');if(dates.length===2){const matches=dates[0].value<='2026-09-07'&&dates[1].value>='2026-09-07';root.querySelectorAll('tbody tr').forEach(r=>r.hidden=!matches);}}
+ });
+ root.addEventListener('submit',event=>{event.preventDefault();if(event.target.dataset.form==='login')navigate('feed');});
+ root.addEventListener('keydown',event=>{
+  if(event.key==='Escape'){if(!ui('modal-layer').hidden)closeModal();else{root.querySelectorAll('[data-menu]').forEach(n=>n.hidden=true);ui('account-menu').hidden=true;}}
+  if(event.key==='Tab'&&!ui('modal-layer').hidden){const all=[...ui('modal-layer').querySelectorAll('button,input,textarea,select')].filter(e=>!e.disabled&&!e.hidden);const first=all[0],last=all[all.length-1];if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus();}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}}
+ });
+ draw();
+ if(globalThis.Tweak){
+  const design={scenario:'normal',density:'comfortable',theme:'system',mobile:false,motion:true};
+  const tweak=new Tweak({container:root,onChange:()=>{
+   timers.forEach(clearTimeout);state.regenerating=false;state.storyBusy=false;root.querySelector('[data-do="play"]').disabled=false;
+   state.scenario=design.scenario;state.density=design.density;state.theme=design.theme;state.mobile=design.mobile;state.motion=design.motion;
+   state.stage=design.scenario==='pending'?'pending':design.scenario==='writing'?'draft':design.scenario==='failure'?'failed':'ready';
+   if(design.scenario!=='normal'){state.view='feed';articles.nordvik.selected='first';}
+   state.newAdded=false;draw();
+  }});
+  tweak.addSelect(design,'scenario',{label:'Tilstand',options:[{label:'Utfyllende klar',value:'normal'},{label:'Førsteutkast lages',value:'pending'},{label:'Utfyllende lages',value:'writing'},{label:'Utfyllende feilet',value:'failure'},{label:'Nye meldinger',value:'new'},{label:'Ingen treff',value:'empty'},{label:'Frakoblet',value:'offline'}]});
+  tweak.addSelect(design,'theme',{label:'Utseende',options:[{label:'System',value:'system'},{label:'Lyst',value:'light'},{label:'Mørkt',value:'dark'}]});
+  tweak.addSelect(design,'density',{label:'Avstand',options:[{label:'Normal',value:'comfortable'},{label:'Tett',value:'compact'}]});
+  tweak.addToggle(design,'mobile',{label:'Mobilvisning'});tweak.addToggle(design,'motion',{label:'Animasjon'});
+ }
+})();
+</script>
+</div>

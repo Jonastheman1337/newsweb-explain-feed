@@ -1,0 +1,41 @@
+name: autoweb-ui-preview
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: preview
+      POSTGRES_PASSWORD: preview
+      POSTGRES_DB: ui_preview
+    ports: ["127.0.0.1:15433:5432"]
+    volumes: ["ui-postgres:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U preview -d ui_preview"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+  postgres-log:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: preview
+      POSTGRES_PASSWORD: preview
+      POSTGRES_DB: ui_preview_logs
+    ports: ["127.0.0.1:15434:5432"]
+    volumes: ["ui-postgres-log:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U preview -d ui_preview_logs"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+  redis:
+    image: redis:7-alpine
+    ports: ["127.0.0.1:16380:6379"]
+    volumes: ["ui-redis:/data"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+volumes:
+  ui-postgres:
+  ui-postgres-log:
+  ui-redis:

@@ -131,6 +131,9 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ messageId: string }> }
 ) {
+  if (process.env.NODE_ENV === "development" && process.env.UI_PREVIEW_FIXTURES === "true") {
+    return NextResponse.json({ message: "Generering er av i lokal forhåndsvisning." }, { status: 409 });
+  }
   const { messageId } = await params;
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE)?.value;

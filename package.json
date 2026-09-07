@@ -26,7 +26,11 @@
     "openai:usage": "node scripts/pull-openai-usage.mjs",
     "prisma:generate": "prisma generate",
     "prisma:migrate:dev": "prisma migrate dev",
-    "prisma:migrate:deploy": "prisma migrate deploy && node scripts/init-log-db.mjs"
+    "prisma:migrate:deploy": "prisma migrate deploy && node scripts/init-log-db.mjs",
+    "dev:ui": "npm run build -w packages/shared && npm run build -w packages/prompt-kit && node scripts/ui-preview/dev.mjs",
+    "ui:replay": "node scripts/ui-preview/replay.mjs",
+    "ui:test": "npm run build -w packages/shared && node --test scripts/ui-preview/server.test.mjs",
+    "ui:verify-routes": "node scripts/ui-preview/verify-routes.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.13.10",

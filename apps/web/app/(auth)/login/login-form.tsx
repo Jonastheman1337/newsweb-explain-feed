@@ -6,9 +6,10 @@ import { loginWithPassword, verifyMagicLink } from "../../../lib/api";
 
 type LoginFormProps = {
   token?: string;
+  returnTo?: string;
 };
 
-export function LoginForm({ token }: LoginFormProps) {
+export function LoginForm({ token, returnTo = "/feed" }: LoginFormProps) {
   const router = useRouter();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -24,7 +25,7 @@ export function LoginForm({ token }: LoginFormProps) {
       if (!token) return;
       try {
         await verifyMagicLink(token);
-        router.replace("/feed");
+        router.replace(returnTo);
       } catch (error) {
         setStatus("error");
         setMessage(
@@ -33,7 +34,7 @@ export function LoginForm({ token }: LoginFormProps) {
       }
     }
     void verify();
-  }, [router, token]);
+  }, [router, token, returnTo]);
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -41,7 +42,7 @@ export function LoginForm({ token }: LoginFormProps) {
     setMessage("");
     try {
       await loginWithPassword(username, password);
-      router.replace("/feed");
+      router.replace(returnTo);
     } catch (error) {
       setStatus("error");
       setMessage(error instanceof Error ? error.message : "Noe gikk galt.");
