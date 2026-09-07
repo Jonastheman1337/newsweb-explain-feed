@@ -3,9 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { FeedItem } from "@newsweb/shared";
-import { EditableRewrite } from "../editable-rewrite";
-import { AttachmentLinks } from "../attachment-links";
-import { GenerateButton } from "../generate-button";
+import { RefreshCard } from "./refresh-card";
+import { rememberSelection, restoreSelection, selectVersion } from "./selection";
 import { useFeedStreamSubscription } from "../feed-stream-provider";
 import {
   initialFeedState,
@@ -15,110 +14,6 @@ import {
   type FeedEntry
 } from "./feed-state";
 import styles from "./refresh.module.css";
-
-function RefreshCard({ entry, onSelect }: { entry: FeedEntry; onSelect: () => void }) {
-  const { current: item, latest, pending } = entry;
-  const [sources, setSources] = useState(false);
-  const sourceId = `source-${item.messageId}`;
-  const sourceToggle = (
-    <button
-      type="button"
-      aria-expanded={sources}
-      aria-controls={sourceId}
-      onClick={() => setSources(!sources)}
-    >
-      Kilder
-    </button>
-  );
-  return (
-    <article
-      className={`${styles.card} ${item.importance === "viktig" ? styles.important : ""}`}
-      aria-label={item.issuerName}
-    >
-      <div className={styles.metadata}>
-        <span>
-          {item.issuerName} <span className={styles.ticker}>{item.issuerSign}</span>
-        </span>
-        <time dateTime={item.publishedAt}>
-          {new Intl.DateTimeFormat("nb-NO", {
-            hour: "2-digit",
-            minute: "2-digit",
-            timeZone: "Europe/Oslo"
-          }).format(new Date(item.publishedAt))}
-        </time>
-      </div>
-      {item.importance === "viktig" && <div className={styles.importance}>Viktig</div>}
-      {item.isFinal && item.rewriteId ? (
-        <EditableRewrite
-          key={`${item.rewriteId}:${item.contentHash}`}
-          messageId={item.messageId}
-          originalTitle={item.title}
-          originalBody={[item.lead, ...item.body].filter(Boolean).join("\n\n")}
-          activeVersion={item.rewriteVersion ?? undefined}
-          rewriteId={item.rewriteId}
-          publicationRevision={item.publicationRevision}
-          contentHash={item.contentHash ?? undefined}
-          isFinal={item.isFinal}
-          className={styles.editor}
-          sourceLinks={{
-            primary: {
-              url: `https://newsweb.oslobors.no/message/${item.messageId}`,
-              issuerName: item.issuerName,
-              issuerSign: item.issuerSign
-            }
-          }}
-        >
-          {sourceToggle}
-        </EditableRewrite>
-      ) : (
-        <div className={styles.waiting}>
-          <h2>{item.sourceTitle || item.title}</h2>
-          <div className={styles.waitActions}>
-            {sourceToggle}
-            {!latest.processing && (
-              <GenerateButton
-                messageId={item.messageId}
-                hasAttachments={item.hasAttachments}
-                label={latest.failed ? "Prøv igjen" : "Lag notis"}
-              />
-            )}
-          </div>
-        </div>
-      )}
-      {(latest.processing || latest.regenerating) && (
-        <div role="status" className={styles.progress}>
-          <span />
-          Notis lages
-        </div>
-      )}
-      {latest.failed && (
-        <div role="status" className={styles.failure}>
-          Generering feilet
-        </div>
-      )}
-      {pending && (
-        <div className={styles.ready} role="status">
-          <span>Ny versjon klar</span>
-          <button type="button" onClick={onSelect}>
-            Vis versjon
-          </button>
-        </div>
-      )}
-      <section id={sourceId} hidden={!sources} className={styles.sources} aria-label="Kilder">
-        <h3>{item.sourceTitle}</h3>
-        <p>{item.sourceBodyText}</p>
-        <AttachmentLinks messageId={item.messageId} attachments={item.attachments} />
-        <a
-          href={`https://newsweb.oslobors.no/message/${item.messageId}`}
-          target="_blank"
-          rel="noreferrer"
-        >
-          Newsweb ↗
-        </a>
-      </section>
-    </article>
-  );
-}
 
 export function RefreshFeed({
   initialItems,
@@ -145,6 +40,19 @@ export function RefreshFeed({
     },
     []
   );
+  const restored = useRef(false);
+  const [selectionReady, setSelectionReady] = useState(false);
+  useEffect(() => {
+    if (restored.current) return;
+    restored.current = true;
+    const entries = initialFeedState(initialItems).entries.map(restoreSelection);
+    entries.filter((entry) => !entry.pending).forEach(rememberSelection);
+    setState((previous) => ({ ...previous, entries }));
+    setSelectionReady(true);
+  }, []);
+  useEffect(() => {
+    if (selectionReady) state.entries.filter((entry) => !entry.pending).forEach(rememberSelection);
+  }, [selectionReady, state.entries]);
   useEffect(() => {
     // Reconnects merge into existing entries; they do not replace focused editors.
     setState((previous) => {
@@ -188,7 +96,12 @@ export function RefreshFeed({
       </div>
       <div className={styles.arrivals} aria-live="polite">
         {incoming.length > 0 && (
-          <button onClick={() => setState(revealIncoming)}>
+          <button
+            onClick={() => {
+              initialFeedState(state.incoming).entries.forEach(rememberSelection);
+              setState(revealIncoming);
+            }}
+          >
             {incoming.length} {incoming.length === 1 ? "ny melding" : "nye meldinger"} ↓
           </button>
         )}
@@ -198,9 +111,18 @@ export function RefreshFeed({
           <RefreshCard
             key={entry.current.messageId}
             entry={entry}
-            onSelect={() =>
-              setState((previous) => selectPending(previous, entry.current.messageId))
-            }
+            onVersion={(selected) => {
+              rememberSelection({ current: selected, latest: entry.latest });
+              setState((previous) => selectVersion(previous, selected));
+            }}
+            onSelect={() => {
+              if (entry.pending)
+                rememberSelection({
+                  current: entry.pending,
+                  latest: entry.latest
+                });
+              setState((previous) => selectPending(previous, entry.current.messageId));
+            }}
           />
         ))}
       </div>

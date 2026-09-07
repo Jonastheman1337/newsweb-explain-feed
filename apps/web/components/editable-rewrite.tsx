@@ -34,6 +34,18 @@ import {
 } from "../lib/rewrite-drafts";
 import { useTitleSuggestions } from "./title-suggestions";
 
+export type RewriteActionControls = {
+  hasDraft: boolean;
+  showingOriginal: boolean;
+  copyState: "idle" | "copied" | "failed";
+  copy: () => Promise<void>;
+  toggleOriginal: () => void;
+  reset: () => void;
+  undoReset: () => void;
+  canUndoReset: boolean;
+  titles: ReturnType<typeof useTitleSuggestions>;
+};
+
 type EditableRewriteProps = {
   messageId: number | string;
   originalTitle: string;
@@ -53,6 +65,7 @@ type EditableRewriteProps = {
   children?: ReactNode;
   extraActions?: ReactNode;
   panelTitle?: string;
+  renderActions?: (controls: RewriteActionControls) => ReactNode;
   className?: string;
   // Newsweb links for the first attribution phrase (primary notice) and the
   // first "meldte i juni" clause (earlier notice). Applied once when the
@@ -94,10 +107,7 @@ function getBodySelectionRange(root: HTMLElement | null): Range | null {
     return null;
   }
 
-  if (
-    !isNodeInside(root, selection.anchorNode) ||
-    !isNodeInside(root, selection.focusNode)
-  ) {
+  if (!isNodeInside(root, selection.anchorNode) || !isNodeInside(root, selection.focusNode)) {
     return null;
   }
 
@@ -140,10 +150,7 @@ function getClosestLink(node: Node | null, root: HTMLElement | null): HTMLAnchor
   }
 
   while (node && root && isNodeInside(root, node)) {
-    if (
-      node.nodeType === Node.ELEMENT_NODE &&
-      (node as Element).tagName.toLowerCase() === "a"
-    ) {
+    if (node.nodeType === Node.ELEMENT_NODE && (node as Element).tagName.toLowerCase() === "a") {
       return node as HTMLAnchorElement;
     }
     node = node.parentNode;
@@ -261,10 +268,7 @@ async function copyNoticeToClipboard(plainText: string, html: string) {
     return;
   }
 
-  if (
-    navigator.clipboard?.write &&
-    typeof ClipboardItem !== "undefined"
-  ) {
+  if (navigator.clipboard?.write && typeof ClipboardItem !== "undefined") {
     try {
       await navigator.clipboard.write([
         new ClipboardItem({
@@ -299,8 +303,9 @@ export function EditableRewrite({
   children,
   extraActions,
   panelTitle,
+  renderActions,
   className,
-  sourceLinks,
+  sourceLinks
 }: EditableRewriteProps) {
   const originalBodyHtml = useMemo(
     () =>
@@ -310,12 +315,14 @@ export function EditableRewrite({
         : plainTextToRichHtml(originalBody)),
     [originalBody, originalBodyHtmlProp, sourceLinks]
   );
+  const initialBodyMarkup = useRef({ __html: originalBodyHtml });
   const isSak = variant === "sak";
   const [editedTitle, setEditedTitle] = useState(originalTitle);
   const [editedBody, setEditedBody] = useState(originalBody);
   const [editedBodyHtml, setEditedBodyHtml] = useState(originalBodyHtml);
   const [storedDraft, setStoredDraft] = useState<RewriteDraft | null>(null);
   const [viewMode, setViewMode] = useState<"draft" | "original">("draft");
+  const [resetSnapshot, setResetSnapshot] = useState<RewriteDraft | null>(null);
   const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle");
   const copyResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [linkMode, setLinkMode] = useState(false);
@@ -472,10 +479,7 @@ export function EditableRewrite({
 
     const range = getBodySelectionRange(bodyRef.current);
     if (!range) {
-      const cachedRange = getCachedBodyRange(
-        bodyRef.current,
-        selectionRangeRef.current
-      );
+      const cachedRange = getCachedBodyRange(bodyRef.current, selectionRangeRef.current);
       if (!cachedRange || !isToolbarInteractingRef.current) {
         selectionRangeRef.current = null;
         hideToolbarElement();
@@ -570,10 +574,8 @@ export function EditableRewrite({
 
     enterDraftMode();
     const selection = window.getSelection();
-    const range =
-      selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
-    const inserted =
-      range && insertLinkForRange(range, bodyRef.current, href);
+    const range = selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
+    const inserted = range && insertLinkForRange(range, bodyRef.current, href);
 
     if (!inserted) {
       runRichTextCommand("createLink", href);
@@ -593,8 +595,7 @@ export function EditableRewrite({
     enterDraftMode();
 
     const html = event.clipboardData.getData("text/html");
-    const clipboardText =
-      event.clipboardData.getData("text/plain") || richHtmlToPlainText(html);
+    const clipboardText = event.clipboardData.getData("text/plain") || richHtmlToPlainText(html);
     const text = normalizePastedTitle(clipboardText);
     if (text) {
       insertPlainTextAtSelection(event.currentTarget, text);
@@ -650,10 +651,7 @@ export function EditableRewrite({
     action();
   }
 
-  function handleToolbarActionClick(
-    event: ReactMouseEvent<HTMLButtonElement>,
-    action: () => void
-  ) {
+  function handleToolbarActionClick(event: ReactMouseEvent<HTMLButtonElement>, action: () => void) {
     event.preventDefault();
     if (event.detail !== 0 && toolbarActionHandledRef.current) {
       toolbarActionHandledRef.current = false;
@@ -691,7 +689,7 @@ export function EditableRewrite({
     requestAnimationFrame(() => linkInputRef.current?.focus());
   }, [linkMode]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     latestDraftStateRef.current = {
       messageId,
       version: activeVersion,
@@ -786,6 +784,19 @@ export function EditableRewrite({
       draft?.bodyHtml ?? (draft ? plainTextToRichHtml(nextBody) : originalBodyHtml)
     );
 
+    // Keep unmount/StrictMode cleanup aligned with the restored DOM before
+    // the state updates render; otherwise cleanup can save the initial original.
+    latestDraftStateRef.current = {
+      messageId,
+      version: activeVersion,
+      title: nextTitle,
+      body: nextBody,
+      bodyHtml: nextBodyHtml,
+      originalTitle,
+      originalBody,
+      originalBodyHtml,
+      viewMode: "draft"
+    };
     setStoredDraftValue(draft);
     setViewMode("draft");
     hideToolbar();
@@ -797,9 +808,9 @@ export function EditableRewrite({
     messageId,
     originalBody,
     originalBodyHtml,
-      originalTitle,
-      setDisplayedRewrite
-    ]);
+    originalTitle,
+    setDisplayedRewrite
+  ]);
 
   useEffect(() => {
     if (viewMode !== "draft") return;
@@ -949,11 +960,7 @@ export function EditableRewrite({
     setViewMode("draft");
     hideToolbar();
     setDisplayedRewrite(originalTitle, originalBody, originalBodyHtml);
-    lastSavedValueRef.current = draftValue(
-      originalTitle,
-      originalBody,
-      originalBodyHtml
-    );
+    lastSavedValueRef.current = draftValue(originalTitle, originalBody, originalBodyHtml);
   }
 
   const titleSuggestions = useTitleSuggestions({
@@ -964,6 +971,8 @@ export function EditableRewrite({
     contentHash,
     isFinal,
     currentTitle: editedTitle,
+    previewOnHover: !renderActions,
+    closeOnOutsideClick: !renderActions,
     onPreview(title) {
       if (titleRef.current) titleRef.current.textContent = title;
     },
@@ -974,8 +983,27 @@ export function EditableRewrite({
       enterDraftMode();
       setEditedTitle(title);
       if (titleRef.current) titleRef.current.textContent = title;
-    },
+    }
   });
+
+  function resetWithUndo() {
+    const current = persistDraftState();
+    if (current) setResetSnapshot(current);
+    handleResetDraft();
+  }
+
+  function undoReset() {
+    if (!resetSnapshot) return;
+    setViewMode("draft");
+    setDisplayedRewrite(resetSnapshot.title, resetSnapshot.body, resetSnapshot.bodyHtml);
+    persistDraftState({
+      ...latestDraftStateRef.current,
+      ...resetSnapshot,
+      bodyHtml: resetSnapshot.bodyHtml ?? plainTextToRichHtml(resetSnapshot.body),
+      viewMode: "draft"
+    });
+    setResetSnapshot(null);
+  }
 
   const hasDraft = storedDraft != null;
   const showingOriginal = viewMode === "original";
@@ -994,6 +1022,7 @@ export function EditableRewrite({
       }}
       onPaste={handleTitlePaste}
     >
+      {renderActions ? originalTitle : null}
     </h2>
   );
 
@@ -1005,16 +1034,19 @@ export function EditableRewrite({
           {titleSuggestButton}
         </div>
       )}
-      {panelTitle || isSak ? titleEditor : (
+      {panelTitle || isSak || renderActions ? (
+        titleEditor
+      ) : (
         <div className="editableTitleRow">
           {titleEditor}
           <span className="titleSuggestWrap">{titleSuggestButton}</span>
         </div>
       )}
-      {titleSuggestDropdown}
+      {!renderActions && titleSuggestDropdown}
       {dateline}
       <div
         ref={bodyRef}
+        dangerouslySetInnerHTML={renderActions ? initialBodyMarkup.current : undefined}
         className="editableBody"
         contentEditable
         suppressContentEditableWarning
@@ -1057,7 +1089,16 @@ export function EditableRewrite({
               title="Sett inn lenke"
               aria-label="Sett inn lenke"
             >
-              <svg className="richEditToolIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <svg
+                className="richEditToolIcon"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
                 <path d="m20 6-11 11-5-5" />
               </svg>
             </button>
@@ -1072,9 +1113,7 @@ export function EditableRewrite({
               onMouseDown={(event) =>
                 handleToolbarActionMouseDown(event, () => applyFormat("bold"))
               }
-              onClick={(event) =>
-                handleToolbarActionClick(event, () => applyFormat("bold"))
-              }
+              onClick={(event) => handleToolbarActionClick(event, () => applyFormat("bold"))}
             >
               <strong>B</strong>
             </button>
@@ -1086,9 +1125,7 @@ export function EditableRewrite({
               onMouseDown={(event) =>
                 handleToolbarActionMouseDown(event, () => applyFormat("italic"))
               }
-              onClick={(event) =>
-                handleToolbarActionClick(event, () => applyFormat("italic"))
-              }
+              onClick={(event) => handleToolbarActionClick(event, () => applyFormat("italic"))}
             >
               <em>I</em>
             </button>
@@ -1098,17 +1135,22 @@ export function EditableRewrite({
               title="Punktliste"
               aria-label="Punktliste"
               onMouseDown={(event) =>
-                handleToolbarActionMouseDown(event, () =>
-                  applyFormat("insertUnorderedList")
-                )
+                handleToolbarActionMouseDown(event, () => applyFormat("insertUnorderedList"))
               }
               onClick={(event) =>
-                handleToolbarActionClick(event, () =>
-                  applyFormat("insertUnorderedList")
-                )
+                handleToolbarActionClick(event, () => applyFormat("insertUnorderedList"))
               }
             >
-              <svg className="richEditToolIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <svg
+                className="richEditToolIcon"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
                 <path d="M8 6h13" />
                 <path d="M8 12h13" />
                 <path d="M8 18h13" />
@@ -1123,17 +1165,22 @@ export function EditableRewrite({
               title="Nummerert liste"
               aria-label="Nummerert liste"
               onMouseDown={(event) =>
-                handleToolbarActionMouseDown(event, () =>
-                  applyFormat("insertOrderedList")
-                )
+                handleToolbarActionMouseDown(event, () => applyFormat("insertOrderedList"))
               }
               onClick={(event) =>
-                handleToolbarActionClick(event, () =>
-                  applyFormat("insertOrderedList")
-                )
+                handleToolbarActionClick(event, () => applyFormat("insertOrderedList"))
               }
             >
-              <svg className="richEditToolIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <svg
+                className="richEditToolIcon"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
                 <path d="M10 6h11" />
                 <path d="M10 12h11" />
                 <path d="M10 18h11" />
@@ -1147,14 +1194,19 @@ export function EditableRewrite({
               type="button"
               title="Lenke"
               aria-label="Lenke"
-              onMouseDown={(event) =>
-                handleToolbarActionMouseDown(event, openLinkInput)
-              }
-              onClick={(event) =>
-                handleToolbarActionClick(event, openLinkInput)
-              }
+              onMouseDown={(event) => handleToolbarActionMouseDown(event, openLinkInput)}
+              onClick={(event) => handleToolbarActionClick(event, openLinkInput)}
             >
-              <svg className="richEditToolIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <svg
+                className="richEditToolIcon"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
                 <path d="M10 13a5 5 0 0 0 7.1 0l2-2a5 5 0 0 0-7.1-7.1l-1.1 1.1" />
                 <path d="M14 11a5 5 0 0 0-7.1 0l-2 2a5 5 0 0 0 7.1 7.1l1.1-1.1" />
               </svg>
@@ -1162,57 +1214,118 @@ export function EditableRewrite({
           </>
         )}
       </div>
-      <div className="editableActions">
-        {children}
-        <span className="actionsRight">
-          {extraActions}
-          {hasDraft && (
-            <>
-              <span className="draftDot" title="Redigert utkast" aria-label="Redigert utkast" />
-              <button
-                className={`draftIconButton${showingOriginal ? " draftIconButtonActive" : ""}`}
-                onClick={handleToggleDraftView}
-                title={showingOriginal ? "Vis redigert utkast" : "Vis AI-original"}
-                aria-label={showingOriginal ? "Vis redigert utkast" : "Vis AI-original"}
-                type="button"
-              >
-                {showingOriginal ? (
-                  <svg className="draftIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <path d="M12 20h9" />
-                    <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+      {renderActions ? (
+        renderActions({
+          hasDraft,
+          showingOriginal,
+          copyState,
+          copy: handleCopy,
+          toggleOriginal: handleToggleDraftView,
+          reset: resetWithUndo,
+          undoReset,
+          canUndoReset: resetSnapshot != null,
+          titles: titleSuggestions
+        })
+      ) : (
+        <div className="editableActions">
+          {children}
+          <span className="actionsRight">
+            {extraActions}
+            {hasDraft && (
+              <>
+                <span className="draftDot" title="Redigert utkast" aria-label="Redigert utkast" />
+                <button
+                  className={`draftIconButton${showingOriginal ? " draftIconButtonActive" : ""}`}
+                  onClick={handleToggleDraftView}
+                  title={showingOriginal ? "Vis redigert utkast" : "Vis AI-original"}
+                  aria-label={showingOriginal ? "Vis redigert utkast" : "Vis AI-original"}
+                  type="button"
+                >
+                  {showingOriginal ? (
+                    <svg
+                      className="draftIcon"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M12 20h9" />
+                      <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                    </svg>
+                  ) : (
+                    <svg
+                      className="draftIcon"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M12 5c5 0 8.5 4.5 9.5 7-1 2.5-4.5 7-9.5 7s-8.5-4.5-9.5-7C3.5 9.5 7 5 12 5Z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                  )}
+                </button>
+                <button
+                  className="draftIconButton"
+                  onClick={handleResetDraft}
+                  title="Tilbakestill til AI-original"
+                  aria-label="Tilbakestill til AI-original"
+                  type="button"
+                >
+                  <svg
+                    className="draftIcon"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M3 12a9 9 0 1 0 3-6.7" />
+                    <path d="M3 4v6h6" />
                   </svg>
-                ) : (
-                  <svg className="draftIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <path d="M12 5c5 0 8.5 4.5 9.5 7-1 2.5-4.5 7-9.5 7s-8.5-4.5-9.5-7C3.5 9.5 7 5 12 5Z" />
-                    <circle cx="12" cy="12" r="3" />
+                </button>
+              </>
+            )}
+            <button
+              className="copyButton"
+              onClick={() => {
+                void handleCopy();
+              }}
+              title="Kopier tekst"
+            >
+              {copyState === "copied" ? (
+                "Kopiert!"
+              ) : copyState === "failed" ? (
+                "Kunne ikke kopiere"
+              ) : (
+                <>
+                  Kopier{" "}
+                  <svg
+                    className="copyIcon"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <rect x="9" y="9" width="13" height="13" rx="2" />
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
                   </svg>
-                )}
-              </button>
-              <button
-                className="draftIconButton"
-                onClick={handleResetDraft}
-                title="Tilbakestill til AI-original"
-                aria-label="Tilbakestill til AI-original"
-                type="button"
-              >
-                <svg className="draftIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M3 12a9 9 0 1 0 3-6.7" />
-                  <path d="M3 4v6h6" />
-                </svg>
-              </button>
-            </>
-          )}
-          <button
-            className="copyButton"
-            onClick={() => {
-              void handleCopy();
-            }}
-            title="Kopier tekst"
-          >
-            {copyState === "copied" ? "Kopiert!" : copyState === "failed" ? "Kunne ikke kopiere" : <>Kopier <svg className="copyIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></>}
-          </button>
-        </span>
-      </div>
+                </>
+              )}
+            </button>
+          </span>
+        </div>
+      )}
     </div>
   );
 }

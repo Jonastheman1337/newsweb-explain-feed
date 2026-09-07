@@ -1,6 +1,10 @@
 import type { FeedItem } from "@newsweb/shared";
 
-export type FeedEntry = { current: FeedItem; latest: FeedItem; pending?: FeedItem };
+export type FeedEntry = {
+  current: FeedItem;
+  latest: FeedItem;
+  pending?: FeedItem;
+};
 export type FeedState = { entries: FeedEntry[]; incoming: FeedItem[] };
 export const sortItems = (items: FeedItem[]) =>
   [...items].sort(
@@ -18,7 +22,11 @@ function receive(entry: FeedEntry, item: FeedItem): FeedEntry {
     item.isFinal &&
     !!item.rewriteId &&
     (item.rewriteId !== entry.current.rewriteId || item.contentHash !== entry.current.contentHash);
-  if (changed && entry.current.isFinal) return { ...entry, latest: item, pending: item };
+  const newlyPublished =
+    item.rewriteId !== entry.latest.rewriteId || item.contentHash !== entry.latest.contentHash;
+  if (changed && entry.current.isFinal && (newlyPublished || entry.pending)) {
+    return { ...entry, latest: item, pending: item };
+  }
   if (!entry.current.isFinal) return { current: item, latest: item };
   // Keep the editor's publication props identical during progress events.
   return { ...entry, latest: item };

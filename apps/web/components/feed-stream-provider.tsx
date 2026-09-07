@@ -6,10 +6,12 @@ import {
   useContext,
   useEffect,
   useRef,
+  useState,
+  useMemo,
   type ReactNode
 } from "react";
 import type { FeedItem } from "@newsweb/shared";
-import { useFeedStream } from "./use-feed-stream";
+import { useFeedStream, type FeedConnectionState } from "./use-feed-stream";
 
 type FeedStreamHandlers = {
   onItem?: (item: FeedItem) => void;
@@ -22,6 +24,8 @@ type SubscriberEntry = {
 
 type FeedStreamContextValue = {
   register: (entry: SubscriberEntry) => () => void;
+  connection: FeedConnectionState;
+  reconnect: () => void;
 };
 
 const FeedStreamContext = createContext<FeedStreamContextValue | null>(null);
@@ -34,8 +38,13 @@ const FeedStreamContext = createContext<FeedStreamContextValue | null>(null);
  */
 export function FeedStreamProvider({ children }: { children: ReactNode }) {
   const subscribersRef = useRef<Set<SubscriberEntry>>(new Set());
+  const [connection, setConnection] = useState<FeedConnectionState>("connecting");
+  const [reconnectKey, setReconnectKey] = useState(0);
+  const reconnect = useCallback(() => setReconnectKey((key) => key + 1), []);
 
   useFeedStream({
+    reconnectKey,
+    onConnectionChange: setConnection,
     onItem: (item) => {
       for (const entry of subscribersRef.current) {
         try {
@@ -63,21 +72,24 @@ export function FeedStreamProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  return (
-    <FeedStreamContext.Provider value={{ register }}>
-      {children}
-    </FeedStreamContext.Provider>
+  const value = useMemo(
+    () => ({ register, connection, reconnect }),
+    [register, connection, reconnect]
   );
+  return <FeedStreamContext.Provider value={value}>{children}</FeedStreamContext.Provider>;
+}
+
+export function useFeedConnection() {
+  const context = useContext(FeedStreamContext);
+  if (!context) throw new Error("Feed connection requires FeedStreamProvider");
+  return { state: context.connection, reconnect: context.reconnect };
 }
 
 /**
  * Subscribe to the shared feed stream. Falls back to a dedicated
  * EventSource when no provider is mounted (e.g. in isolation/tests).
  */
-export function useFeedStreamSubscription(
-  handlers: FeedStreamHandlers,
-  subscribed = true
-): void {
+export function useFeedStreamSubscription(handlers: FeedStreamHandlers, subscribed = true): void {
   const context = useContext(FeedStreamContext);
   const handlersRef = useRef(handlers);
   handlersRef.current = handlers;

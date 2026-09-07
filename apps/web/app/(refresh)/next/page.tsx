@@ -2,6 +2,8 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getFeed, getMetaFilters, getMutedCategories, isApiAuthError } from "../../../lib/api";
 import { getSessionToken } from "../../../lib/session";
+import { FeedConnection } from "../../../components/refresh/feed-connection";
+import { Preferences } from "../../../components/refresh/preferences";
 import { RefreshFeed } from "../../../components/refresh/refresh-feed";
 import styles from "../../../components/refresh/refresh.module.css";
 
@@ -39,9 +41,13 @@ export default async function RefreshPage({ searchParams }: { searchParams: Prom
       <>
         <div className={styles.heading}>
           <h1>Børsmeldinger</h1>
-          <span className={styles.live}>
-            {process.env.UI_PREVIEW_FIXTURES === "true" ? "Eksempeldata" : "Direkte"}
-          </span>
+          <div className={styles.headingTools}>
+            <FeedConnection fixtures={process.env.UI_PREVIEW_FIXTURES === "true"} />
+            <Preferences
+              categories={filters.categories.map((category) => category.categoryNo)}
+              defaultMuted={muted.mutedCategories}
+            />
+          </div>
         </div>
         <form className={styles.filters} action="/next">
           <div className={styles.search}>

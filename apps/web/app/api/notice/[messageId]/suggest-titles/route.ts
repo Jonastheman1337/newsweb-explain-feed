@@ -12,6 +12,7 @@ import {
 } from "@newsweb/shared/openai-responses";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { proxyToApi } from "../../../../../lib/bff-proxy";
 import { getApiBaseUrl } from "../../../../../lib/api-base-url";
 import { SESSION_COOKIE } from "../../../../../lib/session-cookie";
 
@@ -28,8 +29,8 @@ function loadEnvVar(name: string, fallback: string): string {
     // Try multiple possible locations for the .env file
     const candidates = [
       resolve(process.cwd(), ".env"),
-      resolve(process.cwd(), "../../.env"),           // from apps/web
-      resolve(process.cwd(), "../../../.env"),         // deeper nesting
+      resolve(process.cwd(), "../../.env"), // from apps/web
+      resolve(process.cwd(), "../../../.env") // deeper nesting
     ];
     for (const candidate of candidates) {
       try {
@@ -39,7 +40,9 @@ function loadEnvVar(name: string, fallback: string): string {
           if (m) _envCache[m[1]] = m[2];
         }
         break;
-      } catch { /* try next */ }
+      } catch {
+        /* try next */
+      }
     }
   }
   return _envCache[name] ?? fallback;
@@ -92,7 +95,10 @@ function countTitleWords(title: string): number {
 }
 
 function normalizeTitleSuggestion(title: string): string {
-  return title.replace(/\s*%/g, " prosent").replace(/\s{2,}/g, " ").trim();
+  return title
+    .replace(/\s*%/g, " prosent")
+    .replace(/\s{2,}/g, " ")
+    .trim();
 }
 
 function parseTitleSuggestions(raw: string): string[] {
@@ -132,7 +138,8 @@ export async function POST(
   { params }: { params: Promise<{ messageId: string }> }
 ) {
   if (process.env.NODE_ENV === "development" && process.env.UI_PREVIEW_FIXTURES === "true") {
-    return NextResponse.json({ message: "Generering er av i lokal forhåndsvisning." }, { status: 409 });
+    const { messageId } = await params;
+    return proxyToApi(request, `/notice/${messageId}/suggest-titles`);
   }
   const { messageId } = await params;
   const cookieStore = await cookies();
@@ -149,12 +156,8 @@ export async function POST(
 
   const OPENAI_API_KEY = loadEnvVar("OPENAI_API_KEY", "");
   const OPENAI_FAST_MODEL = loadEnvVar("OPENAI_FAST_MODEL", "gpt-5.6-luna");
-  const OPENAI_SERVICE_TIER = readServiceTier(
-    loadEnvVar("OPENAI_SERVICE_TIER", "default")
-  );
-  const OPENAI_FAST_TIMEOUT_MS = Number(
-    loadEnvVar("OPENAI_FAST_TIMEOUT_MS", "15000")
-  );
+  const OPENAI_SERVICE_TIER = readServiceTier(loadEnvVar("OPENAI_SERVICE_TIER", "default"));
+  const OPENAI_FAST_TIMEOUT_MS = Number(loadEnvVar("OPENAI_FAST_TIMEOUT_MS", "15000"));
 
   if (!OPENAI_API_KEY) {
     return NextResponse.json({ message: "OpenAI is not configured" }, { status: 500 });
@@ -165,18 +168,17 @@ export async function POST(
   if (token) {
     headers.Authorization = `Bearer ${token}`;
   }
-  const noticeRes = await fetch(`${API_BASE_URL}/notice/${messageId}`, { headers });
+  const noticeRes = await fetch(`${API_BASE_URL}/notice/${messageId}`, {
+    headers
+  });
   if (!noticeRes.ok) {
     return NextResponse.json({ message: "Notice not found" }, { status: 404 });
   }
   const notice = await noticeRes.json();
 
   const requestedCurrentTitle =
-    typeof requestBody.currentTitle === "string"
-      ? requestBody.currentTitle.trim()
-      : "";
-  const currentTitle =
-    requestedCurrentTitle || notice.rewrite?.title || notice.source?.title || "";
+    typeof requestBody.currentTitle === "string" ? requestBody.currentTitle.trim() : "";
+  const currentTitle = requestedCurrentTitle || notice.rewrite?.title || notice.source?.title || "";
   const lead = notice.rewrite?.lead ?? "";
   const body = notice.rewrite?.body?.join("\n") ?? "";
   const issuerName = notice.source?.issuerName ?? "";
@@ -239,9 +241,7 @@ export async function POST(
     schemaName: "title_suggestions",
     model: OPENAI_FAST_MODEL,
     reasoningEffort: "none",
-    timeoutMs: Number.isFinite(OPENAI_FAST_TIMEOUT_MS)
-      ? OPENAI_FAST_TIMEOUT_MS
-      : 15000,
+    timeoutMs: Number.isFinite(OPENAI_FAST_TIMEOUT_MS) ? OPENAI_FAST_TIMEOUT_MS : 15000,
     maxOutputTokens: 512,
     promptChars: prompt.length,
     responseModel: null,
@@ -306,22 +306,19 @@ export async function POST(
   }
 
   try {
-    const result = await callOpenAIForJson(
-      createOpenAIClient(OPENAI_API_KEY),
-      {
-        schemaName: "title_suggestions",
-        schema: titleSuggestionsJsonSchema,
-        systemPrompt: "",
-        developerPrompt,
-        userPrompt,
-        model: OPENAI_FAST_MODEL,
-        reasoningEffort: "none",
-        serviceTier: OPENAI_SERVICE_TIER,
-        timeoutMs: titleModelCall.timeoutMs,
-        maxOutputTokens: titleModelCall.maxOutputTokens,
-        promptCacheKey: "newsweb:title-suggestions:title-suggestions-v5"
-      }
-    );
+    const result = await callOpenAIForJson(createOpenAIClient(OPENAI_API_KEY), {
+      schemaName: "title_suggestions",
+      schema: titleSuggestionsJsonSchema,
+      systemPrompt: "",
+      developerPrompt,
+      userPrompt,
+      model: OPENAI_FAST_MODEL,
+      reasoningEffort: "none",
+      serviceTier: OPENAI_SERVICE_TIER,
+      timeoutMs: titleModelCall.timeoutMs,
+      maxOutputTokens: titleModelCall.maxOutputTokens,
+      promptCacheKey: "newsweb:title-suggestions:title-suggestions-v5"
+    });
     applyOpenAITelemetry(titleModelCall, result);
     const text = result.content;
 

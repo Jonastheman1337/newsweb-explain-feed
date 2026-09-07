@@ -19,8 +19,9 @@ Open http://127.0.0.1:3101/next. Sign in with `preview` / `ui-preview`.
 The header labels this environment `Eksempeldata`.
 
 The launcher binds the web app to 127.0.0.1:3101 and an in-memory fixture API to
-127.0.0.1:4101. It does not start a worker, polling, a database or Redis. Generation
-and title suggestions return an explicit unavailable response. Edits still use the
+127.0.0.1:4101. It does not start a worker, polling, a database or Redis. Generation and title suggestions use deterministic fictional responses; no model
+is called and instructions do not influence the simulated text. The preview also
+supports version history, settings and local feedback acknowledgements. Edits still use the
 real editor's browser storage. Fixture sessions and data reset when restarted.
 The preview has its own cookie name, so it does not replace a legacy localhost login.
 Occupied ports cause startup to fail; stop the previous preview before restarting.
@@ -61,12 +62,12 @@ npm.cmd run ui:verify-routes
 
 ## Flags and boundaries
 
-| Setting | Default | Effect |
-| --- | --- | --- |
-| `UI_V2_ENABLED` | off | Exposes authenticated `/next`; disabled returns 404. |
-| `FAST_DRAFT_ENABLED` | off | Reserved independent switch. No generation consumer exists yet. |
-| `SESSION_COOKIE_NAME` | `newsweb_session` | Preview sets `newsweb_ui_preview`. |
-| `UI_PREVIEW_FIXTURES` | off | Development-only title-generation guard and preview label. Set by fixture launcher. |
+| Setting               | Default           | Effect                                                                           |
+| --------------------- | ----------------- | -------------------------------------------------------------------------------- |
+| `UI_V2_ENABLED`       | off               | Exposes authenticated `/next`; disabled returns 404.                             |
+| `FAST_DRAFT_ENABLED`  | off               | Reserved independent switch. No generation consumer exists yet.                  |
+| `SESSION_COOKIE_NAME` | `newsweb_session` | Preview sets `newsweb_ui_preview`.                                               |
+| `UI_PREVIEW_FIXTURES` | off               | Development-only fixture title proxy and preview label. Set by fixture launcher. |
 
 Only the literal `true` enables a feature flag. UI enablement must never imply fast
 model calls. The future fast path must preserve the canonical legacy full rewrite,
@@ -82,7 +83,8 @@ remain a separate step; do not point this preview at production to bypass that s
 ## Iteration order
 
 1. Foundation: route, isolated runtime, scoped layout, direct editor and arrival handling.
-2. Refine feed actions and source workspace; keep version and edit state on navigation.
+2. Completed: compact feed actions, source workspace, version history and selection
+   restoration, title/feedback dialogs, hidden-category preferences and connection status.
 3. Restyle the remaining existing screens and preferences within current permissions.
 4. Implement and evaluate the independent fast-version path without changing full
    generation prompts, models, validation or editorial policy.

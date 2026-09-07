@@ -11,6 +11,8 @@ const MAX_RECONNECT_DELAY_MS = 30_000;
 // is down and the stream cycles between connect and close.
 const RECONNECT_RESYNC_GRACE_MS = 2_000;
 
+export type FeedConnectionState = "connecting" | "connected" | "disconnected";
+
 type UseFeedStreamOptions = {
   onItem: (item: FeedItem) => void;
   /**
@@ -20,6 +22,8 @@ type UseFeedStreamOptions = {
    */
   onReconnect?: () => void;
   enabled?: boolean;
+  onConnectionChange?: (state: FeedConnectionState) => void;
+  reconnectKey?: number;
 };
 
 /**
@@ -33,10 +37,17 @@ type UseFeedStreamOptions = {
 export function useFeedStream({
   onItem,
   onReconnect,
+  onConnectionChange,
+  reconnectKey = 0,
   enabled = true
 }: UseFeedStreamOptions): void {
-  const handlersRef = useRef({ onItem, onReconnect });
-  handlersRef.current = { onItem, onReconnect };
+  const handlersRef = useRef({ onItem, onReconnect, onConnectionChange });
+  handlersRef.current = { onItem, onReconnect, onConnectionChange };
+
+  const historyRef = useRef({
+    connected: false,
+    lastEventId: null as string | null
+  });
 
   useEffect(() => {
     if (!enabled) {
@@ -47,11 +58,12 @@ export function useFeedStream({
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
     let resyncTimer: ReturnType<typeof setTimeout> | null = null;
     let reconnectDelay = INITIAL_RECONNECT_DELAY_MS;
-    let hasConnectedBefore = false;
+    let hasConnectedBefore = historyRef.current.connected;
     let disposed = false;
-    let lastEventId: string | null = null;
+    let lastEventId: string | null = historyRef.current.lastEventId;
 
     function connect() {
+      handlersRef.current.onConnectionChange?.("connecting");
       // Hook-managed reconnects cannot set the Last-Event-ID header on a
       // fresh EventSource, so the resume id travels as a query param instead.
       const url = lastEventId
@@ -61,6 +73,7 @@ export function useFeedStream({
       source = es;
 
       es.onopen = () => {
+        handlersRef.current.onConnectionChange?.("connected");
         reconnectDelay = INITIAL_RECONNECT_DELAY_MS;
         if (hasConnectedBefore && !resyncTimer) {
           resyncTimer = setTimeout(() => {
@@ -69,11 +82,13 @@ export function useFeedStream({
           }, RECONNECT_RESYNC_GRACE_MS);
         }
         hasConnectedBefore = true;
+        historyRef.current.connected = true;
       };
 
       es.onmessage = (event) => {
         if (event.lastEventId) {
           lastEventId = event.lastEventId;
+          historyRef.current.lastEventId = lastEventId;
         }
         try {
           const item: FeedItem = JSON.parse(event.data);
@@ -101,6 +116,7 @@ export function useFeedStream({
       });
 
       es.onerror = () => {
+        handlersRef.current.onConnectionChange?.("disconnected");
         if (resyncTimer) {
           clearTimeout(resyncTimer);
           resyncTimer = null;
@@ -134,5 +150,5 @@ export function useFeedStream({
       }
       source?.close();
     };
-  }, [enabled]);
+  }, [enabled, reconnectKey]);
 }

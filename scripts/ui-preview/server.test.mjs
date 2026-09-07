@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createFixtureServer } from "./server.mjs";
 import { feedResponseSchema, noticeResponseSchema } from "../../packages/shared/dist/api.js";
 
-test("fixture preview authenticates, filters, paginates and refuses generation", async (t) => {
+test("fixture preview authenticates, filters, paginates and simulates generation locally", async (t) => {
   const fixture = createFixtureServer();
   const port = await fixture.listen(0);
   t.after(() => fixture.close());
@@ -30,8 +30,11 @@ test("fixture preview authenticates, filters, paginates and refuses generation",
   noticeResponseSchema.parse(await (await fetch(`${base}/notice/900001`, { headers })).json());
   assert.equal(
     (await fetch(`${base}/notice/900001/generate`, { method: "POST", headers })).status,
-    409
+    200
   );
+  const status = await (await fetch(`${base}/notice/900001/status`, { headers })).json();
+  assert.equal(status.ready, false);
+  assert.equal(status.jobState, "active");
   assert.equal(
     (
       await fetch(`${base}/__preview/replay`, {
@@ -73,6 +76,18 @@ test("fixture stream carries a full publication update and an arrival", async (t
     assert.match(output, /"regenerating":true/);
     assert.match(output, /"rewriteId":"fixture-900001-2"/);
     assert.match(output, /Vestby Teknologi/);
+    const notice = noticeResponseSchema.parse(
+      await (
+        await fetch(`${base}/notice/900001`, {
+          headers: { Authorization: `Bearer ${sessionToken}` }
+        })
+      ).json()
+    );
+    assert.deepEqual(
+      notice.rewrites.map((item) => item.version),
+      [1, 2]
+    );
+    assert.equal(notice.publication.version, 2);
   } finally {
     clearTimeout(timeout);
     controller.abort();

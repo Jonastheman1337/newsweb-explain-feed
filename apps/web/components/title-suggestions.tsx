@@ -11,6 +11,8 @@ type TitleSuggestionsProps = {
   contentHash?: string;
   isFinal?: boolean;
   currentTitle: string;
+  previewOnHover?: boolean;
+  closeOnOutsideClick?: boolean;
   onPreview: (title: string) => void;
   onRevert: () => void;
   onCommit: (title: string) => void;
@@ -24,9 +26,11 @@ export function useTitleSuggestions({
   contentHash,
   isFinal,
   currentTitle,
+  previewOnHover = true,
+  closeOnOutsideClick = true,
   onPreview,
   onRevert,
-  onCommit,
+  onCommit
 }: TitleSuggestionsProps) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -48,18 +52,15 @@ export function useTitleSuggestions({
   }, [onRevert]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || !closeOnOutsideClick) return;
     function handleClickOutside(e: MouseEvent) {
       const target = e.target as Node;
-      if (
-        dropdownRef.current?.contains(target) ||
-        btnRef.current?.contains(target)
-      ) return;
+      if (dropdownRef.current?.contains(target) || btnRef.current?.contains(target)) return;
       close();
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [open, close]);
+  }, [open, close, closeOnOutsideClick]);
 
   function logSuggestions(
     suggestions: string[],
@@ -81,10 +82,14 @@ export function useTitleSuggestions({
         action,
         telemetry: buildTelemetry({ actionSource: "title_suggestions" })
       })
-    }).catch(() => { /* silent */ });
+    }).catch(() => {
+      /* silent */
+    });
   }
 
-  async function fetchSuggestions(action: "title_suggestion_request" | "title_suggestion_refresh" = "title_suggestion_request") {
+  async function fetchSuggestions(
+    action: "title_suggestion_request" | "title_suggestion_refresh" = "title_suggestion_request"
+  ) {
     setLoading(true);
     setError(false);
     try {
@@ -127,13 +132,7 @@ export function useTitleSuggestions({
   }
 
   function handleCommit(title: string, selectedIndex: number | null, selectedWasOriginal = false) {
-    logSuggestions(
-      titles,
-      "title_suggestion_select",
-      title,
-      selectedIndex,
-      selectedWasOriginal
-    );
+    logSuggestions(titles, "title_suggestion_select", title, selectedIndex, selectedWasOriginal);
     onCommit(title);
     setOpen(false);
   }
@@ -146,57 +145,70 @@ export function useTitleSuggestions({
       title="Foreslå titler"
       type="button"
     >
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <svg
+        width="14"
+        height="14"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
         <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
       </svg>
     </button>
   );
 
-  const dropdown = open && !loading ? (
-    <div
-      ref={dropdownRef}
-      className="titleSuggestDropdown"
-      onMouseLeave={() => onRevert()}
-    >
-      {error ? (
-        <div className="titleSuggestLoading">Noe gikk galt — prøv igjen</div>
-      ) : titles.length === 0 ? (
-        <div className="titleSuggestLoading">Ingen forslag tilgjengelig</div>
-      ) : (
-        <>
-          <button
-            className="titleSuggestOption titleSuggestCurrent"
-            onClick={() => handleCommit(currentTitle, null, true)}
-            onMouseEnter={() => onRevert()}
-            type="button"
-          >
-            <span className="titleSuggestLabel">Nåværende</span>
-            {currentTitle}
-          </button>
-          {titles.map((title, i) => (
+  const dropdown =
+    open && !loading ? (
+      <div ref={dropdownRef} className="titleSuggestDropdown" onMouseLeave={() => onRevert()}>
+        {error ? (
+          <div className="titleSuggestLoading" role="status">
+            <span>Kunne ikke hente titler</span>
+            <button type="button" onClick={() => fetchSuggestions()}>
+              Prøv igjen
+            </button>
+          </div>
+        ) : titles.length === 0 ? (
+          <div className="titleSuggestLoading">Ingen forslag tilgjengelig</div>
+        ) : (
+          <>
             <button
-              key={i}
-              className="titleSuggestOption"
-              onClick={() => handleCommit(title, i)}
-              onMouseEnter={() => onPreview(title)}
+              className="titleSuggestOption titleSuggestCurrent"
+              onClick={() => handleCommit(currentTitle, null, true)}
+              onMouseEnter={() => onRevert()}
               type="button"
             >
-              {title}
+              <span className="titleSuggestLabel">Nåværende</span>
+              {currentTitle}
             </button>
-          ))}
-          <button
-            className="titleSuggestRefresh"
-            onClick={() => fetchSuggestions("title_suggestion_refresh")}
-            onMouseEnter={() => onRevert()}
-            disabled={loading}
-            type="button"
-          >
-            {loading ? "Genererer..." : "Nye forslag"}
-          </button>
-        </>
-      )}
-    </div>
-  ) : null;
+            {titles.map((title, i) => (
+              <button
+                key={i}
+                className="titleSuggestOption"
+                onClick={() => handleCommit(title, i)}
+                onMouseEnter={() => {
+                  if (previewOnHover) onPreview(title);
+                }}
+                type="button"
+              >
+                {title}
+              </button>
+            ))}
+            <button
+              className="titleSuggestRefresh"
+              onClick={() => fetchSuggestions("title_suggestion_refresh")}
+              onMouseEnter={() => onRevert()}
+              disabled={loading}
+              type="button"
+            >
+              {loading ? "Genererer..." : "Nye forslag"}
+            </button>
+          </>
+        )}
+      </div>
+    ) : null;
 
-  return { button, dropdown };
+  return { button, dropdown, open, loading, toggle: handleToggle, close };
 }

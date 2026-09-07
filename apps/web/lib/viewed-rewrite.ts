@@ -52,24 +52,43 @@ export function rememberViewedRewrite(
   publicationRevision = 0
 ) {
   try {
-    window.sessionStorage.setItem(storageKey(messageId), JSON.stringify({
-      latestVersion,
-      item: {
-        ...active.rewrite,
-        keyFacts: active.rewrite.key_facts,
-        negativeOrSurprising: active.rewrite.negative_or_surprising,
-        sourceLimitations: active.rewrite.source_limitations,
-        rewriteId: active.rewriteId,
-        rewriteVersion: active.version,
-        publicationRevision,
-        contentHash: active.contentHash,
-        finalizedAt: active.generatedAt,
-        isFinal: active.isFinal
-      }
-    }));
+    window.sessionStorage.setItem(
+      storageKey(messageId),
+      JSON.stringify({
+        latestVersion,
+        item: {
+          ...active.rewrite,
+          keyFacts: active.rewrite.key_facts,
+          negativeOrSurprising: active.rewrite.negative_or_surprising,
+          sourceLimitations: active.rewrite.source_limitations,
+          rewriteId: active.rewriteId,
+          rewriteVersion: active.version,
+          publicationRevision,
+          contentHash: active.contentHash,
+          finalizedAt: active.generatedAt,
+          isFinal: active.isFinal
+        }
+      })
+    );
     window.dispatchEvent(new Event(VIEWED_REWRITE_CHANGE_EVENT));
   } catch {
     // Version navigation still works when browser storage is unavailable.
+  }
+}
+
+/** Remember the selected feed publication without synthesizing generation fields. */
+export function rememberViewedFeedItem(item: FeedItem, latestVersion: number) {
+  try {
+    window.sessionStorage.setItem(
+      storageKey(item.messageId),
+      JSON.stringify({
+        latestVersion,
+        item: viewedRewriteSchema.parse(item)
+      })
+    );
+    window.dispatchEvent(new Event(VIEWED_REWRITE_CHANGE_EVENT));
+  } catch {
+    // The mounted editor remains usable when session storage is unavailable.
   }
 }
 
@@ -81,7 +100,8 @@ export function applyViewedRewrite(item: FeedItem): FeedItem {
   if (
     (item.rewriteVersion ?? 0) > viewed.latestVersion ||
     item.publicationRevision > viewed.item.publicationRevision
-  ) return item;
+  )
+    return item;
 
   return {
     ...item,

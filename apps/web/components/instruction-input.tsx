@@ -44,6 +44,7 @@ type InstructionInputProps = {
   contentHash?: string;
   isFinal?: boolean;
   hasAttachments?: boolean;
+  presentation?: "legacy" | "refresh";
 };
 
 export function InstructionInput({
@@ -53,7 +54,8 @@ export function InstructionInput({
   publicationRevision,
   contentHash,
   isFinal,
-  hasAttachments
+  hasAttachments,
+  presentation = "legacy"
 }: InstructionInputProps) {
   const PROGRESS_STEPS = getGenerationSteps(hasAttachments);
   const router = useRouter();
@@ -62,7 +64,9 @@ export function InstructionInput({
   const [outputMode, setOutputMode] = useState<OutputMode>("notice");
   const [materialsOpen, setMaterialsOpen] = useState(false);
   const [materials, setMaterials] = useState<NoticeMaterial[]>([]);
-  const [materialStatus, setMaterialStatus] = useState<"idle" | "loading" | "saving" | "error">("idle");
+  const [materialStatus, setMaterialStatus] = useState<"idle" | "loading" | "saving" | "error">(
+    "idle"
+  );
   const [materialInputMode, setMaterialInputMode] = useState<"text" | "newsweb" | null>(null);
   const [materialTitle, setMaterialTitle] = useState("");
   const [materialText, setMaterialText] = useState("");
@@ -225,25 +229,20 @@ export function InstructionInput({
 
   async function setMaterialEnabled(material: NoticeMaterial, enabled: boolean) {
     setMaterials((current) =>
-      current.map((item) => item.id === material.id ? { ...item, enabled } : item)
+      current.map((item) => (item.id === material.id ? { ...item, enabled } : item))
     );
     try {
-      const response = await fetch(
-        `/api/notice/${messageId}/materials/${material.id}`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ enabled })
-        }
-      );
+      const response = await fetch(`/api/notice/${messageId}/materials/${material.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ enabled })
+      });
       if (!response.ok) {
         throw new Error("Material update failed");
       }
       const updated = (await response.json()) as NoticeMaterial;
-      setMaterials((current) =>
-        current.map((item) => item.id === updated.id ? updated : item)
-      );
+      setMaterials((current) => current.map((item) => (item.id === updated.id ? updated : item)));
     } catch {
       setMaterialStatus("error");
       setMaterials((current) =>
@@ -258,13 +257,10 @@ export function InstructionInput({
     const previous = materials;
     setMaterials((current) => current.filter((item) => item.id !== materialId));
     try {
-      const response = await fetch(
-        `/api/notice/${messageId}/materials/${materialId}`,
-        {
-          method: "DELETE",
-          credentials: "include"
-        }
-      );
+      const response = await fetch(`/api/notice/${messageId}/materials/${materialId}`, {
+        method: "DELETE",
+        credentials: "include"
+      });
       if (!response.ok) {
         throw new Error("Material delete failed");
       }
@@ -276,8 +272,7 @@ export function InstructionInput({
 
   function statusChanged(data: { version?: number | null; generatedAt?: string | null }) {
     return (
-      data.version !== versionBeforeRef.current ||
-      data.generatedAt !== generatedAtBeforeRef.current
+      data.version !== versionBeforeRef.current || data.generatedAt !== generatedAtBeforeRef.current
     );
   }
 
@@ -310,7 +305,9 @@ export function InstructionInput({
         router.refresh();
         return;
       }
-    } catch { /* fall through to timeout handling */ }
+    } catch {
+      /* fall through to timeout handling */
+    }
 
     setStatus("error");
     router.refresh();
@@ -335,13 +332,15 @@ export function InstructionInput({
           versionBeforeRef.current = data.version ?? null;
           generatedAtBeforeRef.current = data.generatedAt ?? null;
         }
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
 
       const fetchOptions: RequestInit = {
         method: "POST",
         credentials: "include",
         keepalive: true,
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" }
       };
       const requestBody = {
         ...(instruction ? { instruction } : {}),
@@ -350,9 +349,7 @@ export function InstructionInput({
         ...(reasoningEffortOverride ? { reasoningEffortOverride } : {}),
         telemetry: buildTelemetry({
           actionSource:
-            reasoningEffortOverride === "xhigh"
-              ? "instruction_input_xhigh"
-              : "instruction_input"
+            reasoningEffortOverride === "xhigh" ? "instruction_input_xhigh" : "instruction_input"
         })
       };
       fetchOptions.body = JSON.stringify(requestBody);
@@ -366,7 +363,9 @@ export function InstructionInput({
       try {
         const data = (await response.json()) as GenerateResponse;
         jobId = data.jobId != null ? String(data.jobId) : null;
-      } catch { /* response body is optional */ }
+      } catch {
+        /* response body is optional */
+      }
 
       setStatus("polling");
       setText("");
@@ -395,7 +394,9 @@ export function InstructionInput({
             setStatus("error");
             return;
           }
-        } catch { /* keep polling */ }
+        } catch {
+          /* keep polling */
+        }
         if (attempts >= MAX_POLL_ATTEMPTS && !isJobStillRunning(data)) {
           void checkFinalStatusAfterTimeout(jobId);
         }
@@ -442,20 +443,21 @@ export function InstructionInput({
   function materialMeta(material: NoticeMaterial): string {
     if (material.status === "failed") return "Feilet";
     const kind =
-      material.kind === "pdf"
-        ? "PDF"
-        : material.kind === "newsweb"
-          ? "Newsweb"
-          : "Tekst";
+      material.kind === "pdf" ? "PDF" : material.kind === "newsweb" ? "Newsweb" : "Tekst";
     return `${kind} - ${material.extractedTextChars.toLocaleString("nb-NO")} tegn`;
   }
 
   return (
-    <div className="instructionWrap">
+    <div className="instructionWrap" data-presentation={presentation}>
       <textarea
         ref={textareaRef}
         className="instructionTextarea"
-        placeholder="Skriv instruksjoner for ny versjon eller gi feedback..."
+        placeholder={
+          presentation === "refresh"
+            ? "Hva skal endres?"
+            : "Skriv instruksjoner for ny versjon eller gi feedback..."
+        }
+        aria-label={presentation === "refresh" ? "Instruksjon for ny versjon" : undefined}
         value={text}
         onChange={(e) => setText(e.target.value)}
         onKeyDown={(e) => {
@@ -474,7 +476,8 @@ export function InstructionInput({
           onClick={() => setMaterialsOpen((open) => !open)}
           disabled={busy}
         >
-          + Materiale{activeMaterialCount ? ` (${activeMaterialCount})` : ""}
+          {presentation === "refresh" ? "+ Kilde" : "+ Materiale"}
+          {activeMaterialCount ? ` (${activeMaterialCount})` : ""}
         </button>
         {materialStatus === "loading" && <span className="muted">Laster ...</span>}
         {materialStatus === "saving" && <span className="muted">Lagrer ...</span>}
@@ -505,7 +508,9 @@ export function InstructionInput({
             <button
               className="ghostButton"
               type="button"
-              onClick={() => setMaterialInputMode((mode) => mode === "newsweb" ? null : "newsweb")}
+              onClick={() =>
+                setMaterialInputMode((mode) => (mode === "newsweb" ? null : "newsweb"))
+              }
               disabled={busy}
             >
               Newsweb
@@ -513,7 +518,7 @@ export function InstructionInput({
             <button
               className="ghostButton"
               type="button"
-              onClick={() => setMaterialInputMode((mode) => mode === "text" ? null : "text")}
+              onClick={() => setMaterialInputMode((mode) => (mode === "text" ? null : "text"))}
               disabled={busy}
             >
               Tekst
@@ -619,61 +624,75 @@ export function InstructionInput({
             Utvidet
           </button>
         </div>
-        <button
-          className="ghostButton"
-          onClick={() => handleGenerate()}
-          disabled={busy}
-        >
+        <button className="ghostButton" onClick={() => handleGenerate()} disabled={busy}>
           {status === "loading"
             ? "Sender ..."
             : status === "polling"
-              ? PROGRESS_STEPS[progressStep] + "..."
-              : (text.trim() ? "Generer ny versjon" : "Regenerer notis")}
+              ? presentation === "refresh"
+                ? "Lager versjon…"
+                : PROGRESS_STEPS[progressStep] + "..."
+              : presentation === "refresh"
+                ? "Lag versjon"
+                : text.trim()
+                  ? "Generer ny versjon"
+                  : "Regenerer notis"}
         </button>
-        <button
-          className={`xhighToggle${xhighEnabled ? " xhighToggleActive" : ""}`}
-          type="button"
-          onClick={() => setXhighEnabled((enabled) => !enabled)}
-          disabled={busy}
-          aria-label="Bruk xhigh-resonnering ved neste generering"
-          aria-pressed={xhighEnabled}
-          title="Bruk xhigh-resonnering ved neste generering"
-        >
-          <svg
-            className="xhighIcon"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
+        <GenerationOptions compact={presentation === "refresh"}>
+          <button
+            className={`xhighToggle${xhighEnabled ? " xhighToggleActive" : ""}`}
+            type="button"
+            onClick={() => setXhighEnabled((enabled) => !enabled)}
+            disabled={busy}
+            aria-label="Bruk xhigh-resonnering ved neste generering"
+            aria-pressed={xhighEnabled}
+            title="Bruk xhigh-resonnering ved neste generering"
           >
-            <path d="M8.4 18.8c-2.1 0-3.8-1.7-3.8-3.8 0-.8.2-1.5.7-2.1a4 4 0 0 1-.5-2 4.1 4.1 0 0 1 4.1-4.1h.3A4.1 4.1 0 0 1 16.8 6a3.8 3.8 0 0 1 2.6 6.8c.4.6.6 1.3.6 2.1 0 2.1-1.7 3.8-3.8 3.8" />
-            <path d="M8.8 6.8v12" />
-            <path d="M15.2 6v12.8" />
-            <path d="M8.8 10.4c1.2 0 2.1-.6 2.5-1.6" />
-            <path d="M15.2 10.2c-1.2 0-2.1-.5-2.6-1.4" />
-            <path d="M8.8 14.2c1.2 0 2.1.5 2.6 1.4" />
-            <path d="M15.2 14.4c-1.2 0-2.1.6-2.5 1.6" />
-          </svg>
-        </button>
+            <svg
+              className="xhighIcon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M8.4 18.8c-2.1 0-3.8-1.7-3.8-3.8 0-.8.2-1.5.7-2.1a4 4 0 0 1-.5-2 4.1 4.1 0 0 1 4.1-4.1h.3A4.1 4.1 0 0 1 16.8 6a3.8 3.8 0 0 1 2.6 6.8c.4.6.6 1.3.6 2.1 0 2.1-1.7 3.8-3.8 3.8" />
+              <path d="M8.8 6.8v12" />
+              <path d="M15.2 6v12.8" />
+              <path d="M8.8 10.4c1.2 0 2.1-.6 2.5-1.6" />
+              <path d="M15.2 10.2c-1.2 0-2.1-.5-2.6-1.4" />
+              <path d="M8.8 14.2c1.2 0 2.1.5 2.6 1.4" />
+              <path d="M15.2 14.4c-1.2 0-2.1.6-2.5 1.6" />
+            </svg>
+            {presentation === "refresh" && <span>Grundigere resonnering</span>}
+          </button>
+        </GenerationOptions>
         {status === "polling" && <E24Loader />}
-        {status === "error" && (
-          <span className="muted">
-            Noe gikk galt — prøv igjen
+        {status === "error" && <span className="muted">Noe gikk galt — prøv igjen</span>}
+        {presentation === "legacy" && (
+          <span className="actionsRight">
+            <button
+              className="ghostButton"
+              onClick={handleFeedback}
+              disabled={!text.trim() || busy}
+            >
+              {status === "sent" ? "Takk!" : "Feedback"}
+            </button>
           </span>
         )}
-        <span className="actionsRight">
-          <button
-            className="ghostButton"
-            onClick={handleFeedback}
-            disabled={!text.trim() || busy}
-          >
-            {status === "sent" ? "Takk!" : "Feedback"}
-          </button>
-        </span>
       </div>
     </div>
+  );
+}
+
+function GenerationOptions({ compact, children }: { compact: boolean; children: React.ReactNode }) {
+  return compact ? (
+    <details className="generationOptions">
+      <summary>Valg</summary>
+      {children}
+    </details>
+  ) : (
+    <>{children}</>
   );
 }

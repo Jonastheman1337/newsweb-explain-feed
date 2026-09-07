@@ -10,13 +10,14 @@ import { stopChild } from "./process.mjs";
 const require = createRequire(import.meta.url);
 const fixture = createFixtureServer();
 const apiPort = await fixture.listen(0);
-const base = "http://127.0.0.1:3102";
+const webPort = process.env.UI_VERIFY_PORT || "3102";
+const base = `http://127.0.0.1:${webPort}`;
 try {
   for (const enabled of [false, true]) {
     let output = "";
     const child = spawn(
       process.execPath,
-      [require.resolve("next/dist/bin/next"), "start", "-H", "127.0.0.1", "-p", "3102"],
+      [require.resolve("next/dist/bin/next"), "start", "-H", "127.0.0.1", "-p", webPort],
       {
         cwd: fileURLToPath(new URL("../../apps/web", import.meta.url)),
         windowsHide: true,
@@ -60,6 +61,11 @@ try {
       assert.equal(next.status, enabled ? 200 : 404, `logged in, flag=${enabled}`);
       const html = await next.text();
       if (enabled) assert.ok(html.includes("Nordvik sikrer kontrakt"));
+      const detail = await fetch(base + "/api/notice/900001", { headers });
+      assert.equal(detail.status, 200);
+      assert.equal((await detail.json()).rewrites.length, 1);
+      assert.equal((await fetch(base + "/api/notice/900001")).status, 401);
+      assert.equal((await fetch(base + "/api/notice/not-an-id", { headers })).status, 400);
       const legacy = await fetch(`${base}/feed`, { headers });
       assert.equal(legacy.status, 200);
       assert.ok((await legacy.text()).includes("Nordvik sikrer kontrakt"));
