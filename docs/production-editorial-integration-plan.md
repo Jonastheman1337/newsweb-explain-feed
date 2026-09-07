@@ -1,5 +1,24 @@
 # Production editorial integration plan
 
+## Earlier-disclosure comparison amendment — 2026-09-07
+
+The owner accepted bounded earlier-notice discovery, original-source/attachment
+comparison and a material-new-information check, excluding the proposed new
+SKIPPED explanation/link interface. This is implemented as observation only;
+there is no enforcement mode and no change to writer or publication behavior.
+
+The local ReFuels/counterexample replay matched 12/13 expected classifications;
+the remaining new-guidance case was retained as uncertain. A separate full
+ReFuels run also returned uncertainty because one model quotation was invalid.
+These results support observation and further evidence gathering, not suppression.
+The full PDF observation took 34.3 seconds locally; comparisons are limited to one
+at a time per worker process. Scope, artifacts, limits and replay instructions are
+in [notice-novelty-2026-09-07.md](notice-novelty-2026-09-07.md).
+
+This amendment supersedes the older E0-only next-step instruction for this
+explicitly requested work. It does not authorize production deployment or change
+the existing exclusions for Sak and unrelated editorial work.
+
 ## Hybrid candidate amendment — 2026-09-07
 
 The owner requested a prepared version combining the successful v5.11 editorial

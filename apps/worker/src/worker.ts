@@ -126,6 +126,16 @@ import {
   type RelatedNoticeTelemetry
 } from "./services/related-notices.js";
 import {
+  NOTICE_NOVELTY_SYSTEM_PROMPT,
+  NOTICE_NOVELTY_VERSION,
+  buildNoveltyAssessmentPrompt,
+  noveltyAssessmentJsonSchema,
+  createNoticeNoveltyObserver,
+  splitNoveltyObservation,
+  type NoticeNoveltyObservation
+} from "./services/notice-novelty.js";
+import { createNoticeNoveltyDependencies, toNoveltyNotice } from "./services/notice-novelty-io.js";
+import {
   downloadGeneralPdfAttachment,
   downloadReportPdfAttachment,
   downloadYearlyReportPdfAttachment,
@@ -208,6 +218,7 @@ type PublishJobData = {
 type FeedUpdateState = "source" | "processing" | "published" | "failed";
 
 const config = loadConfig();
+const observeNoticeNovelty = createNoticeNoveltyObserver();
 const openAIClient = createOpenAIClient(config.OPENAI_API_KEY);
 
 if (config.NUMERIC_ACCEPTANCE_RULES) {
@@ -854,8 +865,10 @@ function generationInputJson(
   modelCalls: ModelCallLog[] = [],
   reasoningEffortOverride?: OpenAIReasoningEffort
 ): Prisma.InputJsonValue {
+  const { sourcePayload, noticeNoveltyObservation } = splitNoveltyObservation(payload);
   return toPrismaJsonValue({
-    sourcePayload: payload,
+    sourcePayload,
+    ...(noticeNoveltyObservation ? { noticeNoveltyObservation } : {}),
     previousRewrite: previousOutput ?? null,
     reasoningEffortOverride: reasoningEffortOverride ?? null,
     modelCalls
@@ -1346,6 +1359,7 @@ type JsonModelCallInput = {
   promptCacheKey?: string;
   promptCacheMode?: OpenAIPromptCacheMode;
   file?: OpenAIFileInput;
+  signal?: AbortSignal;
 };
 
 type ModelCallLog = OpenAIModelCallTelemetry & {
@@ -1456,7 +1470,8 @@ async function callModelForJson({
   maxOutputTokens = 16384,
   promptCacheKey,
   promptCacheMode = config.OPENAI_PROMPT_CACHE_MODE,
-  file
+  file,
+  signal
 }: JsonModelCallInput): Promise<{
   content: string;
   promptChars: number;
@@ -1486,7 +1501,13 @@ async function callModelForJson({
   };
 
   try {
-    const result = await callOpenAIForJson(openAIClient, {
+    const client = signal ? {
+      responses: {
+        create: (body: Parameters<typeof openAIClient.responses.create>[0], options?: { signal?: AbortSignal }) =>
+          openAIClient.responses.create(body, { signal: options?.signal ? AbortSignal.any([signal, options.signal]) : signal })
+      }
+    } : openAIClient;
+    const result = await callOpenAIForJson(client, {
       schemaName,
       schema,
       systemPrompt,
@@ -3907,6 +3928,49 @@ const rewriteWorker = new Worker<RewriteJobData>(
 
         await enqueuePublish(messageId, targetVersion, generationRunId);
         return;
+      }
+
+      // Both regular and report routes pass this observation point. It cannot
+      // skip, repair or change a writer prompt, including on errors/timeouts.
+      if (job.data.reason !== "manual-reprocess" && !job.data.instruction && !payload.supplementalMaterials?.length) {
+        const observation = await observeNoticeNovelty(toNoveltyNotice(source), {
+          mode: config.NOTICE_NOVELTY_MODE,
+          dependencies: createNoticeNoveltyDependencies(prisma),
+          assess: async (pack, signal) => {
+            try {
+              const result = await callModelForJson({
+                schemaName: "notice_novelty_assessment",
+                schema: noveltyAssessmentJsonSchema,
+                systemPrompt: NOTICE_NOVELTY_SYSTEM_PROMPT,
+                developerPrompt: "Compare original disclosures. Ground every finding in the supplied evidence and return only the structured assessment.",
+                userPrompt: buildNoveltyAssessmentPrompt(pack),
+                model: config.OPENAI_FAST_MODEL,
+                reasoningEffort: config.OPENAI_TRIAGE_REASONING_EFFORT,
+                timeoutMs: config.OPENAI_FAST_TIMEOUT_MS,
+                maxOutputTokens: 2_400,
+                promptCacheKey: `newsweb:notice-novelty:${NOTICE_NOVELTY_VERSION}`,
+                promptCacheMode: promptCacheModeForFlow("triage"),
+                signal
+              });
+              signal.throwIfAborted();
+              preRewriteModelCalls.push(result.modelCall);
+              preRewritePromptChars += result.promptChars;
+              return result.content;
+            } catch (error) {
+              if (!signal.aborted) {
+                const failure = error as ModelCallFailureCarrier;
+                if (failure.modelCall) preRewriteModelCalls.push(failure.modelCall);
+                preRewritePromptChars += failure.promptChars ?? 0;
+              }
+              throw error;
+            }
+          }
+        });
+        if (observation) {
+          (payload as PromptPayload & { noticeNoveltyObservation?: NoticeNoveltyObservation }).noticeNoveltyObservation = observation;
+          console.log(JSON.stringify({ service: "worker", event: "notice_novelty_shadow", messageId,
+            decision: observation.decision, reasonCode: observation.reasonCode, durationMs: observation.durationMs }));
+        }
       }
 
       // Three-tier PDF processing for notices with attachments

@@ -2,6 +2,12 @@ import { describe, expect, it } from "vitest";
 import { parseWorkerConfig } from "./config.js";
 
 describe("parseWorkerConfig", () => {
+  it("supports observation and off modes only for notice novelty", () => {
+    const env = { DATABASE_URL: "postgresql://test:test@localhost/test", REDIS_URL: "redis://localhost:6379", OPENAI_API_KEY: "sk-test-key" };
+    expect(parseWorkerConfig(env).NOTICE_NOVELTY_MODE).toBe("shadow");
+    expect(parseWorkerConfig({ ...env, NOTICE_NOVELTY_MODE: "off" }).NOTICE_NOVELTY_MODE).toBe("off");
+    expect(() => parseWorkerConfig({ ...env, NOTICE_NOVELTY_MODE: "enforce" })).toThrow();
+  });
   it("fails when OPENAI_API_KEY is missing", () => {
     expect(() =>
       parseWorkerConfig({

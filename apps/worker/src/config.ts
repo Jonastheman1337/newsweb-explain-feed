@@ -216,6 +216,8 @@ const configSchema = z
     REFERENCE_CHECK_ENFORCEMENT: referenceCheckEnforcementEnvSchema,
     TRIAGE_SKIP_CLASSES: triageSkipClassesEnvSchema,
     RELATED_NOTICE_CONTEXT: relatedNoticeContextEnvSchema,
+    // Observation only until chronological duplicate/new-disclosure review passes.
+    NOTICE_NOVELTY_MODE: z.enum(["off", "shadow"]).default("shadow"),
     NEWSWEB_POLLING_ENABLED: booleanEnvSchema,
     POLL_INTERVAL_MS: z.coerce.number().int().min(5000).default(5000),
     LATEST_BOOTSTRAP_COUNT: z.coerce.number().int().min(0).max(50).default(30)

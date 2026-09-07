@@ -1,0 +1,921 @@
+{
+  "manifest": {
+    "createdAt": "2026-09-07T10:48:12.529Z",
+    "version": "notice-novelty-v1",
+    "fixtureSha256": "dc8a5cec00f053e2b29d4d641f3921ecffb522251a72120e06c1e84b66237e01",
+    "codeHashes": {
+      "notice-novelty.ts": "9d1ab94cd5ac944fcff2313f129d897343764236185389cbd96a604d2e2c34b8",
+      "notice-novelty-io.ts": "8b4dd1fcb06cf9a3b7d4c2d868c1126603541b0725696df14ccb78271072fe3c"
+    },
+    "profile": {
+      "model": "gpt-5.6-luna",
+      "reasoningEffort": "none",
+      "serviceTier": "default",
+      "timeoutMs": 15000,
+      "maxOutputTokens": 2400,
+      "promptCacheMode": "implicit",
+      "promptCacheKey": "newsweb:notice-novelty:notice-novelty-v1"
+    },
+    "callModel": true,
+    "caseIds": [
+      "refuels-first-release",
+      "refuels-recording",
+      "refuels-invitation",
+      "reexported-report",
+      "new-guidance-in-pdf",
+      "new-contract-in-notice",
+      "material-correction",
+      "first-report-in-attachment",
+      "parent-associate-identity",
+      "different-fiscal-year",
+      "missing-earlier-report",
+      "injection-and-new-contract",
+      "changed-chart-same-text"
+    ],
+    "protocol": "Frozen development replay; only original source evidence enters the model. No database writes, article generation or publication."
+  },
+  "cases": [
+    {
+      "id": "refuels-first-release",
+      "expected": "not_applicable",
+      "actual": "not_applicable",
+      "passed": true
+    },
+    {
+      "id": "refuels-recording",
+      "expected": "already_disclosed",
+      "actual": "already_disclosed",
+      "passed": true,
+      "reason": "assessed",
+      "durationMs": 3357,
+      "assessment": {
+        "decision": "already_disclosed",
+        "announcementKind": "administrative",
+        "confidence": "high",
+        "repeatedFacts": [
+          {
+            "fact": "A recording of the Q1 2027 webcast is available after the webcast.",
+            "current": {
+              "sourceId": "current",
+              "quote": "A recording of today's Q1 2027 webcast is available here"
+            },
+            "prior": {
+              "sourceId": "prior_681062",
+              "quote": "A recorded version of the presentation will also be available after the webcast is concluded."
+            }
+          },
+          {
+            "fact": "The Q1 2027 webcast was presented on 4 September 2026 for the April-June 2026 period.",
+            "current": {
+              "sourceId": "current",
+              "quote": "REFUELS N.V. is pleased to share a recording of the Q1 2027 webcast held this morning."
+            },
+            "prior": {
+              "sourceId": "prior_681062",
+              "quote": "28 August 2026 - ReFuels (REFL) will present its first quarter 2027 results for the period April - June 2026 on 4 September at 10:00 CEST."
+            }
+          }
+        ],
+        "newFacts": [],
+        "uncertainties": []
+      },
+      "rejectionCodes": [],
+      "limitations": [
+        "truncated:prior_681640_pdf_332730"
+      ],
+      "modelResult": {
+        "content": "{\"decision\":\"already_disclosed\",\"announcementKind\":\"administrative\",\"confidence\":\"high\",\"repeatedFacts\":[{\"fact\":\"A recording of the Q1 2027 webcast is available after the webcast.\",\"current\":{\"sourceId\":\"current\",\"quote\":\"A recording of today's Q1 2027 webcast is available here\"},\"prior\":{\"sourceId\":\"prior_681062\",\"quote\":\"A recorded version of the presentation will also be available after the webcast is concluded.\"}},{\"fact\":\"The Q1 2027 webcast was presented on 4 September 2026 for the April-June 2026 period.\",\"current\":{\"sourceId\":\"current\",\"quote\":\"REFUELS N.V. is pleased to share a recording of the Q1 2027 webcast held this morning.\"},\"prior\":{\"sourceId\":\"prior_681062\",\"quote\":\"28 August 2026 - ReFuels (REFL) will present its first quarter 2027 results for the period April - June 2026 on 4 September at 10:00 CEST.\"}}],\"newFacts\":[],\"uncertainties\":[]}",
+        "responseModel": "gpt-5.6-luna",
+        "requestedServiceTier": "default",
+        "serviceTier": "default",
+        "attemptCount": 1,
+        "attempts": [
+          {
+            "responseId": "resp_08c916d892cf25e5016a9e9673752c87d29bbfd0a8745be9ec",
+            "status": "completed",
+            "responseModel": "gpt-5.6-luna",
+            "requestedServiceTier": "default",
+            "serviceTier": "default",
+            "durationMs": 3348,
+            "requestedMaxOutputTokens": 2400,
+            "error": null,
+            "rawUsage": {
+              "input_tokens": 21842,
+              "input_tokens_details": {
+                "cache_write_tokens": 21839,
+                "cached_tokens": 0
+              },
+              "output_tokens": 234,
+              "output_tokens_details": {
+                "reasoning_tokens": 0
+              },
+              "total_tokens": 22076
+            },
+            "usage": {
+              "inputTokens": 21842,
+              "cachedInputTokens": 0,
+              "cacheWriteInputTokens": 21839,
+              "outputTokens": 234,
+              "reasoningTokens": 0,
+              "totalTokens": 22076
+            }
+          }
+        ],
+        "usage": {
+          "inputTokens": 21842,
+          "cachedInputTokens": 0,
+          "cacheWriteInputTokens": 21839,
+          "outputTokens": 234,
+          "reasoningTokens": 0,
+          "totalTokens": 22076
+        }
+      }
+    },
+    {
+      "id": "refuels-invitation",
+      "expected": "already_disclosed",
+      "actual": "already_disclosed",
+      "passed": true,
+      "reason": "assessed",
+      "durationMs": 5307,
+      "assessment": {
+        "decision": "already_disclosed",
+        "announcementKind": "administrative",
+        "confidence": "high",
+        "repeatedFacts": [
+          {
+            "fact": "ReFuels will present Q1 2027 results with CEO Philip Fjeld and CFO Baden Gowrie-Smith.",
+            "current": {
+              "sourceId": "current",
+              "quote": "REFUELS N.V is pleased to announce that CEO, Philip Fjeld and CFO & MD, Baden Gowrie-Smith will provide a live presentation relating to the Q1 2027 Results and Q&A via Investor Meet Company on Friday 11 Sep 2026, 10:00 CEST."
+            },
+            "prior": {
+              "sourceId": "prior_681640",
+              "quote": "ReFuels will present the first quarter 2027 results today at 10:00 CEST. The webcast will be hosted by CEO Philip Fjeld and CFO Baden Gowrie-Smith."
+            }
+          },
+          {
+            "fact": "The Q1 2027 results concern April-June 2026.",
+            "current": {
+              "sourceId": "current",
+              "quote": "relating to the Q1 2027 Results"
+            },
+            "prior": {
+              "sourceId": "prior_681062",
+              "quote": "28 August 2026 - ReFuels (REFL) will present its first quarter 2027 results for the period April - June 2026 on 4 September at 10:00 CEST."
+            }
+          }
+        ],
+        "newFacts": [],
+        "uncertainties": []
+      },
+      "rejectionCodes": [],
+      "limitations": [
+        "truncated:prior_681640_pdf_332730"
+      ],
+      "modelResult": {
+        "content": "{\"decision\":\"already_disclosed\",\"announcementKind\":\"administrative\",\"confidence\":\"high\",\"repeatedFacts\":[{\"fact\":\"ReFuels will present Q1 2027 results with CEO Philip Fjeld and CFO Baden Gowrie-Smith.\",\"current\":{\"sourceId\":\"current\",\"quote\":\"REFUELS N.V is pleased to announce that CEO, Philip Fjeld and CFO & MD, Baden Gowrie-Smith will provide a live presentation relating to the Q1 2027 Results and Q&A via Investor Meet Company on Friday 11 Sep 2026, 10:00 CEST.\"},\"prior\":{\"sourceId\":\"prior_681640\",\"quote\":\"ReFuels will present the first quarter 2027 results today at 10:00 CEST. The webcast will be hosted by CEO Philip Fjeld and CFO Baden Gowrie-Smith.\"}},{\"fact\":\"The Q1 2027 results concern April-June 2026.\",\"current\":{\"sourceId\":\"current\",\"quote\":\"relating to the Q1 2027 Results\"},\"prior\":{\"sourceId\":\"prior_681062\",\"quote\":\"28 August 2026 - ReFuels (REFL) will present its first quarter 2027 results for the period April - June 2026 on 4 September at 10:00 CEST.\"}}],\"newFacts\":[],\"uncertainties\":[]}",
+        "responseModel": "gpt-5.6-luna",
+        "requestedServiceTier": "default",
+        "serviceTier": "default",
+        "attemptCount": 1,
+        "attempts": [
+          {
+            "responseId": "resp_069a2d495d3898ff016a9e9678878887d28eb42e8a5d9227de",
+            "status": "completed",
+            "responseModel": "gpt-5.6-luna",
+            "requestedServiceTier": "default",
+            "serviceTier": "default",
+            "durationMs": 5303,
+            "requestedMaxOutputTokens": 2400,
+            "error": null,
+            "rawUsage": {
+              "input_tokens": 25770,
+              "input_tokens_details": {
+                "cache_write_tokens": 25767,
+                "cached_tokens": 0
+              },
+              "output_tokens": 289,
+              "output_tokens_details": {
+                "reasoning_tokens": 0
+              },
+              "total_tokens": 26059
+            },
+            "usage": {
+              "inputTokens": 25770,
+              "cachedInputTokens": 0,
+              "cacheWriteInputTokens": 25767,
+              "outputTokens": 289,
+              "reasoningTokens": 0,
+              "totalTokens": 26059
+            }
+          }
+        ],
+        "usage": {
+          "inputTokens": 25770,
+          "cachedInputTokens": 0,
+          "cacheWriteInputTokens": 25767,
+          "outputTokens": 289,
+          "reasoningTokens": 0,
+          "totalTokens": 26059
+        }
+      }
+    },
+    {
+      "id": "reexported-report",
+      "expected": "already_disclosed",
+      "actual": "already_disclosed",
+      "passed": true,
+      "reason": "assessed",
+      "durationMs": 3632,
+      "assessment": {
+        "decision": "already_disclosed",
+        "announcementKind": "administrative",
+        "confidence": "high",
+        "repeatedFacts": [
+          {
+            "fact": "Q1 2027 adjusted EBITDA was GBP 4.9 million.",
+            "current": {
+              "sourceId": "current_pdf_1001",
+              "quote": "Example Q1 2027 results. Adjusted EBITDA was GBP 4.9 million. FY2027 guidance is GBP 16-20 million. The figures were announced on 4 September 2026."
+            },
+            "prior": {
+              "sourceId": "prior_100",
+              "quote": "Example Q1 2027 results\nExample publishes Q1 2027 results. Adjusted EBITDA was GBP 4.9 million. FY2027 guidance is GBP 16-20 million."
+            }
+          },
+          {
+            "fact": "FY2027 guidance is GBP 16-20 million.",
+            "current": {
+              "sourceId": "current_pdf_1001",
+              "quote": "Example Q1 2027 results. Adjusted EBITDA was GBP 4.9 million. FY2027 guidance is GBP 16-20 million. The figures were announced on 4 September 2026."
+            },
+            "prior": {
+              "sourceId": "prior_100",
+              "quote": "Example Q1 2027 results\nExample publishes Q1 2027 results. Adjusted EBITDA was GBP 4.9 million. FY2027 guidance is GBP 16-20 million."
+            }
+          }
+        ],
+        "newFacts": [],
+        "uncertainties": []
+      },
+      "rejectionCodes": [],
+      "limitations": [],
+      "modelResult": {
+        "content": "{\"decision\":\"already_disclosed\",\"announcementKind\":\"administrative\",\"confidence\":\"high\",\"repeatedFacts\":[{\"fact\":\"Q1 2027 adjusted EBITDA was GBP 4.9 million.\",\"current\":{\"sourceId\":\"current_pdf_1001\",\"quote\":\"Example Q1 2027 results. Adjusted EBITDA was GBP 4.9 million. FY2027 guidance is GBP 16-20 million. The figures were announced on 4 September 2026.\"},\"prior\":{\"sourceId\":\"prior_100\",\"quote\":\"Example Q1 2027 results\\nExample publishes Q1 2027 results. Adjusted EBITDA was GBP 4.9 million. FY2027 guidance is GBP 16-20 million.\"}},{\"fact\":\"FY2027 guidance is GBP 16-20 million.\",\"current\":{\"sourceId\":\"current_pdf_1001\",\"quote\":\"Example Q1 2027 results. Adjusted EBITDA was GBP 4.9 million. FY2027 guidance is GBP 16-20 million. The figures were announced on 4 September 2026.\"},\"prior\":{\"sourceId\":\"prior_100\",\"quote\":\"Example Q1 2027 results\\nExample publishes Q1 2027 results. Adjusted EBITDA was GBP 4.9 million. FY2027 guidance is GBP 16-20 million.\"}}],\"newFacts\":[],\"uncertainties\":[]}",
+        "responseModel": "gpt-5.6-luna",
+        "requestedServiceTier": "default",
+        "serviceTier": "default",
+        "attemptCount": 1,
+        "attempts": [
+          {
+            "responseId": "resp_06f12518e356dc3e016a9e967be04887d2b7c1fb0dcab6d8b7",
+            "status": "completed",
+            "responseModel": "gpt-5.6-luna",
+            "requestedServiceTier": "default",
+            "serviceTier": "default",
+            "durationMs": 3628,
+            "requestedMaxOutputTokens": 2400,
+            "error": null,
+            "rawUsage": {
+              "input_tokens": 1307,
+              "input_tokens_details": {
+                "cache_write_tokens": 1304,
+                "cached_tokens": 0
+              },
+              "output_tokens": 294,
+              "output_tokens_details": {
+                "reasoning_tokens": 0
+              },
+              "total_tokens": 1601
+            },
+            "usage": {
+              "inputTokens": 1307,
+              "cachedInputTokens": 0,
+              "cacheWriteInputTokens": 1304,
+              "outputTokens": 294,
+              "reasoningTokens": 0,
+              "totalTokens": 1601
+            }
+          }
+        ],
+        "usage": {
+          "inputTokens": 1307,
+          "cachedInputTokens": 0,
+          "cacheWriteInputTokens": 1304,
+          "outputTokens": 294,
+          "reasoningTokens": 0,
+          "totalTokens": 1601
+        }
+      }
+    },
+    {
+      "id": "new-guidance-in-pdf",
+      "expected": "new_information",
+      "actual": "uncertain",
+      "passed": false,
+      "reason": "evidence_rejected",
+      "durationMs": 2163,
+      "assessment": {
+        "decision": "uncertain",
+        "announcementKind": "substantive",
+        "confidence": "high",
+        "repeatedFacts": [
+          {
+            "fact": "Q1 2027 adjusted EBITDA was GBP 4.9 million.",
+            "current": {
+              "sourceId": "current_pdf_1001",
+              "quote": "Example Q1 2027 results. Adjusted EBITDA was GBP 4.9 million. FY2027 guidance is GBP 25-30 million."
+            },
+            "prior": {
+              "sourceId": "prior_100",
+              "quote": "Example Q1 2027 results. Adjusted EBITDA was GBP 4.9 million. FY2027 guidance is GBP 16-20 million."
+            }
+          }
+        ],
+        "newFacts": [
+          {
+            "fact": "FY2027 guidance was revised to GBP 25-30 million.",
+            "evidence": {
+              "sourceId": "current_pdf_1001",
+              "quote": "FY2027 guidance is GBP 25-30 million."
+            }
+          }
+        ],
+        "uncertainties": []
+      },
+      "rejectionCodes": [
+        "ungrounded_evidence"
+      ],
+      "limitations": [],
+      "modelResult": {
+        "content": "{\"decision\":\"new_information\",\"announcementKind\":\"substantive\",\"confidence\":\"high\",\"repeatedFacts\":[{\"fact\":\"Q1 2027 adjusted EBITDA was GBP 4.9 million.\",\"current\":{\"sourceId\":\"current_pdf_1001\",\"quote\":\"Example Q1 2027 results. Adjusted EBITDA was GBP 4.9 million. FY2027 guidance is GBP 25-30 million.\"},\"prior\":{\"sourceId\":\"prior_100\",\"quote\":\"Example Q1 2027 results. Adjusted EBITDA was GBP 4.9 million. FY2027 guidance is GBP 16-20 million.\"}}],\"newFacts\":[{\"fact\":\"FY2027 guidance was revised to GBP 25-30 million.\",\"evidence\":{\"sourceId\":\"current_pdf_1001\",\"quote\":\"FY2027 guidance is GBP 25-30 million.\"}}],\"uncertainties\":[]}",
+        "responseModel": "gpt-5.6-luna",
+        "requestedServiceTier": "default",
+        "serviceTier": "default",
+        "attemptCount": 1,
+        "attempts": [
+          {
+            "responseId": "resp_0f3b91ba3b3a81fc016a9e967f7a1087d2a559d22588dad29f",
+            "status": "completed",
+            "responseModel": "gpt-5.6-luna",
+            "requestedServiceTier": "default",
+            "serviceTier": "default",
+            "durationMs": 2161,
+            "requestedMaxOutputTokens": 2400,
+            "error": null,
+            "rawUsage": {
+              "input_tokens": 1386,
+              "input_tokens_details": {
+                "cache_write_tokens": 1383,
+                "cached_tokens": 0
+              },
+              "output_tokens": 193,
+              "output_tokens_details": {
+                "reasoning_tokens": 0
+              },
+              "total_tokens": 1579
+            },
+            "usage": {
+              "inputTokens": 1386,
+              "cachedInputTokens": 0,
+              "cacheWriteInputTokens": 1383,
+              "outputTokens": 193,
+              "reasoningTokens": 0,
+              "totalTokens": 1579
+            }
+          }
+        ],
+        "usage": {
+          "inputTokens": 1386,
+          "cachedInputTokens": 0,
+          "cacheWriteInputTokens": 1383,
+          "outputTokens": 193,
+          "reasoningTokens": 0,
+          "totalTokens": 1579
+        }
+      }
+    },
+    {
+      "id": "new-contract-in-notice",
+      "expected": "new_information",
+      "actual": "new_information",
+      "passed": true,
+      "reason": "assessed",
+      "durationMs": 3275,
+      "assessment": {
+        "decision": "new_information",
+        "announcementKind": "substantive",
+        "confidence": "high",
+        "repeatedFacts": [
+          {
+            "fact": "Q1 2027 adjusted EBITDA was GBP 4.9 million",
+            "current": {
+              "sourceId": "current_pdf_1001",
+              "quote": "Example Q1 2027 results. Adjusted EBITDA was GBP 4.9 million. FY2027 guidance is GBP 16-20 million. The figures were announced on 4 September 2026."
+            },
+            "prior": {
+              "sourceId": "prior_100",
+              "quote": "Example Q1 2027 results\nExample publishes Q1 2027 results. Adjusted EBITDA was GBP 4.9 million. FY2027 guidance is GBP 16-20 million."
+            }
+          },
+          {
+            "fact": "FY2027 guidance was GBP 16-20 million",
+            "current": {
+              "sourceId": "current_pdf_1001",
+              "quote": "Example Q1 2027 results. Adjusted EBITDA was GBP 4.9 million. FY2027 guidance is GBP 16-20 million. The figures were announced on 4 September 2026."
+            },
+            "prior": {
+              "sourceId": "prior_100",
+              "quote": "Example Q1 2027 results\nExample publishes Q1 2027 results. Adjusted EBITDA was GBP 4.9 million. FY2027 guidance is GBP 16-20 million."
+            }
+          }
+        ],
+        "newFacts": [
+          {
+            "fact": "A new GBP 50 million supply contract was signed with North Customer",
+            "evidence": {
+              "sourceId": "current",
+              "quote": "Today we signed a new GBP 50 million supply contract with North Customer."
+            }
+          }
+        ],
+        "uncertainties": []
+      },
+      "rejectionCodes": [],
+      "limitations": [],
+      "modelResult": {
+        "content": "{\"decision\":\"new_information\",\"announcementKind\":\"substantive\",\"confidence\":\"high\",\"repeatedFacts\":[{\"fact\":\"Q1 2027 adjusted EBITDA was GBP 4.9 million\",\"current\":{\"sourceId\":\"current_pdf_1001\",\"quote\":\"Example Q1 2027 results. Adjusted EBITDA was GBP 4.9 million. FY2027 guidance is GBP 16-20 million. The figures were announced on 4 September 2026.\"},\"prior\":{\"sourceId\":\"prior_100\",\"quote\":\"Example Q1 2027 results\\nExample publishes Q1 2027 results. Adjusted EBITDA was GBP 4.9 million. FY2027 guidance is GBP 16-20 million.\"}},{\"fact\":\"FY2027 guidance was GBP 16-20 million\",\"current\":{\"sourceId\":\"current_pdf_1001\",\"quote\":\"Example Q1 2027 results. Adjusted EBITDA was GBP 4.9 million. FY2027 guidance is GBP 16-20 million. The figures were announced on 4 September 2026.\"},\"prior\":{\"sourceId\":\"prior_100\",\"quote\":\"Example Q1 2027 results\\nExample publishes Q1 2027 results. Adjusted EBITDA was GBP 4.9 million. FY2027 guidance is GBP 16-20 million.\"}}],\"newFacts\":[{\"fact\":\"A new GBP 50 million supply contract was signed with North Customer\",\"evidence\":{\"sourceId\":\"current\",\"quote\":\"Today we signed a new GBP 50 million supply contract with North Customer.\"}}],\"uncertainties\":[] }",
+        "responseModel": "gpt-5.6-luna",
+        "requestedServiceTier": "default",
+        "serviceTier": "default",
+        "attemptCount": 1,
+        "attempts": [
+          {
+            "responseId": "resp_01e76fb84899de30016a9e9681a2cc87d2b834552e35a9d4ad",
+            "status": "completed",
+            "responseModel": "gpt-5.6-luna",
+            "requestedServiceTier": "default",
+            "serviceTier": "default",
+            "durationMs": 3274,
+            "requestedMaxOutputTokens": 2400,
+            "error": null,
+            "rawUsage": {
+              "input_tokens": 1374,
+              "input_tokens_details": {
+                "cache_write_tokens": 1371,
+                "cached_tokens": 0
+              },
+              "output_tokens": 337,
+              "output_tokens_details": {
+                "reasoning_tokens": 0
+              },
+              "total_tokens": 1711
+            },
+            "usage": {
+              "inputTokens": 1374,
+              "cachedInputTokens": 0,
+              "cacheWriteInputTokens": 1371,
+              "outputTokens": 337,
+              "reasoningTokens": 0,
+              "totalTokens": 1711
+            }
+          }
+        ],
+        "usage": {
+          "inputTokens": 1374,
+          "cachedInputTokens": 0,
+          "cacheWriteInputTokens": 1371,
+          "outputTokens": 337,
+          "reasoningTokens": 0,
+          "totalTokens": 1711
+        }
+      }
+    },
+    {
+      "id": "material-correction",
+      "expected": "new_information",
+      "actual": "new_information",
+      "passed": true,
+      "reason": "assessed",
+      "durationMs": 1919,
+      "assessment": {
+        "decision": "new_information",
+        "announcementKind": "substantive",
+        "confidence": "high",
+        "repeatedFacts": [
+          {
+            "fact": "Q1 2027 adjusted EBITDA was previously reported as GBP 4.9 million",
+            "current": {
+              "sourceId": "current",
+              "quote": "The previously reported Q1 2027 adjusted EBITDA of GBP 4.9 million was incorrect."
+            },
+            "prior": {
+              "sourceId": "prior_100",
+              "quote": "Adjusted EBITDA was GBP 4.9 million."
+            }
+          }
+        ],
+        "newFacts": [
+          {
+            "fact": "The corrected Q1 2027 adjusted EBITDA is GBP 2.1 million",
+            "evidence": {
+              "sourceId": "current",
+              "quote": "The correct figure is GBP 2.1 million."
+            }
+          }
+        ],
+        "uncertainties": []
+      },
+      "rejectionCodes": [],
+      "limitations": [],
+      "modelResult": {
+        "content": "{\"decision\":\"new_information\",\"announcementKind\":\"substantive\",\"confidence\":\"high\",\"repeatedFacts\":[{\"fact\":\"Q1 2027 adjusted EBITDA was previously reported as GBP 4.9 million\",\"current\":{\"sourceId\":\"current\",\"quote\":\"The previously reported Q1 2027 adjusted EBITDA of GBP 4.9 million was incorrect.\"},\"prior\":{\"sourceId\":\"prior_100\",\"quote\":\"Adjusted EBITDA was GBP 4.9 million.\"}}],\"newFacts\":[{\"fact\":\"The corrected Q1 2027 adjusted EBITDA is GBP 2.1 million\",\"evidence\":{\"sourceId\":\"current\",\"quote\":\"The correct figure is GBP 2.1 million.\"}}],\"uncertainties\":[]}",
+        "responseModel": "gpt-5.6-luna",
+        "requestedServiceTier": "default",
+        "serviceTier": "default",
+        "attemptCount": 1,
+        "attempts": [
+          {
+            "responseId": "resp_0fecd16dd840ded1016a9e9684e2c887d2aceb8ecbc8aec6bf",
+            "status": "completed",
+            "responseModel": "gpt-5.6-luna",
+            "requestedServiceTier": "default",
+            "serviceTier": "default",
+            "durationMs": 1917,
+            "requestedMaxOutputTokens": 2400,
+            "error": null,
+            "rawUsage": {
+              "input_tokens": 1201,
+              "input_tokens_details": {
+                "cache_write_tokens": 1198,
+                "cached_tokens": 0
+              },
+              "output_tokens": 158,
+              "output_tokens_details": {
+                "reasoning_tokens": 0
+              },
+              "total_tokens": 1359
+            },
+            "usage": {
+              "inputTokens": 1201,
+              "cachedInputTokens": 0,
+              "cacheWriteInputTokens": 1198,
+              "outputTokens": 158,
+              "reasoningTokens": 0,
+              "totalTokens": 1359
+            }
+          }
+        ],
+        "usage": {
+          "inputTokens": 1201,
+          "cachedInputTokens": 0,
+          "cacheWriteInputTokens": 1198,
+          "outputTokens": 158,
+          "reasoningTokens": 0,
+          "totalTokens": 1359
+        }
+      }
+    },
+    {
+      "id": "first-report-in-attachment",
+      "expected": "new_information",
+      "actual": "new_information",
+      "passed": true,
+      "reason": "assessed",
+      "durationMs": 2023,
+      "assessment": {
+        "decision": "new_information",
+        "announcementKind": "substantive",
+        "confidence": "high",
+        "repeatedFacts": [],
+        "newFacts": [
+          {
+            "fact": "Q1 2027 results were released publicly for the first time, including adjusted EBITDA of GBP 4.9 million.",
+            "evidence": {
+              "sourceId": "current_pdf_1001",
+              "quote": "Example Q1 2027 results. Adjusted EBITDA was GBP 4.9 million."
+            }
+          },
+          {
+            "fact": "FY2027 guidance of GBP 16-20 million was disclosed.",
+            "evidence": {
+              "sourceId": "current_pdf_1001",
+              "quote": "FY2027 guidance is GBP 16-20 million."
+            }
+          }
+        ],
+        "uncertainties": []
+      },
+      "rejectionCodes": [],
+      "limitations": [],
+      "modelResult": {
+        "content": "{\"decision\":\"new_information\",\"announcementKind\":\"substantive\",\"confidence\":\"high\",\"repeatedFacts\":[],\"newFacts\":[{\"fact\":\"Q1 2027 results were released publicly for the first time, including adjusted EBITDA of GBP 4.9 million.\",\"evidence\":{\"sourceId\":\"current_pdf_1001\",\"quote\":\"Example Q1 2027 results. Adjusted EBITDA was GBP 4.9 million.\"}},{\"fact\":\"FY2027 guidance of GBP 16-20 million was disclosed.\",\"evidence\":{\"sourceId\":\"current_pdf_1001\",\"quote\":\"FY2027 guidance is GBP 16-20 million.\"}}],\"uncertainties\":[]}",
+        "responseModel": "gpt-5.6-luna",
+        "requestedServiceTier": "default",
+        "serviceTier": "default",
+        "attemptCount": 1,
+        "attempts": [
+          {
+            "responseId": "resp_0b85be367b8ab309016a9e9686ceb487d2ba42f9104186fbc2",
+            "status": "completed",
+            "responseModel": "gpt-5.6-luna",
+            "requestedServiceTier": "default",
+            "serviceTier": "default",
+            "durationMs": 2021,
+            "requestedMaxOutputTokens": 2400,
+            "error": null,
+            "rawUsage": {
+              "input_tokens": 1198,
+              "input_tokens_details": {
+                "cache_write_tokens": 1195,
+                "cached_tokens": 0
+              },
+              "output_tokens": 149,
+              "output_tokens_details": {
+                "reasoning_tokens": 0
+              },
+              "total_tokens": 1347
+            },
+            "usage": {
+              "inputTokens": 1198,
+              "cachedInputTokens": 0,
+              "cacheWriteInputTokens": 1195,
+              "outputTokens": 149,
+              "reasoningTokens": 0,
+              "totalTokens": 1347
+            }
+          }
+        ],
+        "usage": {
+          "inputTokens": 1198,
+          "cachedInputTokens": 0,
+          "cacheWriteInputTokens": 1195,
+          "outputTokens": 149,
+          "reasoningTokens": 0,
+          "totalTokens": 1347
+        }
+      }
+    },
+    {
+      "id": "parent-associate-identity",
+      "expected": "new_information",
+      "actual": "new_information",
+      "passed": true,
+      "reason": "assessed",
+      "durationMs": 1532,
+      "assessment": {
+        "decision": "new_information",
+        "announcementKind": "substantive",
+        "confidence": "high",
+        "repeatedFacts": [],
+        "newFacts": [
+          {
+            "fact": "The parent company is disclosing Q1 2027 adjusted EBITDA of GBP 4.9 million for the first time.",
+            "evidence": {
+              "sourceId": "current",
+              "quote": "We publish parent-company Q1 2027 adjusted EBITDA of GBP 4.9 million for the first time today."
+            }
+          }
+        ],
+        "uncertainties": []
+      },
+      "rejectionCodes": [],
+      "limitations": [],
+      "modelResult": {
+        "content": "{\"decision\":\"new_information\",\"announcementKind\":\"substantive\",\"confidence\":\"high\",\"repeatedFacts\":[],\"newFacts\":[{\"fact\":\"The parent company is disclosing Q1 2027 adjusted EBITDA of GBP 4.9 million for the first time.\",\"evidence\":{\"sourceId\":\"current\",\"quote\":\"We publish parent-company Q1 2027 adjusted EBITDA of GBP 4.9 million for the first time today.\"}}],\"uncertainties\":[]}",
+        "responseModel": "gpt-5.6-luna",
+        "requestedServiceTier": "default",
+        "serviceTier": "default",
+        "attemptCount": 1,
+        "attempts": [
+          {
+            "responseId": "resp_0d98f5abf60adb14016a9e9688d83087d295fb29d9ea69f1fe",
+            "status": "completed",
+            "responseModel": "gpt-5.6-luna",
+            "requestedServiceTier": "default",
+            "serviceTier": "default",
+            "durationMs": 1532,
+            "requestedMaxOutputTokens": 2400,
+            "error": null,
+            "rawUsage": {
+              "input_tokens": 989,
+              "input_tokens_details": {
+                "cache_write_tokens": 0,
+                "cached_tokens": 0
+              },
+              "output_tokens": 106,
+              "output_tokens_details": {
+                "reasoning_tokens": 0
+              },
+              "total_tokens": 1095
+            },
+            "usage": {
+              "inputTokens": 989,
+              "cachedInputTokens": 0,
+              "cacheWriteInputTokens": 0,
+              "outputTokens": 106,
+              "reasoningTokens": 0,
+              "totalTokens": 1095
+            }
+          }
+        ],
+        "usage": {
+          "inputTokens": 989,
+          "cachedInputTokens": 0,
+          "cacheWriteInputTokens": 0,
+          "outputTokens": 106,
+          "reasoningTokens": 0,
+          "totalTokens": 1095
+        }
+      }
+    },
+    {
+      "id": "different-fiscal-year",
+      "expected": "uncertain",
+      "actual": "uncertain",
+      "passed": true,
+      "reason": "no_prior_disclosure_found",
+      "durationMs": 0,
+      "limitations": [
+        "no_prior_disclosure_found"
+      ]
+    },
+    {
+      "id": "missing-earlier-report",
+      "expected": "uncertain",
+      "actual": "uncertain",
+      "passed": true,
+      "reason": "no_prior_disclosure_found",
+      "durationMs": 0,
+      "limitations": [
+        "no_prior_disclosure_found"
+      ]
+    },
+    {
+      "id": "injection-and-new-contract",
+      "expected": "new_information",
+      "actual": "new_information",
+      "passed": true,
+      "reason": "assessed",
+      "durationMs": 2381,
+      "assessment": {
+        "decision": "new_information",
+        "announcementKind": "substantive",
+        "confidence": "high",
+        "repeatedFacts": [],
+        "newFacts": [
+          {
+            "fact": "The current notice discloses that the issuer signed a new GBP 50 million contract with North Customer.",
+            "evidence": {
+              "sourceId": "current",
+              "quote": "Today we signed a new GBP 50 million contract with North Customer."
+            }
+          }
+        ],
+        "uncertainties": []
+      },
+      "rejectionCodes": [],
+      "limitations": [],
+      "modelResult": {
+        "content": "{\"decision\":\"new_information\",\"announcementKind\":\"substantive\",\"confidence\":\"high\",\"repeatedFacts\":[],\"newFacts\":[{\"fact\":\"The current notice discloses that the issuer signed a new GBP 50 million contract with North Customer.\",\"evidence\":{\"sourceId\":\"current\",\"quote\":\"Today we signed a new GBP 50 million contract with North Customer.\"}}],\"uncertainties\":[]}",
+        "responseModel": "gpt-5.6-luna",
+        "requestedServiceTier": "default",
+        "serviceTier": "default",
+        "attemptCount": 1,
+        "attempts": [
+          {
+            "responseId": "resp_0a2e42b8a5c507f7016a9e968a889887d2bc89b83ecdc2d8a9",
+            "status": "completed",
+            "responseModel": "gpt-5.6-luna",
+            "requestedServiceTier": "default",
+            "serviceTier": "default",
+            "durationMs": 2380,
+            "requestedMaxOutputTokens": 2400,
+            "error": null,
+            "rawUsage": {
+              "input_tokens": 1202,
+              "input_tokens_details": {
+                "cache_write_tokens": 1199,
+                "cached_tokens": 0
+              },
+              "output_tokens": 92,
+              "output_tokens_details": {
+                "reasoning_tokens": 0
+              },
+              "total_tokens": 1294
+            },
+            "usage": {
+              "inputTokens": 1202,
+              "cachedInputTokens": 0,
+              "cacheWriteInputTokens": 1199,
+              "outputTokens": 92,
+              "reasoningTokens": 0,
+              "totalTokens": 1294
+            }
+          }
+        ],
+        "usage": {
+          "inputTokens": 1202,
+          "cachedInputTokens": 0,
+          "cacheWriteInputTokens": 1199,
+          "outputTokens": 92,
+          "reasoningTokens": 0,
+          "totalTokens": 1294
+        }
+      }
+    },
+    {
+      "id": "changed-chart-same-text",
+      "expected": "uncertain",
+      "actual": "uncertain",
+      "passed": true,
+      "reason": "evidence_rejected",
+      "durationMs": 3267,
+      "assessment": {
+        "decision": "uncertain",
+        "announcementKind": "administrative",
+        "confidence": "high",
+        "repeatedFacts": [
+          {
+            "fact": "Q1 2027 adjusted EBITDA was GBP 4.9 million.",
+            "current": {
+              "sourceId": "current_pdf_1001",
+              "quote": "Example Q1 2027 results. Adjusted EBITDA was GBP 4.9 million. FY2027 guidance is GBP 16-20 million. The figures were announced on 4 September 2026."
+            },
+            "prior": {
+              "sourceId": "prior_100",
+              "quote": "Example Q1 2027 results\nExample publishes Q1 2027 results. Adjusted EBITDA was GBP 4.9 million. FY2027 guidance is GBP 16-20 million."
+            }
+          },
+          {
+            "fact": "FY2027 guidance is GBP 16-20 million.",
+            "current": {
+              "sourceId": "current_pdf_1001",
+              "quote": "Example Q1 2027 results. Adjusted EBITDA was GBP 4.9 million. FY2027 guidance is GBP 16-20 million. The figures were announced on 4 September 2026."
+            },
+            "prior": {
+              "sourceId": "prior_100",
+              "quote": "Example Q1 2027 results\nExample publishes Q1 2027 results. Adjusted EBITDA was GBP 4.9 million. FY2027 guidance is GBP 16-20 million."
+            }
+          }
+        ],
+        "newFacts": [],
+        "uncertainties": []
+      },
+      "rejectionCodes": [
+        "incomplete_current_sources"
+      ],
+      "limitations": [
+        "unverified_visual_content:current_pdf_1001"
+      ],
+      "modelResult": {
+        "content": "{\"decision\":\"already_disclosed\",\"announcementKind\":\"administrative\",\"confidence\":\"high\",\"repeatedFacts\":[{\"fact\":\"Q1 2027 adjusted EBITDA was GBP 4.9 million.\",\"current\":{\"sourceId\":\"current_pdf_1001\",\"quote\":\"Example Q1 2027 results. Adjusted EBITDA was GBP 4.9 million. FY2027 guidance is GBP 16-20 million. The figures were announced on 4 September 2026.\"},\"prior\":{\"sourceId\":\"prior_100\",\"quote\":\"Example Q1 2027 results\\nExample publishes Q1 2027 results. Adjusted EBITDA was GBP 4.9 million. FY2027 guidance is GBP 16-20 million.\"}},{\"fact\":\"FY2027 guidance is GBP 16-20 million.\",\"current\":{\"sourceId\":\"current_pdf_1001\",\"quote\":\"Example Q1 2027 results. Adjusted EBITDA was GBP 4.9 million. FY2027 guidance is GBP 16-20 million. The figures were announced on 4 September 2026.\"},\"prior\":{\"sourceId\":\"prior_100\",\"quote\":\"Example Q1 2027 results\\nExample publishes Q1 2027 results. Adjusted EBITDA was GBP 4.9 million. FY2027 guidance is GBP 16-20 million.\"}}],\"newFacts\":[],\"uncertainties\":[]}",
+        "responseModel": "gpt-5.6-luna",
+        "requestedServiceTier": "default",
+        "serviceTier": "default",
+        "attemptCount": 1,
+        "attempts": [
+          {
+            "responseId": "resp_0f4876299a1dfacf016a9e968cc62c87d28a3b253eecb23551",
+            "status": "completed",
+            "responseModel": "gpt-5.6-luna",
+            "requestedServiceTier": "default",
+            "serviceTier": "default",
+            "durationMs": 3266,
+            "requestedMaxOutputTokens": 2400,
+            "error": null,
+            "rawUsage": {
+              "input_tokens": 1388,
+              "input_tokens_details": {
+                "cache_write_tokens": 1385,
+                "cached_tokens": 0
+              },
+              "output_tokens": 294,
+              "output_tokens_details": {
+                "reasoning_tokens": 0
+              },
+              "total_tokens": 1682
+            },
+            "usage": {
+              "inputTokens": 1388,
+              "cachedInputTokens": 0,
+              "cacheWriteInputTokens": 1385,
+              "outputTokens": 294,
+              "reasoningTokens": 0,
+              "totalTokens": 1682
+            }
+          }
+        ],
+        "usage": {
+          "inputTokens": 1388,
+          "cachedInputTokens": 0,
+          "cacheWriteInputTokens": 1385,
+          "outputTokens": 294,
+          "reasoningTokens": 0,
+          "totalTokens": 1682
+        }
+      }
+    }
+  ]
+}
