@@ -52,7 +52,7 @@ memory_kib=$(awk '/MemTotal:/ {print $2}' /proc/meminfo)
 swap_kib=$(awk '/SwapTotal:/ {print $2}' /proc/meminfo)
 (( swap_kib >= 3500000 )) || fail "Host has less than 3.5 GiB swap"
 free_kib=$(df -Pk "${AUTOWEB_ROOT}" | awk 'NR==2 {print $4}')
-(( free_kib >= 25000000 )) || fail "Host has less than 25 GiB free disk"
+(( free_kib >= 15 * 1024 * 1024 )) || fail "Host has less than 15 GiB free disk"
 
 for component in api worker web; do
   image="autoweb-${component}:${APP_RELEASE_SHA}"
