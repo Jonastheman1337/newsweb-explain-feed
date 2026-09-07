@@ -112,3 +112,6 @@ export function buildAttributionCorrectionInstruction(
     lines.join("\n\n")
   ].join("\n");
 }
+
+// Notice correction preserves source certainty; existing callers retain their contract.
+export { buildNoticeAttributionCorrectionInstruction, findNoticeAttributionRisks, type NoticeAttributionRisk } from "./notice-claim-precautions.js";

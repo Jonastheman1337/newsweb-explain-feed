@@ -27,16 +27,16 @@ import {
 } from "@newsweb/shared/db";
 import { Prisma, type PrismaClient } from "@prisma/client";
 import {
-  PROMPT_VERSION,
-  createDeveloperPrompt,
-  createReportDeveloperPrompt,
+  EDITORIAL_HYBRID_PROMPT_VERSION as PROMPT_VERSION,
+  createHybridDeveloperPrompt as createDeveloperPrompt,
+  createHybridReportDeveloperPrompt as createReportDeveloperPrompt,
   createReportRevisionUserPrompt,
   createReportSystemPrompt,
   createReportUserPrompt,
   createRevisionUserPrompt,
   createSystemPrompt,
   createUserPrompt,
-  createYearlyReportDeveloperPrompt,
+  createHybridYearlyReportDeveloperPrompt as createYearlyReportDeveloperPrompt,
   createYearlyReportRevisionUserPrompt,
   createYearlyReportSystemPrompt,
   createYearlyReportUserPrompt,
@@ -51,9 +51,9 @@ import {
 import { Job, Queue, Worker } from "bullmq";
 import { Redis } from "ioredis";
 import {
-  buildAttributionCorrectionInstruction,
-  findAttributionRisks
-} from "./services/claim-precautions.js";
+  buildNoticeAttributionCorrectionInstruction as buildAttributionCorrectionInstruction,
+  findNoticeAttributionRisks as findAttributionRisks
+} from "./services/notice-claim-precautions.js";
 import { applyImportanceHighBar } from "./services/importance.js";
 import {
   appendRevisionChecklist,

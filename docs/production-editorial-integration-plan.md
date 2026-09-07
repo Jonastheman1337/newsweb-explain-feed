@@ -1,5 +1,30 @@
 # Production editorial integration plan
 
+## Hybrid candidate amendment — 2026-09-07
+
+The owner requested a prepared version combining the successful v5.11 editorial
+foundation with selected source-reading improvements. This supersedes any plan
+to restore the rolled-back v5.12 brief/coverage/writer pipeline.
+
+Base: `6679aa9`, retaining rollback compatibility and the subsequent viewed-version
+feed fix. Work is local on `codex/editorial-hybrid-20260907`; no production release
+or push is part of this preparation. Historical prompt builders remain frozen.
+
+Keep: journalist role, everyday voice, active verbs, company context, useful short
+quotes, source-aware background, separate remuneration scope, and existing worker
+generation/publication flow. Add: a narrow developer-prompt variant for angle and
+quote selection and certainty-preserving attribution correction; source reading
+that retains PDF columns and explanatory management pages. Do not restore the completeness brief, new repair architecture or its checks.
+
+Validate compatibility with existing tests and compare actual model output against
+the restored writer. Keep prompt-only comparisons distinct from extraction changes;
+development examples and machine passes do not establish editorial superiority.
+
+Prepared changes, source comparisons, paired draft review and limits are recorded
+in [editorial-hybrid-2026-09-07.md](editorial-hybrid-2026-09-07.md). The seven-case
+development review favored the candidate four times, the baseline once, with two
+ties; this does not constitute editorial acceptance or deployment authorization.
+
 ## Status and authority
 
 - **Status:** E0 landed on `main` on 2026-08-13 (this commit) and revalidated in

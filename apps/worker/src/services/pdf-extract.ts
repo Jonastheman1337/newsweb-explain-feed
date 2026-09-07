@@ -5,6 +5,7 @@ const ATTACHMENT_URL =
   "https://api3.oslo.oslobors.no/v1/newsreader/attachment";
 const MAX_TEXT_CHARS = 15_000;
 const MAX_REPORT_CONTEXT_CHARS = 24_000;
+const MAX_REPORT_REFERENCE_CHARS = 72_000;
 const MAX_PRIMARY_PAGE_CHARS = 4_500;
 const MAX_USER_PAGE_CHARS = 3_500;
 const MAX_SECONDARY_PAGE_CHARS = 3_000;
@@ -63,6 +64,7 @@ export type ReportExtractionDiagnostics = {
   requestedPageNumbers: number[];
   requestedTopicTerms: string[];
   totalExtractedChars: number;
+  referenceTextTruncated?: boolean;
 };
 
 export type ReportContextPack = {
@@ -122,40 +124,126 @@ export async function downloadAttachmentPdf(
 /**
  * Extract text from each page of a PDF independently.
  */
-export async function extractPagesFromPdf(
-  buffer: Buffer
-): Promise<{ pages: string[]; pageCount: number }> {
-  const data = new Uint8Array(buffer);
-  const doc: PDFDocumentProxy = await getDocument({ data, useSystemFonts: true }).promise;
+export type PdfTextItem = { str: string; width: number; transform: number[] };
 
-  const pages: string[] = [];
-  for (let i = 1; i <= doc.numPages; i++) {
-    const page = await doc.getPage(i);
-    const content = await page.getTextContent();
-    let lastY: number | undefined;
-    let pageText = "";
-    for (const item of content.items) {
-      if ("str" in item) {
-        if (lastY !== undefined && lastY !== item.transform[5]) {
-          pageText += "\n";
-        } else if (
-          pageText &&
-          item.str &&
-          !/\s$/.test(pageText) &&
-          !/^[\s,.;:%)]/.test(item.str)
-        ) {
-          pageText += " ";
-        }
-        pageText += item.str;
-        lastY = item.transform[5];
-      }
+export function renderPdfTextItems(items: PdfTextItem[]): string {
+  // PDF.js represents a visual column gap as a single space with a large width.
+  // Measuring from that space's end erases the gap; measure visible glyphs only.
+  const visible = items.filter(item => item.str.trim());
+  const replacements = new Map<number, string>();
+  const omitted = new Set<number>();
+  for (let i = 0; i < visible.length; i++) {
+    if (!/^(?:three|six|nine|twelve) months ended$/i.test(visible[i].str.trim())) continue;
+    const groups: number[] = [];
+    for (let j = i; j < visible.length && Math.abs(visible[j].transform[5] - visible[i].transform[5]) <= 2; j++) {
+      if (!/^(?:three|six|nine|twelve) months ended$/i.test(visible[j].str.trim())) break;
+      groups.push(j);
     }
-    pages.push(pageText);
+    if (groups.length < 2 || groups.length > 3) continue;
+    const dates: PdfTextItem[] = [];
+    let dateY: number | undefined;
+    for (let j = groups.at(-1)! + 1; j < Math.min(visible.length, groups.at(-1)! + 16); j++) {
+      const item = visible[j];
+      if (!/^(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+\d{1,2},?\s+20\d{2}$/i.test(item.str.trim())) {
+        if (dates.length || !/^(?:\(in (?:thousands|millions) of .+|share data\)|notes?|unaudited)$/i.test(item.str.trim())) break;
+        continue;
+      }
+      const verticalGap = visible[i].transform[5] - item.transform[5];
+      if (verticalGap <= 0 || verticalGap > Math.abs(visible[i].transform[0]) * 4) break;
+      if (dateY !== undefined && Math.abs(item.transform[5] - dateY) > 2) break;
+      dateY = item.transform[5]; dates.push(item);
+    }
+    if (dates.length < groups.length || dates.length > 8 || dates.some((item, index) => index > 0 && item.transform[4] <= dates[index - 1].transform[4])) continue;
+    const partitions: number[][] = [];
+    const visit = (sizes: number[], offset: number) => {
+      if (sizes.length === groups.length) { if (offset === dates.length) partitions.push(sizes); return; }
+      const heading = visible[groups[sizes.length]];
+      const headingCenter = heading.transform[4] + heading.width / 2;
+      for (let count = 1; count <= dates.length - offset - (groups.length - sizes.length - 1); count++) {
+        const subset = dates.slice(offset, offset + count);
+        const center = subset.reduce((sum, item) => sum + item.transform[4] + item.width / 2, 0) / count;
+        if (Math.abs(center - headingCenter) <= Math.max(8, Math.abs(heading.transform[0]) * 2)) visit([...sizes, count], offset + count);
+      }
+    };
+    visit([], 0);
+    if (partitions.length !== 1) continue;
+    // Empty tab cells retain the uniquely aligned visual span. Original words
+    // appear once; no inferred period labels or amounts are added to raw text.
+    replacements.set(i, groups.map((index, g) => visible[index].str + "\t".repeat(partitions[0][g])).join(""));
+    groups.slice(1).forEach(index => omitted.add(index));
+    i = groups.at(-1)!;
   }
+  let lastY: number | undefined;
+  let lastEndX: number | undefined;
+  let text = "";
+  for (const [index, item] of visible.entries()) {
+    if (omitted.has(index)) continue;
+    const value = replacements.get(index) ?? item.str;
+    if (lastY !== undefined && Math.abs(lastY - item.transform[5]) > 2) text += "\n";
+    else if (lastEndX !== undefined && item.transform[4] - lastEndX >= Math.max(12, Math.abs(item.transform[0]) * 1.2)) text += "\t";
+    else if (lastEndX !== undefined && item.transform[4] - lastEndX > Math.max(.3, Math.abs(item.transform[0]) * .08) &&
+      text && !/\s$/.test(text) && !/^[\s,.;:%)]/.test(value)) text += " ";
+    text += value;
+    lastY = item.transform[5];
+    lastEndX = item.transform[4] + item.width;
+  }
+  return text;
+}
 
-  doc.destroy();
+const SECONDARY_CONTEXT_HEADINGS: Array<{ pattern: RegExp; weight: number; reason: ReportPageReason }> = [
+  { pattern: /^(?:(?:q[1-4]|h[12])\s+(?:20\d{2}\s+)?)?financial (?:results|review|performance)(?:\s+(?:q[1-4]|h[12]|20\d{2})[\d\s]*)?$/, weight: 12, reason: "ceo_or_management" },
+  { pattern: /^(?:resultat(?:et)? per\s+\d{1,2}\.\d{1,2}\.20\d{2}|resultatutvikling|okonomisk utvikling)$/, weight: 12, reason: "ceo_or_management" },
+  { pattern: /^(?:management (?:report|review)|(?:board of )?directors['’]? report|report (?:of|from) the (?:board of )?directors|styrets beretning|styret si melding|halvarsberetning)(?:\s+(?:q[1-4]|h[12]|20\d{2})[\d\s]*)?$/, weight: 10, reason: "ceo_or_management" },
+  { pattern: /^(?:(?:letter|message|statement|review|report) from (?:the )?(?:(?:chair(?:man|woman)? and (?:the )?)?ceo|chief executive(?: officer)?|konsernsjef(?:en)?|administrerende direktor)|(?:ceo|chief executive(?: officer)?|konsernsjef(?:en)?|administrerende direktor)(?:['’]s)?\s+(?:letter|message|statement|review|report|kommentar|har ordet))$/, weight: 8, reason: "ceo_or_management" },
+  { pattern: /^(?:outlook|guidance|utsikter|fremtidsutsikter)$/, weight: 6, reason: "outlook_or_events" },
+  { pattern: /^(?:key events|highlights|subsequent events|events after (?:the )?reporting period|(?:viktige |vesentlige )?hendelser(?: etter balansedagen| i forste halvar(?: 20\d{2})?)?|hoydepunkter)$/, weight: 5, reason: "outlook_or_events" }
+];
 
-  return { pages, pageCount: doc.numPages };
+function normalizedPageLines(page: PdfPageText): string[] {
+  return page.text.split(/\r?\n/).map(normalizeForSearch).filter(Boolean);
+}
+
+function possibleHeadingLines(page: PdfPageText): string[] {
+  const lines = normalizedPageLines(page);
+  return lines.flatMap((line, index) => line.length <= 80 && lines[index + 1]?.length <= 80
+    ? [line, `${line} ${lines[index + 1]}`]
+    : [line]);
+}
+
+function isContentsPage(page: PdfPageText): boolean {
+  return normalizedPageLines(page).some(line => /^(?:table of contents|contents|innholdsfortegnelse|innhold)$/.test(line));
+}
+
+function isAccountingPolicyPage(page: PdfPageText): boolean {
+  return normalizedPageLines(page).some(line =>
+    /^(?:note\s+\d+\s*[-.:]?\s*)?(?:(?:significant |material |summary of significant )?accounting (?:principles|policies)|basis (?:for consolidation|of preparation)|regnskapsprinsipper)(?:\s*\([^)]*\))?$/.test(line)
+  );
+}
+
+function isManagementContinuation(page: PdfPageText): boolean {
+  if (isContentsPage(page) || isAccountingPolicyPage(page) || hasIncomeStatementHeading(page)) return false;
+  // Do not follow management prose into a financial statement, a numbered note,
+  // an image page or a table. One adjacent prose page is enough to recover a
+  // section broken at a physical page boundary without unbounded expansion.
+  const lines = normalizedPageLines(page);
+  if (lines.some(line => /^(?:note\s+\d+\b|(?:consolidated )?(?:statement of financial position|balance sheet|cash flow statement)|balanse|kontantstromoppstilling|nokkel(?:tall|tal))/.test(line))) return false;
+  const prose = lines.filter(line => (line.match(/[a-z]+/g) ?? []).length >= 8 && !/^\d/.test(line));
+  return prose.join(" ").length >= 120;
+}
+
+export async function extractPagesFromPdf(buffer: Buffer): Promise<{ pages: string[]; pageCount: number }> {
+  const doc: PDFDocumentProxy = await getDocument({ data: new Uint8Array(buffer), useSystemFonts: true }).promise;
+  try {
+    const pages: string[] = [];
+    for (let i = 1; i <= doc.numPages; i++) {
+      const page = await doc.getPage(i);
+      const content = await page.getTextContent();
+      pages.push(renderPdfTextItems(content.items.filter((item): item is typeof item & PdfTextItem => "str" in item)));
+    }
+    return { pages, pageCount: doc.numPages };
+  } finally {
+    await doc.destroy();
+  }
 }
 
 export async function extractTextFromPdf(
@@ -358,24 +446,7 @@ const NON_INCOME_STATEMENT_TERMS = [
   "balanse"
 ];
 
-const SECONDARY_CONTEXT_TERMS: Array<{ term: string; weight: number; reason: ReportPageReason }> = [
-  { term: "ceo", weight: 6, reason: "ceo_or_management" },
-  { term: "chief executive", weight: 6, reason: "ceo_or_management" },
-  { term: "letter from", weight: 4, reason: "ceo_or_management" },
-  { term: "konsernsjef", weight: 6, reason: "ceo_or_management" },
-  { term: "administrerende direktor", weight: 6, reason: "ceo_or_management" },
-  { term: "management review", weight: 5, reason: "ceo_or_management" },
-  { term: "directors report", weight: 4, reason: "ceo_or_management" },
-  { term: "financial review", weight: 4, reason: "ceo_or_management" },
-  { term: "outlook", weight: 5, reason: "outlook_or_events" },
-  { term: "guidance", weight: 4, reason: "outlook_or_events" },
-  { term: "key events", weight: 4, reason: "outlook_or_events" },
-  { term: "highlights", weight: 3, reason: "outlook_or_events" },
-  { term: "subsequent events", weight: 4, reason: "outlook_or_events" },
-  { term: "utsikter", weight: 5, reason: "outlook_or_events" },
-  { term: "hendelser", weight: 3, reason: "outlook_or_events" },
-  { term: "hoydepunkter", weight: 3, reason: "outlook_or_events" }
-];
+
 
 const METRIC_MATCHERS: Record<ReportMetricKind, RegExp[]> = {
   revenue: [
@@ -507,7 +578,19 @@ function scoreTermWeights(
 }
 
 function hasIncomeStatementHeading(page: PdfPageText): boolean {
-  return scoreTermWeights(page.normalized, INCOME_STATEMENT_TERMS) > 0;
+  if (isContentsPage(page) || isAccountingPolicyPage(page)) return false;
+  return possibleHeadingLines(page).some(line => {
+    const heading = line.match(/^(?:(?:condensed|consolidated|interim|unaudited|group|parent(?: company)?|konsern(?:ets)?)\s+)*(?:income statements?|statements? of (?:comprehensive income|profit (?:or|and) loss(?: and (?:other )?comprehensive income)?)|resultat(?:regn|rekne)skap(?:et)?(?: for konsernet)?|oppstilling over totalresultat|totalresultat)(?=$|\s|[(:–-])/);
+    if (!heading) return false;
+    const suffix = line.slice(heading[0].length).replace(/\([^)]{1,60}\)/g, "").trim();
+    if (!suffix) return true;
+    // Accept ordinary reporting-period headings, including wrapped long IFRS
+    // names, while rejecting sentences about how an income statement is used.
+    if (!/\b(?:20\d{2}|q[1-4]|h[12]|fy)\b/.test(suffix)) return false;
+    return suffix
+      .replace(/\b(?:for|the|periods?|perioden|quarter|kvartal|year|ended|ending|as|at|three|six|nine|twelve|months?|q[1-4]|h[12]|fy|january|february|march|april|may|june|july|august|september|october|november|december|januar|februar|mars|mai|juni|juli|oktober|desember)\b/g, "")
+      .replace(/[\d\s.,/:–-]/g, "").length === 0;
+  });
 }
 
 function scoreIncomeStatementPage(page: PdfPageText): number {
@@ -529,6 +612,7 @@ function scoreIncomeStatementPage(page: PdfPageText): number {
 }
 
 function scoreFinancialFallbackPage(page: PdfPageText): number {
+  if (isAccountingPolicyPage(page) || isContentsPage(page)) return 0;
   let score = metricKindsInText(page.text).size * 6;
   score += scoreTermWeights(page.normalized, [
     { term: "financial review", weight: 5 },
@@ -551,18 +635,17 @@ function scoreFinancialFallbackPage(page: PdfPageText): number {
 }
 
 function scoreSecondaryPage(page: PdfPageText): { score: number; reason: ReportPageReason } {
+  if (isContentsPage(page) || isAccountingPolicyPage(page)) return { score: 0, reason: "ceo_or_management" };
   let score = 0;
   let reason: ReportPageReason = "ceo_or_management";
-  for (const term of SECONDARY_CONTEXT_TERMS) {
-    if (page.normalized.includes(term.term)) {
-      score += term.weight;
-      reason = term.reason;
+  const headings = possibleHeadingLines(page).map(line => line.split(":")[0].trim()).filter(line => line.length <= 120);
+  for (const heading of SECONDARY_CONTEXT_HEADINGS) {
+    if (headings.some(line => heading.pattern.test(line)) && heading.weight > score) {
+      score = heading.weight;
+      reason = heading.reason;
     }
   }
-  if (hasAnyTerm(page.normalized, CONTENTS_TERMS)) {
-    score -= 12;
-  }
-  return { score: Math.max(0, score), reason };
+  return { score, reason };
 }
 
 function scoreByInstructionTerms(page: PdfPageText, terms: string[]): number {
@@ -896,23 +979,32 @@ export function buildReportContextFromPages(
   const metrics = extractMetricsFromPages(pages, metricPageIndexes);
 
   const secondaryScores = pages
-    .map((page) => ({
-      index: page.index,
-      ...scoreSecondaryPage(page)
-    }))
-    .filter((item) => item.score >= 4)
-    .sort((left, right) => right.score - left.score)
-    .slice(0, 4);
-  for (const item of secondaryScores) {
+    .map(page => ({ index: page.index, ...scoreSecondaryPage(page) }))
+    .filter(item => item.score >= 4)
+    .sort((a, b) => b.score - a.score);
+  const narrativeIndexes = new Set<number>();
+  for (const item of secondaryScores.slice(0, 4)) {
     addSelectedPage(selected, pages, item.index, item.reason, item.score);
+    narrativeIndexes.add(item.index);
+  }
+  for (const item of secondaryScores) {
+    if (narrativeIndexes.size >= 4) break;
+    const next = pages[item.index + 1];
+    if (next && !selected.has(next.index) && isManagementContinuation(next)) {
+      addSelectedPage(selected, pages, next.index, item.reason, item.score - 1);
+      narrativeIndexes.add(next.index);
+    }
   }
 
   const selectedPages = toSelectedPages(selected, pages);
   const text = buildReportContextText(pages, selected, metrics);
+  const rawReferenceText = selectedPages
+    .map(page => `[PDF page ${page.pageNumber}]\n${rawPages[page.pageNumber - 1]}`)
+    .join("\n\n");
 
   return {
     text,
-    referenceText: text,
+    referenceText: rawReferenceText.slice(0, MAX_REPORT_REFERENCE_CHARS),
     pageCount: pages.length,
     metrics,
     selectedPages,
@@ -921,7 +1013,8 @@ export function buildReportContextFromPages(
       fallbackUsed: !incomeStatementFound,
       requestedPageNumbers,
       requestedTopicTerms,
-      totalExtractedChars: rawPages.join("\n\n").length
+      totalExtractedChars: rawPages.join("\n\n").length,
+      referenceTextTruncated: rawReferenceText.length > MAX_REPORT_REFERENCE_CHARS
     }
   };
 }
