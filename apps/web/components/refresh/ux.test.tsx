@@ -12,7 +12,7 @@ import RefreshPage from "../../app/(refresh)/next/page";
 
 const mocks = vi.hoisted(() => ({
   replace: vi.fn(), refresh: vi.fn(), query: new URLSearchParams(),
-  getFeed: vi.fn(), getNotice: vi.fn()
+  getFeed: vi.fn(), getNotice: vi.fn(), getNoticeModelSource: vi.fn()
 }));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace: mocks.replace, refresh: mocks.refresh }),
@@ -21,7 +21,7 @@ vi.mock("next/navigation", () => ({
 }));
 vi.mock("../../lib/session", () => ({ getSessionToken: async () => "fixture-session" }));
 vi.mock("../../lib/api", () => ({
-  getFeed: mocks.getFeed, getNotice: mocks.getNotice,
+  getFeed: mocks.getFeed, getNotice: mocks.getNotice, getNoticeModelSource: mocks.getNoticeModelSource,
   getMetaFilters: async () => ({ markets: [], categories: [], issuers: [] }),
   getMutedCategories: async () => ({ mutedCategories: ["RENTEREGULERING"] }),
   isApiAuthError: () => false
@@ -49,6 +49,7 @@ beforeEach(() => {
   sessionStorage.clear();
   mocks.query = new URLSearchParams();
   mocks.getNotice.mockResolvedValue({ source: { title: "Original source", bodyText: "Source text", attachments: [] }, rewrites: [] });
+  mocks.getNoticeModelSource.mockResolvedValue({ rewriteId: null, text: null, pageCount: null, attachmentId: null });
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
@@ -236,4 +237,186 @@ it("uses legacy source dimming without generation badges and leaves processing n
   }
   expect(container.querySelector("#notice-5")?.textContent).toContain("Førsteutkast");
   expect(Array.from(container.querySelectorAll("article")).map((card) => card.textContent).join(" ")).not.toMatch(/Generert|Ikke generert|Oppdateres automatisk/);
+});
+
+const setValue = (field: HTMLTextAreaElement, value: string) => {
+  Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(field, value);
+  field.dispatchEvent(new Event("input", { bubbles: true }));
+};
+const flush = () => act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+const card = (id: number) => container.querySelector(`#notice-${id}`) as HTMLElement;
+const renderCard = (current: FeedItem, key = "card") =>
+  act(() => root.render(<RefreshCard key={key} entry={{ current, latest: current }} onSelect={vi.fn()} onVersion={vi.fn()} />));
+
+it("reveals the instruction form inline without opening sources and drops the menu duplicates", async () => {
+  await renderCard(item(1));
+  expect(buttons("Lag ny versjon")).toHaveLength(0);
+  expect(buttons("Åpne arbeidsvisning")).toHaveLength(0);
+  const trigger = buttons("Ny versjon")[0];
+  await act(() => trigger.click());
+  expect(container.querySelector("aside")).toBeNull();
+  const form = container.querySelector("[data-compose]") as HTMLElement;
+  expect(form.hidden).toBe(false);
+  expect(document.activeElement).toBe(form.querySelector("textarea"));
+  expect(trigger.getAttribute("aria-expanded")).toBe("true");
+  expect(buttons("Lag versjon")).toHaveLength(1);
+  await act(() => trigger.click());
+  expect(form.hidden).toBe(true);
+  expect(trigger.getAttribute("aria-expanded")).toBe("false");
+  expect(document.activeElement).toBe(trigger);
+});
+
+it("keeps typed instruction text while the form is hidden", async () => {
+  await renderCard(item(1));
+  await act(() => buttons("Ny versjon")[0].click());
+  const textarea = container.querySelector("[data-compose] textarea") as HTMLTextAreaElement;
+  await act(() => setValue(textarea, "Kortere ingress"));
+  await act(() => buttons("Ny versjon")[0].click());
+  await act(() => buttons("Ny versjon")[0].click());
+  expect(container.querySelector("[data-compose] textarea")).toBe(textarea);
+  expect(textarea.value).toBe("Kortere ingress");
+});
+
+it("closes the form before the panel on Escape and returns focus to the trigger", async () => {
+  await renderCard(item(1));
+  await act(() => (container.querySelector("[data-source-trigger]") as HTMLButtonElement).click());
+  await act(() => buttons("Ny versjon")[0].click());
+  const textarea = container.querySelector("[data-compose] textarea") as HTMLTextAreaElement;
+  await act(() => { textarea.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); });
+  expect((container.querySelector("[data-compose]") as HTMLElement).hidden).toBe(true);
+  expect(container.querySelector("aside")?.hidden).toBe(false);
+  expect(document.activeElement).toBe(container.querySelector("[data-compose-trigger]"));
+  const editor = container.querySelector('[aria-label="Rediger notistekst"]') as HTMLElement;
+  await act(() => { editor.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); });
+  expect(container.querySelector("aside")?.hidden).toBe(true);
+  expect(document.activeElement).toBe(container.querySelector("[data-source-trigger]"));
+});
+
+it("renders the source as paragraphs with attachments in a row under the heading", async () => {
+  mocks.getNotice.mockResolvedValue({
+    source: { title: "Original source", bodyText: "First\n\nSecond\n \nThird", attachments: [{ id: 1, fileName: "report.pdf", fileType: "application/pdf", fileSize: 1024 }] },
+    rewrites: []
+  });
+  await renderCard(item(1));
+  await act(() => (container.querySelector("[data-source-trigger]") as HTMLButtonElement).click());
+  await flush();
+  expect(Array.from(container.querySelectorAll(`#sources-panel-1 .${styles.sourceBody} p`)).map((p) => p.textContent)).toEqual(["First", "Second", "Third"]);
+  const heading = container.querySelector(`#sources-panel-1 .${styles.sourceHeading}`)!;
+  const attachments = container.querySelector("#sources-panel-1 .attachmentLinks")!;
+  const title = container.querySelector("#sources-panel-1 h3")!;
+  expect(heading.compareDocumentPosition(attachments) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(attachments.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+});
+
+it("offers PDF-tekst only for notices with attachments and loads it lazily per version", async () => {
+  await renderCard(item(1));
+  await act(() => (container.querySelector("[data-source-trigger]") as HTMLButtonElement).click());
+  expect(buttons("PDF-tekst")).toHaveLength(0);
+  const withPdf = item(2, { hasAttachments: true });
+  await renderCard(withPdf, "pdf");
+  await act(() => (container.querySelector("[data-source-trigger]") as HTMLButtonElement).click());
+  expect(mocks.getNoticeModelSource).not.toHaveBeenCalled();
+  mocks.getNoticeModelSource.mockRejectedValueOnce(new Error("down"));
+  await act(() => buttons("PDF-tekst")[0].click());
+  await flush();
+  expect(mocks.getNoticeModelSource).toHaveBeenCalledWith(2, "rewrite-2");
+  const panel = container.querySelector("#pdf-panel-2") as HTMLElement;
+  expect(panel.hidden).toBe(false);
+  expect(panel.querySelector('[role="alert"]')?.textContent).toContain("Kunne ikke hente PDF-tekst");
+  mocks.getNoticeModelSource.mockResolvedValueOnce({ rewriteId: "rewrite-2", text: "[PDF page 1]\nIntro\n\n[PDF page 2]\nMore", pageCount: 2, attachmentId: 1 });
+  await act(() => buttons("Prøv igjen")[0].click());
+  await flush();
+  expect(Array.from(panel.querySelectorAll("h4")).map((heading) => heading.textContent)).toEqual(["Side 1", "Side 2"]);
+  expect(Array.from(panel.querySelectorAll("p")).map((paragraph) => paragraph.textContent)).toEqual(["Intro", "More"]);
+  expect(panel.textContent).toContain("PDF · 2 sider");
+  mocks.getNoticeModelSource.mockResolvedValueOnce({ rewriteId: "rewrite-2b", text: null, pageCount: null, attachmentId: null });
+  await renderCard(item(2, { hasAttachments: true, rewriteId: "rewrite-2b", contentHash: "hash-2b", rewriteVersion: 2 }), "pdf");
+  await flush();
+  expect(mocks.getNoticeModelSource).toHaveBeenLastCalledWith(2, "rewrite-2b");
+  expect(panel.textContent).toContain("Ingen PDF-tekst lagret for denne versjonen");
+});
+
+it("gives the wider column to the longer text unless a width is stored", async () => {
+  const longSource = item(1, { sourceBodyText: "x".repeat(600) });
+  await act(() => root.render(<RefreshFeed initialItems={[longSource, item(2)]} mutedCategories={[]} filtered={false} />));
+  expect(card(1).style.getPropertyValue("--source-ratio")).toBe("0.57");
+  expect(card(2).style.getPropertyValue("--source-ratio")).toBe("0.43");
+  localStorage.setItem("newsweb:next-prefs", JSON.stringify({ sourceRatio: 0.6 }));
+  await act(() => root.render(<RefreshFeed key="stored" initialItems={[longSource, item(2)]} mutedCategories={[]} filtered={false} />));
+  expect(card(1).style.getPropertyValue("--source-ratio")).toBe("0.6");
+  expect(card(2).style.getPropertyValue("--source-ratio")).toBe("0.6");
+});
+
+it("resizes the split by keyboard and pointer and remembers the width", async () => {
+  await renderCard(item(1));
+  await act(() => (container.querySelector("[data-source-trigger]") as HTMLButtonElement).click());
+  const handle = container.querySelector('[role="separator"]') as HTMLElement;
+  const article = container.querySelector("article") as HTMLElement;
+  expect(handle.getAttribute("aria-valuenow")).toBe("43");
+  await act(() => { handle.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true })); });
+  expect(article.style.getPropertyValue("--source-ratio")).toBe("0.45");
+  expect(handle.getAttribute("aria-valuenow")).toBe("45");
+  expect(JSON.parse(localStorage.getItem("newsweb:next-prefs")!).sourceRatio).toBe(0.45);
+  vi.spyOn(article, "getBoundingClientRect").mockReturnValue({ left: 0, width: 1000 } as DOMRect);
+  await act(() => { handle.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true, button: 0, clientX: 550 })); });
+  expect(article.hasAttribute("data-dragging")).toBe(true);
+  await act(() => { handle.dispatchEvent(new MouseEvent("pointermove", { bubbles: true, clientX: 400 })); });
+  expect(article.style.getPropertyValue("--source-ratio")).toBe("0.6");
+  await act(() => { handle.dispatchEvent(new MouseEvent("pointerup", { bubbles: true, clientX: 400 })); });
+  expect(article.hasAttribute("data-dragging")).toBe(false);
+  expect(JSON.parse(localStorage.getItem("newsweb:next-prefs")!).sourceRatio).toBe(0.6);
+  await act(() => { handle.dispatchEvent(new MouseEvent("dblclick", { bubbles: true })); });
+  expect(article.style.getPropertyValue("--source-ratio")).toBe("0.43");
+});
+
+it("steps the source text size for every open card and stops at the largest step", async () => {
+  await act(() => root.render(<RefreshFeed initialItems={[item(1), item(2)]} mutedCategories={[]} filtered={false} />));
+  for (const id of [1, 2]) await act(() => (card(id).querySelector("[data-source-trigger]") as HTMLButtonElement).click());
+  const bigger = card(1).querySelector('[aria-label="Større kildetekst"]') as HTMLButtonElement;
+  await act(() => bigger.click());
+  expect(card(1).style.getPropertyValue("--source-font")).toBe("15px");
+  expect(card(2).style.getPropertyValue("--source-font")).toBe("15px");
+  expect(JSON.parse(localStorage.getItem("newsweb:next-prefs")!).sourceFontPx).toBe(15);
+  await act(() => bigger.click());
+  expect(bigger.disabled).toBe(true);
+  expect(card(2).style.getPropertyValue("--source-font")).toBe("16px");
+  await act(() => (card(2).querySelector('[aria-label="Mindre kildetekst"]') as HTMLButtonElement).click());
+  expect(card(1).style.getPropertyValue("--source-font")).toBe("15px");
+});
+
+it("expands to arbeidsvisning from the panel header and returns to the feed", async () => {
+  await act(() => root.render(<RefreshFeed initialItems={[item(1), item(2)]} mutedCategories={[]} filtered={false} />));
+  vi.spyOn(window, "scrollY", "get").mockReturnValue(400);
+  await act(() => (card(1).querySelector("[data-source-trigger]") as HTMLButtonElement).click());
+  expect(buttons("Utvid")).toHaveLength(1);
+  const editor = card(1).querySelector('[aria-label="Rediger notistekst"]') as HTMLElement;
+  await act(() => editor.focus());
+  await act(() => buttons("Utvid")[0].click());
+  expect(card(1).classList.contains(styles.focused)).toBe(true);
+  expect(window.scrollTo).toHaveBeenCalledWith({ top: 0, behavior: "instant" });
+  expect((card(1).querySelector("[data-compose]") as HTMLElement).hidden).toBe(false);
+  expect(document.activeElement).toBe(editor);
+  const back = buttons("Tilbake til feed")[0];
+  expect(back.getAttribute("aria-pressed")).toBe("true");
+  await act(() => back.click());
+  expect(card(1).classList.contains(styles.focused)).toBe(false);
+  expect(card(1).querySelector("aside")?.hidden).toBe(false);
+  expect(window.scrollTo).toHaveBeenLastCalledWith({ top: 400, behavior: "instant" });
+  await act(() => buttons("Utvid")[0].click());
+  await act(() => buttons("← Feed")[0].click());
+  expect(card(1).querySelector("aside")?.hidden).toBe(true);
+  expect(document.activeElement).toBe(card(1).querySelector("[data-source-trigger]"));
+});
+
+it("lets a source-only notice be generated with an instruction in one step", async () => {
+  await renderCard(item(2, { isFinal: false, rewriteId: null, notGenerated: true, skipped: true }));
+  expect(buttons("Instruksjon")).toHaveLength(1);
+  expect(buttons("Lag notis")).toHaveLength(1);
+  await act(() => buttons("Instruksjon")[0].click());
+  expect(document.activeElement).toBe(container.querySelector("[data-compose] textarea"));
+  expect(buttons("Lag versjon")).toHaveLength(1);
+  await renderCard(item(3, { isFinal: false, rewriteId: null, failed: true }), "failed");
+  expect(buttons("Instruksjon")).toHaveLength(0);
+  await act(() => buttons("Tilpass instruksjon")[0].click());
+  expect((container.querySelector("[data-compose]") as HTMLElement).hidden).toBe(false);
 });

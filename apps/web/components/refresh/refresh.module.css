@@ -270,7 +270,7 @@
 .sourceOnly.workspace {
   opacity: 1;
 }
-.sourceOnly.workspace > .editorPane {
+.sourceOnly.workspace > .editorPane > :not(.compose) {
   opacity: 0.5;
 }
 .dateline {
@@ -363,6 +363,11 @@
   gap: 8px;
   margin-top: 12px;
   justify-content: space-between;
+}
+.waitGenerate {
+  display: flex;
+  gap: 8px;
+  align-items: center;
 }
 .progress,
 .failure {
@@ -505,16 +510,53 @@
   padding: 16px 20px 14px;
   min-width: 0;
 }
+/* Split: --source-ratio (set on the card) is the share of the width given to
+   the source column. The handle track between the columns draws the divider. */
 .workspace {
   width: 100%;
   display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  --split-handle: 10px;
+  grid-template-columns:
+    minmax(0, calc((1 - var(--source-ratio, 0.43)) * (100% - var(--split-handle))))
+    var(--split-handle)
+    minmax(0, calc(var(--source-ratio, 0.43) * (100% - var(--split-handle))));
   align-items: start;
+}
+.splitHandle {
+  align-self: stretch;
+  position: relative;
+  cursor: col-resize;
+  touch-action: none;
+  border-radius: 4px;
+}
+.splitHandle::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  background: var(--line);
+}
+.splitHandle:hover::before,
+.card[data-dragging] .splitHandle::before {
+  background: var(--ink-soft);
+}
+.splitHandle:focus-visible {
+  outline: 2px solid var(--accent-2);
+  outline-offset: -2px;
+}
+.card[data-dragging] {
+  user-select: none;
+  cursor: col-resize;
 }
 .main:has(.focused) > .filters,
 .main:has(.focused) .viewBar,
 .feed:has(.focused) > .card:not(.focused) {
   display: none;
+}
+.main:has(.focused) {
+  max-width: 1320px;
 }
 .editorActions {
   display: flex;
@@ -538,6 +580,9 @@
 }
 .editorActions button {
   min-height: 32px;
+}
+.editorActionsLeft > button[aria-expanded="true"] {
+  background: var(--bg-soft);
 }
 .shell .copy {
   background: var(--ink);
@@ -632,12 +677,12 @@
   color: var(--ink-soft);
 }
 .sourcePane {
-  border-left: 1px solid var(--line);
+  border-left: 0;
   padding: 16px 20px;
   background: color-mix(in srgb, var(--bg-main) 50%, var(--bg-panel));
   min-width: 0;
   border-radius: 0 8px 8px 0;
-  max-height: var(--editor-pane-height, 520px);
+  max-height: max(var(--editor-pane-height, 520px), 70vh);
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
@@ -648,7 +693,7 @@
   max-height: calc(100dvh - 96px);
 }
 .sourcePane[hidden],
-.generation[hidden] {
+.compose[hidden] {
   display: none;
 }
 .panelTabs {
@@ -660,10 +705,37 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
   gap: 6px;
   padding-bottom: 10px;
   margin-bottom: 14px;
   border-bottom: 1px solid var(--line);
+}
+.panelTools {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.shell .fontStep {
+  border: 0;
+  width: 30px;
+  padding: 0;
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+.shell .fontStep:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.shell .expandToggle {
+  border: 0;
+  padding-inline: 8px;
+  color: var(--ink-soft);
+}
+.shell .expandToggle[aria-pressed="true"] {
+  color: var(--ink);
 }
 .shell .closeSource {
   border: 0;
@@ -700,13 +772,47 @@
 }
 .sourceText p {
   white-space: pre-wrap;
-  font-size: 14px;
+  font-size: var(--source-font, 14px);
   line-height: 1.6;
   color: var(--ink);
   overflow-wrap: anywhere;
 }
-.sourceText :global(.attachments) {
-  margin: 0 0 14px;
+.sourceBody p {
+  margin: 0 0 12px;
+}
+.sourceBody h4 {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  margin: 18px 0 6px;
+}
+.sourceBody h4:first-child {
+  margin-top: 0;
+}
+/* Attachments: one compact row under the Newsweb heading, before the text. */
+.sourceText :global(.attachmentLinks) {
+  margin: -4px 0 14px;
+}
+.sourceText :global(.attachmentLinksTitle) {
+  display: none;
+}
+.sourceText :global(.attachmentLinks) ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sourceText :global(.attachmentLink) {
+  font-size: 12px;
+  font-weight: 500;
+  text-decoration: underline;
+}
+.sourceText :global(.attachmentMeta) {
+  font-size: 11px;
 }
 .related {
   border-top: 1px solid var(--line);
@@ -765,67 +871,60 @@
   color: var(--ink-soft);
   font-size: 11px;
 }
-.generation {
-  margin-top: 18px;
-  border-top: 1px solid var(--line);
-  padding-top: 12px;
+.compose {
+  margin-top: 12px;
 }
-.generation > summary {
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: 500;
-}
-.generation :global(.instructionWrap) {
+.compose :global(.instructionWrap) {
   border: none;
-  padding: 14px 0 0;
+  padding: 0;
   margin: 0;
 }
-.generation :global(.instructionTextarea) {
-  min-height: 90px;
-  padding: 12px;
+.compose :global(.instructionTextarea) {
+  min-height: 64px;
+  padding: 10px 12px;
   font-size: 14px;
   background: var(--bg-main);
   border: 1px solid var(--line);
   border-radius: 6px;
 }
-.generation :global(.instructionActions) {
+.compose :global(.instructionActions) {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
   align-items: center;
 }
-.generation :global(.instructionActions) > :global(.ghostButton) {
+.compose :global(.instructionActions) > :global(.ghostButton) {
   margin-left: auto;
   min-height: 36px;
   order: 3;
   background: var(--ink);
   color: var(--bg-panel);
 }
-.generation :global(.outputModeButton) {
+.compose :global(.outputModeButton) {
   border: 0;
   min-height: 36px;
 }
-.generation :global(.outputModeButton.active) {
+.compose :global(.outputModeButton.active) {
   background: var(--bg-soft);
 }
-.generation :global(.materialBar) {
+.compose :global(.materialBar) {
   margin: 10px 0;
 }
-.generation :global(.materialBar) button,
-.generation :global(.materialActions) button {
+.compose :global(.materialBar) button,
+.compose :global(.materialActions) button {
   min-height: 36px;
 }
-.generation :global(.xhighToggle) {
+.compose :global(.xhighToggle) {
   width: 36px;
   height: 36px;
   padding: 8px;
 }
-.generation :global(.materialItem),
-.generation :global(.materialToggle) {
+.compose :global(.materialItem),
+.compose :global(.materialToggle) {
   min-width: 0;
   flex-wrap: wrap;
 }
-.generation :global(.materialTitle) {
+.compose :global(.materialTitle) {
   overflow-wrap: anywhere;
 }
 .modal {
@@ -921,6 +1020,10 @@
 @media (max-width: 850px) {
   .workspace {
     grid-template-columns: 1fr;
+  }
+  .splitHandle,
+  .shell .expandToggle {
+    display: none;
   }
   .sourcePane {
     border-left: 0;
@@ -1098,15 +1201,15 @@
   height: 18px;
   flex-shrink: 0;
 }
-.generation :global(.generationOptions) {
+.compose :global(.generationOptions) {
   position: relative;
   font-size: 12px;
 }
-.generation :global(.generationOptions) > summary {
+.compose :global(.generationOptions) > summary {
   cursor: pointer;
   padding: 10px 0;
 }
-.generation :global(.generationOptions) :global(.xhighToggle) {
+.compose :global(.generationOptions) :global(.xhighToggle) {
   position: absolute;
   z-index: 2;
   bottom: calc(100% + 6px);
@@ -1121,10 +1224,10 @@
   border: 1px solid var(--line);
   box-shadow: 0 4px 16px #0002;
 }
-.generation :global(.generationOptions) :global(.xhighToggleActive) {
+.compose :global(.generationOptions) :global(.xhighToggleActive) {
   border-color: var(--ink);
 }
-.generation :global(.generationOptions) svg {
+.compose :global(.generationOptions) svg {
   flex: 0 0 20px;
 }
 @media (max-width: 480px) {
@@ -1141,4 +1244,24 @@
     width: 40px;
     min-width: 40px;
   }
+}
+
+/* Ny versjon at rest: the instruction field and its button only. Length,
+   sources and options appear while the field is in use. */
+.compose :global(.instructionWrap) > :global(.materialBar),
+.compose :global(.instructionActions) > :global(.outputModeToggle),
+.compose :global(.instructionActions) > :global(.generationOptions) {
+  display: none;
+}
+.compose :global(.instructionWrap:is(:focus-within, :has(.instructionTextarea:not(:placeholder-shown)), :has(.materialTray), :has(.generationOptions[open]))) > :global(.materialBar) {
+  display: flex;
+}
+.compose :global(.instructionWrap:is(:focus-within, :has(.instructionTextarea:not(:placeholder-shown)), :has(.materialTray), :has(.generationOptions[open]))) :global(.instructionActions) > :global(.outputModeToggle) {
+  display: inline-flex;
+}
+.compose :global(.instructionWrap:is(:focus-within, :has(.instructionTextarea:not(:placeholder-shown)), :has(.materialTray), :has(.generationOptions[open]))) :global(.instructionActions) > :global(.generationOptions) {
+  display: block;
+}
+.compose :global(.e24Loader) {
+  display: none;
 }

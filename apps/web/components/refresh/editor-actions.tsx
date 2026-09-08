@@ -5,21 +5,23 @@ import type { RewriteActionControls } from "../editable-rewrite";
 import { ActionMenu, Modal } from "./controls";
 import styles from "./refresh.module.css";
 
-export type WorkspacePanel = "sources" | "versions" | "generate";
+export type WorkspacePanel = "sources" | "versions" | "pdf";
 export function RefreshEditorActions({
   controls,
   sourcesOpen,
+  composeOpen,
   onPanel,
   onClosePanel,
-  onWorkspace,
+  onCompose,
   onFeedback,
   showEditingHint
 }: {
   controls: RewriteActionControls;
   sourcesOpen: boolean;
-  onPanel: (panel: WorkspacePanel) => void;
+  composeOpen: boolean;
+  onPanel: (panel: "sources" | "versions") => void;
   onClosePanel: () => void;
-  onWorkspace: () => void;
+  onCompose: () => void;
   onFeedback: () => void;
   showEditingHint: boolean;
 }) {
@@ -30,6 +32,9 @@ export function RefreshEditorActions({
         <div className={styles.editorActionsLeft}>
           <button type="button" data-source-trigger aria-expanded={sourcesOpen} onClick={() => sourcesOpen ? onClosePanel() : onPanel("sources")}>
             {sourcesOpen ? "Lukk kilder" : "Kilder"}
+          </button>
+          <button type="button" data-compose-trigger aria-expanded={composeOpen} onClick={onCompose}>
+            Ny versjon
           </button>
           {(controls.hasDraft || controls.saveState !== "idle") && (
             <span className={styles.edited} role="status" data-save-state={controls.saveState}>
@@ -50,12 +55,6 @@ export function RefreshEditorActions({
           <ActionMenu>
             <button type="button" onClick={() => onPanel("versions")}>
               Versjoner
-            </button>
-            <button type="button" onClick={() => onPanel("generate")}>
-              Lag ny versjon
-            </button>
-            <button type="button" onClick={onWorkspace}>
-              Åpne arbeidsvisning
             </button>
             {controls.hasDraft && (
               <>

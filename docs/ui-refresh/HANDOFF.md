@@ -218,3 +218,56 @@ preview uses the real editor with isolated fictional API data and no model calls
 This is a local implementation checkpoint, not a production deployment. The
 original dirty checkout was left intact. Next: review this UX pass, then release
 the approved commit through the UpCloud deployment workflow when requested.
+
+## 2026-09-08 — DONE: source sizing, per-browser prefs, one-step ny versjon, arbeidsvisning from panel
+
+Owner review of the live `/next` (release 60734e9) found the source panel sized for
+the notice rather than the source, the PDF the model read invisible, "Lag ny versjon"
+four steps deep behind the overflow menu, and arbeidsvisning hidden in the same menu.
+Implemented on `codex/next-generated-filter-20260908`:
+
+- **Source panel.** `.sourcePane` may grow to `max(editor height, 70vh)`. The split is a
+  three-track grid driven by `--source-ratio` on the card: 0.43 by default, 0.57 when the
+  source text is longer than the notice, `max(0.5, …)` in focused mode. A `role=separator`
+  handle between the columns resizes by pointer drag, arrow keys (±2 pp), Home/End, and
+  double-click resets to the computed default. A−/A+ in the panel header step the source
+  text through 13/14/15/16 px. Both are remembered per browser in `localStorage`
+  (`newsweb:next-prefs`, `components/refresh/prefs.ts`) and shared live between open
+  cards; the first render always uses defaults, so hydration is unaffected. Source body
+  is rendered as paragraphs; attachments are one compact row under the Newsweb heading.
+- **PDF-tekst tab.** Shown only for notices with attachments. Lazy-loads
+  `GET /notice/:id/model-source?rewriteId=`, a new API route that resolves the published
+  rewrite (active or explicit, same notice only) and reads
+  `GenerationRun.inputJson.sourcePayload.pdfSupplementText` through `logPrisma` (the
+  runs may live in the log database). Returns `{ rewriteId, text, pageCount, attachmentId }`
+  and nothing else from the run. `[PDF page N]` markers become "Side N" headings;
+  bare `---` dividers are dropped. Cached per version, retried on error, refetched when
+  the selected version changes. Fixture preview: Nordvik has an attachment and text.
+- **Ny versjon in one step.** A visible "Ny versjon" button beside Kilder reveals the
+  existing instruction form inline under the action row without opening the source
+  pane; the form stays mounted once shown so polling and typed text survive hiding.
+  At rest only the field and "Lag versjon" show; Notis/Utvidet, "+ Kilde" and "Valg"
+  appear while the field is in use (CSS `:focus-within` / `:has()`, no change to the
+  shared `InstructionInput`). Source-only cards get an "Instruksjon" button beside
+  "Lag notis"; the failure row's "Tilpass instruksjon" opens the same form. Escape
+  closes menu → form → panel, in that order, from one native listener.
+- **Arbeidsvisning.** "Utvid" / "Tilbake til feed" in the panel header (`aria-pressed`)
+  replaces the menu item; `.main` widens to 1320 px while a card is focused; the form is
+  visible under the editor in focused mode. "← Feed" and Escape still return with the
+  saved scroll position. The overflow menu keeps Versjoner, AI-original, Tilbakestill and
+  Meld feil.
+
+Validation: shared/api/web typecheck; API route test (4); web suite 95 tests including
+10 new UX tests (inline form, Escape order, paragraphs + attachment row, PDF tab
+lazy/error/retry/refetch, ratio flip and stored ratio, keyboard + pointer drag, font
+steps shared between cards, Utvid/Tilbake/← Feed, source-only Instruksjon); fixture
+server tests (2); full production build; `ui:verify-routes` on 3112 for both flag
+states. In-app browser on the fixture preview at 1280 px: inline split with attachment
+row, PDF-tekst tab with "Side 1/2" headings, A+ to 16 px, pointer drag to 0.617 and
+arrow keys to 0.657 persisted across reload, Utvid to full width with the form under
+the editor. The narrow layout (handle and Utvid hidden) is covered by CSS and tests
+only; the window could not be resized below 1280 px in this session.
+
+Not changed: prompts, models, validation, importance, clipboard contract, legacy `/feed`,
+`InstructionInput` behaviour. No migration. Preferences are per browser; cross-device
+preferences would need a user settings table.
