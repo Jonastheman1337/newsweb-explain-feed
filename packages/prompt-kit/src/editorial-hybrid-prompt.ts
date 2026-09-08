@@ -4,7 +4,7 @@ import { createYearlyReportDeveloperPrompt } from "./yearly-report-prompt.js";
 import { EDITORIAL_ATTRIBUTION, EDITORIAL_QUOTES, EDITORIAL_TITLE } from "./shared-editorial.js";
 
 /** Local candidate built on the frozen v5.11 writer; no brief/coverage pipeline. */
-export const EDITORIAL_HYBRID_PROMPT_VERSION = "v5.11.1-hybrid.1:currency-names-v1:shareholder-sales-v1";
+export const EDITORIAL_HYBRID_PROMPT_VERSION = "v5.11.2-hybrid.1:currency-names-v1";
 
 const attribution = EDITORIAL_ATTRIBUTION.replace(
   "- Effekt- eller verdipastander krever forbehold: 'kan', 'ifolge selskapet'.",
