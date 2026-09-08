@@ -1,3 +1,4 @@
+import { EDITORIAL_CURRENCY_NAMES } from "./currency-editorial.js";
 import type { RewriteOutput } from "@newsweb/shared";
 import {
   formatRewriteForRevisionPrompt,
@@ -45,6 +46,8 @@ export function createYearlyReportDeveloperPrompt(_schemaJson?: string): string 
 ${EDITORIAL_SOURCE_AS_DATA}
 
 ${EDITORIAL_LANGUAGE}
+
+${EDITORIAL_CURRENCY_NAMES}
 
 ${EDITORIAL_SOURCE_AS_DATA}
 

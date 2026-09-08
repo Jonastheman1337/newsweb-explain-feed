@@ -1,3 +1,4 @@
+import { EDITORIAL_CURRENCY_NAMES } from "@newsweb/prompt-kit";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import type { Prisma } from "@prisma/client";
@@ -209,6 +210,7 @@ export async function POST(
     "- «Multiconsult-sjef Warloe går av med umiddelbar virkning» → «Multiconsult-sjefen går på dagen».",
     "- «Sentia-CFO fratrer i september» → «Sentias finansdirektør går av».",
     "Øvrige regler:",
+    EDITORIAL_CURRENCY_NAMES,
     "- Velg nyhetspoenget som er mest vesentlig for en aksjonær å forstå, uten å antyde kursretning.",
     "- Prioriter sakens viktigste nyhet, også når den er negativ. En negativ vinkling må være vesentlig og tydelig støttet av saken.",
     "- Ikke beskriv tall med subjektive ord som 'stort', 'lite', 'betydelig' eller 'kraftig'.",
@@ -280,7 +282,7 @@ export async function POST(
         status: "started",
         inputJson: toJsonValue(requestPayload),
         model: OPENAI_FAST_MODEL,
-        promptVersion: "title-suggestions-v5",
+        promptVersion: "title-suggestions-v5:currency-names-v1",
         promptChars: prompt.length,
         startedAt: new Date()
       }
@@ -324,7 +326,7 @@ export async function POST(
       serviceTier: OPENAI_SERVICE_TIER,
       timeoutMs: titleModelCall.timeoutMs,
       maxOutputTokens: titleModelCall.maxOutputTokens,
-      promptCacheKey: "newsweb:title-suggestions:title-suggestions-v5"
+      promptCacheKey: "newsweb:title-suggestions:title-suggestions-v5:currency-names-v1"
     });
     applyOpenAITelemetry(titleModelCall, result);
     const text = result.content;

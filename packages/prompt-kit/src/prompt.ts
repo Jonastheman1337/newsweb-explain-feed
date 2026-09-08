@@ -18,7 +18,7 @@ import {
   EDITORIAL_WRITING_STYLE
 } from "./shared-editorial.js";
 
-export const PROMPT_VERSION = "v5.11.0";
+export const PROMPT_VERSION = "v5.11.0:currency-names-v1";
 
 export type OutputMode = "notice" | "extended_notice";
 

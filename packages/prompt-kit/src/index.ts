@@ -1,5 +1,6 @@
 export * from "./notice-references.js";
 export * from "./editorial-hybrid-prompt.js";
+export * from "./currency-editorial.js";
 export * from "./numbers.js";
 export * from "./prompt.js";
 export * from "./prompt-v6.js";

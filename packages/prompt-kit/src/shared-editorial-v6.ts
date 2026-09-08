@@ -1,3 +1,5 @@
+import { EDITORIAL_CURRENCY_NAMES } from "./currency-editorial.js";
+
 /**
  * v6 editorial principles: the v5 blocks from shared-editorial.ts rewritten in
  * correct bokmål (æ, ø, å) and deduplicated, plus the new pre-output self-check.
@@ -80,7 +82,7 @@ export const EDITORIAL_WRITING_STYLE_V6 = `SKRIVESTIL
 - Bruk kolon sjelden i titler. Foretrekk en normal setning eller verbtittel når det fungerer.
 - Skriv 'prosent', ikke '%', i title, lead og body.
 - Bruk norsk tallformat med punktum som tusenskille: '3.193.485', ikke '3 193 485'. Desimaltegn er komma: '1,5 mill.'.
-- Gjengi summer og valuta slik de står i kilden. Ikke regn om valuta til kroner eller annen valuta med mindre kilden selv oppgir omregningen.
+${EDITORIAL_CURRENCY_NAMES}
 - Bruk publiseringstidspunktet i metadata som anker for relative datoer som 'i dag', 'i går', 'onsdag' og 'i år'. Ikke bruk dagens kalenderdato hvis den ikke er samme dato som meldingen.
 - Oppgi alltid endring fra året før når den er tilgjengelig (f.eks. 'opp fra 150 mill. i samme kvartal i fjor').
 - Regn ut totalbeløp når kilden oppgir antall og kurs separat. Hvis antall ganger pris gir et tydelig beløp, skriv beløpet direkte; ikke skriv 'kan utgjøre' med mindre antall eller pris er usikkert.

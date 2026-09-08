@@ -1,3 +1,4 @@
+import { specificCurrencyLabels, withoutSpecificCurrencies } from "./currency-markers.js";
 import {
   assessNumbers,
   assessNumbersInText,
@@ -585,11 +586,16 @@ function findUnexpectedCurrencyMarkers(
   sourceText: string
 ): string[] {
   const visibleText = visibleArticleText(rewrite);
-  return CURRENCY_MARKER_GROUPS.filter(
+  const sourceCurrencies = new Set(specificCurrencyLabels(sourceText));
+  const unexpectedSpecific = specificCurrencyLabels(visibleText)
+    .filter((label) => !sourceCurrencies.has(label));
+  const genericVisibleText = withoutSpecificCurrencies(visibleText);
+  const genericSourceText = withoutSpecificCurrencies(sourceText);
+  return [...unexpectedSpecific, ...CURRENCY_MARKER_GROUPS.filter(
     (group) =>
-      hasAnyPattern(visibleText, group.patterns) &&
-      !hasAnyPattern(sourceText, group.patterns)
-  ).map((group) => group.label);
+      hasAnyPattern(genericVisibleText, group.patterns) &&
+      !hasAnyPattern(genericSourceText, group.patterns)
+  ).map((group) => group.label)];
 }
 
 function sourceRequiresRightOfReply(sourceText: string): boolean {

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { EDITORIAL_CURRENCY_NAMES } from "@newsweb/prompt-kit";
 import type { PromptPayload } from "@newsweb/prompt-kit";
 import type { OpenAIJsonRequest, OpenAIJsonResult } from "@newsweb/shared/openai-responses";
 const db = vi.hoisted(() => ({ createMany: vi.fn(), updateMany: vi.fn() }));
@@ -28,6 +29,7 @@ describe("V2 first drafts", () => {
         expect(result.status).toBe("ready");
         expect(result.status === "ready" && result.rewrite.lead).toBe(payload.bodyText);
         expect(call).toHaveBeenCalledTimes(2);
+        expect(call.mock.calls[0][0].developerPrompt).toContain(EDITORIAL_CURRENCY_NAMES);
     });
     it("leaves number findings as warnings and lets the source checker decide", async () => {
         const call = fakeCall({ ungrounded: true, draft: { lead: "Fjord ASA vil kjøpe Dal AS for 900 millioner kroner. Avtalen er betinget." } });

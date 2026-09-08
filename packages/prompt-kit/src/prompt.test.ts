@@ -75,7 +75,7 @@ function sha256(value: string): string {
 
 describe("OpenAI prompt contract", () => {
   it("bumps the prompt version for the editorial guardrail update", () => {
-    expect(PROMPT_VERSION).toBe("v5.11.0");
+    expect(PROMPT_VERSION).toBe("v5.11.0:currency-names-v1");
   });
 
   it("adds related-notice rules only when usable prior context is present", () => {
@@ -107,7 +107,7 @@ describe("OpenAI prompt contract", () => {
       "RELATERTE MELDINGER SOM BAKGRUNN"
     );
     expect(sha256(createReportDeveloperPrompt())).toBe(
-      "fe15d124a58a3206b45ead5e10d3bd25225806d3101914f1cc1e7ee4d0efd3f1"
+      "a24de8738bee632621817925d559b58a5c998abf5f71403f171a2d05ea62fc3b"
     );
     expect(
       createDeveloperPrompt(undefined, {
@@ -163,7 +163,7 @@ describe("OpenAI prompt contract", () => {
 
     expect(frozen.promptVersion).toBe("v5.9.2:regular_v5_9_2_frozen");
     expect(frozen.systemPrompt).toBe(createSystemPrompt());
-    expect(frozen.developerPrompt).toBe(createDeveloperPrompt());
+    expect(frozen.developerPrompt).not.toBe(createDeveloperPrompt());
     expect(frozen.developerPrompt).not.toContain("RELATERTE MELDINGER");
     expect(frozen.developerPrompt).not.toContain("prior_");
     expect(frozen.userPrompt).not.toContain("TIDLIGERE MELDING");
@@ -180,10 +180,10 @@ describe("OpenAI prompt contract", () => {
     );
 
     expect(candidateWithoutPrior.promptVersion).toBe(
-      "v5.11.0:regular_v5_11_candidate"
+      "v5.11.0:currency-names-v1:regular_v5_11_candidate"
     );
     expect(candidateWithoutPrior.systemPrompt).toBe(frozen.systemPrompt);
-    expect(candidateWithoutPrior.developerPrompt).toBe(frozen.developerPrompt);
+    expect(candidateWithoutPrior.developerPrompt).toBe(createDeveloperPrompt());
     expect(candidateWithoutPrior.userPrompt).toBe(frozen.userPrompt);
     expect(candidateWithPrior.developerPrompt).toContain(
       "RELATERTE MELDINGER SOM BAKGRUNN"

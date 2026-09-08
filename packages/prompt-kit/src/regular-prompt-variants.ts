@@ -1,3 +1,4 @@
+import { EDITORIAL_CURRENCY_NAMES } from "./currency-editorial.js";
 import {
   PROMPT_VERSION,
   createDeveloperPrompt,
@@ -76,7 +77,7 @@ export const regularPromptVariantProfiles: Record<
   },
   regular_v5_11_candidate: {
     variantId: "regular_v5_11_candidate",
-    promptVersion: "v5.11.0:regular_v5_11_candidate",
+    promptVersion: "v5.11.0:currency-names-v1:regular_v5_11_candidate",
     responseSchemaId: "rewrite_v5_title_first_v1",
     parserProfileId: "rewrite_output_zod_v1",
     validationProfileId: "regular_rewrite_validation_v1"
@@ -463,11 +464,14 @@ function createV6Draft2UserPrompt(payload: PromptPayload): string {
   );
 }
 
-// The no-context v5.11 builder remains byte-identical to the v5.9.2 prompt.
+// Restore the historical currency rule only for the frozen research control.
 // Keep this dedicated function so the frozen control cannot accidentally pick
 // up conditional related-notice language in a future refactor.
 export function createV592DeveloperPrompt(): string {
-  return createDeveloperPrompt();
+  return createDeveloperPrompt().replace(
+    EDITORIAL_CURRENCY_NAMES,
+    "- Gjengi summer og valuta slik de star i kilden. Ikke regn om valuta til kroner eller annen valuta med mindre kilden selv oppgir omregningen."
+  );
 }
 
 export function createRegularPromptVariantMessages(

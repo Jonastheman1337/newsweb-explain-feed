@@ -15,6 +15,7 @@ COPY . .
 
 RUN npm run prisma:generate \
   && npm run build -w packages/shared \
+  && npm run build -w packages/prompt-kit \
   && npm run build -w apps/web
 
 EXPOSE 3000

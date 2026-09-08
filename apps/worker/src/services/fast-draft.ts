@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import OpenAI from "openai";
 import { z } from "zod";
-import { EDITORIAL_SOURCE_AS_DATA, EDITORIAL_IMPORTANCE, EDITORIAL_ATTRIBUTION, EDITORIAL_NO_MARKET_COMMENTARY, EDITORIAL_TITLE, EDITORIAL_NORWEGIAN, type PromptPayload } from "@newsweb/prompt-kit";
+import { EDITORIAL_CURRENCY_NAMES, EDITORIAL_SOURCE_AS_DATA, EDITORIAL_IMPORTANCE, EDITORIAL_ATTRIBUTION, EDITORIAL_NO_MARKET_COMMENTARY, EDITORIAL_TITLE, EDITORIAL_NORWEGIAN, type PromptPayload } from "@newsweb/prompt-kit";
 import { rewriteOutputSchema, type RewriteOutput } from "@newsweb/shared";
 import { callOpenAIForJson, type OpenAIJsonRequest, type OpenAIJsonResult } from "@newsweb/shared/openai-responses";
 import { prisma } from "@newsweb/shared/db";
@@ -9,7 +9,7 @@ import type { Prisma } from "@prisma/client";
 import { hasImportantSourceSignals } from "./importance.js";
 import { validateRewriteOutput } from "./rewrite-validation.js";
 import { buildReferenceCheckPrompt, referenceCheckJsonSchema, referenceCheckResultSchema, buildCoverageReport, assessReferenceCheckGate } from "./reference-check.js";
-export const FAST_DRAFT_PROMPT_VERSION = "fast-draft-1";
+export const FAST_DRAFT_PROMPT_VERSION = "fast-draft-1:currency-names-v1";
 const MAX_DURATION_MS = 35000;
 const shortSchema = z.object({ title: z.string().min(6).max(100), lead: z.string().min(20).max(300), importance: z.enum(["viktig", "medium", "uviktig"]), sourceEvidence: z.string().min(5).max(320) });
 const jsonSchema = { type: "object", additionalProperties: false, properties: { title: { type: "string" }, lead: { type: "string" }, importance: { type: "string", enum: ["viktig", "medium", "uviktig"] }, sourceEvidence: { type: "string" } }, required: ["title", "lead", "importance", "sourceEvidence"] };
@@ -27,7 +27,7 @@ export async function generateFastDraft(payload: PromptPayload, model: string, d
     const raw = shortSchema.parse(JSON.parse(await ask({
         schemaName: "fast_draft", schema: jsonSchema,
         systemPrompt: "Du er en norsk nyhetsjournalist. Returner kun JSON etter skjemaet.",
-        developerPrompt: [EDITORIAL_SOURCE_AS_DATA, EDITORIAL_IMPORTANCE, EDITORIAL_TITLE.split("\n- lead:")[0], EDITORIAL_ATTRIBUTION, EDITORIAL_NO_MARKET_COMMENTARY, EDITORIAL_NORWEGIAN,
+        developerPrompt: [EDITORIAL_CURRENCY_NAMES, EDITORIAL_SOURCE_AS_DATA, EDITORIAL_IMPORTANCE, EDITORIAL_TITLE.split("\n- lead:")[0], EDITORIAL_ATTRIBUTION, EDITORIAL_NO_MARKET_COMMENTARY, EDITORIAL_NORWEGIAN,
             "Skriv et kort førsteutkast: én tittel (maks 8 ord) og en ingress på to korte setninger, maks 300 tegn. Ta med hovednyheten og viktigste forbehold. Ingen bakgrunn fra egen kunnskap, sitater, regnestykker eller kurskommentar. Behold hva som er planlagt, anslått eller betinget. sourceEvidence skal være et ordrett sammenhengende utdrag fra kilden. Vurder importance etter de samme strenge reglene; skriv ikke viktig bare fordi meldingen er valgt ut."].join("\n\n"),
         userPrompt: JSON.stringify({ title: payload.title, issuer: payload.issuerName, publishedAt: payload.publishedAt, source: payload.bodyText }), maxOutputTokens: 650
     })));
