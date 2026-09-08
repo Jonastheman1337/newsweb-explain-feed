@@ -239,7 +239,10 @@ Implemented on `codex/next-generated-filter-20260908`:
   `GET /notice/:id/model-source?rewriteId=`, a new API route that resolves the published
   rewrite (active or explicit, same notice only) and reads
   `GenerationRun.inputJson.sourcePayload.pdfSupplementText` through `logPrisma` (the
-  runs may live in the log database). Returns `{ rewriteId, text, pageCount, attachmentId }`
+  runs may live in the log database). Quarterly and half-year runs store the text as
+  `reportText` (+ `reportPageCount`) and yearly reports as `remunerationText`; the
+  route reads all three (found on the live Karlsberg half-year card after the first
+  deploy, fixed in a follow-up release). Returns `{ rewriteId, text, pageCount, attachmentId }`
   and nothing else from the run. `[PDF page N]` markers become "Side N" headings;
   bare `---` dividers are dropped. Cached per version, retried on error, refetched when
   the selected version changes. Fixture preview: Nordvik has an attachment and text.
@@ -271,3 +274,31 @@ only; the window could not be resized below 1280 px in this session.
 Not changed: prompts, models, validation, importance, clipboard contract, legacy `/feed`,
 `InstructionInput` behaviour. No migration. Preferences are per browser; cross-device
 preferences would need a user settings table.
+
+## 2026-09-08 — DONE: simpler ny versjon (paste box, Lengde, Grundig)
+
+Owner review of the shipped form: adding a source took a type choice plus a form,
+the reasoning option sat behind a "Valg" disclosure, and Notis/Utvidet was a mode
+to set before submitting. Decisions: keep the "Ny versjon" reveal (no always-visible
+field), one paste box for sources as in Sak, keep a reasoning toggle but plain, and
+let the user choose the character length instead of Utvidet.
+
+- **One paste box.** "+ Kilde" opens a single box: a Newsweb link or message id
+  becomes a Newsweb source, anything else a text source titled by its first line
+  (or its first 60 characters), and PDFs come in through "PDF …" or by dropping
+  them on the box (several at once). The PDF / Newsweb / Tekst tray and the title
+  field are gone from `/next`; the legacy `/feed` form keeps its tray.
+- **Lengde.** A number field with presets 600/800/1000/1300/1800/2500 (free entry
+  300–4000, default 1000) replaces Notis/Utvidet. It is sent as
+  `maxVisibleArticleChars`, which the prompt already used as its visible-text cap
+  (Notis = 1000, Utvidet = 1800), so validation and replay honour it with no prompt
+  change. Remembered per browser in `newsweb:next-prefs.noticeChars` and applied to
+  every card. New API body field, job-data field and stored in the run input.
+- **Grundig.** The reasoning override is a plain pressed-state chip beside Lengde
+  (title explains it takes longer). Still one-shot: it resets after the run.
+- Resting state unchanged: only the field and "Lag versjon" until the field is in
+  use, a source is open, or Grundig is pressed.
+
+Validation: api/worker/web typecheck; web suite 97 tests (new: paste box sends the
+Newsweb and text bodies, length persisted and sent with `reasoningEffortOverride`,
+remembered length on a new card); production build; fixture preview check.

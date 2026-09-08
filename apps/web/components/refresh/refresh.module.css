@@ -900,12 +900,61 @@
   background: var(--ink);
   color: var(--bg-panel);
 }
-.compose :global(.outputModeButton) {
-  border: 0;
-  min-height: 36px;
+.compose :global(.composeOptions) {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
-.compose :global(.outputModeButton.active) {
+.compose :global(.lengthControl) {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+.compose :global(.lengthControl) input {
+  width: 66px;
+  min-height: 36px;
+  padding: 4px 8px;
+  font: inherit;
+  font-size: 13px;
+  text-align: right;
+  color: var(--ink);
+  background: var(--bg-main);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+.shell .compose :global(.reasoningToggle) {
+  min-height: 36px;
+  color: var(--ink-soft);
+}
+.shell .compose :global(.reasoningToggle[aria-pressed="true"]) {
+  color: var(--ink);
+  border-color: var(--ink);
   background: var(--bg-soft);
+}
+.compose :global(.pasteBox) {
+  display: grid;
+  gap: 8px;
+  margin: 6px 0 10px;
+}
+.compose :global(.pasteTextarea) {
+  width: 100%;
+  min-height: 72px;
+  padding: 10px 12px;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink);
+  background: var(--bg-main);
+  border: 1px dashed var(--line);
+  border-radius: 6px;
+  resize: vertical;
+}
+.compose :global(.pasteActions) {
+  display: flex;
+  gap: 8px;
 }
 .compose :global(.materialBar) {
   margin: 10px 0;
@@ -914,11 +963,7 @@
 .compose :global(.materialActions) button {
   min-height: 36px;
 }
-.compose :global(.xhighToggle) {
-  width: 36px;
-  height: 36px;
-  padding: 8px;
-}
+
 .compose :global(.materialItem),
 .compose :global(.materialToggle) {
   min-width: 0;
@@ -1201,35 +1246,7 @@
   height: 18px;
   flex-shrink: 0;
 }
-.compose :global(.generationOptions) {
-  position: relative;
-  font-size: 12px;
-}
-.compose :global(.generationOptions) > summary {
-  cursor: pointer;
-  padding: 10px 0;
-}
-.compose :global(.generationOptions) :global(.xhighToggle) {
-  position: absolute;
-  z-index: 2;
-  bottom: calc(100% + 6px);
-  right: 0;
-  width: 225px;
-  height: auto;
-  min-height: 44px;
-  padding: 10px;
-  display: flex;
-  gap: 10px;
-  background: var(--bg-panel);
-  border: 1px solid var(--line);
-  box-shadow: 0 4px 16px #0002;
-}
-.compose :global(.generationOptions) :global(.xhighToggleActive) {
-  border-color: var(--ink);
-}
-.compose :global(.generationOptions) svg {
-  flex: 0 0 20px;
-}
+
 @media (max-width: 480px) {
   .header {
     gap: 12px;
@@ -1249,18 +1266,14 @@
 /* Ny versjon at rest: the instruction field and its button only. Length,
    sources and options appear while the field is in use. */
 .compose :global(.instructionWrap) > :global(.materialBar),
-.compose :global(.instructionActions) > :global(.outputModeToggle),
-.compose :global(.instructionActions) > :global(.generationOptions) {
+.compose :global(.instructionActions) > :global(.composeOptions) {
   display: none;
 }
-.compose :global(.instructionWrap:is(:focus-within, :has(.instructionTextarea:not(:placeholder-shown)), :has(.materialTray), :has(.generationOptions[open]))) > :global(.materialBar) {
+.compose :global(.instructionWrap:is(:focus-within, :has(.instructionTextarea:not(:placeholder-shown)), :has(.materialTray), :has(.reasoningToggle[aria-pressed="true"]))) > :global(.materialBar) {
   display: flex;
 }
-.compose :global(.instructionWrap:is(:focus-within, :has(.instructionTextarea:not(:placeholder-shown)), :has(.materialTray), :has(.generationOptions[open]))) :global(.instructionActions) > :global(.outputModeToggle) {
+.compose :global(.instructionWrap:is(:focus-within, :has(.instructionTextarea:not(:placeholder-shown)), :has(.materialTray), :has(.reasoningToggle[aria-pressed="true"]))) :global(.instructionActions) > :global(.composeOptions) {
   display: inline-flex;
-}
-.compose :global(.instructionWrap:is(:focus-within, :has(.instructionTextarea:not(:placeholder-shown)), :has(.materialTray), :has(.generationOptions[open]))) :global(.instructionActions) > :global(.generationOptions) {
-  display: block;
 }
 .compose :global(.e24Loader) {
   display: none;

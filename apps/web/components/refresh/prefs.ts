@@ -11,9 +11,18 @@ export const SOURCE_FONT_STEPS = [13, 14, 15, 16] as const;
 export const SOURCE_RATIO_MIN = 0.3;
 export const SOURCE_RATIO_MAX = 0.7;
 export const SOURCE_RATIO_STEP = 0.02;
+export const NOTICE_CHARS_DEFAULT = 1000;
+export const NOTICE_CHARS_MIN = 300;
+export const NOTICE_CHARS_MAX = 4000;
+export const NOTICE_CHARS_PRESETS = [600, 800, 1000, 1300, 1800, 2500] as const;
 
 export type SourceFontPx = (typeof SOURCE_FONT_STEPS)[number];
-export type NextPrefs = { sourceRatio?: number; sourceFontPx?: SourceFontPx };
+export type NextPrefs = { sourceRatio?: number; sourceFontPx?: SourceFontPx; noticeChars?: number };
+
+export function clampNoticeChars(value: number): number {
+  const chars = Number.isFinite(value) ? Math.round(value) : NOTICE_CHARS_DEFAULT;
+  return Math.min(NOTICE_CHARS_MAX, Math.max(NOTICE_CHARS_MIN, chars));
+}
 
 // Fallback only when storage throws (private mode, blocked site data): the
 // preference still applies to every open card for the rest of the session.
@@ -36,6 +45,8 @@ function sanitize(value: unknown): NextPrefs {
   if (typeof raw.sourceRatio === "number" && Number.isFinite(raw.sourceRatio))
     prefs.sourceRatio = clampSourceRatio(raw.sourceRatio);
   if (isFontStep(raw.sourceFontPx)) prefs.sourceFontPx = raw.sourceFontPx;
+  if (typeof raw.noticeChars === "number" && Number.isFinite(raw.noticeChars))
+    prefs.noticeChars = clampNoticeChars(raw.noticeChars);
   return prefs;
 }
 

@@ -17,8 +17,8 @@ describe("next prefs", () => {
   it("ignores garbage and out-of-range values", () => {
     localStorage.setItem(NEXT_PREFS_KEY, "{not json");
     expect(readNextPrefs()).toEqual({});
-    localStorage.setItem(NEXT_PREFS_KEY, JSON.stringify({ sourceRatio: 0.9, sourceFontPx: 12 }));
-    expect(readNextPrefs()).toEqual({ sourceRatio: 0.7 });
+    localStorage.setItem(NEXT_PREFS_KEY, JSON.stringify({ sourceRatio: 0.9, sourceFontPx: 12, noticeChars: 99999.4 }));
+    expect(readNextPrefs()).toEqual({ sourceRatio: 0.7, noticeChars: 4000 });
     expect(clampSourceRatio(Number.NaN)).toBe(0.3);
     expect(clampSourceRatio(0.4567)).toBe(0.457);
   });

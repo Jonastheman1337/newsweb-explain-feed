@@ -202,6 +202,7 @@ type RewriteJobData = {
   reason: "new-message" | "manual-reprocess";
   instruction?: string;
   outputMode?: "notice" | "extended_notice";
+  maxVisibleArticleChars?: number;
   supplementalMaterials?: SupplementalMaterialPayload[];
   reasoningEffortOverride?: OpenAIReasoningEffort;
   generationRunId?: string;
@@ -3803,9 +3804,9 @@ const rewriteWorker = new Worker<RewriteJobData>(
         hasAttachments: source.hasAttachments,
         sourceBodyChars: source.bodyText.length,
         outputMode: job.data.outputMode ?? "notice",
-        maxVisibleArticleChars: maxVisibleArticleCharsForOutputMode(
-          job.data.outputMode ?? "notice"
-        ),
+        maxVisibleArticleChars:
+          job.data.maxVisibleArticleChars ??
+          maxVisibleArticleCharsForOutputMode(job.data.outputMode ?? "notice"),
         supplementalMaterials: job.data.supplementalMaterials ?? []
       };
 
