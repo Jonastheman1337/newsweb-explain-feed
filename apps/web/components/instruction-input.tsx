@@ -7,6 +7,15 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useEditorialTelemetry } from "../lib/editorial-telemetry";
 import { E24Loader } from "./e24-loader";
 import {
+  NOTICE_CHARS_DEFAULT,
+  NOTICE_CHARS_MAX,
+  NOTICE_CHARS_MIN,
+  NOTICE_CHARS_PRESETS,
+  clampNoticeChars,
+  readNextPrefs,
+  writeNextPrefs
+} from "./refresh/prefs";
+import {
   GENERATION_STEP_DURATION_MS,
   getGenerationStepIndex,
   getGenerationSteps
@@ -71,6 +80,9 @@ export function InstructionInput({
   const [materialTitle, setMaterialTitle] = useState("");
   const [materialText, setMaterialText] = useState("");
   const [materialUrl, setMaterialUrl] = useState("");
+  const [pasteText, setPasteText] = useState("");
+  const [maxCharsText, setMaxCharsText] = useState(String(NOTICE_CHARS_DEFAULT));
+  const refresh = presentation === "refresh";
   const [status, setStatus] = useState<"idle" | "loading" | "polling" | "sent" | "error">("idle");
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const versionBeforeRef = useRef<number | null>(null);
@@ -138,6 +150,10 @@ export function InstructionInput({
     void loadMaterials();
   }, [messageId]);
 
+  useEffect(() => {
+    if (refresh) setMaxCharsText(String(readNextPrefs().noticeChars ?? NOTICE_CHARS_DEFAULT));
+  }, [refresh]);
+
   function selectedMaterialIds() {
     return materials
       .filter((material) => material.enabled && material.status === "ready")
@@ -149,10 +165,11 @@ export function InstructionInput({
     setMaterialTitle("");
     setMaterialText("");
     setMaterialUrl("");
+    setPasteText("");
   }
 
-  async function saveTextMaterial() {
-    if (!materialText.trim()) return;
+  async function saveTextMaterial(text = materialText, title = materialTitle) {
+    if (!text.trim()) return;
     setMaterialStatus("saving");
     try {
       const response = await fetch(`/api/notice/${messageId}/materials/text`, {
@@ -160,8 +177,8 @@ export function InstructionInput({
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
-          ...(materialTitle.trim() ? { title: materialTitle.trim() } : {}),
-          text: materialText.trim()
+          ...(title.trim() ? { title: title.trim() } : {}),
+          text: text.trim()
         })
       });
       if (!response.ok) {
@@ -177,15 +194,15 @@ export function InstructionInput({
     }
   }
 
-  async function saveNewswebMaterial() {
-    if (!materialUrl.trim()) return;
+  async function saveNewswebMaterial(url = materialUrl) {
+    if (!url.trim()) return;
     setMaterialStatus("saving");
     try {
       const response = await fetch(`/api/notice/${messageId}/materials/newsweb`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ url: materialUrl.trim() })
+        body: JSON.stringify({ url: url.trim() })
       });
       if (!response.ok) {
         setMaterialStatus("error");
@@ -197,6 +214,35 @@ export function InstructionInput({
       setMaterialStatus("idle");
     } catch {
       setMaterialStatus("error");
+    }
+  }
+
+  // One paste box in the refresh form: a Newsweb link or id becomes a Newsweb
+  // source, anything else a text source titled by its first line.
+  function isNewswebReference(value: string): boolean {
+    if (/^\d{3,}$/.test(value)) return true;
+    try {
+      const host = new URL(value).hostname.toLowerCase();
+      return host === "newsweb.oslobors.no" || host.endsWith(".newsweb.oslobors.no");
+    } catch {
+      return false;
+    }
+  }
+  function pastedTitle(text: string): string {
+    const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+    const first = lines[0] ?? "";
+    if (lines.length > 1 && first.length <= 90) return first;
+    return first.length > 60 ? `${first.slice(0, 57).trimEnd()}…` : first;
+  }
+  async function addPastedSource() {
+    const value = pasteText.trim();
+    if (!value) return;
+    if (isNewswebReference(value)) await saveNewswebMaterial(value);
+    else await saveTextMaterial(value, pastedTitle(value));
+  }
+  async function uploadFiles(files: File[]) {
+    for (const file of files) {
+      if (/\.pdf$/i.test(file.name)) await uploadPdfMaterial(file);
     }
   }
 
@@ -317,6 +363,11 @@ export function InstructionInput({
     const instruction = text.trim();
     const reasoningEffortOverride =
       options.reasoningEffortOverride ?? (xhighEnabled ? "xhigh" : undefined);
+    const maxVisibleArticleChars = clampNoticeChars(Number(maxCharsText));
+    if (refresh) {
+      setMaxCharsText(String(maxVisibleArticleChars));
+      writeNextPrefs({ noticeChars: maxVisibleArticleChars });
+    }
     isRegenRef.current = !instruction;
     versionBeforeRef.current = null;
     generatedAtBeforeRef.current = null;
@@ -345,6 +396,7 @@ export function InstructionInput({
       const requestBody = {
         ...(instruction ? { instruction } : {}),
         outputMode,
+        ...(refresh ? { maxVisibleArticleChars } : {}),
         selectedMaterialIds: selectedMaterialIds(),
         ...(reasoningEffortOverride ? { reasoningEffortOverride } : {}),
         telemetry: buildTelemetry({
@@ -485,18 +537,64 @@ export function InstructionInput({
       </div>
       {materialsOpen && (
         <div className="materialTray">
-          <div className="materialActions">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="application/pdf,.pdf"
-              className="materialFileInput"
-              onChange={(event) => {
-                const file = event.currentTarget.files?.[0];
-                if (file) void uploadPdfMaterial(file);
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="application/pdf,.pdf"
+            multiple={refresh}
+            className="materialFileInput"
+            onChange={(event) => {
+              void uploadFiles(Array.from(event.currentTarget.files ?? []));
+            }}
+            disabled={busy || materialStatus === "saving"}
+          />
+          {refresh && (
+            <div
+              className="pasteBox"
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={(event) => {
+                event.preventDefault();
+                if (!busy && materialStatus !== "saving")
+                  void uploadFiles(Array.from(event.dataTransfer.files));
               }}
-              disabled={busy || materialStatus === "saving"}
-            />
+            >
+              <textarea
+                className="pasteTextarea"
+                aria-label="Ny kilde"
+                placeholder="Lim inn Newsweb-lenke eller tekst. PDF kan slippes her."
+                value={pasteText}
+                onChange={(event) => setPasteText(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+                    event.preventDefault();
+                    void addPastedSource();
+                  }
+                }}
+                disabled={busy || materialStatus === "saving"}
+                rows={3}
+              />
+              <div className="pasteActions">
+                <button
+                  className="ghostButton"
+                  type="button"
+                  onClick={() => void addPastedSource()}
+                  disabled={!pasteText.trim() || busy || materialStatus === "saving"}
+                >
+                  Legg til
+                </button>
+                <button
+                  className="ghostButton"
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={busy || materialStatus === "saving"}
+                >
+                  PDF …
+                </button>
+              </div>
+            </div>
+          )}
+          {!refresh && (
+          <div className="materialActions">
             <button
               className="ghostButton"
               type="button"
@@ -524,6 +622,7 @@ export function InstructionInput({
               Tekst
             </button>
           </div>
+          )}
 
           {materialInputMode === "newsweb" && (
             <div className="materialInlineForm">
@@ -537,7 +636,7 @@ export function InstructionInput({
               <button
                 className="ghostButton"
                 type="button"
-                onClick={saveNewswebMaterial}
+                onClick={() => void saveNewswebMaterial()}
                 disabled={!materialUrl.trim() || busy || materialStatus === "saving"}
               >
                 Legg til
@@ -565,7 +664,7 @@ export function InstructionInput({
               <button
                 className="ghostButton"
                 type="button"
-                onClick={saveTextMaterial}
+                onClick={() => void saveTextMaterial()}
                 disabled={!materialText.trim() || busy || materialStatus === "saving"}
               >
                 Legg til
@@ -606,24 +705,65 @@ export function InstructionInput({
         </div>
       )}
       <div className="instructionActions">
-        <div className="outputModeToggle" aria-label="Lengde">
-          <button
-            type="button"
-            className={`outputModeButton${outputMode === "notice" ? " active" : ""}`}
-            onClick={() => setOutputMode("notice")}
-            disabled={busy}
-          >
-            Notis
-          </button>
-          <button
-            type="button"
-            className={`outputModeButton${outputMode === "extended_notice" ? " active" : ""}`}
-            onClick={() => setOutputMode("extended_notice")}
-            disabled={busy}
-          >
-            Utvidet
-          </button>
-        </div>
+        {refresh ? (
+          <span className="composeOptions">
+            <label className="lengthControl">
+              Lengde
+              <input
+                type="number"
+                inputMode="numeric"
+                min={NOTICE_CHARS_MIN}
+                max={NOTICE_CHARS_MAX}
+                step={100}
+                list={`notice-chars-${messageId}`}
+                aria-label="Maks antall tegn"
+                value={maxCharsText}
+                onChange={(event) => setMaxCharsText(event.target.value)}
+                onBlur={() => {
+                  const next = clampNoticeChars(Number(maxCharsText));
+                  setMaxCharsText(String(next));
+                  writeNextPrefs({ noticeChars: next });
+                }}
+                disabled={busy}
+              />
+              tegn
+              <datalist id={`notice-chars-${messageId}`}>
+                {NOTICE_CHARS_PRESETS.map((value) => (
+                  <option key={value} value={value} />
+                ))}
+              </datalist>
+            </label>
+            <button
+              className="reasoningToggle"
+              type="button"
+              onClick={() => setXhighEnabled((enabled) => !enabled)}
+              disabled={busy}
+              aria-pressed={xhighEnabled}
+              title="Grundigere resonnering i neste versjon. Tar lengre tid."
+            >
+              Grundig
+            </button>
+          </span>
+        ) : (
+          <div className="outputModeToggle" aria-label="Lengde">
+            <button
+              type="button"
+              className={`outputModeButton${outputMode === "notice" ? " active" : ""}`}
+              onClick={() => setOutputMode("notice")}
+              disabled={busy}
+            >
+              Notis
+            </button>
+            <button
+              type="button"
+              className={`outputModeButton${outputMode === "extended_notice" ? " active" : ""}`}
+              onClick={() => setOutputMode("extended_notice")}
+              disabled={busy}
+            >
+              Utvidet
+            </button>
+          </div>
+        )}
         <button className="ghostButton" onClick={() => handleGenerate()} disabled={busy}>
           {status === "loading"
             ? "Sender ..."
@@ -637,7 +777,7 @@ export function InstructionInput({
                   ? "Generer ny versjon"
                   : "Regenerer notis"}
         </button>
-        <GenerationOptions compact={presentation === "refresh"}>
+        {!refresh && (
           <button
             className={`xhighToggle${xhighEnabled ? " xhighToggleActive" : ""}`}
             type="button"
@@ -665,9 +805,8 @@ export function InstructionInput({
               <path d="M8.8 14.2c1.2 0 2.1.5 2.6 1.4" />
               <path d="M15.2 14.4c-1.2 0-2.1.6-2.5 1.6" />
             </svg>
-            {presentation === "refresh" && <span>Grundigere resonnering</span>}
           </button>
-        </GenerationOptions>
+        )}
         {status === "polling" && <E24Loader />}
         {status === "error" && <span className="muted">Noe gikk galt — prøv igjen</span>}
         {presentation === "legacy" && (
@@ -686,13 +825,3 @@ export function InstructionInput({
   );
 }
 
-function GenerationOptions({ compact, children }: { compact: boolean; children: React.ReactNode }) {
-  return compact ? (
-    <details className="generationOptions">
-      <summary>Valg</summary>
-      {children}
-    </details>
-  ) : (
-    <>{children}</>
-  );
-}

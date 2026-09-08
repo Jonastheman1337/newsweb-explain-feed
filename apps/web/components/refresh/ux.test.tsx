@@ -6,6 +6,7 @@ import type { FeedItem } from "@newsweb/shared";
 import { RefreshCard } from "./refresh-card";
 import { RefreshFeed } from "./refresh-feed";
 import { RefreshFilters } from "./filters";
+import { InstructionInput } from "../instruction-input";
 import { useFeedStreamSubscription } from "../feed-stream-provider";
 import styles from "./refresh.module.css";
 import RefreshPage from "../../app/(refresh)/next/page";
@@ -419,4 +420,91 @@ it("lets a source-only notice be generated with an instruction in one step", asy
   expect(buttons("Instruksjon")).toHaveLength(0);
   await act(() => buttons("Tilpass instruksjon")[0].click());
   expect((container.querySelector("[data-compose]") as HTMLElement).hidden).toBe(false);
+});
+
+it("adds pasted links or text as one source and sends the chosen length and reasoning", async () => {
+  const calls: Array<{ url: string; init?: RequestInit }> = [];
+  const material = (id: string, kind: string, title: string) => ({
+    id, messageId: 1, kind, title, url: null, fileName: null, mimeType: null, fileSize: null,
+    extractedTextChars: 40, status: "ready", errorText: null, enabled: true, metadata: null,
+    createdAt: "2026-09-08T10:00:00Z"
+  });
+  vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+    calls.push({ url, init });
+    const body = url.includes("/materials/newsweb") ? material("m-nw", "newsweb", "Newsweb 123456")
+      : url.includes("/materials/text") ? material("m-txt", "text", "Bloomberg skriver")
+      : url.endsWith("/materials") ? { materials: [] }
+      : url.endsWith("/status") ? { ready: true, version: 1, generatedAt: "2026-09-08T08:00:00Z" }
+      : url.endsWith("/generate") ? { jobId: "job-1", version: 2 }
+      : { titles: [] };
+    return { ok: true, json: async () => body } as Response;
+  }));
+  const setField = (field: HTMLInputElement | HTMLTextAreaElement, value: string) => {
+    const proto = field instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+    Object.getOwnPropertyDescriptor(proto, "value")!.set!.call(field, value);
+    field.dispatchEvent(new Event("input", { bubbles: true }));
+  };
+  await renderCard(item(1));
+  await act(() => buttons("Ny versjon")[0].click());
+  await flush();
+  expect(buttons("Utvidet")).toHaveLength(0);
+  expect(Array.from(container.querySelectorAll("summary")).some((summary) => summary.textContent?.trim() === "Valg")).toBe(false);
+  await act(() => buttons("+ Kilde")[0].click());
+  expect(container.querySelectorAll(".materialActions")).toHaveLength(0);
+  const paste = container.querySelector('[aria-label="Ny kilde"]') as HTMLTextAreaElement;
+  await act(() => setField(paste, "https://newsweb.oslobors.no/message/123456"));
+  await act(() => buttons("Legg til")[0].click());
+  await flush();
+  expect(calls.find((call) => call.url.includes("/materials/newsweb"))?.init?.body).toBe(JSON.stringify({ url: "https://newsweb.oslobors.no/message/123456" }));
+  expect(paste.value).toBe("");
+  await act(() => setField(paste, "Bloomberg skriver\n\nOljeprisen steg to prosent."));
+  await act(() => buttons("Legg til")[0].click());
+  await flush();
+  expect(JSON.parse(calls.find((call) => call.url.includes("/materials/text"))!.init!.body as string)).toEqual({
+    title: "Bloomberg skriver",
+    text: "Bloomberg skriver\n\nOljeprisen steg to prosent."
+  });
+  expect(container.querySelectorAll(".materialItem")).toHaveLength(2);
+  const length = container.querySelector('[aria-label="Maks antall tegn"]') as HTMLInputElement;
+  expect(length.value).toBe("1000");
+  await act(() => {
+    setField(length, "1300");
+    length.dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
+  });
+  expect(JSON.parse(localStorage.getItem("newsweb:next-prefs")!).noticeChars).toBe(1300);
+  const grundig = buttons("Grundig")[0];
+  await act(() => grundig.click());
+  expect(grundig.getAttribute("aria-pressed")).toBe("true");
+  await act(() => buttons("Lag versjon")[0].click());
+  await flush();
+  const generate = calls.find((call) => call.url.endsWith("/generate"));
+  expect(JSON.parse(generate!.init!.body as string)).toMatchObject({
+    maxVisibleArticleChars: 1300,
+    reasoningEffortOverride: "xhigh",
+    selectedMaterialIds: ["m-nw", "m-txt"]
+  });
+  expect(grundig.getAttribute("aria-pressed")).toBe("false");
+});
+
+it("starts a new card from the remembered length", async () => {
+  localStorage.setItem("newsweb:next-prefs", JSON.stringify({ noticeChars: 1800 }));
+  await renderCard(item(1));
+  await act(() => buttons("Ny versjon")[0].click());
+  expect((container.querySelector('[aria-label="Maks antall tegn"]') as HTMLInputElement).value).toBe("1800");
+});
+
+it("keeps the legacy feed form unchanged", async () => {
+  await act(() => root.render(<InstructionInput messageId={1} presentation="legacy" />));
+  await flush();
+  await act(() => buttons("+ Materiale")[0].click());
+  expect(buttons("PDF")).toHaveLength(1);
+  expect(buttons("Newsweb")).toHaveLength(1);
+  expect(buttons("Tekst")).toHaveLength(1);
+  expect(container.querySelector('[aria-label="Ny kilde"]')).toBeNull();
+  expect(buttons("Notis")).toHaveLength(1);
+  expect(buttons("Utvidet")).toHaveLength(1);
+  expect(container.querySelector('[aria-label="Maks antall tegn"]')).toBeNull();
+  expect(buttons("Grundig")).toHaveLength(0);
+  expect(container.querySelector(".xhighToggle")).not.toBeNull();
+  expect(buttons("Regenerer notis")).toHaveLength(1);
 });
