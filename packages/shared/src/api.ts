@@ -60,6 +60,8 @@ export const feedItemSchema = z.object({
   contentHash: z.string().nullable(),
   finalizedAt: z.string().datetime().nullable(),
   isFinal: z.boolean(),
+  // Live-stream marker for a newly received Newsweb notice.
+  notifyNewNotice: z.boolean().optional(),
   title: z.string(),
   issuerName: z.string(),
   issuerSign: z.string(),

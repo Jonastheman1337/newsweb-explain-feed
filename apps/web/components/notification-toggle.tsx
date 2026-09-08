@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useFeedStreamSubscription } from "./feed-stream-provider";
 
 export function NotificationToggle() {
   const [enabled, setEnabled] = useState(false);
   const [supported, setSupported] = useState(true);
+  const notifiedIds = useRef(new Set<number>());
 
   // Check support + restore state after mount (avoids hydration mismatch)
   useEffect(() => {
@@ -26,11 +27,14 @@ export function NotificationToggle() {
   useFeedStreamSubscription(
     {
       onItem: (item) => {
-        new Notification(item.title, {
+        if (!item.notifyNewNotice || notifiedIds.current.has(item.messageId)) return;
+        if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
+        new Notification(item.sourceTitle, {
           body: item.issuerName,
           tag: String(item.messageId),
           icon: "/favicon.ico"
         });
+        notifiedIds.current.add(item.messageId);
       }
     },
     enabled
