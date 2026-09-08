@@ -67,3 +67,21 @@ describe("PDF evidence typography", () => {
     expect(sakEvidenceExists("The network locks up bitcoin", "The network unlocks bitcoin")).toBe(false);
   });
 });
+
+describe("plain-language and written quotations", () => {
+  const source = "The acquisition is subject to regulatory approval. The board describes the proposal as materially undervaluing the business.";
+  const material = { sourceId: "material_report", kind: "text" as const, title: "Styrets melding", status: "ready" as const, text: source, textChars: source.length };
+  const copy: SakArticle = { ...article, title: "Må få ja til kjøpet", lead: "Myndighetene må godkjenne kjøpet før det kan gjennomføres.", blocks: [{ kind: "paragraph", text: "Styret skriver at forslaget «vesentlig undervurderer virksomheten»." }], sources: [{ materialId: material.sourceId, usedFor: "Vilkår og styrets vurdering" }], source_spans: ["material_report: The acquisition is subject to regulatory approval."] };
+  const context: SakPromptPayload = { ...payload, materials: [material] };
+  function checked(grounded = true) {
+    return JSON.stringify({ sentences: sakReviewPassages(copy).map(p => ({ index: p.index, grounded, explanation: grounded ? "Samme mening." : "Kilden sier at godkjennelse gjenstår.", evidence: [{ materialId: material.sourceId, quote: source }] })) });
+  }
+  it("accepts different Norwegian wording and a written-source quote with valid original evidence", () => {
+    expect(parseSakReferenceReview(checked(), copy, context).issues).toEqual([]);
+  });
+  it("retains a semantic rejection even when every evidence excerpt is valid", () => {
+    const result = parseSakReferenceReview(checked(false), copy, context);
+    expect(result.issues).toHaveLength(sakReviewPassages(copy).length);
+    expect(result.issues.every(issue => issue.severity === "blocking")).toBe(true);
+  });
+});

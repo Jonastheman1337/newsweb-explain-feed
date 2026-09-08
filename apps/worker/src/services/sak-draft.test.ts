@@ -451,3 +451,21 @@ describe("brief recovery and Sak model routing", () => {
     expect(JSON.stringify(fake.version()?.validationJson)).toContain("SAK_BRIEF_FAILED");
   });
 });
+
+describe("editorial voice is advisory", () => {
+  it("retains a grounded article and makes no extra call for a style finding", async () => {
+    const draft = article({ title: "Air Canada får ny rute" });
+    draft.blocks = draft.blocks.filter(block => !block.text.includes("material_finnesikke"));
+    draft.desk_notes = ["Kildegrunnlaget bærer bare en kort sak."];
+    const harness = fakeDeps({ responses: [draft], editorialResponse: { findings: [{
+      severity: "warning", location: "title", message: "Tittelen kan være mer konkret.",
+      correction: "Vurder å nevne Toronto."
+    }] } });
+    await processSakDraft(job(), harness.deps);
+    expect(harness.allCalls.map(call => call.schemaName)).toEqual([
+      "sak_news_brief", "sak_article", "sak_reference_check", "sak_editorial_review"
+    ]);
+    expect(harness.version()?.articleJson).toMatchObject({ title: draft.title, lead: draft.lead });
+    expect(harness.version()?.status).toBe("ready");
+  });
+});

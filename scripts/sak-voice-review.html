@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="nb">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>/sak – vurder tekstene</title>
+<style>
+:root{font-family:Arial,Helvetica,sans-serif;color:#172634;background:#f4f3ef;font-synthesis:none}
+*{box-sizing:border-box}body{margin:0}button,select,textarea{font:inherit}button{cursor:pointer}
+header{background:#122d40;color:white;padding:26px max(24px,calc((100vw - 1260px)/2));border-bottom:4px solid #e6aa54}
+.eyebrow{font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#cedde6}header h1{font-size:28px;margin:10px 0}
+header p{max-width:760px;line-height:1.5;color:#dbe4e9;margin:0}
+.toolbar{position:sticky;top:0;z-index:2;display:flex;gap:12px;align-items:center;background:#fff;border-bottom:1px solid #d4d8d9;padding:12px max(24px,calc((100vw - 1260px)/2))}
+.toolbar select{max-width:220px;padding:9px;border:1px solid #a9b5bd;border-radius:5px;background:#fff;font-size:13px}.toolbar span{margin-right:auto;font-size:14px}.toolbar button,.nav button{padding:9px 14px;background:white;border:1px solid #a9b5bd;border-radius:5px}.toolbar .export{background:#153b54;color:#fff;border-color:#153b54}
+main{max-width:1310px;padding:25px;margin:auto}.context{line-height:1.6;margin-bottom:20px}.context h2{font-size:19px;margin:0 0 8px}.context .instruction{border-left:3px solid #d6a05d;padding-left:14px;white-space:pre-wrap}
+details{margin:14px 0;background:#fff;border:1px solid #d6dddf;padding:13px;border-radius:5px}summary{cursor:pointer;font-size:14px;font-weight:600}
+.source{margin-top:12px}.source pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:420px;overflow:auto;font:14px/1.65 Arial;padding:14px;background:#f6f7f7}
+.articles{display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:start}
+article{background:white;border:1px solid #dce0df;box-shadow:0 2px 9px #132a3510;border-radius:6px;padding:28px 34px;overflow-wrap:anywhere}
+.label{display:flex;align-items:center;gap:12px;border-bottom:1px solid #dce0df;padding-bottom:15px;margin-bottom:22px}
+.label b{background:#183d54;color:#fff;border-radius:50%;display:grid;place-items:center;width:32px;height:32px}
+.label small{color:#61717b;font-size:12px}article h2{font-size:30px;line-height:1.13;letter-spacing:-.5px;margin:0 0 19px}article .lead{font-size:18px;font-weight:600;line-height:1.45}
+article p{font-size:16px;line-height:1.65;margin:0 0 20px}article h3{font-size:21px;margin:27px 0 14px}
+article blockquote{font-size:17px;line-height:1.6;margin:20px 0;padding-left:17px;border-left:3px solid #a9bdc8}a{color:#205471;text-decoration-thickness:1px;text-underline-offset:3px}
+.review{margin-top:26px;background:white;border:1px solid #cfd8dd;border-radius:6px;padding:24px}.review h2{font-size:21px;margin:0 0 16px}
+.verdict{display:flex;gap:10px;flex-wrap:wrap}.verdict button{border:1px solid #92a5b2;background:white;border-radius:5px;padding:11px 18px}.verdict button[aria-pressed=true]{background:#153b54;color:white;border-color:#153b54}
+.dimensions{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:22px 0}.dimensions label{display:flex;flex-direction:column;gap:8px;font-size:14px}.dimensions select{padding:9px;border:1px solid #a9b5bd;border-radius:4px;background:white;color:#172634}
+textarea{display:block;width:100%;min-height:90px;resize:vertical;padding:12px;margin:9px 0;border:1px solid #a9b5bd;border-radius:4px}
+.nav{display:flex;align-items:center;justify-content:space-between;margin-top:18px}.note{font-size:13px;color:#65727c;line-height:1.5}.error{color:#8a402a}
+@media(max-width:900px){.articles{grid-template-columns:1fr}.dimensions{grid-template-columns:1fr 1fr}article{padding:24px}.toolbar{padding:10px 16px;flex-wrap:wrap}header{padding:22px}main{padding:18px}.toolbar span{width:100%}}
+</style>
+</head>
+<body>
+<header><div class="eyebrow">/sak · redaksjonell vurdering</div><h1>Hvilken sak ville du publisert?</h1><p>Les de to versjonene med samme kilder og oppgave. Vurder hva som gir leselyst, forståelse og fremdrift — og om faktaene holder.</p></header>
+<div class="toolbar"><span id="progress"></span><select id="case-select" aria-label="Velg sak"></select><button id="prev">← Forrige</button><button id="next">Neste →</button><button class="export" id="export">Lagre vurderingene</button></div>
+<main id="main"></main>
+<script id="data" type="application/json">__REVIEW_DATA__</script>
+<script>
+const data=JSON.parse(document.getElementById("data").textContent),key="sak-review-"+data.runId;
+let saved={};try{saved=JSON.parse(localStorage.getItem(key)||"{}")}catch{}
+let position=Math.max(0,data.rows.findIndex(r=>!saved[r.id]?.verdict));
+const picker=document.getElementById("case-select");data.rows.forEach((r,i)=>{const o=document.createElement("option");o.value=String(i);o.textContent=(i+1)+". "+r.description;picker.append(o)});picker.onchange=()=>move(Number(picker.value)-position);
+const labels=[["","Velg vurdering"],["A","A er bedre"],["B","B er bedre"],["tie","Like gode"],["both_bad","Begge er svake"]];
+function element(tag,text,cls){const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n}
+function entry(row){if(!saved[row.id])saved[row.id]={id:row.id,outputHashA:row.A.outputHash,outputHashB:row.B.outputHash,verdict:"",dimensions:{},note:""};return saved[row.id]}
+function persist(){try{localStorage.setItem(key,JSON.stringify(saved))}catch{}updateProgress()}
+function updateProgress(){picker.value=String(position);document.getElementById("progress").textContent="Sak "+(position+1)+" av "+data.rows.length+" · "+Object.values(saved).filter(r=>r.verdict).length+" vurdert";document.getElementById("prev").disabled=position===0;document.getElementById("next").disabled=position===data.rows.length-1}
+function rich(n,text,sources){
+const re=/\[\[([^\]|]+)\|([^\]]+)\]\]/g;let last=0,m;
+while((m=re.exec(text||""))){n.append(document.createTextNode(text.slice(last,m.index)));const source=sources.find(s=>s.id===m[2]);let a=element("span",m[1]);if(source?.url&&/^https?:\/\//i.test(source.url)){a=element("a",m[1]);a.href=source.url;a.target="_blank";a.rel="noopener noreferrer"}n.append(a);last=re.lastIndex}
+n.append(document.createTextNode((text||"").slice(last)));
+}
+function article(side,row){
+const n=element("article"),v=row[side],label=element("div",undefined,"label");label.append(element("b",side),element("small",v.state));n.append(label);
+if(!v.article){n.append(element("p","Denne kjøringen ga ingen ferdig artikkel. Den er beholdt i sammenligningen.","error"));return n}
+const a=v.article;n.append(element("h2",a.title));const lead=element("p",undefined,"lead");rich(lead,a.lead,row.sources);n.append(lead);
+for(const b of a.blocks){const p=element(b.kind==="subheading"?"h3":b.kind==="quote"?"blockquote":"p");rich(p,b.text,row.sources);n.append(p)}return n;
+}
+function render(){
+const row=data.rows[position],v=entry(row),main=document.getElementById("main");main.replaceChildren();
+const context=element("section",undefined,"context");context.append(element("h2",row.description));
+if(row.instruction)context.append(element("p",row.instruction,"instruction"));
+context.append(element("p","Lengdemål: "+row.targetChars.toLocaleString("nb-NO")+" tegn.","note"));
+const sources=element("details");sources.append(element("summary","Kilder"+(row.previous?" og tidligere versjon":"")));
+if(row.previous){const d=element("details");d.append(element("summary","Tidligere versjon som begge fikk"));const p=element("pre",row.previous.title+"\n\n"+row.previous.lead+"\n\n"+row.previous.blocks.map(b=>b.text).join("\n\n"));d.append(p);sources.append(d)}
+for(const s of row.sources){const d=element("details",undefined,"source");d.append(element("summary",s.title+(s.status==="ready"?"":" · ikke lest")));d.append(element("pre",s.text||"Ingen lest kildetekst."));sources.append(d)}
+context.append(sources);main.append(context);
+const columns=element("section",undefined,"articles");columns.append(article("A",row),article("B",row));main.append(columns);
+const review=element("section",undefined,"review");review.append(element("h2","Din vurdering"));
+const verdict=element("div",undefined,"verdict");
+for(const [value,label]of labels.slice(1)){const b=element("button",label);b.setAttribute("aria-pressed",String(v.verdict===value));b.onclick=()=>{v.verdict=value;for(const x of verdict.children)x.setAttribute("aria-pressed",String(x===b));persist()};verdict.append(b)}review.append(verdict);
+const dims=element("div",undefined,"dimensions");
+for(const dimension of data.dimensions){const label=element("label",dimension),select=element("select");select.setAttribute("aria-label",dimension);for(const [value,name]of labels){const option=element("option",name);option.value=value;select.append(option)}select.value=v.dimensions[dimension]||"";select.onchange=()=>{v.dimensions[dimension]=select.value;persist()};label.append(select);dims.append(label)}review.append(dims);
+const note=element("label","Hva bør beholdes eller endres? Noter også eventuelle faktafeil."),textarea=element("textarea");textarea.value=v.note||"";textarea.oninput=()=>{v.note=textarea.value;persist()};note.append(textarea);review.append(note);
+review.append(element("p","Vurderingene lagres i denne nettleseren. Bruk «Lagre vurderingene» for å laste ned en kopi.","note"));
+const nav=element("div",undefined,"nav"),nxt=element("button",position===data.rows.length-1?"Lagre vurderingene":"Neste sak →");nxt.onclick=()=>position===data.rows.length-1?download():move(1);nav.append(element("span","A og B er tilfeldig fordelt.","note"),nxt);review.append(nav);main.append(review);updateProgress();
+}
+function move(step){position=Math.max(0,Math.min(data.rows.length-1,position+step));render();window.scrollTo({top:0,behavior:"instant"})}
+function download(){const review={schemaVersion:1,runId:data.runId,assignmentHash:data.assignmentHash,rows:data.rows.map(r=>entry(r))};const url=URL.createObjectURL(new Blob([JSON.stringify(review,null,2)],{type:"application/json"}));const a=element("a");a.href=url;a.download="sak-vurderinger-"+data.runId.slice(0,8)+".json";a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
+document.getElementById("prev").onclick=()=>move(-1);document.getElementById("next").onclick=()=>move(1);document.getElementById("export").onclick=download;
+render();
+</script>
+</body></html>

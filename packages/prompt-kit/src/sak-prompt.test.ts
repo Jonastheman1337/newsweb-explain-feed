@@ -80,9 +80,9 @@ describe("sak prompt", () => {
       expect(developer).toContain(heading);
     }
     expect(developer).toContain("KILDE SOM DATA");
-    expect(developer).toContain("Regnskap for uttalelser");
+    expect(developer).not.toContain("Regnskap for uttalelser");
     expect(developer).toContain("INGEN KURSKOMMENTAR");
-    expect(developer).toContain("SITATER, GUILLEMETS OG PERSONATTRIBUSJON");
+    expect(developer).toContain("NYHETSVERDI OG KLARSPRÅK");
     expect(developer).toContain("desk_notes i denne oppgaven");
   });
 
@@ -100,11 +100,17 @@ describe("sak prompt", () => {
     expect(developer).not.toContain("TIDLIGERE MELDING DET VISES TIL");
   });
 
-  it("orders the lead precedence note after the attribution block", () => {
+  it("uses one coherent sak voice and allows a concrete opening", () => {
     const developer = createSakDeveloperPrompt();
-    expect(developer.indexOf("ATTRIBUSJON OG FORBEHOLD")).toBeLessThan(
-      developer.indexOf("LEAD-reglene over går foran")
-    );
+    expect(developer).not.toContain("SPRAK OG FORENKLING");
+    expect(developer).not.toContain("Fri personattribuert parafrase er fallback");
+    expect(developer).not.toContain("Ingen tall, datoer");
+    expect(developer).not.toContain("begynner ikke med et tall");
+    expect(developer).toContain("et tall, et kort sitat");
+    expect(developer).toContain("Sikt mot 4–6 ord, maks 8");
+    expect(developer).toContain("Listen kan være tom");
+    expect(developer.indexOf("REDAKSJONELL SLUTTLESING")).toBeGreaterThan(developer.indexOf("FELT UTENFOR SAKEN"));
+    expect(SAK_PROMPT_VERSION).toBe("sak-v2.1.0:currency-names-v1");
   });
 
   it("user prompt labels materials with status and omits text for unread ones", () => {

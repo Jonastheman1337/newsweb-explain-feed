@@ -75,13 +75,6 @@ export type SakValidationResult = {
   revisionCompliance: RevisionInstructionCompliance | null;
 };
 
-const WEEKDAY_OR_MONTH_SOURCE =
-  "(?:mandag|tirsdag|onsdag|torsdag|fredag|lørdag|søndag|januar|februar|mars|april|mai|juni|juli|august|september|oktober|november|desember)";
-const BODY_OPENS_WITH_NUMBER_PATTERNS = [
-  /^\s*[-–]?\s*\d/,
-  new RegExp(`^\\s*(?:i\\s+)?${WEEKDAY_OR_MONTH_SOURCE}\\s+\\d`, "i")
-];
-
 // A sentence ends at . ! ? followed by whitespace and a capital letter, an
 // opening quote or dash, or the end of the text. "24. september" and
 // "3. juni" therefore do not split; "SSB. Det" does.
@@ -320,19 +313,6 @@ export function validateSakArticle(
       "Første blokk etter leaden er en mellomtittel; skriv et avsnitt først."
     );
   }
-  const firstParagraph = article.blocks.find((block) => block.kind === "paragraph");
-  if (firstParagraph) {
-    const plain = sakBlockPlainText(firstParagraph.text);
-    if (BODY_OPENS_WITH_NUMBER_PATTERNS.some((pattern) => pattern.test(plain))) {
-      addIssue(
-        issues,
-        "SAK_BODY_OPENS_WITH_NUMBER",
-        "warning",
-        "Første avsnitt i brødteksten åpner med et tall eller en dato; skriv betydningen først."
-      );
-    }
-  }
-
   // (3) Length band.
   const visibleChars = countSakVisibleChars(article);
   const lengthBand = sakLengthBand(ctx.targetChars);
@@ -522,7 +502,7 @@ export function buildSakRepairInstruction(issues: SakValidationIssue[]): string 
     .filter((issue) => issue.severity === "blocking")
     .map((issue) => `- ${issue.location ?? "article"}: ${issue.message}${issue.passage ? ` Tekst: «${issue.passage}»` : ""}`);
   return [
-    "KORRIGERINGSMODUS: Rett bare feilene under. Behold alt som ikke berøres av feilene: vinkel, rekkefølge, lenker, sitater, sources, excluded_hype og desk_notes. Ved lengdefeil kutter du sekundære detaljer eller tilfører vesentlig kildebelagt informasjon; aldri fyllstoff.",
+    "KORRIGERINGSMODUS: Rett bare feilene under. Behold fungerende vinkel, klarspråk og fremdrift. En enklere formulering er ikke i seg selv en feil og skal ikke trekkes tilbake mot kildens ordvalg. Behold alt som ikke berøres av feilene: rekkefølge, lenker, sitater, sources, excluded_hype og desk_notes. Ved lengdefeil kutter du sekundære detaljer eller tilfører vesentlig kildebelagt informasjon; aldri fyllstoff.",
     ...lines,
     "Returner hele JSON-strukturen. change_note: «Korrigert etter validering»."
   ].join("\n");

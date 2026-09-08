@@ -4,7 +4,10 @@ import { formatNorwegianNoticeDate } from "./prompt.js";
 import {
   SAK_FIELD_MAPPING,
   SAK_LEAD,
-  SAK_LEAD_PRECEDENCE,
+  SAK_VOICE,
+  SAK_ATTRIBUTION,
+  SAK_PRESENTATION,
+  SAK_SELF_EDIT,
   SAK_LENGTH,
   SAK_OUTPUT_FIELDS,
   SAK_QUOTE_LEDGER,
@@ -15,18 +18,14 @@ import {
   SAK_TITLE
 } from "./sak-editorial.js";
 import {
-  EDITORIAL_ATTRIBUTION,
-  EDITORIAL_AVOID,
-  EDITORIAL_LANGUAGE,
   EDITORIAL_NO_MARKET_COMMENTARY,
   EDITORIAL_NORWEGIAN,
-  EDITORIAL_QUOTES,
   EDITORIAL_REVISION_PRIORITY,
-  EDITORIAL_SOURCE_AS_DATA,
-  EDITORIAL_WRITING_STYLE
+  EDITORIAL_SOURCE_AS_DATA
 } from "./shared-editorial.js";
+import { EDITORIAL_CURRENCY_NAMES } from "./currency-editorial.js";
 
-export const SAK_PROMPT_VERSION = "sak-v2.0.0:currency-names-v1";
+export const SAK_PROMPT_VERSION = "sak-v2.1.0:currency-names-v1";
 
 export type SakMaterialPayload = {
   /** Prompt label, e.g. "material_ckabc" (see sakMaterialSourceId). */
@@ -64,20 +63,20 @@ export function createSakDeveloperPrompt(): string {
     OPPGAVE,
     EDITORIAL_SOURCE_AS_DATA,
     SAK_SOURCES_AND_LINKS,
-    EDITORIAL_LANGUAGE,
+    SAK_VOICE,
     SAK_TITLE,
     SAK_LEAD,
     SAK_STRUCTURE,
-    EDITORIAL_WRITING_STYLE,
+    SAK_PRESENTATION,
+    EDITORIAL_CURRENCY_NAMES,
     EDITORIAL_NO_MARKET_COMMENTARY,
-    EDITORIAL_ATTRIBUTION,
-    SAK_LEAD_PRECEDENCE,
-    EDITORIAL_QUOTES,
+    SAK_ATTRIBUTION,
     SAK_QUOTE_LEDGER,
     SAK_LENGTH,
     SAK_OUTPUT_FIELDS,
-    `${EDITORIAL_AVOID}\n${SAK_FIELD_MAPPING}`,
-    EDITORIAL_NORWEGIAN
+    SAK_FIELD_MAPPING,
+    EDITORIAL_NORWEGIAN,
+    SAK_SELF_EDIT
   ].join("\n\n");
 }
 

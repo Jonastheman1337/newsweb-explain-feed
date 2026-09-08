@@ -1,0 +1,371 @@
+{
+  "schemaVersion": 1,
+  "completedAt": "2026-09-08T13:12:38.126Z",
+  "baselineSha": "2769690f766115fb858b47dafdae4f5296f955c8",
+  "corpusSha": "b6d088bd2cba35ad118cc82f9dd19c758a44e4fb75413d3fe3c94accbdb786ab",
+  "caseCount": 12,
+  "firstDrafts": 8,
+  "revisions": 4,
+  "arms": {
+    "control": {
+      "promptVersion": "sak-v2.0.0:currency-names-v1",
+      "fingerprint": "92faaf2dd952833ea48c2ca1bc84169a3385b153fcb96af4366780e57053bd54",
+      "profile": {
+        "model": "gpt-5.6-sol",
+        "reasoningEffort": "high",
+        "serviceTier": "default",
+        "maxOutputTokens": 24576,
+        "timeoutMs": 360000
+      },
+      "completed": 12,
+      "articles": 12,
+      "ready": 4,
+      "needsReview": 8,
+      "calls": 82,
+      "responseModels": [
+        "gpt-5.6-sol"
+      ],
+      "cases": [
+        {
+          "caseId": "tesla",
+          "status": "ready",
+          "hasArticle": true,
+          "calls": 7,
+          "visibleChars": 2243,
+          "blocking": 0,
+          "warnings": 0,
+          "repairAttempted": true,
+          "repairApplied": true
+        },
+        {
+          "caseId": "rates",
+          "status": "needs_review",
+          "hasArticle": true,
+          "calls": 8,
+          "visibleChars": 2553,
+          "blocking": 5,
+          "warnings": 3,
+          "repairAttempted": true,
+          "repairApplied": false
+        },
+        {
+          "caseId": "diesel",
+          "status": "needs_review",
+          "hasArticle": true,
+          "calls": 7,
+          "visibleChars": 2473,
+          "blocking": 1,
+          "warnings": 0,
+          "repairAttempted": true,
+          "repairApplied": true
+        },
+        {
+          "caseId": "liquid",
+          "status": "needs_review",
+          "hasArticle": true,
+          "calls": 7,
+          "visibleChars": 2276,
+          "blocking": 1,
+          "warnings": 2,
+          "repairAttempted": true,
+          "repairApplied": true
+        },
+        {
+          "caseId": "oslo",
+          "status": "needs_review",
+          "hasArticle": true,
+          "calls": 7,
+          "visibleChars": 2584,
+          "blocking": 3,
+          "warnings": 3,
+          "repairAttempted": true,
+          "repairApplied": false
+        },
+        {
+          "caseId": "air-canada",
+          "status": "needs_review",
+          "hasArticle": true,
+          "calls": 7,
+          "visibleChars": 2239,
+          "blocking": 1,
+          "warnings": 3,
+          "repairAttempted": true,
+          "repairApplied": true
+        },
+        {
+          "caseId": "banks",
+          "status": "ready",
+          "hasArticle": true,
+          "calls": 7,
+          "visibleChars": 2572,
+          "blocking": 0,
+          "warnings": 3,
+          "repairAttempted": true,
+          "repairApplied": true
+        },
+        {
+          "caseId": "thin-financing",
+          "status": "needs_review",
+          "hasArticle": true,
+          "calls": 7,
+          "visibleChars": 3541,
+          "blocking": 8,
+          "warnings": 4,
+          "repairAttempted": true,
+          "repairApplied": false
+        },
+        {
+          "caseId": "rev-shorten",
+          "status": "ready",
+          "hasArticle": true,
+          "calls": 7,
+          "visibleChars": 1410,
+          "blocking": 0,
+          "warnings": 2,
+          "repairAttempted": true,
+          "repairApplied": true,
+          "revision": {
+            "titleChanged": true,
+            "leadChanged": true,
+            "bodyUnchanged": false
+          }
+        },
+        {
+          "caseId": "rev-lead",
+          "status": "needs_review",
+          "hasArticle": true,
+          "calls": 7,
+          "visibleChars": 2220,
+          "blocking": 1,
+          "warnings": 3,
+          "repairAttempted": true,
+          "repairApplied": false,
+          "revision": {
+            "titleChanged": false,
+            "leadChanged": true,
+            "bodyUnchanged": true
+          }
+        },
+        {
+          "caseId": "rev-angle",
+          "status": "ready",
+          "hasArticle": true,
+          "calls": 4,
+          "visibleChars": 2354,
+          "blocking": 0,
+          "warnings": 0,
+          "repairAttempted": false,
+          "repairApplied": false,
+          "revision": {
+            "titleChanged": true,
+            "leadChanged": true,
+            "bodyUnchanged": false
+          }
+        },
+        {
+          "caseId": "rev-remove",
+          "status": "needs_review",
+          "hasArticle": true,
+          "calls": 7,
+          "visibleChars": 2258,
+          "blocking": 1,
+          "warnings": 0,
+          "repairAttempted": true,
+          "repairApplied": true,
+          "revision": {
+            "titleChanged": false,
+            "leadChanged": false,
+            "bodyUnchanged": false
+          }
+        }
+      ],
+      "responseServiceTiers": [
+        "default"
+      ]
+    },
+    "candidate": {
+      "promptVersion": "sak-v2.1.0:currency-names-v1",
+      "fingerprint": "5a0a749f32ffa560052dab4c553f8037031d26e2a52528474aee90e4f7b60df5",
+      "profile": {
+        "model": "gpt-5.6-sol",
+        "reasoningEffort": "high",
+        "serviceTier": "default",
+        "maxOutputTokens": 24576,
+        "timeoutMs": 360000
+      },
+      "completed": 12,
+      "articles": 12,
+      "ready": 8,
+      "needsReview": 4,
+      "calls": 75,
+      "responseModels": [
+        "gpt-5.6-sol"
+      ],
+      "cases": [
+        {
+          "caseId": "tesla",
+          "status": "ready",
+          "hasArticle": true,
+          "calls": 4,
+          "visibleChars": 2467,
+          "blocking": 0,
+          "warnings": 1,
+          "repairAttempted": false,
+          "repairApplied": false
+        },
+        {
+          "caseId": "rates",
+          "status": "needs_review",
+          "hasArticle": true,
+          "calls": 8,
+          "visibleChars": 2682,
+          "blocking": 6,
+          "warnings": 2,
+          "repairAttempted": true,
+          "repairApplied": false
+        },
+        {
+          "caseId": "diesel",
+          "status": "ready",
+          "hasArticle": true,
+          "calls": 5,
+          "visibleChars": 2440,
+          "blocking": 0,
+          "warnings": 1,
+          "repairAttempted": false,
+          "repairApplied": false
+        },
+        {
+          "caseId": "liquid",
+          "status": "needs_review",
+          "hasArticle": true,
+          "calls": 7,
+          "visibleChars": 2300,
+          "blocking": 3,
+          "warnings": 5,
+          "repairAttempted": true,
+          "repairApplied": false
+        },
+        {
+          "caseId": "oslo",
+          "status": "needs_review",
+          "hasArticle": true,
+          "calls": 7,
+          "visibleChars": 2490,
+          "blocking": 3,
+          "warnings": 1,
+          "repairAttempted": true,
+          "repairApplied": false
+        },
+        {
+          "caseId": "air-canada",
+          "status": "ready",
+          "hasArticle": true,
+          "calls": 7,
+          "visibleChars": 2159,
+          "blocking": 0,
+          "warnings": 1,
+          "repairAttempted": true,
+          "repairApplied": true
+        },
+        {
+          "caseId": "banks",
+          "status": "ready",
+          "hasArticle": true,
+          "calls": 4,
+          "visibleChars": 2361,
+          "blocking": 0,
+          "warnings": 2,
+          "repairAttempted": false,
+          "repairApplied": false
+        },
+        {
+          "caseId": "thin-financing",
+          "status": "needs_review",
+          "hasArticle": true,
+          "calls": 7,
+          "visibleChars": 3420,
+          "blocking": 4,
+          "warnings": 7,
+          "repairAttempted": true,
+          "repairApplied": false
+        },
+        {
+          "caseId": "rev-shorten",
+          "status": "ready",
+          "hasArticle": true,
+          "calls": 7,
+          "visibleChars": 1570,
+          "blocking": 0,
+          "warnings": 3,
+          "repairAttempted": true,
+          "repairApplied": true,
+          "revision": {
+            "titleChanged": true,
+            "leadChanged": true,
+            "bodyUnchanged": false
+          }
+        },
+        {
+          "caseId": "rev-lead",
+          "status": "ready",
+          "hasArticle": true,
+          "calls": 4,
+          "visibleChars": 2239,
+          "blocking": 0,
+          "warnings": 0,
+          "repairAttempted": false,
+          "repairApplied": false,
+          "revision": {
+            "titleChanged": false,
+            "leadChanged": true,
+            "bodyUnchanged": true
+          }
+        },
+        {
+          "caseId": "rev-angle",
+          "status": "ready",
+          "hasArticle": true,
+          "calls": 7,
+          "visibleChars": 2283,
+          "blocking": 0,
+          "warnings": 0,
+          "repairAttempted": true,
+          "repairApplied": true,
+          "revision": {
+            "titleChanged": true,
+            "leadChanged": true,
+            "bodyUnchanged": false
+          }
+        },
+        {
+          "caseId": "rev-remove",
+          "status": "ready",
+          "hasArticle": true,
+          "calls": 8,
+          "visibleChars": 2297,
+          "blocking": 0,
+          "warnings": 3,
+          "repairAttempted": true,
+          "repairApplied": true,
+          "revision": {
+            "titleChanged": false,
+            "leadChanged": false,
+            "bodyUnchanged": false
+          }
+        }
+      ],
+      "responseServiceTiers": [
+        "default"
+      ]
+    }
+  },
+  "humanReview": {
+    "completed": 0,
+    "candidatePreference": null,
+    "threshold": 0.65,
+    "status": "pending"
+  },
+  "releaseDecision": "not_deployed_pending_editorial_and_source_review",
+  "interpretation": "Ready means existing automatic gates passed. Needs-review includes source, evidence, length and editorial findings; these counts are not verified factual-error rates or editorial preference scores."
+}

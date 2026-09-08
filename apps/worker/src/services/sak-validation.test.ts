@@ -91,6 +91,15 @@ describe("validateSakArticle", () => {
     expect(codes(result)).not.toContain("SAK_LENGTH_OUT_OF_BAND");
   });
 
+  it.each(["182 seter får flyet.", "3. juni 2027 starter flygingene."])("allows a source-backed numeric opening: %s", (opening) => {
+    const base = article();
+    const result = validateSakArticle({ ...base, lead: opening, blocks: [{ kind: "paragraph", text: opening }, ...base.blocks] }, payload(), firstDraft);
+    expect(codes(result)).not.toContain("SAK_BODY_OPENS_WITH_NUMBER");
+    expect(codes(result)).not.toContain("SAK_UNEXPECTED_NUMBERS");
+    expect(result.article.lead).toBe(opening);
+    expect(result.article.blocks[0]?.text).toBe(opening);
+  });
+
   it("blocks a title over eight words unless the owner supplied it", () => {
     const long = article({ title: "Air Canada starter ny direkterute mellom Oslo og Toronto neste sommer" });
     expect(codes(validateSakArticle(long, payload(), firstDraft))).toContain("SAK_TITLE_TOO_LONG");
@@ -210,7 +219,7 @@ describe("validateSakArticle", () => {
     expect(found).toContain("SAK_LEAD_TOO_MANY_SENTENCES");
     expect(found).toContain("SAK_SUBHEADING_TOO_LONG");
     expect(found).toContain("SAK_SUBHEADING_AFTER_LEAD");
-    expect(found).toContain("SAK_BODY_OPENS_WITH_NUMBER");
+    expect(found).not.toContain("SAK_BODY_OPENS_WITH_NUMBER");
     expect(found).toContain("SAK_QUOTE_BLOCK_NO_DASH");
     expect(found).toContain("SAK_LENGTH_OUT_OF_BAND");
     expect(result.article.blocks[2]?.text.startsWith("– ")).toBe(true);
