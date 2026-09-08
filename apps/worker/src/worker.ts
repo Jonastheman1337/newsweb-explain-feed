@@ -216,7 +216,7 @@ type PublishJobData = {
   generationRunId?: string;
 };
 
-type FeedUpdateState = "source" | "processing" | "published" | "failed";
+type FeedUpdateState = "new-notice" | "source" | "processing" | "published" | "failed";
 
 const config = loadConfig();
 const observeNoticeNovelty = createNoticeNoveltyObserver();
@@ -3676,7 +3676,7 @@ const ingestWorker = new Worker<IngestJobData>(
         },
         update: {}
       });
-      await publishFeedUpdate(job.data.messageId, "source");
+      await publishFeedUpdate(job.data.messageId, "new-notice");
 
       const phaseUpdatedAt = new Date();
       const generationRun = await logPrisma.generationRun.create({

@@ -40,6 +40,18 @@ const baseItem: FeedItem = {
 };
 
 describe("feed stream updates", () => {
+  it("notifies only a new Newsweb notice, never generation updates", () => {
+    expect(parseFeedUpdate(JSON.stringify({ messageId: 123, state: "new-notice" })).state).toBe("new-notice");
+    expect(applyFeedUpdateState(baseItem, "new-notice").notifyNewNotice).toBe(true);
+    const published = { ...baseItem, isFinal: true, publicationRevision: 1, failed: false };
+    for (const item of [baseItem, published, { ...published, publicationRevision: 2 }]) {
+      for (const state of ["source", "processing", "published", "failed", "fast-draft", undefined] as const) {
+        expect(applyFeedUpdateState(item, state).notifyNewNotice).not.toBe(true);
+      }
+    }
+    expect(applyFeedUpdateState(published, "processing").regenerating).toBe(true);
+  });
+
   it("accepts failed update state", () => {
     expect(parseFeedUpdate(JSON.stringify({ messageId: 123, state: "failed" }))).toEqual({
       messageId: 123,

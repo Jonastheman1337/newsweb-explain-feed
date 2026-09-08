@@ -12,7 +12,7 @@ import { getMutedCategories } from "../services/app-settings.js";
 import { loadFastDrafts } from "../services/fast-drafts.js";
 import { mapDbItemToFeedItem } from "../services/feed-item-mapper.js";
 
-type FeedUpdateState = "source" | "processing" | "published" | "failed" | "fast-draft";
+type FeedUpdateState = "new-notice" | "source" | "processing" | "published" | "failed" | "fast-draft";
 
 export function parseFeedUpdate(message: string): {
   messageId: number;
@@ -28,6 +28,7 @@ export function parseFeedUpdate(message: string): {
     messageId: parsed.messageId,
     state:
       parsed.state === "fast-draft" ||
+      parsed.state === "new-notice" ||
       parsed.state === "source" ||
       parsed.state === "processing" ||
       parsed.state === "published" ||
@@ -43,6 +44,10 @@ export function applyFeedUpdateState(
   state: FeedUpdateState | undefined,
   phase?: GenerationPhase
 ): FeedItem {
+  if (state === "new-notice") {
+    return { ...item, notifyNewNotice: true };
+  }
+
   if (state === "source") {
     // The mapper already reflects the database truth for source-only items
     // (not generated / skipped / failed / processing). Forcing notGenerated
