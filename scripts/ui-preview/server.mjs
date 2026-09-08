@@ -1,6 +1,6 @@
 import http from "node:http";
 import { randomUUID } from "node:crypto";
-import { initialFixtures, fixtureItem } from "./fixtures.mjs";
+import { initialFixtures, fixtureItem, fixtureModelSources } from "./fixtures.mjs";
 import { feedResponseSchema, noticeResponseSchema } from "../../packages/shared/dist/api.js";
 
 export function createFixtureServer() {
@@ -260,6 +260,15 @@ export function createFixtureServer() {
         )
           return json(res, 200, { ok: true });
         if (action === "materials") return json(res, 200, { materials: [] });
+        if (action === "model-source") {
+          const modelSource = fixtureModelSources.get(item.messageId);
+          return json(res, 200, {
+            rewriteId: item.rewriteId ?? null,
+            text: modelSource?.text ?? null,
+            pageCount: modelSource?.pageCount ?? null,
+            attachmentId: modelSource?.attachmentId ?? null
+          });
+        }
         if (action === "generate" && req.method === "POST")
           return json(res, 200, {
             jobId: queueGeneration(

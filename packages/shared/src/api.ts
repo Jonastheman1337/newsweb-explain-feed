@@ -200,6 +200,15 @@ export const noticeMaterialsResponseSchema = z.object({
   materials: z.array(noticeMaterialSchema)
 });
 
+// The PDF text the worker read for a published version, taken from the
+// generation run's stored input. Null text means the run kept no PDF supplement.
+export const noticeModelSourceSchema = z.object({
+  rewriteId: z.string().nullable(),
+  text: z.string().nullable(),
+  pageCount: z.number().int().nullable(),
+  attachmentId: z.number().int().nullable()
+});
+
 export type FeedQuery = z.infer<typeof feedQuerySchema>;
 export type FeedResponse = z.infer<typeof feedResponseSchema>;
 export type FeedItem = z.infer<typeof feedItemSchema>;
@@ -209,3 +218,4 @@ export type OutputMode = z.infer<typeof outputModeSchema>;
 export type NoticeMaterialKind = z.infer<typeof noticeMaterialKindSchema>;
 export type NoticeMaterial = z.infer<typeof noticeMaterialSchema>;
 export type NoticeMaterialsResponse = z.infer<typeof noticeMaterialsResponseSchema>;
+export type NoticeModelSource = z.infer<typeof noticeModelSourceSchema>;

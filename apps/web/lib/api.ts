@@ -3,6 +3,7 @@ import type {
   FeedQuery,
   FeedResponse,
   NoticeMaterial,
+  NoticeModelSource,
   RewriteOutput,
   RewriteStatusResponse
 } from "@newsweb/shared";
@@ -150,6 +151,11 @@ type NoticeResponse = { fastDraft?: FeedItem["fastDraft"] } & (
 
 export async function getNotice(token: string | null | undefined, messageId: number, ui?: "v2") {
   return apiGet<NoticeResponse>(token, `/notice/${messageId}`, { ui });
+}
+
+/** The PDF text the worker read for a published version (browser only). */
+export async function getNoticeModelSource(messageId: number, rewriteId?: string) {
+  return apiGet<NoticeModelSource>(null, `/notice/${messageId}/model-source`, { rewriteId });
 }
 
 export async function getNoticeStatus(

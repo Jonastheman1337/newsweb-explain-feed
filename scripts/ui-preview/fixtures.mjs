@@ -30,6 +30,39 @@ export function fixtureItem(id, issuer, title, lead, body, overrides = {}) {
   });
 }
 
+// Fictional PDF text "read by the model" for the preview's PDF-tekst tab.
+export const fixtureModelSources = new Map([
+  [
+    900001,
+    {
+      pageCount: 2,
+      attachmentId: 1,
+      text: [
+        "KEY METRICS (fiktivt eksempel)",
+        "Kontraktsverdi: 420 millioner kroner. Varighet: tre år med opsjon på to år.",
+        "",
+        "---",
+        "",
+        "[PDF page 1]",
+        "Nordvik Energy AS – Melding om kontrakt",
+        "",
+        "Nordvik Energy AS har i dag inngått en avtale med en operatør på norsk sokkel om vedlikehold av to plattformer i Nordsjøen. Avtalen har en varighet på tre år fra 1. januar 2027, med opsjon for operatøren på ytterligere to år.",
+        "",
+        "Kontrakten har en estimert verdi på 420 millioner kroner over den faste perioden. Arbeidet omfatter planlagt vedlikehold, inspeksjon og mindre modifikasjoner, og vil bli utført av selskapets eksisterende organisasjon i Stavanger og Bergen.",
+        "",
+        "– Dette er en viktig avtale som gir oss forutsigbarhet i tre år fremover, sier administrerende direktør Kari Nordvik.",
+        "",
+        "[PDF page 2]",
+        "Om Nordvik Energy",
+        "",
+        "Nordvik Energy AS leverer vedlikeholds- og modifikasjonstjenester til olje- og gassindustrien. Selskapet har rundt 640 ansatte og hadde en omsetning på 1,9 milliarder kroner i 2025. Dette dokumentet er et fiktivt eksempel laget for lokal forhåndsvisning og beskriver ikke et reelt selskap.",
+        "",
+        "Kontakt: ir@nordvik-energy.example"
+      ].join("\n")
+    }
+  ]
+]);
+
 export function initialFixtures() {
   return [
     fixtureItem(
@@ -41,7 +74,18 @@ export function initialFixtures() {
         "Arbeidet starter i januar. Avtalen omfatter en opsjon på ytterligere to år.",
         "Nordvik Energy leverer tjenester til olje- og gassindustrien."
       ],
-      { importance: "viktig" }
+      {
+        importance: "viktig",
+        hasAttachments: true,
+        attachments: [
+          {
+            id: 1,
+            fileName: "Nordvik_kontraktsmelding_2026.pdf",
+            fileType: "application/pdf",
+            fileSize: 184320
+          }
+        ]
+      }
     ),
     fixtureItem(
       900002,

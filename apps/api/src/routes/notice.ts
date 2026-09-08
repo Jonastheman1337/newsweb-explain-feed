@@ -2,6 +2,7 @@ import {
   fixDoubleEncodedUtf8,
   normalizeRewriteJson,
   noticeMaterialsResponseSchema,
+  noticeModelSourceSchema,
   noticeResponseSchema,
   outputModeSchema,
   relatedNoticeLinkSchema,
@@ -58,6 +59,16 @@ const materialParamsSchema = z.object({
   messageId: z.coerce.number().int().positive(),
   materialId: z.string().min(1).max(80)
 });
+
+const modelSourceQuerySchema = z.object({
+  rewriteId: z.string().min(1).max(80).optional()
+});
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
 
 const statusQuerySchema = z.object({
   jobId: z.string().optional()
@@ -383,6 +394,63 @@ export const noticeRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.send(
         noticeMaterialsResponseSchema.parse({
           materials: materials.map(materialPayload)
+        })
+      );
+    }
+  );
+
+  // The PDF text the worker read for a published version. Generation runs may
+  // live in a separate log database, so the run is looked up by id after the
+  // published rewrite is resolved. Nothing else from the run leaves the API.
+  fastify.get(
+    "/notice/:messageId/model-source",
+    {
+      preHandler: fastify.authenticate
+    },
+    async (request, reply) => {
+      const { messageId } = paramsSchema.parse(request.params);
+      const { rewriteId } = modelSourceQuerySchema.parse(request.query ?? {});
+      const published = rewriteId
+        ? await prisma.publishedRewrite.findFirst({
+            where: { id: rewriteId, messageId },
+            select: { id: true, generationRunId: true }
+          })
+        : ((
+            await prisma.feedItem.findUnique({
+              where: { messageId },
+              select: {
+                activePublishedRewrite: { select: { id: true, generationRunId: true } }
+              }
+            })
+          )?.activePublishedRewrite ?? null);
+      if (!published) {
+        return reply.code(404).send({ message: "Ingen publisert versjon." });
+      }
+
+      reply.header("cache-control", "private, no-store");
+      const empty = { rewriteId: published.id, text: null, pageCount: null, attachmentId: null };
+      if (!published.generationRunId) {
+        return reply.send(noticeModelSourceSchema.parse(empty));
+      }
+
+      const run = await logPrisma.generationRun.findUnique({
+        where: { id: published.generationRunId },
+        select: { inputJson: true }
+      });
+      const sourcePayload = asRecord(asRecord(run?.inputJson).sourcePayload);
+      const text =
+        typeof sourcePayload.pdfSupplementText === "string" &&
+        sourcePayload.pdfSupplementText.trim()
+          ? sourcePayload.pdfSupplementText
+          : null;
+      const pageCount = sourcePayload.pdfSupplementPageCount;
+      const attachmentId = sourcePayload.pdfSupplementAttachmentId;
+      return reply.send(
+        noticeModelSourceSchema.parse({
+          ...empty,
+          text,
+          pageCount: text && Number.isInteger(pageCount) ? pageCount : null,
+          attachmentId: text && Number.isInteger(attachmentId) ? attachmentId : null
         })
       );
     }
