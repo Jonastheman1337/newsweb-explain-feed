@@ -245,18 +245,11 @@
 .feedCount > span {
   font-size: 11px;
 }
-.arrivals {
-  text-align: center;
-}
-.arrivals:has(button) {
-  padding: 12px 0;
-}
-.arrivals button {
-  background: var(--bg-panel);
-}
 .feed {
   display: grid;
   gap: 20px;
+  /* Reading position is preserved explicitly when live cards are inserted. */
+  overflow-anchor: none;
 }
 .card {
   min-width: 0;
@@ -267,6 +260,46 @@
 }
 .important {
   border-top: 2px solid var(--refresh-accent);
+}
+.generated {
+  border-left: 3px solid var(--accent-2);
+}
+.sourceOnly {
+  background: color-mix(in srgb, var(--bg-soft) 55%, var(--bg-panel));
+  border-style: dashed;
+}
+.sourceOnly.important {
+  border-top-style: solid;
+}
+.cardStatus {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin-bottom: 12px;
+  font-size: 12px;
+}
+.generationStatus {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+.generated .generationStatus {
+  color: var(--ink);
+}
+.generated .generationStatus > span {
+  color: var(--accent-2);
+}
+.cardStatus .importance {
+  margin: 0;
+}
+.sourceOnly .waiting h2 {
+  font-size: 18px;
+  line-height: 1.4;
+  font-weight: 500;
+  letter-spacing: -0.2px;
 }
 .dateline {
   color: var(--ink-soft);
@@ -484,8 +517,7 @@
 }
 /* Cards expand independently; only deliberate focused work hides the feed. */
 .filters,
-.viewBar,
-.arrivals {
+.viewBar {
   max-width: 700px;
   margin-inline: auto;
 }
@@ -509,7 +541,6 @@
 }
 .main:has(.focused) > .filters,
 .main:has(.focused) .viewBar,
-.main:has(.focused) .arrivals,
 .feed:has(.focused) > .card:not(.focused) {
   display: none;
 }

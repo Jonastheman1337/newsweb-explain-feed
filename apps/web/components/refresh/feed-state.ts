@@ -5,7 +5,7 @@ export type FeedEntry = {
   latest: FeedItem;
   pending?: FeedItem;
 };
-export type FeedState = { entries: FeedEntry[]; incoming: FeedItem[] };
+export type FeedState = { entries: FeedEntry[] };
 export const sortItems = (items: FeedItem[]) =>
   [...items].sort(
     (a, b) => b.publishedAt.localeCompare(a.publishedAt) || b.messageId - a.messageId
@@ -17,8 +17,7 @@ export function fastDraftToFeedItem(item: FeedItem): FeedItem | undefined {
   return { ...item, publicationKind: "fast", rewriteId: `fast:${draft.id}`, rewriteVersion: 1, contentHash: draft.id, finalizedAt: draft.finishedAt, isFinal: true, title: rewrite.title, lead: rewrite.lead, body: rewrite.body, keyFacts: rewrite.key_facts, negativeOrSurprising: rewrite.negative_or_surprising, sourceLimitations: rewrite.source_limitations, confidence: rewrite.confidence, importance: rewrite.importance, notGenerated: false, skipped: false, failed: false, processing: false, regenerating: false };
 }
 export const initialFeedState = (items: FeedItem[]): FeedState => ({
-  entries: sortItems(items).map((item) => ({ current: item.isFinal ? item : fastDraftToFeedItem(item) ?? item, latest: item })),
-  incoming: []
+  entries: sortItems(items).map((item) => ({ current: item.isFinal ? item : fastDraftToFeedItem(item) ?? item, latest: item }))
 });
 
 function receive(entry: FeedEntry, item: FeedItem): FeedEntry {
@@ -47,22 +46,12 @@ export function receiveFeedItem(state: FeedState, item: FeedItem): FeedState {
       )
     };
   }
-  const previous = state.incoming.find((old) => old.messageId === item.messageId);
-  if (previous && previous.publicationRevision > item.publicationRevision) return state;
   return {
-    ...state,
-    incoming: sortItems([...state.incoming.filter((old) => old.messageId !== item.messageId), item])
-  };
-}
-
-export function revealIncoming(state: FeedState): FeedState {
-  return {
-    entries: [...state.entries, ...initialFeedState(state.incoming).entries].sort(
+    entries: [...state.entries, ...initialFeedState([item]).entries].sort(
       (a, b) =>
         b.current.publishedAt.localeCompare(a.current.publishedAt) ||
         b.current.messageId - a.current.messageId
-    ),
-    incoming: []
+    )
   };
 }
 

@@ -154,12 +154,12 @@ it("restores the selected old version and only prompts for an unseen newer publi
   let entry = restoreSelection(initialFeedState([v2]).entries[0]);
   expect(entry.current.rewriteId).toBe("v1");
   expect(entry.pending).toBeUndefined();
-  const state = receiveFeedItem({ entries: [entry], incoming: [] }, v2);
+  const state = receiveFeedItem({ entries: [entry] }, v2);
   expect(state.entries[0].pending).toBeUndefined();
   entry = restoreSelection(initialFeedState([v3]).entries[0]);
   expect(entry.current.rewriteId).toBe("v1");
   expect(entry.pending?.rewriteId).toBe("v3");
-  const selected = selectVersion({ entries: [entry], incoming: [] }, v2);
+  const selected = selectVersion({ entries: [entry] }, v2);
   rememberSelection(selected.entries[0]);
   expect(restoreSelection(initialFeedState([v3]).entries[0]).pending).toBeUndefined();
 });

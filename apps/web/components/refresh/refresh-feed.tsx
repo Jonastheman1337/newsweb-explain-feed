@@ -1,18 +1,15 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { FeedItem } from "@newsweb/shared";
 import { RefreshCard } from "./refresh-card";
 import { rememberSelection, restoreSelection, selectVersion } from "./selection";
 import { useFeedStreamSubscription } from "../feed-stream-provider";
 import {
-  fastDraftToFeedItem,
   initialFeedState,
   receiveFeedItem,
-  revealIncoming,
-  selectPending,
-  type FeedEntry
+  selectPending
 } from "./feed-state";
 import styles from "./refresh.module.css";
 
@@ -27,6 +24,25 @@ export function RefreshFeed({
 }) {
   const router = useRouter();
   const [state, setState] = useState(() => initialFeedState(initialItems));
+  const feedRef = useRef<HTMLDivElement>(null);
+  const scrollAnchor = useRef<{ element: HTMLElement; top: number; scrollY: number } | null>(null);
+  function rememberReadingPosition() {
+    if (scrollAnchor.current || window.scrollY <= 32) return;
+    const element = Array.from(feedRef.current?.querySelectorAll<HTMLElement>("article") ?? [])
+      .find((card) => {
+        const rect = card.getBoundingClientRect();
+        return rect.height > 0 && rect.bottom > 0 && rect.top < window.innerHeight;
+      });
+    if (element) scrollAnchor.current = { element, top: element.getBoundingClientRect().top, scrollY: window.scrollY };
+  }
+  useLayoutEffect(() => {
+    const anchor = scrollAnchor.current;
+    scrollAnchor.current = null;
+    // Do not undo a scroll made by the reader while React was updating.
+    if (!anchor || !anchor.element.isConnected || window.scrollY !== anchor.scrollY) return;
+    const offset = anchor.element.getBoundingClientRect().top - anchor.top;
+    if (offset) window.scrollTo({ top: window.scrollY + offset, behavior: "instant" });
+  }, [state]);
   const searchParams = useSearchParams();
   const importantOnly = searchParams.get("important") === "1";
   function setImportantOnly(important: boolean) {
@@ -63,13 +79,13 @@ export function RefreshFeed({
   }, [selectionReady, state.entries]);
   useEffect(() => {
     // Reconnects merge into existing entries; they do not replace focused editors.
+    rememberReadingPosition();
     setState((previous) => {
       const next = initialItems.reduce(receiveFeedItem, previous);
       if (!filtered) return next;
       const matchingIds = new Set(initialItems.map((item) => item.messageId));
       return {
-        entries: next.entries.filter((entry) => matchingIds.has(entry.current.messageId)),
-        incoming: next.incoming.filter((item) => matchingIds.has(item.messageId))
+        entries: next.entries.filter((entry) => matchingIds.has(entry.current.messageId))
       };
     });
   }, [initialItems, filtered]);
@@ -79,15 +95,13 @@ export function RefreshFeed({
         refresh();
         return;
       }
+      rememberReadingPosition();
       setState((previous) => receiveFeedItem(previous, item));
     },
     onReconnect: refresh
   });
   const entries = state.entries.filter(
     (entry) => isVisible(entry.latest) && (!importantOnly || (entry.latest.isFinal ? entry.latest : entry.current).importance === "viktig")
-  );
-  const incoming = state.incoming.filter(
-    (item) => isVisible(item) && (!importantOnly || (item.isFinal ? item : fastDraftToFeedItem(item) ?? item).importance === "viktig")
   );
   return (
     <>
@@ -105,19 +119,10 @@ export function RefreshFeed({
           {!!mutedCategories.length && <span>{mutedCategories.length} {mutedCategories.length === 1 ? "kategori skjult" : "kategorier skjult"}</span>}
         </span>
       </div>
-      <div className={styles.arrivals} aria-live="polite">
-        {incoming.length > 0 && (
-          <button
-            onClick={() => {
-              initialFeedState(state.incoming).entries.forEach(rememberSelection);
-              setState(revealIncoming);
-            }}
-          >
-            {incoming.length} {incoming.length === 1 ? "ny melding" : "nye meldinger"} ↓
-          </button>
-        )}
+      <div className={styles.visuallyHidden} role="status" aria-atomic="true">
+        {entries.length} {entries.length === 1 ? "melding" : "meldinger"} i feeden. Oppdateres automatisk.
       </div>
-      <div className={styles.feed}>
+      <div className={styles.feed} ref={feedRef}>
         {entries.map((entry) => (
           <RefreshCard
             key={entry.current.messageId}

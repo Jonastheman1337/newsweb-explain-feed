@@ -6,6 +6,7 @@ import type { FeedItem } from "@newsweb/shared";
 import { RefreshCard } from "./refresh-card";
 import { RefreshFeed } from "./refresh-feed";
 import { RefreshFilters } from "./filters";
+import { useFeedStreamSubscription } from "../feed-stream-provider";
 import RefreshPage from "../../app/(refresh)/next/page";
 
 const mocks = vi.hoisted(() => ({
@@ -154,4 +155,83 @@ it("keeps the important view and filters when moving to older messages", async (
   await act(() => root.render(<RefreshFeed key="older-page" initialItems={[item(2, { importance: "viktig" })]} mutedCategories={[]} filtered />));
   expect(buttons("Viktige")[0].getAttribute("aria-pressed")).toBe("true");
   expect(container.querySelectorAll("article")).toHaveLength(1);
+});
+
+function liveItem(next: FeedItem) {
+  vi.mocked(useFeedStreamSubscription).mock.calls.at(-1)![0].onItem?.(next);
+}
+
+it("automatically inserts live notices without replacing the focused editor or its edits", async () => {
+  await act(() => root.render(<RefreshFeed initialItems={[item(1)]} mutedCategories={[]} filtered={false} />));
+  const editor = container.querySelector('[aria-label="Rediger notistekst"]') as HTMLElement;
+  await act(() => {
+    editor.focus();
+    editor.innerHTML = "<p>Keep my current edit.</p>";
+    editor.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await act(() => liveItem(item(2)));
+  await act(() => liveItem(item(2)));
+  expect(Array.from(container.querySelectorAll("article")).map((card) => card.id)).toEqual(["notice-2", "notice-1"]);
+  expect(container.querySelector('#notice-1 [aria-label="Rediger notistekst"]')).toBe(editor);
+  expect(document.activeElement).toBe(editor);
+  expect(editor.textContent).toBe("Keep my current edit.");
+  expect(container.textContent).not.toMatch(/ny melding|nye meldinger/);
+  expect(window.scrollTo).not.toHaveBeenCalled();
+  await act(() => liveItem(item(1, { rewriteId: "updated", contentHash: "updated", publicationRevision: 2, title: "Regenerated title" })));
+  expect(editor.textContent).toBe("Keep my current edit.");
+  expect(container.querySelector("#notice-1")?.textContent).toContain("Ny versjon klar");
+});
+
+it("keeps a scrolled card at the same viewport position when a notice arrives", async () => {
+  await act(() => root.render(<RefreshFeed initialItems={[item(1)]} mutedCategories={[]} filtered={false} />));
+  vi.spyOn(window, "scrollY", "get").mockReturnValue(400);
+  const card = container.querySelector("#notice-1")!;
+  vi.spyOn(card, "getBoundingClientRect").mockImplementation(() => {
+    const top = container.querySelector("#notice-2") ? 140 : -40;
+    return { top, bottom: top + 300, height: 300 } as DOMRect;
+  });
+  await act(() => liveItem(item(2)));
+  expect(window.scrollTo).toHaveBeenCalledWith({ top: 580, behavior: "instant" });
+});
+
+it("automatically merges matching server refreshes and excludes muted notices", async () => {
+  const renderFeed = (items: FeedItem[], filtered = true) =>
+    root.render(<RefreshFeed initialItems={items} mutedCategories={["HIDDEN"]} filtered={filtered} />);
+  await act(() => renderFeed([item(1)]));
+  await act(() => liveItem(item(2)));
+  expect(container.querySelector("#notice-2")).toBeNull();
+  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 300)); });
+  expect(mocks.refresh).toHaveBeenCalled();
+  await act(() => renderFeed([item(2), item(1)]));
+  expect(container.querySelector("#notice-2")).not.toBeNull();
+  expect(container.textContent).not.toMatch(/ny melding|nye meldinger/);
+  await act(() => renderFeed([item(2), item(1)], false));
+  await act(() => liveItem(item(3, { categories: ["HIDDEN"] })));
+  expect(container.querySelector("#notice-3")).toBeNull();
+});
+
+it("distinguishes usable generated text from source, processing and failed notices", async () => {
+  const source = { isFinal: false, rewriteId: null };
+  await act(() => root.render(<RefreshFeed initialItems={[
+    item(1),
+    item(2, { ...source, notGenerated: true }),
+    item(3, { ...source, processing: true }),
+    item(4, { ...source, failed: true }),
+    item(5, { publicationKind: "fast", rewriteId: "fast:5", regenerating: true }),
+    item(6, { regenerating: true }),
+    item(7, { ...source, skipped: true })
+  ]} mutedCategories={[]} filtered={false} />));
+  for (const id of [1, 5, 6]) {
+    const card = container.querySelector(`#notice-${id}`)!;
+    expect(card.getAttribute("data-generation-state")).toBe("generated");
+    expect(card.textContent).toContain("Generert");
+    expect(card.querySelector('[aria-label="Rediger notistekst"]')).not.toBeNull();
+  }
+  for (const id of [2, 3, 4, 7]) {
+    const card = container.querySelector(`#notice-${id}`)!;
+    expect(card.getAttribute("data-generation-state")).toBe("not-generated");
+    expect(card.textContent).toContain("Ikke generert");
+    expect(card.querySelector('[aria-label="Rediger notistekst"]')).toBeNull();
+  }
+  expect(container.querySelector("#notice-5")?.textContent).toContain("Generert · førsteutkast");
 });

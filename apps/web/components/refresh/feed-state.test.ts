@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { FeedItem } from "@newsweb/shared";
-import { initialFeedState, receiveFeedItem, revealIncoming, selectPending } from "./feed-state";
+import { initialFeedState, receiveFeedItem, selectPending } from "./feed-state";
 const item = {
   messageId: 1,
   publishedAt: "2026-09-07T07:00:00Z",
@@ -32,15 +32,14 @@ describe("refresh feed publications", () => {
     expect(state.entries[0].current).toBe(completed);
     expect(state.entries[0].pending).toBeUndefined();
   });
-  it("buffers and deduplicates new notices without moving existing cards", () => {
+  it("inserts and deduplicates new notices automatically in publication order", () => {
     const newer = { ...item, messageId: 2, publishedAt: "2026-09-07T08:00:00Z" };
     let state = receiveFeedItem(initialFeedState([item]), newer);
     state = receiveFeedItem(state, newer);
-    expect(state.entries.map((entry) => entry.current.messageId)).toEqual([1]);
-    expect(state.incoming).toHaveLength(1);
-    state = revealIncoming(state);
     expect(state.entries.map((entry) => entry.current.messageId)).toEqual([2, 1]);
-    expect(state.incoming).toEqual([]);
+    expect(state.entries[1].current).toBe(item);
+    state = receiveFeedItem(state, { ...newer, publicationRevision: 0, title: "Stale replay" });
+    expect(state.entries[0].current.title).toBe(newer.title);
   });
   it("shows the first usable publication directly when the source was waiting", () => {
     const waiting = { ...item, isFinal: false, rewriteId: null, publicationRevision: 0 };

@@ -44,6 +44,7 @@ export function RefreshCard({
 }) {
   const { current: item, latest, pending } = entry;
   const isFast = item.publicationKind === "fast";
+  const isGenerated = Boolean(item.isFinal && item.rewriteId);
   const firstDraft = fastDraftToFeedItem(latest);
   const [panel, setPanel] = useState<WorkspacePanel | null>(null);
   const [focused, setFocused] = useState(false);
@@ -184,7 +185,8 @@ export function RefreshCard({
     <article
       ref={cardRef}
       id={`notice-${item.messageId}`}
-      className={`${styles.card} ${item.importance === "viktig" ? styles.important : ""} ${panel ? styles.workspace : ""} ${focused ? styles.focused : ""}`}
+      className={`${styles.card} ${isGenerated ? styles.generated : styles.sourceOnly} ${item.importance === "viktig" ? styles.important : ""} ${panel ? styles.workspace : ""} ${focused ? styles.focused : ""}`}
+      data-generation-state={isGenerated ? "generated" : "not-generated"}
       aria-label={item.issuerName}
       onFocusCapture={(event) => {
         if (!editingHint || !(event.target as HTMLElement).closest('[contenteditable="true"]')) return;
@@ -198,9 +200,14 @@ export function RefreshCard({
             ← Feed
           </button>
         )}
-        {item.importance === "viktig" && <div className={styles.importance}>Viktig</div>}
-        {isFast && <div className={styles.versionLink}>Førsteutkast</div>}
-        {item.isFinal && item.rewriteId ? (
+        <div className={styles.cardStatus}>
+          <span className={styles.generationStatus}>
+            <span aria-hidden="true">{isGenerated ? "✓" : "○"}</span>
+            {isGenerated ? isFast ? "Generert · førsteutkast" : "Generert" : "Ikke generert"}
+          </span>
+          {item.importance === "viktig" && <span className={styles.importance}>Viktig</span>}
+        </div>
+        {isGenerated && item.rewriteId ? (
           <EditableRewrite
             key={`${item.rewriteId}:${item.contentHash}`}
             messageId={item.messageId}
