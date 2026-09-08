@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { needsNewsworthinessTriage } from "@newsweb/shared";
 import { describe, expect, it } from "vitest";
 import {
@@ -418,7 +419,8 @@ describe("getDeterministicTriageSkip", () => {
       "STVKO: 1. tertial 2026 Stavanger kommune",
       "Stavanger kommune legger frem rapport for 1. tertial 2026 med ordinære resultattall.",
       ["ANNEN INFORMASJONSPLIKTIG REGULATORISK INFORMASJON"],
-      true
+      true,
+      "Stavanger kommune"
     );
 
     expect(result?.newsworthy).toBe(false);
@@ -518,5 +520,74 @@ describe("parseTriageResponse", () => {
   it("defaults to newsworthy on missing field", () => {
     const result = parseTriageResponse('{"reason": "test"}');
     expect(result.newsworthy).toBe(true);
+  });
+});
+
+describe("conservative municipal report triage", () => {
+  const source = JSON.parse(readFileSync(new URL("../fixtures/notice-681799.json", import.meta.url), "utf8"));
+  const regulatory = ["ANNEN INFORMASJONSPLIKTIG REGULATORISK INFORMASJON"];
+  const evaluateMunicipal = (title: string, body: string, issuerName?: string, categories = regulatory) =>
+    evaluateTriageClasses(title, body, categories, false, issuerName, body, { enabledClasses: ["public-sector-results"] });
+
+  it.each([{ categories: source.categories }, { categories: regulatory }])("keeps the complete original bank merger with categories $categories", ({ categories }) => {
+    expect(source.messageId).toBe(681799);
+    expect(source.bodyText).toContain("Indre Fosen kommune");
+    expect(source.bodyText).toContain("normalisert resultat");
+    const result = evaluateTriageClasses(source.title, source.bodyText, categories, source.hasAttachments, source.issuerName, source.bodyText);
+    expect(result.enabledSkip).toBeNull();
+    expect(result.candidateClassIds).not.toContain("public-sector-results");
+  });
+
+  it.each(["Stadsbygd Sparebank", "Kommune Invest AS", "Municipal Finance Ltd", "Stavanger kommune Eiendom AS", "", undefined])(
+    "does not infer municipal identity from report text for %s", (issuerName) => {
+      const result = evaluateMunicipal("Årsrapport 2026", "Indre Fosen kommune omtales i rapporten. Normalisert resultat legges til grunn.", issuerName);
+      expect(result.candidateClassIds).not.toContain("public-sector-results");
+      expect(result.enabledSkip).toBeNull();
+    }
+  );
+
+  it.each([
+    ["Stavanger kommune", "STVKO: 1. tertial 2026"],
+    ["Haugesund kommune", "HGSKO: Årsmelding 2025"],
+    ["Tromsø kommune", "Årsregnskap 2025"],
+    ["Trøndelag fylkeskommune", "Kvartalsrapport 2026"],
+    ["  BÆRUM KOMMUNE  ", "ÅRSRAPPORT 2025"],
+    ["Bærum kommune", "Halvårsresultater 2026"],
+    ["Stavanger kommune", "Resultater for 1. kvartal 2026"],
+    ["Municipality of Oslo", "Interim results 2026"],
+    ["Oslo Municipality", "Annual accounts 2025"],
+    ["Municipality of Tromsø", "Quarterly report 2026"]
+  ])("retains municipal reporting for %s: %s", (issuerName, title) => {
+    const result = evaluateMunicipal(title, "Ordinær rapportering for perioden.", issuerName);
+    expect(result.enabledSkip?.classId).toBe("public-sector-results");
+    expect(result.enabledSkip?.reasonCode).toBe("TRIAGE_PUBLIC_SECTOR_RESULTS");
+  });
+
+  it.each(["Strategisk samarbeid", "Endringer i organisasjonen", "Normalisert resultat", "Oppdatering om regnskap"])(
+    "requires a reporting title: %s", (title) => {
+      expect(evaluateMunicipal(title, "Kommunens årsrapport og resultat for 2025 er bakgrunn for saken.", "Tromsø kommune").enabledSkip).toBeNull();
+    }
+  );
+
+  it.each([{ categories: ["INNSIDEINFORMASJON"] }, { categories: [...regulatory, "INNSIDEINFORMASJON"] }, { categories: [" innsideinformasjon "] }])(
+    "protects inside information with categories $categories", ({ categories }) => {
+      expect(evaluateMunicipal("Årsregnskap 2025", "Ordinær rapportering.", "Tromsø kommune", categories).candidateClassIds).not.toContain("public-sector-results");
+    }
+  );
+
+  it.each([
+    "nytt obligasjonslån", "new bond", "emisjon", "capital raise", "default", "rating downgrade",
+    "fusjonsplan", "fisjon", "sammenslåing", "oppkjøp", "kapitalomstrukturering",
+    "kapitalrestrukturering", "konvertering av grunnfondskapital", "merger", "demerger",
+    "acquisition", "takeover", "capital restructuring", "restructuring of the capital"
+  ])("protects a market event in the source title or body: %s", (event) => {
+    for (const [title, body] of [[`Årsregnskap 2025: ${event}`, "Ordinær rapportering."], ["Årsregnskap 2025", `Meldingen gjelder ${event}.`]]) {
+      expect(evaluateMunicipal(title, body, "Tromsø kommune").candidateClassIds).not.toContain("public-sector-results");
+    }
+  });
+
+  it("uses original source events even when supplemental report text is supplied", () => {
+    const result = evaluateTriageClasses("Årsregnskap 2025", "Ordinær rapportering.", regulatory, true, "Tromsø kommune", "Det er inngått en avtale om oppkjøp.", { enabledClasses: ["public-sector-results"] });
+    expect(result.enabledSkip).toBeNull();
   });
 });
