@@ -239,7 +239,10 @@ Implemented on `codex/next-generated-filter-20260908`:
   `GET /notice/:id/model-source?rewriteId=`, a new API route that resolves the published
   rewrite (active or explicit, same notice only) and reads
   `GenerationRun.inputJson.sourcePayload.pdfSupplementText` through `logPrisma` (the
-  runs may live in the log database). Returns `{ rewriteId, text, pageCount, attachmentId }`
+  runs may live in the log database). Quarterly and half-year runs store the text as
+  `reportText` (+ `reportPageCount`) and yearly reports as `remunerationText`; the
+  route reads all three (found on the live Karlsberg half-year card after the first
+  deploy, fixed in a follow-up release). Returns `{ rewriteId, text, pageCount, attachmentId }`
   and nothing else from the run. `[PDF page N]` markers become "Side N" headings;
   bare `---` dividers are dropped. Cached per version, retried on error, refetched when
   the selected version changes. Fixture preview: Nordvik has an attachment and text.

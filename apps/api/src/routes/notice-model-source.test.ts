@@ -98,6 +98,33 @@ describe("GET /notice/:messageId/model-source", () => {
     });
   });
 
+  it("reads the report text stored by the quarterly and yearly report paths", async () => {
+    mocks.publishedRewrite.findFirst.mockResolvedValue({ id: "pub-4", generationRunId: "run-4" });
+    mocks.generationRun.findUnique.mockResolvedValue({
+      inputJson: {
+        sourcePayload: {
+          bodyText: "Half-year notice",
+          reportText: "KEY METRICS\n\n[PDF page 2]\nRevenue rose",
+          reportPageCount: 48,
+          reportMetrics: { revenue: 1 }
+        }
+      }
+    });
+    const report = await app.inject({ method: "GET", url: "/notice/42/model-source?rewriteId=pub-4" });
+    expect(report.json()).toEqual({
+      rewriteId: "pub-4",
+      text: "KEY METRICS\n\n[PDF page 2]\nRevenue rose",
+      pageCount: 48,
+      attachmentId: null
+    });
+
+    mocks.generationRun.findUnique.mockResolvedValue({
+      inputJson: { sourcePayload: { bodyText: "Annual report", remunerationText: "CEO pay table" } }
+    });
+    const yearly = await app.inject({ method: "GET", url: "/notice/42/model-source?rewriteId=pub-4" });
+    expect(yearly.json()).toEqual({ rewriteId: "pub-4", text: "CEO pay table", pageCount: null, attachmentId: null });
+  });
+
   it("returns 404 for a notice without a published version", async () => {
     mocks.feedItem.findUnique.mockResolvedValue(null);
     const response = await app.inject({ method: "GET", url: "/notice/42/model-source" });

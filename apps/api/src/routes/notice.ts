@@ -437,13 +437,21 @@ export const noticeRoutes: FastifyPluginAsync = async (fastify) => {
         where: { id: published.generationRunId },
         select: { inputJson: true }
       });
+      // General notices carry the PDF as pdfSupplementText; quarterly and
+      // half-year runs store it as reportText, yearly reports as remunerationText.
       const sourcePayload = asRecord(asRecord(run?.inputJson).sourcePayload);
+      const firstText = (...candidates: unknown[]) =>
+        candidates.find((value) => typeof value === "string" && value.trim()) as string | undefined;
       const text =
-        typeof sourcePayload.pdfSupplementText === "string" &&
-        sourcePayload.pdfSupplementText.trim()
-          ? sourcePayload.pdfSupplementText
-          : null;
-      const pageCount = sourcePayload.pdfSupplementPageCount;
+        firstText(
+          sourcePayload.pdfSupplementText,
+          sourcePayload.reportText,
+          sourcePayload.remunerationText
+        ) ?? null;
+      const pageCount =
+        sourcePayload.pdfSupplementText != null
+          ? sourcePayload.pdfSupplementPageCount
+          : sourcePayload.reportPageCount;
       const attachmentId = sourcePayload.pdfSupplementAttachmentId;
       return reply.send(
         noticeModelSourceSchema.parse({
