@@ -1,7 +1,14 @@
-import { shouldSkipRewrite } from "@newsweb/shared";
+import { needsNewsworthinessTriage, shouldSkipRewrite } from "@newsweb/shared";
 import { describe, expect, it } from "vitest";
 
 describe("shouldSkipRewrite", () => {
+  it("assesses third-party disclosures instead of excluding major shareholder sales", () => {
+    const categories = ["MELDING FRA ANDRE AKTØRER"];
+    expect(shouldSkipRewrite(categories)).toBe(false);
+    expect(needsNewsworthinessTriage(categories)).toBe(true);
+    expect(shouldSkipRewrite([...categories, "EKS.DATO"])).toBe(false);
+  });
+
   it("skips purely mechanical categories", () => {
     expect(shouldSkipRewrite(["RENTEREGULERING"])).toBe(true);
     expect(shouldSkipRewrite(["EKS.DATO"])).toBe(true);

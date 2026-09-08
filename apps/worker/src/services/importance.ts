@@ -1,6 +1,7 @@
 import type { PromptPayload } from "@newsweb/prompt-kit";
 import type { RewriteOutput } from "@newsweb/shared";
 import { normalizeGuardrailText } from "./text-normalization.js";
+import { hasMaterialShareSale } from "./material-share-sale.js";
 
 const SEVERE_EVENT_KEYWORDS = [
   "profit warning",
@@ -113,13 +114,23 @@ function includesAny(text: string, keywords: string[]): boolean {
 
 export function hasImportantSourceSignals(payload: PromptPayload): boolean {
   const text = normalizeGuardrailText(`${payload.title}\n${payload.bodyText}`);
-  return includesAny(text, SEVERE_EVENT_KEYWORDS) || includesAny(text, HIGH_READER_INTEREST_KEYWORDS);
+  return hasMaterialShareSale(payload.title, payload.bodyText)
+    || includesAny(text, SEVERE_EVENT_KEYWORDS) || includesAny(text, HIGH_READER_INTEREST_KEYWORDS);
 }
 
 export function applyImportanceHighBar(
   rewrite: RewriteOutput,
   payload: PromptPayload
 ): { rewrite: RewriteOutput; adjusted: boolean; reason: string | null } {
+  if (hasMaterialShareSale(payload.title, payload.bodyText)) {
+    return rewrite.importance === "viktig"
+      ? { rewrite, adjusted: false, reason: null }
+      : {
+          rewrite: { ...rewrite, importance: "viktig" },
+          adjusted: true,
+          reason: "upgraded_material_share_sale"
+        };
+  }
   const sourceText = normalizeGuardrailText(`${payload.title}\n${payload.bodyText}`);
   const issuer = payload.issuerSign.toUpperCase();
 

@@ -17,6 +17,7 @@ NYHETSVERDIG (svar JA):
 - Oppkjøp, fusjoner, fisjoner
 - Nye kontrakter av betydelig verdi
 - Emisjoner, rettet emisjon, kapitalinnhenting
+- Store aksjesalg/nedsalg fra eksisterende aksjonærer, inkludert lansering av akselerert bookbuilding. Dette er nyheter selv om kategorien er «Melding fra andre aktører», selgeren ikke er selskapet, og pris/endelig antall først fastsettes senere.
 - Innsideinformasjon om drift, strategi, resultater
 - Store organisatoriske endringer (CEO-bytte, restrukturering)
 - Kvartals-/årsresultater med vesentlig innhold

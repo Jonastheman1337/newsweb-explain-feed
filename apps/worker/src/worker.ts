@@ -56,6 +56,7 @@ import {
 } from "./services/notice-claim-precautions.js";
 import { createFastDraftService } from "./services/fast-draft.js";
 import { applyImportanceHighBar } from "./services/importance.js";
+import { hasMaterialShareSale } from "./services/material-share-sale.js";
 import {
   appendRevisionChecklist,
   isAmbiguousBareRemovalInstruction,
@@ -3791,6 +3792,7 @@ const rewriteWorker = new Worker<RewriteJobData>(
       }
 
       const categories = ((source.categoriesJson as string[]) ?? []).map(fixDoubleEncodedUtf8);
+      const materialShareSale = hasMaterialShareSale(source.title, source.bodyText);
 
       const payload: PromptPayload = {
         messageId: source.messageId,
@@ -3905,7 +3907,7 @@ const rewriteWorker = new Worker<RewriteJobData>(
       }
 
       // Skip full AI rewrite for mechanical categories, unless manually triggered
-      if (job.data.reason !== "manual-reprocess" && shouldSkipRewrite(categories)) {
+      if (job.data.reason !== "manual-reprocess" && !materialShareSale && shouldSkipRewrite(categories)) {
         await setGenerationPhase(logPrisma, generationRunId, "analyzing_content");
         await upsertRewrite({
           messageId,
@@ -4204,13 +4206,14 @@ const rewriteWorker = new Worker<RewriteJobData>(
           (classId) => !defaultEnabledTriageClasses.includes(classId)
         );
       const triageTelemetryJson = {
+        materialShareSale,
         enabledClasses: [...activeTriageEnabledClasses],
         // Non-null only when an enabled skip was bypassed (manual reprocess)
         // or the run persisted despite a matching enabled class.
         bypassedSkipClassId: triageEvaluation.enabledSkip?.classId ?? null,
         shadowSkipClassIds: triageShadowSkipClassIds
       };
-      if (job.data.reason !== "manual-reprocess") {
+      if (job.data.reason !== "manual-reprocess" && !materialShareSale) {
         const deterministicSkip = triageEvaluation.enabledSkip;
         if (deterministicSkip) {
           console.log(
@@ -4256,7 +4259,7 @@ const rewriteWorker = new Worker<RewriteJobData>(
       }
 
       // AI triage for ambiguous categories — lightweight check before full pipeline
-      if (job.data.reason !== "manual-reprocess" && needsNewsworthinessTriage(categories)) {
+      if (job.data.reason !== "manual-reprocess" && !materialShareSale && needsNewsworthinessTriage(categories)) {
         const triage = await callModelTriage(
           source.title,
           source.bodyText,
