@@ -12,6 +12,7 @@ export type RefreshFilterValues = {
   category?: string;
   issuer?: string;
   important?: string;
+  generated?: string;
 };
 type Option = { value: string; label: string };
 
@@ -50,7 +51,7 @@ export function RefreshFilters({
 
   function without(name: string) {
     const query = new URLSearchParams();
-    for (const key of ["q", "market", "category", "issuer", "important"] as const) {
+    for (const key of ["q", "market", "category", "issuer", "important", "generated"] as const) {
       if (key !== name && params[key]) query.set(key, params[key]!);
     }
     return `/next${query.size ? `?${query}` : ""}`;
@@ -64,6 +65,7 @@ export function RefreshFilters({
           <button type="submit">Søk</button>
         </div>
         {params.important === "1" && <input type="hidden" name="important" value="1" />}
+        {params.generated === "1" && <input type="hidden" name="generated" value="1" />}
         <details
           ref={filtersRef}
           className={styles.filterPopover}

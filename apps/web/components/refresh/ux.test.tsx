@@ -235,5 +235,5 @@ it("uses legacy source dimming without generation badges and leaves processing n
     expect(card.querySelector('[aria-label="Rediger notistekst"]')).toBeNull();
   }
   expect(container.querySelector("#notice-5")?.textContent).toContain("Førsteutkast");
-  expect(container.textContent).not.toMatch(/Generert|Ikke generert|Oppdateres automatisk/);
+  expect(Array.from(container.querySelectorAll("article")).map((card) => card.textContent).join(" ")).not.toMatch(/Generert|Ikke generert|Oppdateres automatisk/);
 });

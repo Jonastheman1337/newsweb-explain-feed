@@ -51,7 +51,7 @@ export default async function RefreshPage({ searchParams }: { searchParams: Prom
           key={JSON.stringify(params)}
           initialItems={feed.items}
           mutedCategories={muted.mutedCategories}
-          filtered={Object.entries(params).some(([key, value]) => key !== "important" && !!value)}
+          filtered={Object.entries(params).some(([key, value]) => key !== "important" && key !== "generated" && !!value)}
         />
         {feed.nextCursor && (
           <Link className={styles.nextPage} href={`/next?${next}`}>

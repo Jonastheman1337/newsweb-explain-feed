@@ -44,11 +44,13 @@ export function RefreshFeed({
     if (offset) window.scrollTo({ top: window.scrollY + offset, behavior: "instant" });
   }, [state]);
   const searchParams = useSearchParams();
-  const importantOnly = searchParams.get("important") === "1";
-  function setImportantOnly(important: boolean) {
+  const generatedOnly = searchParams.get("generated") === "1";
+  const importantOnly = !generatedOnly && searchParams.get("important") === "1";
+  function setView(view: "all" | "important" | "generated") {
     const query = new URLSearchParams(searchParams.toString());
-    if (important) query.set("important", "1");
-    else query.delete("important");
+    query.delete("important");
+    query.delete("generated");
+    if (view !== "all") query.set(view, "1");
     router.replace(`/next${query.size ? `?${query}` : ""}`, { scroll: false });
   }
   const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -101,21 +103,24 @@ export function RefreshFeed({
     onReconnect: refresh
   });
   const entries = state.entries.filter(
-    (entry) => isVisible(entry.latest) && (!importantOnly || (entry.latest.isFinal ? entry.latest : entry.current).importance === "viktig")
+    (entry) => isVisible(entry.latest) && (!generatedOnly || (entry.current.isFinal && !!entry.current.rewriteId)) && (!importantOnly || (entry.latest.isFinal ? entry.latest : entry.current).importance === "viktig")
   );
   return (
     <>
       <div className={styles.viewBar}>
         <div role="group" aria-label="Vis meldinger">
-          <button aria-pressed={!importantOnly} onClick={() => setImportantOnly(false)}>
+          <button aria-pressed={!importantOnly && !generatedOnly} onClick={() => setView("all")}>
             Alle
           </button>
-          <button aria-pressed={importantOnly} onClick={() => setImportantOnly(true)}>
+          <button aria-pressed={importantOnly} onClick={() => setView("important")}>
             Viktige
+          </button>
+          <button aria-pressed={generatedOnly} onClick={() => setView("generated")}>
+            Genererte
           </button>
         </div>
         <span className={styles.feedCount} role="status" aria-atomic="true">
-          {entries.length} {importantOnly ? (entries.length === 1 ? "viktig på denne siden" : "viktige på denne siden") : (entries.length === 1 ? "melding" : "meldinger")}
+          {entries.length} {generatedOnly ? (entries.length === 1 ? "generert på denne siden" : "genererte på denne siden") : importantOnly ? (entries.length === 1 ? "viktig på denne siden" : "viktige på denne siden") : (entries.length === 1 ? "melding" : "meldinger")}
           {!!mutedCategories.length && <span>{mutedCategories.length} {mutedCategories.length === 1 ? "kategori skjult" : "kategorier skjult"}</span>}
         </span>
       </div>
@@ -140,7 +145,7 @@ export function RefreshFeed({
           />
         ))}
       </div>
-      {!entries.length && <p className={styles.empty}>{importantOnly ? "Ingen viktige meldinger på denne siden." : "Ingen meldinger som passer med søket og filtrene."}</p>}
+      {!entries.length && <p className={styles.empty}>{generatedOnly ? "Ingen genererte notiser på denne siden." : importantOnly ? "Ingen viktige meldinger på denne siden." : "Ingen meldinger som passer med søket og filtrene."}</p>}
     </>
   );
 }
