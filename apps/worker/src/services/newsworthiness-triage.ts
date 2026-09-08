@@ -187,19 +187,22 @@ const REMINDER_OUTCOME_PATTERNS = [
   /\b(?:resultat|driftsresultat|inntekter|omsetning|utbytte|contract|kontrakt)\b/i
 ];
 
-const PUBLIC_SECTOR_RESULT_PATTERNS = [
-  /\bkommune\b/i,
-  /\bfylkeskommune\b/i,
-  /\bmunicipal(?:ity)?\b/i
+// Issuer identity must come from metadata, never a municipality mentioned in
+// a corporate announcement. Unknown identities proceed to editorial processing.
+const MUNICIPAL_ISSUER_PATTERNS = [
+  /^\p{L}[\p{L}\p{M} .’'()-]*\s+(?:fylkeskommune|kommune)$/iu,
+  /^municipality\s+of\s+\p{L}[\p{L}\p{M} .’'()-]*$/iu,
+  /^\p{L}[\p{L}\p{M} .’'()-]*\s+municipality$/iu
 ];
 
-const RESULT_REPORT_PATTERNS = [
-  /\b\d+\.\s*tertial\b/i,
-  /\btertial\s+\d{4}\b/i,
-  /\b(?:tertial|kvartal|quarter|interim|financial)\s+(?:report|rapport)\b/i,
-  /\b(?:resultat|regnskap|årsrapport|arsrapport|annual report)\b/i,
-  /\b(?:\u00e5rsrapport|arsrapport|\u00e5rsmelding|arsmelding|annual report)\b/i,
-  /\u00e5rsrapport|\u00e5rsmelding/i
+// Only a reporting title qualifies; incidental body words such as "resultat"
+// do not establish that the announcement is a periodic report.
+const PUBLIC_SECTOR_REPORT_TITLE_PATTERNS = [
+  /(?<!\p{L})(?:årsrapport(?:en|er)?|arsrapport(?:en|er)?|årsmelding(?:en|er)?|arsmelding(?:en|er)?|årsregnskap(?:et)?|arsregnskap(?:et)?|kvartalsrapport(?:en|er)?|kvartalsresultat(?:er)?|halvårsrapport(?:en|er)?|halvårsresultat(?:er)?|delårsrapport(?:en|er)?)(?!\p{L})/iu,
+  /(?<!\p{L})(?:annual\s+(?:reports?|accounts|results)|(?:quarterly|interim|half[- ]year)\s+(?:reports?|results|accounts))(?!\p{L})/iu,
+  /(?<!\p{L})(?:regnskap|resultat(?:er)?)\s+(?:for\s+)?(?:\d{4}|[1-4]\.\s*kvartal|[12]\.\s*halvår)(?!\p{L})/iu,
+  /(?<![\p{L}\d])(?:[1-3]\.\s*tertial|tertial\s+[1-3](?!\d)|tertialrapport\s+(?:[1-3](?!\d)|\d{4}))(?!\p{L})/iu,
+  /(?<!\p{L})(?:q[1-4]|[1-4]\.\s*kvartal)\s+(?:\d{4}\s+)?(?:report|rapport|results|resultater)(?!\p{L})/iu
 ];
 
 const PUBLIC_SECTOR_MARKET_EVENT_PATTERNS = [
@@ -208,7 +211,9 @@ const PUBLIC_SECTOR_MARKET_EVENT_PATTERNS = [
   /\bemisjon\b/i,
   /\bcapital raise\b/i,
   /\bdefault\b/i,
-  /\b(?:downgrade|upgrade|rating)\b/i
+  /\b(?:downgrade|upgrade|rating)\b/i,
+  /(?<!\p{L})(?:fusjon\p{L}*|fisjon\p{L}*|sammenslåing\p{L}*|sammenslått\p{L}*|oppkjøp\p{L}*|kapitalinnhenting\p{L}*|kapitalomstrukturering\p{L}*|kapitalrestrukturering\p{L}*|konvertering\p{L}*\s+av\s+(?:grunnfonds)?kapital)(?!\p{L})/iu,
+  /(?<!\p{L})(?:mergers?|demergers?|acquisitions?|takeovers?|capital\s+(?:restructuring|reorganisation|reorganization)|restructuring\s+of\s+(?:the\s+)?capital)(?!\p{L})/iu
 ];
 
 const ROUTINE_BOND_PATTERNS = [
@@ -364,6 +369,8 @@ function maxNokAmount(text: string): number | null {
 
 type TriageTextViews = {
   title: string;
+  issuerName: string;
+  categories: readonly string[];
   bodyText: string;
   text: string;
   sourceOnlyText: string;
@@ -377,8 +384,7 @@ type TriageClassDefinition = {
   match: (views: TriageTextViews) => boolean;
 };
 
-// Registry order must mirror triageClassIds; each match body is the original
-// rule logic verbatim.
+// Registry order must mirror triageClassIds; each predicate is scoped to its class.
 const triageClassDefinitions: readonly TriageClassDefinition[] = [
   {
     id: "document-only",
@@ -413,10 +419,11 @@ const triageClassDefinitions: readonly TriageClassDefinition[] = [
     id: "public-sector-results",
     reasonCode: "TRIAGE_PUBLIC_SECTOR_RESULTS",
     reason:
-      "Rutinemessig kommune-/offentlig resultatsak uten konkret kapitalmarkedshendelse eller substansielle tall.",
+      "Periodisk rapport fra kommune/fylkeskommune uten identifisert kapitalmarkeds- eller selskapshendelse.",
     match: (views) =>
-      hasAnyPattern(views.text, PUBLIC_SECTOR_RESULT_PATTERNS) &&
-      hasAnyPattern(views.text, RESULT_REPORT_PATTERNS) &&
+      hasAnyPattern(views.issuerName, MUNICIPAL_ISSUER_PATTERNS) &&
+      hasAnyPattern(views.title, PUBLIC_SECTOR_REPORT_TITLE_PATTERNS) &&
+      !views.categories.includes("INNSIDEINFORMASJON") &&
       !hasAnyPattern(views.marketEventText, PUBLIC_SECTOR_MARKET_EVENT_PATTERNS)
   },
   {
@@ -498,11 +505,14 @@ if (
 function buildTriageTextViews(
   title: string,
   bodyText: string,
-  issuerName?: string,
-  sourceBodyText?: string
+  issuerName: string | undefined,
+  sourceBodyText: string | undefined,
+  categories: readonly string[]
 ): TriageTextViews {
   return {
     title,
+    issuerName: issuerName?.normalize("NFC").trim() ?? "",
+    categories: categories.map((category) => category.trim().toUpperCase()),
     bodyText,
     text: [title, issuerName, bodyText].filter(Boolean).join("\n").trim(),
     sourceOnlyText: [title, issuerName, sourceBodyText ?? bodyText]
@@ -527,13 +537,13 @@ export type TriageShadowEvaluation = {
 export function evaluateTriageClasses(
   title: string,
   bodyText: string,
-  _categories: string[],
+  categories: string[],
   _hasAttachments?: boolean,
   issuerName?: string,
   sourceBodyText?: string,
   options?: { enabledClasses?: readonly TriageClassId[] }
 ): TriageShadowEvaluation {
-  const views = buildTriageTextViews(title, bodyText, issuerName, sourceBodyText);
+  const views = buildTriageTextViews(title, bodyText, issuerName, sourceBodyText, categories);
   const enabled = new Set(options?.enabledClasses ?? defaultEnabledTriageClasses);
   const candidates = triageClassDefinitions.filter((definition) =>
     definition.match(views)
