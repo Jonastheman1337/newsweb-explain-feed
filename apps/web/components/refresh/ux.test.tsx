@@ -7,6 +7,7 @@ import { RefreshCard } from "./refresh-card";
 import { RefreshFeed } from "./refresh-feed";
 import { RefreshFilters } from "./filters";
 import { useFeedStreamSubscription } from "../feed-stream-provider";
+import styles from "./refresh.module.css";
 import RefreshPage from "../../app/(refresh)/next/page";
 
 const mocks = vi.hoisted(() => ({
@@ -210,7 +211,7 @@ it("automatically merges matching server refreshes and excludes muted notices", 
   expect(container.querySelector("#notice-3")).toBeNull();
 });
 
-it("distinguishes usable generated text from source, processing and failed notices", async () => {
+it("uses legacy source dimming without generation badges and leaves processing notices visible", async () => {
   const source = { isFinal: false, rewriteId: null };
   await act(() => root.render(<RefreshFeed initialItems={[
     item(1),
@@ -224,14 +225,15 @@ it("distinguishes usable generated text from source, processing and failed notic
   for (const id of [1, 5, 6]) {
     const card = container.querySelector(`#notice-${id}`)!;
     expect(card.getAttribute("data-generation-state")).toBe("generated");
-    expect(card.textContent).toContain("Generert");
+    expect(card.classList.contains(styles.sourceOnly)).toBe(false);
     expect(card.querySelector('[aria-label="Rediger notistekst"]')).not.toBeNull();
   }
   for (const id of [2, 3, 4, 7]) {
     const card = container.querySelector(`#notice-${id}`)!;
     expect(card.getAttribute("data-generation-state")).toBe("not-generated");
-    expect(card.textContent).toContain("Ikke generert");
+    expect(card.classList.contains(styles.sourceOnly)).toBe(id !== 3);
     expect(card.querySelector('[aria-label="Rediger notistekst"]')).toBeNull();
   }
-  expect(container.querySelector("#notice-5")?.textContent).toContain("Generert · førsteutkast");
+  expect(container.querySelector("#notice-5")?.textContent).toContain("Førsteutkast");
+  expect(container.textContent).not.toMatch(/Generert|Ikke generert|Oppdateres automatisk/);
 });

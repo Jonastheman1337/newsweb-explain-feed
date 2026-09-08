@@ -114,13 +114,10 @@ export function RefreshFeed({
             Viktige
           </button>
         </div>
-        <span className={styles.feedCount}>
+        <span className={styles.feedCount} role="status" aria-atomic="true">
           {entries.length} {importantOnly ? (entries.length === 1 ? "viktig på denne siden" : "viktige på denne siden") : (entries.length === 1 ? "melding" : "meldinger")}
           {!!mutedCategories.length && <span>{mutedCategories.length} {mutedCategories.length === 1 ? "kategori skjult" : "kategorier skjult"}</span>}
         </span>
-      </div>
-      <div className={styles.visuallyHidden} role="status" aria-atomic="true">
-        {entries.length} {entries.length === 1 ? "melding" : "meldinger"} i feeden. Oppdateres automatisk.
       </div>
       <div className={styles.feed} ref={feedRef}>
         {entries.map((entry) => (

@@ -261,45 +261,15 @@
 .important {
   border-top: 2px solid var(--refresh-accent);
 }
-.generated {
-  border-left: 3px solid var(--accent-2);
-}
+/* Match the legacy source-only flow; an opened source stays fully readable. */
 .sourceOnly {
-  background: color-mix(in srgb, var(--bg-soft) 55%, var(--bg-panel));
-  border-style: dashed;
+  opacity: 0.5;
 }
-.sourceOnly.important {
-  border-top-style: solid;
+.sourceOnly.workspace {
+  opacity: 1;
 }
-.cardStatus {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px 12px;
-  margin-bottom: 12px;
-  font-size: 12px;
-}
-.generationStatus {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-weight: 600;
-  color: var(--ink-soft);
-}
-.generated .generationStatus {
-  color: var(--ink);
-}
-.generated .generationStatus > span {
-  color: var(--accent-2);
-}
-.cardStatus .importance {
-  margin: 0;
-}
-.sourceOnly .waiting h2 {
-  font-size: 18px;
-  line-height: 1.4;
-  font-weight: 500;
-  letter-spacing: -0.2px;
+.sourceOnly.workspace > .editorPane {
+  opacity: 0.5;
 }
 .dateline {
   color: var(--ink-soft);
