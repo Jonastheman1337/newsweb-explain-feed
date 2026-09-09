@@ -244,7 +244,7 @@
   margin-left: auto;
   padding-inline: 12px;
   font-weight: 600;
-  border-color: var(--editor-edge-active);
+  border-color: transparent;
   background: color-mix(in srgb, var(--ink) 12%, transparent);
 }
 .card .generateAction:hover {
