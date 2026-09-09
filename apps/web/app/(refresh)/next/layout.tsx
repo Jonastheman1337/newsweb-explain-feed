@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { FeedStreamProvider } from "../../../components/feed-stream-provider";
 import { ThemeToggle } from "../../../components/theme-toggle";
 import { NotificationToggle } from "../../../components/notification-toggle";
+import { FeedConnection } from "../../../components/refresh/feed-connection";
 import { getSessionToken } from "../../../lib/session";
 import { readUiFeatures } from "../../../lib/ui-features";
 import styles from "../../../components/refresh/refresh.module.css";
@@ -26,6 +27,7 @@ export default async function RefreshLayout({ children }: { children: React.Reac
             <Link href="/feed">Klassisk</Link>
           </nav>
           <div className={styles.tools}>
+            <FeedConnection fixtures={process.env.UI_PREVIEW_FIXTURES === "true"} />
             <NotificationToggle />
             <ThemeToggle />
           </div>

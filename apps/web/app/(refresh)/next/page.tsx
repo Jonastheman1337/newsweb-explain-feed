@@ -2,7 +2,6 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getFeed, getMetaFilters, getMutedCategories, isApiAuthError } from "../../../lib/api";
 import { getSessionToken } from "../../../lib/session";
-import { FeedConnection } from "../../../components/refresh/feed-connection";
 import { RefreshFilters, type RefreshFilterValues } from "../../../components/refresh/filters";
 import { RefreshFeed } from "../../../components/refresh/refresh-feed";
 import { formatCategoryLabel } from "../../../lib/format-category";
@@ -45,7 +44,6 @@ export default async function RefreshPage({ searchParams }: { searchParams: Prom
           categories={filters.categories.map((category) => ({ value: category.categoryNo, label: formatCategoryLabel(category.categoryNo) }))}
           issuers={filters.issuers.map((issuer) => ({ value: issuer.symbol, label: `${issuer.name} (${issuer.symbol})` }))}
           mutedCategories={muted.mutedCategories}
-          connection={<FeedConnection fixtures={process.env.UI_PREVIEW_FIXTURES === "true"} />}
         />
         <RefreshFeed
           key={JSON.stringify(params)}

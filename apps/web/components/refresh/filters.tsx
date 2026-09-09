@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { SearchableSelect } from "../searchable-select";
 import { Preferences } from "./preferences";
@@ -21,15 +21,13 @@ export function RefreshFilters({
   markets,
   categories,
   issuers,
-  mutedCategories,
-  connection
+  mutedCategories
 }: {
   params: RefreshFilterValues;
   markets: Option[];
   categories: Option[];
   issuers: Option[];
   mutedCategories: string[];
-  connection: ReactNode;
 }) {
   const filtersRef = useRef<HTMLDetailsElement>(null);
   useEffect(() => {
@@ -89,7 +87,6 @@ export function RefreshFilters({
             <Preferences categories={categories.map((category) => category.value)} defaultMuted={mutedCategories} />
           </div>
         </details>
-        {connection}
       </div>
       {active.length > 0 && (
         <div className={styles.activeFilters} aria-label="Aktive søk og filter">

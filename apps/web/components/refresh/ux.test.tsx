@@ -169,7 +169,6 @@ it("searches an issuer by ticker and preserves the important view in the submitt
         markets={[]}
         categories={[]}
         mutedCategories={[]}
-        connection={null}
         issuers={[
           { value: "EQNR", label: "Equinor ASA (EQNR)" },
           { value: "DNB", label: "DNB Bank ASA (DNB)" },
