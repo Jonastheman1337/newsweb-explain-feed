@@ -1084,12 +1084,26 @@ export const noticeRoutes: FastifyPluginAsync = async (fastify) => {
 
       const source = await prisma.sourceNotice.findUnique({
         where: { messageId },
-        select: { messageId: true }
+        select: {
+          messageId: true,
+          rewrites: {
+            orderBy: { version: "desc" },
+            take: 1,
+            select: { status: true }
+          }
+        }
       });
 
       if (!source) {
         return reply.code(404).send({ message: "Notis ikke funnet." });
       }
+
+      // Resolve this on the server so every client escalates failed notices.
+      // Keep requestInput unchanged for idempotent request comparisons.
+      const reasoningEffortOverride =
+        source.rewrites[0]?.status === "failed"
+          ? "xhigh"
+          : body?.reasoningEffortOverride;
 
       if (body?.clientRequestId) {
         const { telemetry, ...requestInput } = body;
@@ -1136,6 +1150,9 @@ export const noticeRoutes: FastifyPluginAsync = async (fastify) => {
             clientRequestId: body.clientRequestId,
             snapshot: {
               ...asRecord(prior.snapshotJson),
+              ...(prior.status === "failed" || reasoningEffortOverride === "xhigh"
+                ? { reasoningEffortOverride: "xhigh" }
+                : {}),
               requestInput,
               retryOf: prior.generationRunId
             }
@@ -1196,7 +1213,7 @@ export const noticeRoutes: FastifyPluginAsync = async (fastify) => {
             instruction: body.instruction?.trim() || null,
             outputMode: body.outputMode ?? "notice",
             maxVisibleArticleChars: body.maxVisibleArticleChars ?? 1000,
-            reasoningEffortOverride: body.reasoningEffortOverride ?? null,
+            reasoningEffortOverride: reasoningEffortOverride ?? null,
             supplementalMaterials,
             telemetry: telemetry ?? null
           }
@@ -1234,7 +1251,6 @@ export const noticeRoutes: FastifyPluginAsync = async (fastify) => {
       const instruction = body?.instruction?.trim() || undefined;
       const outputMode = body?.outputMode ?? "notice";
       const maxVisibleArticleChars = body?.maxVisibleArticleChars;
-      const reasoningEffortOverride = body?.reasoningEffortOverride;
       const supplementalMaterials = await selectedMaterialSnapshots(
         messageId,
         body?.selectedMaterialIds
