@@ -17,6 +17,14 @@
     "./openai-responses": {
       "types": "./dist/openai-responses.d.ts",
       "default": "./dist/openai-responses.js"
+    },
+    "./generation-context": {
+      "types": "./dist/generation-context.d.ts",
+      "default": "./dist/generation-context.js"
+    },
+    "./generation-control": {
+      "types": "./dist/generation-control.d.ts",
+      "default": "./dist/generation-control.js"
     }
   },
   "scripts": {

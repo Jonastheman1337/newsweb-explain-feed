@@ -324,3 +324,10 @@ describe("generation status", () => {
     });
   });
 });
+
+
+it("treats acknowledged cancellation as terminal even when the last phase was writing",()=>{
+ const run={id:"cancelled-run",status:"cancelled",phase:"writing_notice",phaseUpdatedAt:new Date()};
+ expect(isGenerationRunActive(run)).toBe(false);
+ expect(buildGenerationStatusPayload({generationRun:run,rewrite:{status:"failed",version:2,generatedAt:new Date()},jobState:"completed"})).toMatchObject({ready:false,failed:false,phase:null});
+});

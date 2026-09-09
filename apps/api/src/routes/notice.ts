@@ -1,3 +1,6 @@
+import { NOTICE_EDITOR_CAPABILITIES, noticeEditorSnapshotSchema } from "@newsweb/shared";
+import { createGenerationRequest, cancelGenerationRequest, generationControlPayload, generationJobId, resolveNoticeEditorBase, InvalidEditorBaseError, snapshotHash } from "@newsweb/shared/generation-control";
+import { fetchUrlMaterial } from "../services/url-material.js";
 import {
   fixDoubleEncodedUtf8,
   normalizeRewriteJson,
@@ -71,12 +74,16 @@ function asRecord(value: unknown): Record<string, unknown> {
 }
 
 const statusQuerySchema = z.object({
-  jobId: z.string().optional()
+  jobId: z.string().optional(),
+  generationRunId: z.string().min(1).max(100).optional()
 });
 
 const generateBodySchema = z
   .object({
     instruction: z.string().max(2000).optional(),
+    clientRequestId: z.string().uuid().optional(),
+    retryOf: z.string().min(1).max(100).optional(),
+    baseSnapshot: noticeEditorSnapshotSchema.optional(),
     outputMode: outputModeSchema.optional(),
     // Visible-text cap chosen by the user; overrides the outputMode default.
     maxVisibleArticleChars: z.number().int().min(300).max(4000).optional(),
@@ -217,7 +224,8 @@ async function ensureNoticeExists(messageId: number): Promise<boolean> {
 
 async function selectedMaterialSnapshots(
   messageId: number,
-  selectedMaterialIds?: string[]
+  selectedMaterialIds?: string[],
+  requireSelected = false
 ): Promise<MaterialSnapshot[]> {
   if (selectedMaterialIds && selectedMaterialIds.length === 0) {
     return [];
@@ -233,6 +241,9 @@ async function selectedMaterialSnapshots(
     orderBy: { createdAt: "asc" }
   });
 
+  if (requireSelected && selectedMaterialIds && materials.length !== new Set(selectedMaterialIds).size) {
+    throw new Error("SELECTED_MATERIAL_NOT_READY");
+  }
   const truncationMarker = "\n\n[... mer valgt materiale er avkortet ...]";
   let remainingChars = MAX_TOTAL_MATERIAL_TEXT_CHARS;
   const snapshots: MaterialSnapshot[] = [];
@@ -258,6 +269,86 @@ async function selectedMaterialSnapshots(
 }
 
 export const noticeRoutes: FastifyPluginAsync = async (fastify) => {
+  fastify.get(
+    "/notice/editor-capabilities",
+    { preHandler: fastify.authenticate },
+    async (_request, reply) => {
+      const workerReady = await fastify.redis.get(
+        "newsweb:notice-editor-worker:v1"
+      );
+      reply.header("Cache-Control", "private, no-store");
+      return {
+        ...NOTICE_EDITOR_CAPABILITIES,
+        queuedGeneration: !!workerReady,
+        cancellation: !!workerReady
+      };
+    }
+  );
+  fastify.post(
+    "/notice/:messageId/generations/:generationRunId/cancel",
+    { preHandler: fastify.authenticate },
+    async (request, reply) => {
+      const { messageId, generationRunId } = z
+        .object({
+          messageId: z.coerce.number().int().positive(),
+          generationRunId: z.string().min(1).max(100)
+        })
+        .parse(request.params);
+      const result = await cancelGenerationRequest(
+        prisma,
+        messageId,
+        generationRunId
+      );
+      if (!result)
+        return reply.code(404).send({ message: "Forespørselen finnes ikke." });
+      await fastify.redis
+        .publish(
+          "newsweb:generation-cancel",
+          JSON.stringify({ messageId, generationRunId })
+        )
+        .catch(() => {});
+      return generationControlPayload(result);
+    }
+  );
+  fastify.post(
+    "/notice/:messageId/materials/url",
+    { preHandler: fastify.authenticate },
+    async (request, reply) => {
+      const { messageId } = paramsSchema.parse(request.params);
+      if (!(await ensureNoticeExists(messageId)))
+        return reply.code(404).send({ message: "Notis ikke funnet." });
+      const { url } = z
+        .object({ url: z.string().min(1).max(4000) })
+        .parse(request.body);
+      const result = await fetchUrlMaterial(url, { maxChars: 15000 });
+      let fallback = url;
+      try {
+        fallback = new URL(url).hostname;
+      } catch {}
+      const material = await prisma.noticeMaterial.create({
+        data: {
+          messageId,
+          kind: "url",
+          title: result.ok ? result.title : sanitizeMaterialTitle(fallback),
+          url: result.ok ? result.finalUrl : url,
+          extractedText: result.ok ? result.text : "",
+          status: result.ok ? "ready" : "failed",
+          enabled: true,
+          errorText: result.ok ? null : result.errorText,
+          metadataJson: toJsonValue(
+            result.ok
+              ? {
+                  requestedUrl: url,
+                  contentType: result.contentType,
+                  pageCount: result.pageCount ?? null
+                }
+              : { requestedUrl: url, errorCode: result.errorCode }
+          )
+        }
+      });
+      return reply.code(201).send(materialPayload(material));
+    }
+  );
   fastify.get(
     "/notice/:messageId",
     {
@@ -726,7 +817,13 @@ export const noticeRoutes: FastifyPluginAsync = async (fastify) => {
     },
     async (request, reply) => {
       const { messageId } = paramsSchema.parse(request.params);
-      const { jobId } = statusQuerySchema.parse(request.query);
+      const { jobId, generationRunId } = statusQuerySchema.parse(request.query);
+      if (generationRunId) {
+        const row=await prisma.noticeGenerationControl.findFirst({where:{generationRunId,messageId}});
+        if (!row) return reply.code(404).send({message:"Forespørselen finnes ikke."});
+        reply.header("Cache-Control","private, no-store");
+        return {request:generationControlPayload(row),ready:row.status==="published",failed:row.status==="failed",generationRunId,version:row.targetVersion,rewriteId:row.resultRewriteId};
+      }
       const rewrite = await prisma.rewrite.findFirst({
         where: { messageId },
         orderBy: { generatedAt: "desc" },
@@ -994,6 +1091,146 @@ export const noticeRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.code(404).send({ message: "Notis ikke funnet." });
       }
 
+      if (body?.clientRequestId) {
+        const { telemetry, ...requestInput } = body;
+        const existing = await prisma.noticeGenerationControl.findUnique({
+          where: {
+            messageId_clientRequestId: {
+              messageId,
+              clientRequestId: body.clientRequestId
+            }
+          }
+        });
+        if (existing) {
+          if (
+            snapshotHash(asRecord(existing.snapshotJson).requestInput) !==
+            snapshotHash(requestInput)
+          )
+            return reply
+              .code(409)
+              .send({
+                message: "Forespørselen er allerede sendt med annet innhold."
+              });
+          return reply.send({
+            queued: true,
+            jobId: generationJobId(existing.generationRunId),
+            ...generationControlPayload(existing)
+          });
+        }
+        if (!(await fastify.redis.get("newsweb:notice-editor-worker:v1")))
+          return reply
+            .code(503)
+            .send({
+              message: "Generering er midlertidig utilgjengelig. Prøv igjen."
+            });
+        if (body.retryOf) {
+          const prior = await prisma.noticeGenerationControl.findFirst({
+            where: { generationRunId: body.retryOf, messageId }
+          });
+          if (!prior || !["failed", "skipped", "cancelled"].includes(prior.status))
+            return reply
+              .code(409)
+              .send({ message: "Denne forespørselen kan ikke prøves på nytt nå." });
+          const control = await createGenerationRequest(prisma, {
+            messageId,
+            clientRequestId: body.clientRequestId,
+            snapshot: {
+              ...asRecord(prior.snapshotJson),
+              requestInput,
+              retryOf: prior.generationRunId
+            }
+          });
+          return reply
+            .code(202)
+            .send({
+              queued: true,
+              jobId: generationJobId(control.generationRunId),
+              ...generationControlPayload(control)
+            });
+        }
+        if (
+          body.baseSnapshot?.rewriteId.startsWith("fast:") &&
+          !fastify.config.FAST_DRAFT_ENABLED
+        )
+          return reply
+            .code(409)
+            .send({ message: "Førsteutkastet er ikke tilgjengelig." });
+        let previousRewriteJson: unknown;
+        try {
+          previousRewriteJson = body.baseSnapshot
+            ? await resolveNoticeEditorBase(prisma, messageId, body.baseSnapshot)
+            : undefined;
+        } catch (error) {
+          if (error instanceof InvalidEditorBaseError)
+            return reply.code(409).send({ message: error.message });
+          throw error;
+        }
+        let supplementalMaterials: MaterialSnapshot[];
+        try {
+          supplementalMaterials = await selectedMaterialSnapshots(
+            messageId,
+            body.selectedMaterialIds,
+            true
+          );
+        } catch (error) {
+          if (
+            error instanceof Error &&
+            error.message === "SELECTED_MATERIAL_NOT_READY"
+          ) {
+            return reply
+              .code(400)
+              .send({
+                message:
+                  "En valgt kilde er ikke klar. Prøv igjen eller fjern kilden."
+              });
+          }
+          throw error;
+        }
+        const control = await createGenerationRequest(prisma, {
+          messageId,
+          clientRequestId: body.clientRequestId,
+          snapshot: {
+            requestInput,
+            baseSnapshot: body.baseSnapshot ?? null,
+            previousRewriteJson: previousRewriteJson ?? null,
+            instruction: body.instruction?.trim() || null,
+            outputMode: body.outputMode ?? "notice",
+            maxVisibleArticleChars: body.maxVisibleArticleChars ?? 1000,
+            reasoningEffortOverride: body.reasoningEffortOverride ?? null,
+            supplementalMaterials,
+            telemetry: telemetry ?? null
+          }
+        });
+        await tryCreateUserActionEvent({
+          logger: request.log,
+          sessionSecret: fastify.config.SESSION_SECRET,
+          messageId,
+          version: body.telemetry?.version ?? null,
+          action: "regenerate_request",
+          telemetry: body.telemetry,
+          actionSource: "next_composer",
+          payload: {
+            generationRunId: control.generationRunId,
+            clientRequestId: body.clientRequestId,
+            baseRewriteId: body.baseSnapshot?.rewriteId ?? null,
+            selectedMaterialIds: supplementalMaterials.map(
+              (material) => material.id
+            )
+          }
+        });
+        // The primary record is the durable outbox. A worker discovers it even
+        // if the API exits before a Redis notification or audit write.
+        await fastify.redis
+          .publish("newsweb:generation-request", control.generationRunId)
+          .catch(() => {});
+        return reply
+          .code(202)
+          .send({
+            queued: true,
+            jobId: generationJobId(control.generationRunId),
+            ...generationControlPayload(control)
+          });
+      }
       const instruction = body?.instruction?.trim() || undefined;
       const outputMode = body?.outputMode ?? "notice";
       const maxVisibleArticleChars = body?.maxVisibleArticleChars;

@@ -72,6 +72,7 @@ model SourceNotice {
   feedItem          FeedItem?
   jobRuns           JobRun[]
   materials         NoticeMaterial[]
+  generationControls NoticeGenerationControl[]
   fastDraft         FastDraft?
 
   @@index([publishedAt(sort: Desc)])
@@ -361,4 +362,28 @@ model SakVersion {
   @@unique([sakId, version])
   @@index([sakId, requestedAt])
   @@map("sak_versions")
+}
+
+// Durable request/cancellation authority. It belongs in the primary database,
+// so publication and cancellation share the feed-item transaction lock.
+model NoticeGenerationControl {
+  generationRunId String   @id @map("generation_run_id")
+  messageId       Int      @map("message_id")
+  sourceNotice    SourceNotice @relation(fields: [messageId], references: [messageId], onDelete: Cascade)
+  clientRequestId String?  @map("client_request_id")
+  position        BigInt   @unique @default(autoincrement())
+  status          String   @default("queued")
+  targetVersion   Int?     @map("target_version")
+  snapshotJson    Json     @map("snapshot_json")
+  resultRewriteId String?  @map("result_rewrite_id")
+  errorText       String?  @map("error_text") @db.Text
+  heartbeatAt     DateTime? @map("heartbeat_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  finishedAt      DateTime? @map("finished_at")
+
+  @@unique([messageId, clientRequestId])
+  @@index([messageId, status, position])
+  @@index([status, heartbeatAt])
+  @@map("notice_generation_controls")
 }

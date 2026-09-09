@@ -40,7 +40,7 @@ export type FinalizePublicationResult =
       publicationRevision: number;
     }
   | {
-      outcome: "candidate_missing" | "ownership_lost" | "not_publishable";
+      outcome: "candidate_missing" | "ownership_lost" | "not_publishable" | "cancelled";
       publication: null;
       publicationRevision: number | null;
     };
@@ -76,6 +76,9 @@ async function finalizePublicationTransaction(
       throw new Error(`feed_items missing for ${args.messageId}`);
     }
 
+    const control=args.generationRunId?await tx.noticeGenerationControl.findUnique({where:{generationRunId:args.generationRunId}}):null;
+    if(control&&["cancelling","cancelled"].includes(control.status))return {outcome:"cancelled",publication:null,publicationRevision:feedItem.publicationRevision};
+    if(control&&!['running','published'].includes(control.status))return {outcome:"not_publishable",publication:null,publicationRevision:feedItem.publicationRevision};
     const candidate = await tx.rewrite.findUnique({
       where: {
         messageId_version: {
@@ -162,6 +165,7 @@ async function finalizePublicationTransaction(
       data: { status: "published" }
     });
 
+    if(control)await tx.noticeGenerationControl.update({where:{generationRunId:control.generationRunId},data:{status:"published",resultRewriteId:publication.id,finishedAt:new Date()}});
     if (feedItem.activePublishedRewriteId === publication.id) {
       return {
         outcome: "already_active",

@@ -25,7 +25,8 @@ const TERMINAL_GENERATION_RUN_STATUSES = new Set([
   "published",
   "skipped",
   "failed",
-  "superseded"
+  "superseded",
+  "cancelled"
 ]);
 
 const TERMINAL_GENERATION_RUN_PHASES = new Set(["published", "skipped", "failed"]);
@@ -114,6 +115,7 @@ export function deriveGenerationPhase(args: {
   jobState: string | null;
 }): GenerationPhase | null {
   const { generationRun, rewrite, jobState } = args;
+  if (generationRun?.status === "cancelled") return null;
 
   if (isGenerationPhase(generationRun?.phase)) {
     return generationRun.phase;
@@ -157,6 +159,7 @@ export function buildGenerationStatusPayload(args: {
     now
   });
   const failed =
+    generationRun?.status !== "cancelled" &&
     !currentReadyRewrite &&
     !runActive &&
     (staleFailed ||

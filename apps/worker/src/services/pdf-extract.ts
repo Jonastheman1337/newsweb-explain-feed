@@ -1,3 +1,4 @@
+import { currentGenerationSignal, throwIfGenerationCancelled } from "@newsweb/shared/generation-context";
 // Use legacy build — the default build requires browser APIs (DOMMatrix)
 import { getDocument, type PDFDocumentProxy } from "pdfjs-dist/legacy/build/pdf.mjs";
 
@@ -111,7 +112,8 @@ export async function downloadAttachmentPdf(
   attachmentId: number
 ): Promise<Buffer> {
   const url = `${ATTACHMENT_URL}?messageId=${messageId}&attachmentId=${attachmentId}`;
-  const response = await fetch(url);
+  throwIfGenerationCancelled();
+  const response = await fetch(url, {signal:currentGenerationSignal()});
   if (!response.ok) {
     throw new Error(
       `Failed to download attachment ${attachmentId} for message ${messageId}: ${response.status}`
@@ -236,6 +238,7 @@ export async function extractPagesFromPdf(buffer: Buffer): Promise<{ pages: stri
   try {
     const pages: string[] = [];
     for (let i = 1; i <= doc.numPages; i++) {
+      throwIfGenerationCancelled();
       const page = await doc.getPage(i);
       const content = await page.getTextContent();
       pages.push(renderPdfTextItems(content.items.filter((item): item is typeof item & PdfTextItem => "str" in item)));

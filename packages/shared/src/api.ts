@@ -178,7 +178,7 @@ export const rewriteStatusResponseSchema = z.object({
 
 export const outputModeSchema = z.enum(["notice", "extended_notice"]);
 
-export const noticeMaterialKindSchema = z.enum(["pdf", "newsweb", "text"]);
+export const noticeMaterialKindSchema = z.enum(["pdf", "newsweb", "text", "url"]);
 export const noticeMaterialStatusSchema = z.enum(["ready", "failed"]);
 
 export const noticeMaterialSchema = z.object({

@@ -1,3 +1,4 @@
+import { generationRequestSignal, throwIfGenerationCancelled } from "./generation-context.js";
 import OpenAI from "openai";
 import {
   createOpenAIFailureTelemetry,
@@ -69,6 +70,7 @@ export type OpenAIFileInput = {
 };
 
 export type OpenAIJsonRequest = {
+  signal?: AbortSignal;
   schemaName: string;
   schema: Record<string, unknown>;
   systemPrompt: string;
@@ -115,6 +117,8 @@ export async function callOpenAIForJson(
   let hitMaxOutputTokens = false;
 
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    throwIfGenerationCancelled();
+    request.signal?.throwIfAborted();
     const startedAt = Date.now();
     let response: OpenAIJsonResponse;
     try {
@@ -310,6 +314,6 @@ async function callOpenAIResponse(
           verbosity: "low"
         }
       },
-      { signal: AbortSignal.timeout(request.timeoutMs) }
+      { signal: generationRequestSignal(request.timeoutMs, request.signal) }
     );
 }

@@ -28,6 +28,7 @@
     "prisma:migrate:dev": "prisma migrate dev",
     "prisma:migrate:deploy": "prisma migrate deploy && node scripts/init-log-db.mjs",
     "dev:ui": "npm run build -w packages/shared && npm run build -w packages/prompt-kit && node scripts/ui-preview/dev.mjs",
+    "test:notice-editor:integration": "node --test scripts/notice-editor-integration.test.mjs",
     "ui:replay": "node scripts/ui-preview/replay.mjs",
     "ui:test": "npm run build -w packages/shared && node --test scripts/ui-preview/server.test.mjs",
     "ui:verify-routes": "node scripts/ui-preview/verify-routes.mjs"

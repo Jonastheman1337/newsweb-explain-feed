@@ -1,3 +1,5 @@
+import { createNoticeGenerationRuntime, CONTROLLED_JOB_NAME } from "./services/notice-generation-runtime.js";
+import { throwIfGenerationCancelled } from "@newsweb/shared/generation-context";
 import {
   QUEUE_NAMES,
   GENERATION_RUN_STALE_MS,
@@ -382,6 +384,7 @@ async function setGenerationPhaseAndNotify(
   messageId: number,
   phase: GenerationPhase
 ): Promise<void> {
+  throwIfGenerationCancelled();
   await setGenerationPhase(logPrisma, generationRunId, phase);
   try {
     await publishFeedUpdate(messageId, "processing", phase);
@@ -403,6 +406,7 @@ async function enqueuePublish(
   version: number,
   generationRunId?: string
 ): Promise<void> {
+  throwIfGenerationCancelled();
   await publishQueue.add(
     "publish-notice",
     { messageId, version, generationRunId },
@@ -558,7 +562,7 @@ async function claimRewriteCandidateOwnership(
     Date.now() - owner.phaseUpdatedAt.getTime() <= GENERATION_RUN_STALE_MS;
   const ownerTerminal =
     !owner ||
-    ["published", "skipped", "failed", "superseded"].includes(owner.status);
+    ["published", "skipped", "failed", "superseded", "cancelled"].includes(owner.status);
   if (!ownerTerminal && ownerFresh) return false;
 
   const reclaimed = await prisma.rewrite.updateMany({
@@ -1344,6 +1348,7 @@ async function startGenerationRun(
     },
     data: { nextRewriteVersion: version + 1 }
   });
+  job.data.generationRunId = generationRunId;
   return generationRunId;
 }
 
@@ -3252,6 +3257,8 @@ async function upsertRewrite(args: {
   generationRunId?: string;
   inputJson?: Prisma.InputJsonValue;
 }): Promise<boolean> {
+  throwIfGenerationCancelled();
+  if(args.generationRunId){const control=await prisma.noticeGenerationControl.findUnique({where:{generationRunId:args.generationRunId}});if(control&&["cancelling","cancelled"].includes(control.status))throw new Error("GENERATION_CANCELLED");}
   const version = args.version ?? 1;
   const rewriteJson = toPrismaJsonValue(args.rewriteJson);
   const validationJson = toPrismaJsonValue(args.validationJson);
@@ -3772,11 +3779,12 @@ const fastDrafts = createFastDraftService({
   log: (message) => console.info(message)
 });
 
+const noticeGenerationRuntime=createNoticeGenerationRuntime({db:prisma,logDb:logPrisma,rewriteQueue,publishQueue,redis:redisPub,notify:(messageId)=>publishFeedUpdate(messageId,"processing")});
 const rewriteWorker = new Worker<RewriteJobData>(
   QUEUE_NAMES.rewrite,
-  async (job: Job<RewriteJobData>) => {
+  async (job: Job<RewriteJobData>, token) => {
     const messageId = job.data.messageId;
-    return withJobRun("rewrite", messageId, async () => {
+    return noticeGenerationRuntime.run(job,token,()=>withJobRun("rewrite", messageId, async () => {
       // Also publishes the "processing" event that bootstrap and retry jobs
       // otherwise miss (they skip the ingest-time publish).
       await setGenerationPhaseAndNotify(
@@ -3829,9 +3837,11 @@ const rewriteWorker = new Worker<RewriteJobData>(
       let previousOutput: RewriteOutput | undefined;
       if (job.data.previousRewriteJson) {
         try {
-          previousOutput = rewriteOutputSchema.parse(
-            normalizeRewriteJson(job.data.previousRewriteJson)
-          );
+          // Displayed editor text is an input, not a model output: the API
+          // validated its shape and publication identity before freezing it.
+          previousOutput = job.name === CONTROLLED_JOB_NAME
+            ? job.data.previousRewriteJson as RewriteOutput
+            : rewriteOutputSchema.parse(normalizeRewriteJson(job.data.previousRewriteJson));
         } catch {
           // Corrupted queued previous output: fall back to DB lookup.
         }
@@ -4724,7 +4734,7 @@ const rewriteWorker = new Worker<RewriteJobData>(
         logFinalRewriteFailure(messageId, "REWRITE_FAILED_FINAL", errorText);
         await publishFeedUpdate(messageId, "failed");
       }
-    });
+    }));
   },
   {
     connection,
@@ -5049,6 +5059,7 @@ async function recoverStaleNewMessageRuns(): Promise<{
     let recoveryRunId: string | null = null;
 
     try {
+      if(await prisma.noticeGenerationControl.findUnique({where:{generationRunId:candidate.id}})){skipped+=1;continue;}
       // Optimistic lock: only kill the run if it is still in the exact stale
       // state the candidate query saw — a run whose phase advanced since then
       // is alive and must not be requeued.
@@ -5463,6 +5474,7 @@ for (const [queueName, worker] of [
 }
 
 async function shutdown(): Promise<void> {
+  await noticeGenerationRuntime.stop();
   if (staleRecoveryTimer) {
     clearInterval(staleRecoveryTimer);
     staleRecoveryTimer = null;
@@ -5498,3 +5510,5 @@ process.on("SIGTERM", () => {
 });
 
 void bootstrap();
+
+noticeGenerationRuntime.start();
