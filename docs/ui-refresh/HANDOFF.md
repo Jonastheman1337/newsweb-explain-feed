@@ -302,3 +302,80 @@ let the user choose the character length instead of Utvidet.
 Validation: api/worker/web typecheck; web suite 97 tests (new: paste box sends the
 Newsweb and text bodies, length persisted and sent with `reasoningEffortOverride`,
 remembered length on a new card); production build; fixture preview check.
+
+## 2026-09-09 — STARTED: approved editor, request lifecycle and public sources
+
+Base: freshly fetched origin/main 10dc0b696630c17adbdb121d85357d7750f84c17.
+Branch/worktree: codex/next-editor-20260909 / newsweb-next-editor.
+The September 9 approved plan supersedes the old source toolbar and composer.
+Implement displayed-text snapshots, durable FIFO requests, active cancellation,
+public URL sources and the approved UI. Preserve legacy presentation and editorial
+validation. Exit: tested working preview, migration, scoped commits and handoff.
+No production deployment. Docker/WSL unavailable; provision isolated integration
+runtimes or record the specific remaining verification limitation.
+
+
+## 2026-09-09 — IMPLEMENTED: approved editor and durable requests
+
+Read order: README.md (preview/integration commands), DESIGN.md September 9
+amendment, then this entry. Base remains refreshed origin/main `10dc0b6`.
+Implementation is on `codex/next-editor-20260909` in the isolated
+`newsweb-next-editor` worktree under the September 9 visualization directory.
+The original checkout still has its 91 unrelated changed/untracked entries;
+none were included. No push, migration or deployment to production was performed.
+
+Delivered the full dateline and three reading modes, inline title suggestions,
+compact overflow/version controls, combined source/instruction composer, persisted
+instructions and independent rich edits, result-diff display, guarded automatic
+opening, public URL imports, and request-specific generation/cancellation status.
+The primary DB migration and worker runtime provide immutable submitted snapshots,
+idempotency, FIFO admission, run ownership, actual model-call abort, cancellation
+versus publication locking, and recovery of interrupted accepted requests.
+Retry uses the frozen request even if newer composer text has been entered.
+
+Validation:
+
+- Shared 22, prompt-kit 163, API 107, worker 797 passed (one existing skip).
+- Web full suite 111 passed; final composer suite 15 passed after adding the
+  frozen-retry regression, giving 112 current web cases. React act warnings in
+  the new source-view tests were fixed; their focused suite passed cleanly.
+- All workspace typechecks passed; API and web were checked again after final
+  corrections. Production web build passed; final build is recorded below.
+- All 15 migrations applied to a fresh isolated PostgreSQL 16 database. Eight
+  integration cases passed with real PostgreSQL/Redis 7 and a delayed local model
+  responder; rerun passed after consolidating material validation and snapshot read.
+  Cases: auth/base/source checks, FIFO/idempotency/frozen inputs, queued cancellation,
+  active model abort/no publication, cancellation/publication race, admission crash,
+  failure/retry after source deletion, candidate-to-publication enqueue recovery.
+- Fixture tests: 2 passed. Production route gates passed with UI off and on,
+  including authenticated legacy feed and session isolation. The first sandboxed
+  route check could not stop its child process; rerunning outside the sandbox
+  passed and cleaned up its own test process.
+- In-app browser: desktop, 320/360 px, light/dark, wrapping datelines, source-only
+  notices, comparison actions, Original hiding editor actions, history placement,
+  Escape/focus, five suggestions/explicit choice, result diff and Kopiert feedback.
+  Untouched revision opened automatically. Newer typing stayed intact with
+  Ny versjon klar. Active fixture cancellation showed Avbrutt. Fast-to-full arrival
+  retained the edited first draft and showed Fullstendig melding klar.
+- Legacy `/feed` was checked in the in-app browser. `/sak` API, worker and web
+  regression suites passed; its presentation files were not modified.
+
+Preview is fictional data at http://127.0.0.1:3101/next (`preview` / `ui-preview`).
+Use `npm.cmd run dev:ui` to restart; title fixtures intentionally require development
+mode. Production build/route verification runs separately while dev is stopped.
+The browser preview simulates lifecycle timing; real cancellation/FIFO evidence
+comes from the database/queue integration suite, not those UI timers.
+
+Next action is review of the scoped commits. A release requires the usual separate
+UpCloud task: apply the additive migration, roll out compatible API/worker, preserve
+existing feature flags and confirm worker capability before exposing controls.
+Do not deploy the original dirty checkout. Keep the additive table during an
+application rollback; existing RewriteStatus enum values are unchanged.
+
+
+Final verification: production web build and UI-off/UI-on route checks passed
+again after the frozen-retry correction. Scoped implementation commits:
+`ba37c6a` (primary request lifecycle, public materials, migration and integration)
+and `92c17f3` (editor, BFF proxies, persistence, fixture support and web tests).
+Documentation is committed separately. The dev fixture preview was restarted for
+review; PostgreSQL/Redis integration services are independent of that preview.

@@ -158,3 +158,32 @@ The redesign is ready to implement when these behaviours are agreed:
 8. Light, dark, keyboard and narrow-screen layouts work without hidden essential actions or clipped text.
 
 The prototype covers the principal screen layouts and interactions. Simulated generation, example source/PDF content and example signal records are for design review; production saving, authentication, parsing, feedback submission and monitoring are not implemented by the prototype.
+
+
+## Approved September 9 amendment
+
+This amendment supersedes conflicting proposal controls above. Use the full
+dateline, Notis / Original / Sammenlign and no important/first-draft badges.
+Remove source resizing, source font controls and expanded-workspace controls.
+Keep comparison actions under the notis column; Original-only hides editing and
+copying. Phone actions occupy two rows, with versions below Endre / Kopier.
+
+Endre opens one field: **Be om endring, lim inn kildetekst eller lenke**. Keep PDFs,
+source chips, Legg ved teksten, length presets 300 / 500 / 1 000 / 1 500 / Annet
+and the reasoning icon together. Length remains 300–4 000, default 1 000.
+Plain Enter inserts a newline; Ctrl/Cmd+Enter submits; custom-length Enter only
+applies its value. Public HTTP(S) articles and linked PDFs use the shared importer.
+
+One version control offers Fullstendig melding klar for the first unseen full
+draft, then Vis første / Vis nyeste with all versions in its dropdown. Requested
+results automatically open only while untouched; otherwise show Ny versjon klar.
+Vis endringer compares the submitted snapshot with its requested result. Preserve
+independent rich edits and unfinished instructions for each selected version.
+Headline suggestions sit beside the headline and require explicit selection.
+
+Manual changes queue behind active full generation. Durable primary-database
+request records govern FIFO admission, frozen inputs, exact-result status,
+idempotency, cancellation and recovery. Cancellation interrupts actual model calls
+and coordinates with publication under the existing notice lock. Backend worker
+capability is required before exposing these controls. `/feed` and `/sak` retain
+their presentation; production deployment remains a separate task.
