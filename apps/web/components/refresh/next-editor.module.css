@@ -1,4 +1,7 @@
 .card {
+  --editor-edge: color-mix(in srgb, var(--ink) 22%, transparent);
+  --editor-edge-active: color-mix(in srgb, var(--ink) 32%, transparent);
+  --editor-divider: color-mix(in srgb, var(--ink) 12%, transparent);
   background: var(--bg-panel);
   border: 1px solid var(--line);
   border-radius: 7px;
@@ -57,11 +60,12 @@
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
   padding: 10px 18px;
   border-bottom: 1px solid var(--line);
 }
 .dateline {
+  flex-basis: 100%;
   font-size: 12px;
   line-height: 1.5;
   color: var(--ink-soft);
@@ -193,6 +197,21 @@
 .editor :global(.editableBody) p:last-child {
   margin-bottom: 3px;
 }
+.editor :global(.editableTitle[contenteditable="true"]),
+.editor :global(.editableBody[contenteditable="true"]) {
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 6px 8px;
+  outline: none;
+}
+.editor :global(.editableTitle[contenteditable="true"]):hover,
+.editor :global(.editableBody[contenteditable="true"]):hover {
+  border-color: var(--editor-edge);
+}
+.editor :global(.editableTitle[contenteditable="true"]):focus,
+.editor :global(.editableBody[contenteditable="true"]):focus {
+  border-color: var(--editor-edge-active);
+}
 .showDiff :global(.editableTitleRow),
 .showDiff :global(.editableBody) {
   display: none;
@@ -212,7 +231,7 @@
   gap: 5px;
   margin-top: 16px;
   padding-top: 11px;
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--editor-divider);
 }
 .rightActions {
   display: flex;
@@ -236,9 +255,20 @@
   gap: 4px;
   min-width: 0;
 }
-.historyTrigger {
-  min-width: 24px;
-  padding-inline: 5px !important;
+.card .historyTrigger {
+  min-width: 30px;
+  padding: 5px;
+  border-color: transparent;
+  color: var(--ink-soft);
+}
+.card .historyTrigger:focus-visible,
+.card .lengthTrigger:focus-visible {
+  outline: 1px solid var(--editor-edge-active);
+  outline-offset: 1px;
+}
+.historyTrigger[aria-expanded="true"] svg,
+.lengthTrigger[aria-expanded="true"] svg {
+  transform: rotate(180deg);
 }
 .historyMenu {
   position: absolute;
@@ -294,7 +324,7 @@
 }
 .composeReveal[data-open="true"] {
   grid-template-rows: 1fr;
-  margin-top: 7px;
+  margin-top: 10px;
 }
 .composeClip {
   min-height: 0;
@@ -304,21 +334,26 @@
   overflow: visible;
 }
 .composer {
-  border: 1px solid var(--line);
-  border-radius: 9px;
+  border: 1px solid var(--editor-edge);
+  border-radius: 6px;
   background: var(--bg-main);
-  padding: 7px 8px 6px;
+  padding: 8px;
   position: relative;
+}
+.composer:hover,
+.composer:focus-within {
+  border-color: var(--editor-edge-active);
 }
 .composer textarea {
   display: block;
   width: 100%;
   border: 0;
+  outline: none;
   box-shadow: none;
   background: transparent;
   resize: none;
   min-height: 42px;
-  padding: 7px 8px;
+  padding: 6px;
   font: inherit;
   font-size: 16px;
   line-height: 1.6;
@@ -335,13 +370,23 @@
 .composeControls {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   flex-wrap: wrap;
+  border-top: 1px solid var(--editor-divider);
+  margin-top: 8px;
+  padding-top: 8px;
 }
 .composeControls button {
   font-size: 12px;
   color: var(--ink-soft);
   padding: 5px 7px;
+}
+.composeControls .attachmentButton {
+  min-width: 34px;
+}
+.composeControls .lengthTrigger {
+  border-color: transparent;
+  gap: 6px;
 }
 .composeControls .primary {
   color: var(--bg-panel);

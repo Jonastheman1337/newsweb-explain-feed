@@ -28,6 +28,7 @@ import { ActionMenu } from "./controls";
 import { fastDraftToFeedItem, type FeedEntry } from "./feed-state";
 import { versionToFeedItem } from "./selection";
 import { useNoticeComposer } from "./next-composer";
+import { ChevronIcon } from "./next-icons";
 import styles from "./next-editor.module.css";
 
 type ReadingView = "notice" | "original" | "compare";
@@ -358,7 +359,7 @@ export function RefreshCard({
         aria-expanded={historyOpen}
         onClick={() => setHistoryOpen(!historyOpen)}
       >
-        ⌄
+        <ChevronIcon />
       </button>
       {historyOpen && (
         <div className={styles.historyMenu} aria-label="Alle versjoner">
@@ -592,7 +593,6 @@ export function RefreshCard({
       data-generation-state={generated ? "generated" : "not-generated"}
     >
       <header className={styles.header}>
-        <Dateline item={item} />
         <div className={styles.viewSwitch} role="group" aria-label="Lesemodus">
           {(
             [
@@ -611,6 +611,7 @@ export function RefreshCard({
             </button>
           ))}
         </div>
+        <Dateline item={item} />
       </header>
       <div
         className={`${styles.reading} ${view === "compare" ? styles.comparing : ""}`}

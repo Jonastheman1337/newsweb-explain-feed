@@ -7,6 +7,7 @@ import {
   type NoticeMaterial,
 } from "@newsweb/shared";
 import { readNextPrefs, writeNextPrefs, clampNoticeChars } from "./prefs";
+import { AttachmentIcon, ChevronIcon } from "./next-icons";
 import styles from "./next-editor.module.css";
 import { useEditorialTelemetry } from "../../lib/editorial-telemetry";
 
@@ -724,8 +725,14 @@ export function useNoticeComposer(args: {
             e.target.value = "";
           }}
         />
-        <button type="button" onClick={() => fileInput.current?.click()}>
-          PDF
+        <button
+          type="button"
+          className={styles.attachmentButton}
+          aria-label="Legg ved PDF"
+          title="Legg ved PDF"
+          onClick={() => fileInput.current?.click()}
+        >
+          <AttachmentIcon />
         </button>
         {!!draft.text.trim() && (
           <button type="button" onClick={attachText}>
@@ -746,6 +753,7 @@ export function useNoticeComposer(args: {
           <button
             ref={lengthTrigger}
             type="button"
+            className={styles.lengthTrigger}
             aria-label={`Maksimal lengde, ${draft.maxChars} tegn`}
             aria-expanded={lengthOpen}
             onClick={() => {
@@ -753,7 +761,8 @@ export function useNoticeComposer(args: {
               setCustomOpen(false);
             }}
           >
-            {draft.maxChars.toLocaleString("nb-NO")} tegn⌄
+            <span>{draft.maxChars.toLocaleString("nb-NO")} tegn</span>
+            <ChevronIcon />
           </button>
           {lengthOpen && (
             <div ref={lengthMenu} className={styles.lengthMenu}>
