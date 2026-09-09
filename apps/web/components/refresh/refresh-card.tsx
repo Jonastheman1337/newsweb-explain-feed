@@ -463,6 +463,7 @@ export function RefreshCard({
             aria-label="Endringer fra teksten som ble sendt inn"
           >
             <ChangedText before={before.title} after={visible.title} heading />
+            <Dateline item={item} />
             {Array.from(
               {
                 length: Math.max(
@@ -611,7 +612,6 @@ export function RefreshCard({
             </button>
           ))}
         </div>
-        <Dateline item={item} />
       </header>
       <div
         className={`${styles.reading} ${view === "compare" ? styles.comparing : ""}`}
@@ -636,6 +636,7 @@ export function RefreshCard({
               showTitleButton
               inlineTitleSuggestions
               titleSuggestionContext={view}
+              dateline={!showDiff && <Dateline item={item} />}
               className={`${styles.editor} ${showDiff ? styles.showDiff : ""}`}
               sourceLinks={sourceLinks}
               onDraftChange={onDraftChange}
@@ -644,6 +645,7 @@ export function RefreshCard({
           ) : (
             <>
               <h2>{item.sourceTitle || item.title}</h2>
+              <Dateline item={item} />
               <div className={styles.actions}>
                 <button
                   ref={composeTrigger}
@@ -741,6 +743,7 @@ export function RefreshCard({
                 attachments={source?.attachments ?? item.attachments}
               />
               <h2>{source?.title ?? item.sourceTitle}</h2>
+              <Dateline item={item} />
               {splitParagraphs(source?.bodyText ?? item.sourceBodyText).map(
                 (p, i) => (
                   <p key={i}>{p}</p>

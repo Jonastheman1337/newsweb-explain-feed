@@ -417,7 +417,7 @@ it("preserves edited DOM and full dateline across original and comparison views"
     editor.innerHTML = "<p>Min redigerte tekst.</p>";
     editor.dispatchEvent(new Event("input", { bubbles: true }));
   });
-  const dateline = container.querySelector("header a")!;
+  const dateline = container.querySelector(".editableTitleRow + a")!;
   expect(dateline.textContent).toContain("Test ASA (TEST)");
   expect(dateline.textContent).toContain("Innsideinformasjon");
   expect(dateline.getAttribute("href")).toBe(

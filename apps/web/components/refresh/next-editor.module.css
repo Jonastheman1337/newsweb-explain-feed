@@ -65,12 +65,16 @@
   border-bottom: 1px solid var(--line);
 }
 .dateline {
-  flex-basis: 100%;
+  display: block;
+  margin: 0 0 12px;
   font-size: 12px;
   line-height: 1.5;
   color: var(--ink-soft);
   text-decoration: none;
   overflow-wrap: anywhere;
+}
+.editor > .dateline {
+  margin-inline: 9px;
 }
 .dateline:hover {
   text-decoration: underline;
