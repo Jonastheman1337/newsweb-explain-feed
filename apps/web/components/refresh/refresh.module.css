@@ -4,8 +4,9 @@
 }
 .header {
   height: 56px;
-  max-width: 1120px;
-  padding: 0 32px;
+  max-width: 700px;
+  width: calc(100% - 48px);
+  padding: 0;
   margin: auto;
   display: flex;
   align-items: center;
@@ -447,7 +448,8 @@
 @media (max-width: 760px) {
   .header {
     height: 56px;
-    padding: 0 20px;
+    width: calc(100% - 32px);
+    padding: 0;
     gap: 26px;
   }
   .main {
@@ -466,7 +468,6 @@
 }
 @media (max-width: 420px) {
   .header {
-    padding: 0 16px;
     gap: 18px;
   }
   .brand {

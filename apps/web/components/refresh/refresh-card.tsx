@@ -216,7 +216,7 @@ export function RefreshCard({
   const composer = useNoticeComposer({
     messageId: item.messageId,
     rewriteId: item.rewriteId ?? undefined,
-    enabled: compose,
+    enabled: generated && compose,
     getSnapshot,
     getInteractionVersion: () => interaction.current,
     onResult,
@@ -230,6 +230,11 @@ export function RefreshCard({
   useEffect(() => {
     if (view !== "notice" || historyOpen) void loadDetails().catch(() => {});
   }, [view, historyOpen, latest.rewriteId]);
+  useEffect(() => {
+    // Version numbers also count unsuccessful runs; verify actual alternatives.
+    if (latest.isFinal && (latest.rewriteVersion ?? 0) > 1)
+      void loadDetails().catch(() => {});
+  }, [latest.rewriteId, latest.rewriteVersion, latest.isFinal]);
   useEffect(() => {
     if (sourceMode !== "pdf" || view === "notice") return;
     if (fast || !generated) {
@@ -299,32 +304,18 @@ export function RefreshCard({
     result && !resultViewed && result.item.rewriteId !== item.rewriteId
       ? result.item
       : pending;
-  const multiple =
-    (!!first && !!latest.isFinal && latest.rewriteId !== first.rewriteId) ||
-    (latest.rewriteVersion ?? 0) > 1 ||
-    versions.length > 1;
   const atLatest = item.rewriteId === latest.rewriteId;
-  async function selectFirstOrLatest() {
-    if (completed) {
-      select(completed);
-      return;
-    }
-    if (!atLatest) {
-      select(latest);
-      return;
-    }
-    if (first) {
-      select(first);
-      return;
-    }
-    try {
-      const data = await loadDetails();
-      const rows = "rewrites" in data ? (data.rewrites ?? []) : [];
-      const earliest = [...rows].sort((a, b) => a.version - b.version)[0];
-      if (earliest) select(versionToFeedItem(earliest, latest));
-    } catch {}
-  }
-  const versionControl = (completed || multiple) && (
+  const earliestRow = [...versions].sort((a, b) => a.version - b.version)[0];
+  const earliest =
+    first ?? (earliestRow ? versionToFeedItem(earliestRow, latest) : undefined);
+  const firstTarget =
+    earliest?.rewriteId !== item.rewriteId ? earliest : undefined;
+  const latestTarget = latest.isFinal && !atLatest ? latest : undefined;
+  const versionTarget =
+    completed ?? latestTarget ?? (atLatest ? firstTarget : undefined);
+  const historyUnavailable =
+    loadError && generated && (latest.rewriteVersion ?? 0) > 1;
+  const versionControl = (versionTarget || historyUnavailable) && (
     <div
       ref={history}
       className={styles.versionControl}
@@ -341,16 +332,21 @@ export function RefreshCard({
         ref={versionTrigger}
         type="button"
         className={completed ? styles.primary : undefined}
-        disabled={loading && !completed}
-        onClick={() => void selectFirstOrLatest()}
+        disabled={loading && !versionTarget}
+        onClick={() => {
+          if (versionTarget) select(versionTarget);
+          else setHistoryOpen(true);
+        }}
       >
         {completed
           ? fast && completed.rewriteVersion === 1
             ? "Fullstendig melding klar"
             : "Ny versjon klar"
-          : atLatest
-            ? "Vis første"
-            : "Vis nyeste"}
+          : latestTarget
+            ? "Vis nyeste"
+            : firstTarget
+              ? "Vis første"
+              : "Versjoner"}
       </button>
       <button
         type="button"
@@ -646,16 +642,7 @@ export function RefreshCard({
             <>
               <h2>{item.sourceTitle || item.title}</h2>
               <Dateline item={item} />
-              <div className={styles.actions}>
-                <button
-                  ref={composeTrigger}
-                  type="button"
-                  data-compose-trigger
-                  aria-expanded={compose}
-                  onClick={toggleCompose}
-                >
-                  Endre
-                </button>
+              <div className={`${styles.actions} ${styles.sourceActions}`}>
                 {composer.status}
                 {!composer.busy && (
                   <span role="status">
@@ -671,33 +658,41 @@ export function RefreshCard({
                 {!latest.processing && !composer.busy && !composer.request && (
                   <button
                     type="button"
+                    className={styles.generateAction}
                     disabled={!composer.canGenerate}
                     onClick={() => void composer.generate()}
                   >
-                    {latest.failed ? "Prøv igjen" : "Lag notis"}
+                    Generer
                   </button>
                 )}
               </div>
+              {composer.error && (
+                <p className={styles.error} role="alert">
+                  {composer.error}
+                </p>
+              )}
             </>
           )}
-          <div
-            id={`compose-${item.messageId}`}
-            className={styles.composeReveal}
-            data-open={compose}
-            aria-hidden={!compose}
-            inert={!compose}
-            onKeyDown={(event) => {
-              if (event.key === "Escape" && !event.defaultPrevented) {
-                event.stopPropagation();
-                setCompose(false);
-                composeTrigger.current?.focus({ preventScroll: true });
-              }
-            }}
-          >
-            <div className={styles.composeClip}>
-              {composeMounted && composer.form}
+          {generated && (
+            <div
+              id={`compose-${item.messageId}`}
+              className={styles.composeReveal}
+              data-open={compose}
+              aria-hidden={!compose}
+              inert={!compose}
+              onKeyDown={(event) => {
+                if (event.key === "Escape" && !event.defaultPrevented) {
+                  event.stopPropagation();
+                  setCompose(false);
+                  composeTrigger.current?.focus({ preventScroll: true });
+                }
+              }}
+            >
+              <div className={styles.composeClip}>
+                {composeMounted && composer.form}
+              </div>
             </div>
-          </div>
+          )}
         </div>
         <aside
           className={styles.sourcePane}

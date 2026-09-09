@@ -891,8 +891,9 @@ export function useNoticeComposer(args: {
     status,
     request,
     busy,
+    error,
     canGenerate: !!capabilities.queuedGeneration && !busy && !blockedSources,
-    generate: () => send(),
+    generate: () => send(retrySnapshot),
     focus: () => field.current?.focus({ preventScroll: true }),
   };
 }

@@ -67,7 +67,7 @@
 .dateline {
   display: block;
   margin: 0 0 12px;
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.5;
   color: var(--ink-soft);
   text-decoration: none;
@@ -236,6 +236,19 @@
   margin-top: 16px;
   padding-top: 11px;
   border-top: 1px solid var(--editor-divider);
+}
+.actions.sourceActions {
+  display: flex;
+}
+.card .generateAction {
+  margin-left: auto;
+  padding-inline: 12px;
+  font-weight: 600;
+  border-color: var(--editor-edge-active);
+  background: color-mix(in srgb, var(--ink) 12%, transparent);
+}
+.card .generateAction:hover {
+  background: color-mix(in srgb, var(--ink) 18%, transparent);
 }
 .rightActions {
   display: flex;

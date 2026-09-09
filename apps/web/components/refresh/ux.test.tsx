@@ -397,7 +397,7 @@ const flush = () =>
 const card = (id: number) =>
   container.querySelector(`#notice-${id}`) as HTMLElement;
 const renderCard = (current: FeedItem, key = "card") =>
-  act(() =>
+  act(async () => {
     root.render(
       <RefreshCard
         key={key}
@@ -405,8 +405,8 @@ const renderCard = (current: FeedItem, key = "card") =>
         onSelect={vi.fn()}
         onVersion={vi.fn()}
       />,
-    ),
-  );
+    );
+  });
 
 it("preserves edited DOM and full dateline across original and comparison views", async () => {
   await renderCard(item(1));
@@ -585,7 +585,7 @@ it("keeps PDF source text available with lazy loading and retry", async () => {
   await act(async () => { buttons("Prøv igjen")[0].click(); });
   expect(container.querySelector("aside")?.textContent).toContain("Kildetekst");
 });
-it("offers one retry on failed source cards and the single composer for instructions", async () => {
+it("offers generation without editing on failed source cards", async () => {
   await renderCard(
     item(2, {
       isFinal: false,
@@ -594,19 +594,25 @@ it("offers one retry on failed source cards and the single composer for instruct
       notGenerated: true,
     }),
   );
-  expect(buttons("Prøv igjen")).toHaveLength(1);
-  await act(() => buttons("Endre")[0].click());
-  expect(container.querySelector("textarea")?.placeholder).toBe(
-    "Be om endring, lim inn kildetekst eller lenke",
-  );
+  expect(buttons("Generer")).toHaveLength(1);
+  expect(buttons("Endre")).toHaveLength(0);
+  expect(container.querySelector('[aria-label="Instruksjon, lenke eller kildetekst"]')).toBeNull();
 });
-it("retains generation from source-only notices", async () => {
+it("retains generation and safe retries from source-only notices", async () => {
   await renderCard(
     item(2, { isFinal: false, rewriteId: null, notGenerated: true }),
   );
-  expect(buttons("Lag notis")).toHaveLength(1);
-  await act(() => buttons("Endre")[0].click());
-  expect(container.querySelector("textarea")).not.toBeNull();
+  expect(buttons("Generer")).toHaveLength(1);
+  expect(buttons("Endre")).toHaveLength(0);
+  expect(container.querySelector('[aria-label="Instruksjon, lenke eller kildetekst"]')).toBeNull();
+  await act(() => buttons("Generer")[0].click());
+  expect(container.querySelector('[role="alert"]')?.textContent).toContain("Serveren støtter ikke");
+  await act(() => buttons("Generer")[0].click());
+  const requests = vi.mocked(fetch).mock.calls
+    .filter(([url]) => String(url) === "/api/notice/2/generate")
+    .map(([, options]) => JSON.parse(String(options?.body)));
+  expect(requests).toHaveLength(2);
+  expect(requests[1].clientRequestId).toBe(requests[0].clientRequestId);
 });
 it("uses the remembered character limit on a new composer", async () => {
   localStorage.setItem(
@@ -693,4 +699,61 @@ it("keeps the legacy feed form unchanged", async () => {
   expect(buttons("Grundig")).toHaveLength(0);
   expect(container.querySelector(".xhighToggle")).not.toBeNull();
   expect(buttons("Regenerer notis")).toHaveLength(1);
+});
+
+function publishedVersion(current: FeedItem) {
+  return {
+    rewriteId: current.rewriteId,
+    version: current.rewriteVersion,
+    contentHash: current.contentHash,
+    generatedAt: current.finalizedAt,
+    userInstruction: null,
+    isFinal: true,
+    rewrite: {
+      title: current.title,
+      lead: current.lead,
+      body: current.body,
+      key_facts: [],
+      negative_or_surprising: [],
+      source_limitations: [],
+      confidence: "high",
+      importance: "medium",
+    },
+  };
+}
+
+it("does not offer Vis første when version 2 is the only published version", async () => {
+  const current = item(1, { rewriteVersion: 2 });
+  mocks.getNotice.mockResolvedValue({ source: {}, rewrites: [publishedVersion(current)] });
+  await renderCard(current);
+  expect(mocks.getNotice).toHaveBeenCalledWith(null, 1, "v2");
+  expect(buttons("Vis første")).toHaveLength(0);
+  expect(container.querySelector('[aria-label="Velg blant alle versjoner"]')).toBeNull();
+});
+
+it("switches between the earliest available published version and the latest", async () => {
+  const latest = item(1, { rewriteId: "version-3", rewriteVersion: 3, title: "Latest title" });
+  const first = item(1, { rewriteId: "version-2", rewriteVersion: 2, title: "First available title" });
+  mocks.getNotice.mockResolvedValue({ source: {}, rewrites: [publishedVersion(first), publishedVersion(latest)] });
+  await act(async () => { root.render(<RefreshFeed initialItems={[latest]} mutedCategories={[]} filtered={false} />); });
+  await act(async () => { buttons("Vis første")[0].click(); });
+  expect(container.querySelector(".editableTitle")?.textContent).toBe("First available title");
+  expect(buttons("Vis nyeste")).toHaveLength(1);
+  await act(async () => { buttons("Vis nyeste")[0].click(); });
+  expect(container.querySelector(".editableTitle")?.textContent).toBe("Latest title");
+});
+
+it("makes unavailable version history retryable instead of offering a no-op", async () => {
+  const current = item(1, { rewriteVersion: 2 });
+  mocks.getNotice.mockRejectedValueOnce(new Error("offline"));
+  await renderCard(current);
+  expect(buttons("Vis første")).toHaveLength(0);
+  expect(buttons("Versjoner")).toHaveLength(1);
+  mocks.getNotice.mockRejectedValueOnce(new Error("offline"));
+  await act(async () => { buttons("Versjoner")[0].click(); });
+  expect(container.querySelector('[role="alert"]')?.textContent).toContain("Kunne ikke hente versjoner");
+  mocks.getNotice.mockResolvedValue({ source: {}, rewrites: [publishedVersion(current)] });
+  await act(async () => { buttons("Prøv igjen")[0].click(); });
+  expect(buttons("Vis første")).toHaveLength(0);
+  expect(buttons("Versjoner")).toHaveLength(0);
 });
