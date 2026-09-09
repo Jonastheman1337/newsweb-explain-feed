@@ -119,10 +119,6 @@ export function RefreshFeed({
             Genererte
           </button>
         </div>
-        <span className={styles.feedCount} role="status" aria-atomic="true">
-          {entries.length} {generatedOnly ? (entries.length === 1 ? "generert på denne siden" : "genererte på denne siden") : importantOnly ? (entries.length === 1 ? "viktig på denne siden" : "viktige på denne siden") : (entries.length === 1 ? "melding" : "meldinger")}
-          {!!mutedCategories.length && <span>{mutedCategories.length} {mutedCategories.length === 1 ? "kategori skjult" : "kategorier skjult"}</span>}
-        </span>
       </div>
       <div className={styles.feed} ref={feedRef}>
         {entries.map((entry) => (
