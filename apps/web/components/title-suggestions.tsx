@@ -11,6 +11,8 @@ type TitleSuggestionsProps = {
   contentHash?: string;
   isFinal?: boolean;
   currentTitle: string;
+  currentBody?: string;
+  requestScope?: string;
   previewOnHover?: boolean;
   closeOnOutsideClick?: boolean;
   onPreview: (title: string) => void;
@@ -26,12 +28,16 @@ export function useTitleSuggestions({
   contentHash,
   isFinal,
   currentTitle,
+  currentBody,
+  requestScope,
   previewOnHover = true,
   closeOnOutsideClick = true,
   onPreview,
   onRevert,
   onCommit
 }: TitleSuggestionsProps) {
+  const requestNumber=useRef(0);
+  const requestAbort=useRef<AbortController|null>(null);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
@@ -46,6 +52,16 @@ export function useTitleSuggestions({
     isFinal
   });
 
+  useEffect(()=>{
+    requestNumber.current++;requestAbort.current?.abort();setOpen(false);setLoading(false);setTitles([]);setError(false);
+    return ()=>{requestNumber.current++;requestAbort.current?.abort();};
+  },[rewriteId,contentHash,currentTitle,currentBody,requestScope]);
+  useEffect(()=>{
+    if(!open)return;
+    const escape=(event:KeyboardEvent)=>{if(event.key==="Escape"){event.stopPropagation();setOpen(false);onRevert();btnRef.current?.focus({preventScroll:true});}};
+    const parent=btnRef.current?.closest(".editableTitleRow");parent?.addEventListener("keydown",escape as EventListener);
+    return ()=>parent?.removeEventListener("keydown",escape as EventListener);
+  },[open,onRevert]);
   const close = useCallback(() => {
     setOpen(false);
     onRevert();
@@ -90,20 +106,26 @@ export function useTitleSuggestions({
   async function fetchSuggestions(
     action: "title_suggestion_request" | "title_suggestion_refresh" = "title_suggestion_request"
   ) {
+    const token=++requestNumber.current;
+    requestAbort.current?.abort();requestAbort.current=new AbortController();
     setLoading(true);
     setError(false);
     try {
       const res = await fetch(`/api/notice/${messageId}/suggest-titles`, {
         method: "POST",
+        signal:requestAbort.current.signal,
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
           currentTitle,
+          ...(currentBody!==undefined && rewriteId && contentHash ? {baseSnapshot:{rewriteId,contentHash,title:currentTitle,body:currentBody}} : {}),
           telemetry: buildTelemetry({ actionSource: "title_suggestions" })
         })
       });
+      if(token!==requestNumber.current)return;
       if (res.ok) {
         const data = await res.json();
+        if(token!==requestNumber.current)return;
         const newTitles = data.titles ?? [];
         setTitles(newTitles);
         if (newTitles.length > 0) {
@@ -113,9 +135,9 @@ export function useTitleSuggestions({
         setError(true);
       }
     } catch {
-      setError(true);
+      if(token===requestNumber.current)setError(true);
     } finally {
-      setLoading(false);
+      if(token===requestNumber.current)setLoading(false);
     }
   }
 
@@ -143,6 +165,8 @@ export function useTitleSuggestions({
       className={`titleSuggestBtn${loading ? " titleSuggestBtnLoading" : ""}`}
       onClick={handleToggle}
       title="Foreslå titler"
+      aria-label="Foreslå titler"
+      aria-expanded={open}
       type="button"
     >
       <svg

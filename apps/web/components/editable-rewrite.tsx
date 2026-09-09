@@ -41,6 +41,7 @@ export type RewriteActionControls = {
   saveState: "idle" | "saving" | "saved" | "failed";
   copyState: "idle" | "copied" | "failed";
   copy: () => Promise<void>;
+  getSnapshot: () => { title: string; body: string; bodyHtml: string };
   toggleOriginal: () => void;
   reset: () => void;
   undoReset: () => void;
@@ -69,6 +70,8 @@ type EditableRewriteProps = {
   panelTitle?: string;
   renderActions?: (controls: RewriteActionControls) => ReactNode;
   showTitleButton?: boolean;
+  inlineTitleSuggestions?: boolean;
+  titleSuggestionContext?: string;
   className?: string;
   onDraftChange?: (draft: { title: string; body: string; bodyHtml: string }) => void;
   readOnly?: boolean;
@@ -310,6 +313,8 @@ export function EditableRewrite({
   panelTitle,
   renderActions,
   showTitleButton = false,
+  inlineTitleSuggestions = false,
+  titleSuggestionContext,
   className,
   sourceLinks,
   onDraftChange,
@@ -991,8 +996,10 @@ export function EditableRewrite({
     contentHash,
     isFinal,
     currentTitle: editedTitle,
+    currentBody: inlineTitleSuggestions ? editedBody : undefined,
+    requestScope: titleSuggestionContext,
     previewOnHover: !renderActions,
-    closeOnOutsideClick: !renderActions,
+    closeOnOutsideClick: inlineTitleSuggestions || !renderActions,
     onPreview(title) {
       if (titleRef.current) titleRef.current.textContent = title;
     },
@@ -1070,7 +1077,7 @@ export function EditableRewrite({
       ) : (
         <div className="editableTitleRow">
           {titleEditor}
-          <span className="titleSuggestWrap">{titleSuggestButton}</span>
+          <span className="titleSuggestWrap">{titleSuggestButton}{inlineTitleSuggestions && titleSuggestDropdown}</span>
         </div>
       )}
       {!renderActions && titleSuggestDropdown}
@@ -1258,6 +1265,7 @@ export function EditableRewrite({
           saveState,
           copyState,
           copy: handleCopy,
+          getSnapshot: () => {const bodyHtml=sanitizeRichHtml(bodyRef.current?.innerHTML??editedBodyHtml);return {title:titleRef.current?.textContent??editedTitle,body:richHtmlToPlainText(bodyHtml),bodyHtml};},
           toggleOriginal: handleToggleDraftView,
           reset: resetWithUndo,
           undoReset,

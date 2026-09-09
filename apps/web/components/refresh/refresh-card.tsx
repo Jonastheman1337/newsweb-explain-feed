@@ -1,69 +1,85 @@
 "use client";
-
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import type {
+  FeedItem,
+  NoticeEditorSnapshot,
+  NoticeGenerationRequest,
+} from "@newsweb/shared";
 import {
-  Fragment,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type CSSProperties,
-  type KeyboardEvent as ReactKeyboardEvent,
-  type PointerEvent as ReactPointerEvent
-} from "react";
-import type { FeedItem } from "@newsweb/shared";
-import { getNotice, getNoticeModelSource, type RewriteVersion } from "../../lib/api";
+  getNotice,
+  getNoticeModelSource,
+  type RewriteVersion,
+} from "../../lib/api";
 import { formatCategoryList } from "../../lib/format-category";
-import { hasRewriteDraft, REWRITE_DRAFT_CHANGE_EVENT } from "../../lib/rewrite-drafts";
+import {
+  getRewriteDraft,
+  REWRITE_DRAFT_CHANGE_EVENT,
+} from "../../lib/rewrite-drafts";
 import { splitParagraphs, splitPdfPages } from "../../lib/source-text";
 import { useEditorialTelemetry } from "../../lib/editorial-telemetry";
-import { EditableRewrite } from "../editable-rewrite";
-import { AttachmentLinks } from "../attachment-links";
-import { GenerateButton } from "../generate-button";
-import { InstructionInput } from "../instruction-input";
-import { getGenerationPhaseLabel } from "../generation-steps";
-import { RefreshEditorActions, type WorkspacePanel } from "./editor-actions";
-import { FeedbackDialog } from "./feedback-dialog";
-import { fastDraftToFeedItem, type FeedEntry } from "./feed-state";
 import {
-  SOURCE_FONT_STEPS,
-  SOURCE_RATIO_MAX,
-  SOURCE_RATIO_MIN,
-  SOURCE_RATIO_STEP,
-  clampSourceRatio,
-  useNextPrefs,
-  writeNextPrefs
-} from "./prefs";
+  EditableRewrite,
+  type RewriteActionControls,
+} from "../editable-rewrite";
+import { AttachmentLinks } from "../attachment-links";
+import { getGenerationPhaseLabel } from "../generation-steps";
+import { FeedbackDialog } from "./feedback-dialog";
+import { ActionMenu } from "./controls";
+import { fastDraftToFeedItem, type FeedEntry } from "./feed-state";
 import { versionToFeedItem } from "./selection";
-import styles from "./refresh.module.css";
+import { useNoticeComposer } from "./next-composer";
+import styles from "./next-editor.module.css";
 
-function RefreshDateline({ item }: { item: FeedItem }) {
+type ReadingView = "notice" | "original" | "compare";
+type Details = Awaited<ReturnType<typeof getNotice>>;
+function Dateline({ item }: { item: FeedItem }) {
   const category = formatCategoryList(item.categories);
   return (
-    <div className={styles.dateline}>
-      <a href={`https://newsweb.oslobors.no/message/${item.messageId}`} target="_blank" rel="noopener noreferrer">
-        <time dateTime={item.publishedAt}>{new Intl.DateTimeFormat("nb-NO", {
-          dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Oslo"
-        }).format(new Date(item.publishedAt))}</time>
-        {` | ${item.issuerName} (${item.issuerSign})${category ? ` | ${category}` : ""}`}
-      </a>
-    </div>
+    <a
+      className={styles.dateline}
+      href={`https://newsweb.oslobors.no/message/${item.messageId}`}
+      target="_blank"
+      rel="noopener noreferrer"
+    >
+      <time dateTime={item.publishedAt}>
+        {new Intl.DateTimeFormat("nb-NO", {
+          dateStyle: "medium",
+          timeStyle: "short",
+          timeZone: "Europe/Oslo",
+        }).format(new Date(item.publishedAt))}
+      </time>
+      {` | ${item.issuerName}${item.issuerSign ? ` (${item.issuerSign})` : ""}${category ? ` | ${category}` : ""}`}
+    </a>
   );
 }
-
-// The instruction form stays mounted once revealed: InstructionInput owns the
-// generation polling and the typed text.
-type ComposeState = "unmounted" | "open" | "closed";
-type PdfState = {
-  status: "idle" | "loading" | "ready" | "error";
-  text: string | null;
-  pageCount: number | null;
-};
-
+function ChangedText({
+  before,
+  after,
+  heading = false,
+}: {
+  before: string;
+  after: string;
+  heading?: boolean;
+}) {
+  const Tag = heading ? "h2" : "p";
+  return (
+    <Tag>
+      {before === after ? (
+        after
+      ) : (
+        <>
+          {before && <del>{before}</del>}
+          {before && after ? " " : ""}
+          {after && <ins>{after}</ins>}
+        </>
+      )}
+    </Tag>
+  );
+}
 export function RefreshCard({
   entry,
   onSelect,
   onVersion,
-  showEditingHint = false
 }: {
   entry: FeedEntry;
   onSelect: () => void;
@@ -71,640 +87,725 @@ export function RefreshCard({
   showEditingHint?: boolean;
 }) {
   const { current: item, latest, pending } = entry;
-  const isFast = item.publicationKind === "fast";
-  const isGenerated = Boolean(item.isFinal && item.rewriteId);
-  const isMutedSource = !isGenerated && (item.notGenerated || item.skipped || !item.processing);
-  const firstDraft = fastDraftToFeedItem(latest);
-  const [panel, setPanel] = useState<WorkspacePanel | null>(null);
-  const [focused, setFocused] = useState(false);
-  const [compose, setCompose] = useState<ComposeState>("unmounted");
-  const composing = compose === "open";
-  const [editingHint, setEditingHint] = useState(false);
-  const [opened, setOpened] = useState(false);
-  const [versions, setVersions] = useState<RewriteVersion[]>([]);
-  const [details, setDetails] = useState<Awaited<ReturnType<typeof getNotice>> | null>(null);
-  const [loadState, setLoadState] = useState<"idle" | "loading" | "error">("idle");
-  const [feedback, setFeedback] = useState(false);
-  const [drafts, setDrafts] = useState<Set<string>>(() => new Set());
-  const [versionRequest, setVersionRequest] = useState(0);
-  const [pdf, setPdf] = useState<PdfState>({ status: "idle", text: null, pageCount: null });
-  const [pdfRequest, setPdfRequest] = useState(0);
-  const prefs = useNextPrefs();
-  const cardRef = useRef<HTMLElement>(null);
-  const composeRef = useRef<HTMLDivElement>(null);
-  const composeFocusPending = useRef(false);
-  const pdfKeyRef = useRef<string | null>(null);
-  const drag = useRef<{ left: number; width: number } | null>(null);
-  const savedScroll = useRef(0);
-  const wasOpen = useRef(false);
-  const wasFocused = useRef(false);
+  const generated = !!(item.isFinal && item.rewriteId),
+    fast = item.publicationKind === "fast";
+  const first = fastDraftToFeedItem(latest);
+  const [view, setView] = useState<ReadingView>("notice");
+  const [compose, setCompose] = useState(false),
+    [composeMounted, setComposeMounted] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false),
+    [details, setDetails] = useState<Details | null>(null);
+  const [versions, setVersions] = useState<RewriteVersion[]>([]),
+    [loading, setLoading] = useState(false),
+    [loadError, setLoadError] = useState(false);
+  const [feedback, setFeedback] = useState(false),
+    [draftTick, setDraftTick] = useState(0);
+  const [sourceMode, setSourceMode] = useState<"newsweb" | "pdf">("newsweb");
+  const [pdf, setPdf] = useState<{
+    state: "loading" | "ready" | "failed";
+    text: string | null;
+    pages: number | null;
+  } | null>(null);
+  const [pdfRetry, setPdfRetry] = useState(0);
+  const [result, setResult] = useState<{
+      item: FeedItem;
+      base?: NoticeEditorSnapshot;
+    } | null>(null),
+    [resultViewed, setResultViewed] = useState(false),
+    [showDiff, setShowDiff] = useState(false);
+  const card = useRef<HTMLElement>(null),
+    composeTrigger = useRef<HTMLButtonElement>(null),
+    versionTrigger = useRef<HTMLButtonElement>(null),
+    history = useRef<HTMLDivElement>(null);
+  const controls = useRef<RewriteActionControls | null>(null);
+  const props = useRef({ entry, onVersion });
+  props.current = { entry, onVersion };
+  const interaction = useRef(0),
+    lastEditor = useRef(""),
+    selectedIdentity = useRef(item.rewriteId);
+  if (selectedIdentity.current !== item.rewriteId) {
+    selectedIdentity.current = item.rewriteId;
+    interaction.current++;
+  }
+  const alive = useRef(true);
   useEffect(() => {
-    try {
-      setEditingHint(showEditingHint && sessionStorage.getItem("newsweb:next-editing-hint") !== "seen");
-    } catch {
-      setEditingHint(showEditingHint);
-    }
-  }, [showEditingHint]);
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
+  const detailRequest = useRef<Promise<Details> | null>(null);
   const { logEvent } = useEditorialTelemetry(item.messageId);
-  const sourceLinks = useMemo(
-    () => ({
-      primary: {
-        url: `https://newsweb.oslobors.no/message/${item.messageId}`,
-        issuerName: item.issuerName,
-        issuerSign: item.issuerSign
-      },
-      related: details && "relatedNotices" in details ? details.relatedNotices : undefined
-    }),
-    [item.messageId, item.issuerName, item.issuerSign, details]
+  const onDraftChange = useCallback(
+    (draft: { title: string; body: string; bodyHtml: string }) => {
+      const value = JSON.stringify(draft);
+      if (value !== lastEditor.current) {
+        lastEditor.current = value;
+        interaction.current++;
+      }
+    },
+    [],
   );
-
-  // The longer text gets the wider column unless the reader has set a width.
-  const noticeChars = [item.lead, ...item.body].filter(Boolean).join("\n\n").length;
-  const baseRatio = item.sourceBodyText.length > noticeChars ? 0.57 : 0.43;
-  const sourceRatio = prefs.sourceRatio ?? (focused ? Math.max(0.5, baseRatio) : baseRatio);
-  const fontPx = prefs.sourceFontPx ?? 14;
-  const fontIndex = SOURCE_FONT_STEPS.indexOf(fontPx);
-  const pdfRewriteId = isFast ? latest.rewriteId ?? undefined : item.rewriteId ?? undefined;
-  const pdfKey = `${item.messageId}:${pdfRewriteId ?? ""}:${pdfRequest}`;
-
-  function openPanel(next: WorkspacePanel) {
-    if (!panel) savedScroll.current = window.scrollY;
-    setOpened(true);
-    setPanel(next);
+  const getSnapshot = useCallback(() => {
+    const current = props.current.entry.current;
+    if (!current.rewriteId || !current.contentHash) return undefined;
+    const text = controls.current?.getSnapshot() ?? {
+      title: current.title,
+      body: [current.lead, ...current.body].filter(Boolean).join("\n\n"),
+    };
+    return {
+      rewriteId: current.rewriteId,
+      contentHash: current.contentHash,
+      title: text.title,
+      body: text.body,
+    };
+  }, []);
+  async function loadDetails() {
+    if (detailRequest.current) return detailRequest.current;
+    setLoading(true);
+    setLoadError(false);
+    const promise = getNotice(null, item.messageId, "v2");
+    detailRequest.current = promise;
+    try {
+      const data = await promise;
+      if (!alive.current) return data;
+      setDetails(data);
+      setVersions("rewrites" in data ? (data.rewrites ?? []) : []);
+      return data;
+    } catch (error) {
+      if (alive.current) setLoadError(true);
+      throw error;
+    } finally {
+      detailRequest.current = null;
+      if (alive.current) setLoading(false);
+    }
   }
-  function closePanel() {
-    setPanel(null);
-    setFocused(false);
-  }
-  function openCompose() {
-    composeFocusPending.current = true;
-    setCompose("open");
-  }
-  function closeCompose() {
-    setCompose("closed");
-    cardRef.current
-      ?.querySelector<HTMLButtonElement>("[data-compose-trigger]")
-      ?.focus({ preventScroll: true });
-  }
-  function toggleCompose() {
-    if (composing) closeCompose();
-    else openCompose();
-  }
-  function toggleFocused() {
-    if (focused) {
-      setFocused(false);
+  const onResult = useCallback(
+    async (
+      request: NoticeGenerationRequest,
+      base: NoticeEditorSnapshot | undefined,
+      canAutoOpen: () => boolean,
+    ) => {
+      const data = await getNotice(
+        null,
+        props.current.entry.current.messageId,
+        "v2",
+      );
+      if (!alive.current) return;
+      const rows = "rewrites" in data ? (data.rewrites ?? []) : [];
+      const version = rows.find((row) => row.rewriteId === request.rewriteId);
+      if (!version)
+        throw new Error("Den ferdige versjonen er ikke tilgjengelig ennå.");
+      setDetails(data);
+      setVersions(rows);
+      const next = versionToFeedItem(version, props.current.entry.latest);
+      const autoOpen = canAutoOpen();
+      setResult({ item: next, base });
+      setResultViewed(
+        autoOpen || props.current.entry.current.rewriteId === next.rewriteId,
+      );
+      if (autoOpen) {
+        props.current.onVersion(next);
+        setCompose(false);
+        setShowDiff(false);
+      }
+    },
+    [],
+  );
+  const composer = useNoticeComposer({
+    messageId: item.messageId,
+    rewriteId: item.rewriteId ?? undefined,
+    enabled: compose,
+    getSnapshot,
+    getInteractionVersion: () => interaction.current,
+    onResult,
+  });
+  useEffect(() => {
+    const changed = () => setDraftTick((value) => value + 1);
+    window.addEventListener(REWRITE_DRAFT_CHANGE_EVENT, changed);
+    return () =>
+      window.removeEventListener(REWRITE_DRAFT_CHANGE_EVENT, changed);
+  }, []);
+  useEffect(() => {
+    if (view !== "notice" || historyOpen) void loadDetails().catch(() => {});
+  }, [view, historyOpen, latest.rewriteId]);
+  useEffect(() => {
+    if (sourceMode !== "pdf" || view === "notice") return;
+    if (fast || !generated) {
+      setPdf({ state: "ready", text: null, pages: null });
       return;
     }
-    setFocused(true);
-    // Focused work usually continues with an instruction: show the form, but
-    // never move focus away from where the reader was.
-    if (compose !== "open") setCompose("open");
-  }
-  useEffect(() => {
-    if (!composing || !composeFocusPending.current) return;
-    composeFocusPending.current = false;
-    composeRef.current?.querySelector("textarea")?.focus();
-  }, [composing]);
-  useEffect(() => {
-    const entering = focused && !wasFocused.current;
-    const leaving = !focused && wasFocused.current;
-    const closing = !panel && wasOpen.current;
-    if (entering) {
-      savedScroll.current = window.scrollY;
-      window.scrollTo({ top: 0, behavior: "instant" });
-    } else if (panel && !wasOpen.current && window.innerWidth <= 850) {
-      cardRef.current?.querySelector("aside")?.scrollIntoView({ block: "start" });
-    }
-    if (leaving || (closing && window.innerWidth <= 850))
-      window.scrollTo({ top: savedScroll.current, behavior: "instant" });
-    if (closing)
-      cardRef.current
-        ?.querySelector<HTMLButtonElement>("[data-source-trigger]")
-        ?.focus({ preventScroll: true });
-    wasOpen.current = !!panel;
-    wasFocused.current = focused;
-  }, [panel, focused]);
-  useEffect(() => {
-    const card = cardRef.current;
-    const editor = card?.querySelector<HTMLElement>("[data-editor-pane]");
-    if (!panel || !card || !editor) return;
-    const measure = () => card.style.setProperty("--editor-pane-height", `${Math.max(260, editor.getBoundingClientRect().height)}px`);
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(editor);
-    return () => observer.disconnect();
-  }, [panel]);
-  useEffect(() => {
-    const card = cardRef.current;
-    if ((!panel && !composing) || !card) return;
-    // One native listener decides what Escape closes: an open menu or "Valg"
-    // first, then the instruction form, then the panel.
-    const escape = (event: KeyboardEvent) => {
-      if (event.key !== "Escape" || document.querySelector("dialog[open]")) return;
-      const target = event.target as HTMLElement | null;
-      if (target?.closest(".richEditLinkForm")) return;
-      const open = target?.closest<HTMLDetailsElement>("details[open]");
-      if (open) {
-        if (!open.hasAttribute("data-actions-menu")) {
-          open.open = false;
-          open.querySelector<HTMLElement>("summary")?.focus();
-          event.stopPropagation();
-        }
-        return;
-      }
-      if (composing && target?.closest("[data-compose]")) {
-        event.stopPropagation();
-        closeCompose();
-        return;
-      }
-      if (panel) {
-        event.stopPropagation();
-        closePanel();
-      }
-    };
-    card.addEventListener("keydown", escape);
-    return () => card.removeEventListener("keydown", escape);
-  }, [panel, composing]);
-  useEffect(() => {
-    if (!opened) return;
-    let cancelled = false;
-    setLoadState("loading");
-    getNotice(null, item.messageId, "v2")
-      .then((notice) => {
-        if (cancelled) return;
-        setDetails(notice);
-        setVersions("rewrites" in notice ? (notice.rewrites ?? []) : []);
-        setLoadState("idle");
-      })
-      .catch(() => {
-        if (!cancelled) setLoadState("error");
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [opened, item.messageId, latest.rewriteId, versionRequest]);
-  useEffect(() => {
-    // Lazy and cached per version; switching tabs and back keeps the request.
-    if (panel !== "pdf" || pdfKeyRef.current === pdfKey) return;
-    pdfKeyRef.current = pdfKey;
-    setPdf({ status: "loading", text: null, pageCount: null });
-    getNoticeModelSource(item.messageId, pdfRewriteId).then(
-      (result) => {
-        if (pdfKeyRef.current === pdfKey)
-          setPdf({ status: "ready", text: result.text, pageCount: result.pageCount });
+    let active = true;
+    setPdf({ state: "loading", text: null, pages: null });
+    const rewriteId = fast
+      ? (latest.rewriteId ?? undefined)
+      : (item.rewriteId ?? undefined);
+    getNoticeModelSource(item.messageId, rewriteId).then(
+      (value) => {
+        if (active)
+          setPdf({ state: "ready", text: value.text, pages: value.pageCount });
       },
       () => {
-        if (pdfKeyRef.current === pdfKey) setPdf({ status: "error", text: null, pageCount: null });
-      }
+        if (active) setPdf({ state: "failed", text: null, pages: null });
+      },
     );
-  }, [panel, pdfKey, item.messageId, pdfRewriteId]);
+    return () => {
+      active = false;
+    };
+  }, [view, sourceMode, item.rewriteId, latest.rewriteId, pdfRetry]);
   useEffect(() => {
-    const refresh = () =>
-      setDrafts(
-        new Set(
-          versions
-            .filter((version) =>
-              hasRewriteDraft({
-                messageId: item.messageId,
-                version: version.version,
-                rewriteId: version.rewriteId,
-                originalTitle: version.rewrite.title,
-                originalBody: [version.rewrite.lead, ...version.rewrite.body]
-                  .filter(Boolean)
-                  .join("\n\n")
-              })
-            )
-            .map((version) => version.rewriteId)
-        )
-      );
-    refresh();
-    window.addEventListener(REWRITE_DRAFT_CHANGE_EVENT, refresh);
-    return () => window.removeEventListener(REWRITE_DRAFT_CHANGE_EVENT, refresh);
-  }, [versions, item.messageId]);
-
-  function ratioAt(clientX: number): number | null {
-    const bounds = drag.current;
-    return bounds ? clampSourceRatio(1 - (clientX - bounds.left) / bounds.width) : null;
+    if (!historyOpen) return;
+    const close = (event: PointerEvent) => {
+      if (!history.current?.contains(event.target as Node))
+        setHistoryOpen(false);
+    };
+    document.addEventListener("pointerdown", close);
+    return () => document.removeEventListener("pointerdown", close);
+  }, [historyOpen]);
+  useEffect(() => {
+    if (compose) composer.focus();
+  }, [compose]);
+  function toggleCompose() {
+    interaction.current++;
+    setComposeMounted(true);
+    setCompose(!compose);
+    if (compose) composeTrigger.current?.focus({ preventScroll: true });
   }
-  function startDrag(event: ReactPointerEvent<HTMLDivElement>) {
-    const card = cardRef.current;
-    const bounds = card?.getBoundingClientRect();
-    if (event.button !== 0 || !card || !bounds?.width) return;
-    drag.current = { left: bounds.left, width: bounds.width };
-    event.currentTarget.setPointerCapture?.(event.pointerId);
-    card.dataset.dragging = "";
-    event.preventDefault();
+  function changeView(next: ReadingView) {
+    interaction.current++;
+    setView(next === "compare" && view === "compare" ? "notice" : next);
+    setHistoryOpen(false);
   }
-  function moveDrag(event: ReactPointerEvent<HTMLDivElement>) {
-    const ratio = ratioAt(event.clientX);
-    if (ratio != null) cardRef.current?.style.setProperty("--source-ratio", String(ratio));
+  function select(next: FeedItem) {
+    interaction.current++;
+    setResultViewed(true);
+    setShowDiff(false);
+    setHistoryOpen(false);
+    onVersion(next);
+    versionTrigger.current?.focus({ preventScroll: true });
+    void logEvent({
+      action: "rewrite_version_view",
+      version: next.rewriteVersion ?? undefined,
+      rewriteId: next.rewriteId ?? undefined,
+      publicationRevision: latest.publicationRevision,
+      contentHash: next.contentHash ?? undefined,
+      isFinal: true,
+      actionSource: "refresh_versions",
+      payload: { selectedVersion: next.rewriteVersion },
+    }).catch(() => {});
   }
-  function endDrag(event: ReactPointerEvent<HTMLDivElement>) {
-    const ratio = ratioAt(event.clientX);
-    drag.current = null;
-    const card = cardRef.current;
-    if (card) delete card.dataset.dragging;
-    if (ratio != null) writeNextPrefs({ sourceRatio: ratio });
+  const completed =
+    result && !resultViewed && result.item.rewriteId !== item.rewriteId
+      ? result.item
+      : pending;
+  const multiple =
+    (!!first && !!latest.isFinal && latest.rewriteId !== first.rewriteId) ||
+    (latest.rewriteVersion ?? 0) > 1 ||
+    versions.length > 1;
+  const atLatest = item.rewriteId === latest.rewriteId;
+  async function selectFirstOrLatest() {
+    if (completed) {
+      select(completed);
+      return;
+    }
+    if (!atLatest) {
+      select(latest);
+      return;
+    }
+    if (first) {
+      select(first);
+      return;
+    }
+    try {
+      const data = await loadDetails();
+      const rows = "rewrites" in data ? (data.rewrites ?? []) : [];
+      const earliest = [...rows].sort((a, b) => a.version - b.version)[0];
+      if (earliest) select(versionToFeedItem(earliest, latest));
+    } catch {}
   }
-  function keyDrag(event: ReactKeyboardEvent<HTMLDivElement>) {
-    const next =
-      event.key === "ArrowLeft"
-        ? sourceRatio + SOURCE_RATIO_STEP
-        : event.key === "ArrowRight"
-          ? sourceRatio - SOURCE_RATIO_STEP
-          : event.key === "Home"
-            ? SOURCE_RATIO_MAX
-            : event.key === "End"
-              ? SOURCE_RATIO_MIN
-              : null;
-    if (next == null) return;
-    event.preventDefault();
-    writeNextPrefs({ sourceRatio: clampSourceRatio(next) });
-  }
-
-  const source = details?.source;
-  const composeTrigger = (label: string) => (
-    <button type="button" data-compose-trigger aria-expanded={composing} onClick={toggleCompose}>
-      {label}
-    </button>
-  );
-  return (
-    <article
-      ref={cardRef}
-      id={`notice-${item.messageId}`}
-      className={`${styles.card} ${isMutedSource ? styles.sourceOnly : ""} ${item.importance === "viktig" ? styles.important : ""} ${panel ? styles.workspace : ""} ${focused ? styles.focused : ""}`}
-      style={{ "--source-ratio": sourceRatio, "--source-font": `${fontPx}px` } as CSSProperties}
-      data-generation-state={isGenerated ? "generated" : "not-generated"}
-      aria-label={item.issuerName}
-      onFocusCapture={(event) => {
-        if (!editingHint || !(event.target as HTMLElement).closest('[contenteditable="true"]')) return;
-        setEditingHint(false);
-        try { sessionStorage.setItem("newsweb:next-editing-hint", "seen"); } catch { /* Hint only. */ }
+  const versionControl = (completed || multiple) && (
+    <div
+      ref={history}
+      className={styles.versionControl}
+      onKeyDown={(event) => {
+        if (event.key === "Escape" && historyOpen) {
+          event.preventDefault();
+          event.stopPropagation();
+          setHistoryOpen(false);
+          versionTrigger.current?.focus({ preventScroll: true });
+        }
       }}
     >
-      <div className={styles.editorPane} data-editor-pane>
-        {focused && (
-          <button type="button" className={styles.backToFeed} onClick={closePanel}>
-            ← Feed
-          </button>
-        )}
-        {item.importance === "viktig" && <div className={styles.importance}>Viktig</div>}
-        {isFast && <div className={styles.versionLink}>Førsteutkast</div>}
-        {isGenerated && item.rewriteId ? (
-          <EditableRewrite
-            key={`${item.rewriteId}:${item.contentHash}`}
-            messageId={item.messageId}
-            originalTitle={item.title}
-            originalBody={[item.lead, ...item.body].filter(Boolean).join("\n\n")}
-            activeVersion={item.rewriteVersion ?? undefined}
-            rewriteId={item.rewriteId}
-            publicationRevision={item.publicationRevision}
-            contentHash={item.contentHash ?? undefined}
-            isFinal={item.isFinal}
-            className={styles.editor}
-            dateline={<RefreshDateline item={item} />}
-            showTitleButton
-            sourceLinks={sourceLinks}
-            renderActions={(controls) => (
-              <RefreshEditorActions
-                controls={controls}
-                sourcesOpen={!!panel}
-                composeOpen={composing}
-                onPanel={openPanel}
-                onClosePanel={closePanel}
-                onCompose={toggleCompose}
-                onFeedback={() => setFeedback(true)}
-                showEditingHint={editingHint}
-              />
-            )}
-          />
-        ) : (
-          <div className={styles.waiting}>
-            <RefreshDateline item={item} />
-            <h2>{item.sourceTitle || item.title}</h2>
-            <div className={styles.waitActions}>
-              <button type="button" data-source-trigger aria-expanded={!!panel} onClick={() => panel ? closePanel() : openPanel("sources")}>
-                {panel ? "Lukk kilder" : "Kilder"}
+      <button
+        ref={versionTrigger}
+        type="button"
+        className={completed ? styles.primary : undefined}
+        disabled={loading && !completed}
+        onClick={() => void selectFirstOrLatest()}
+      >
+        {completed
+          ? fast && completed.rewriteVersion === 1
+            ? "Fullstendig melding klar"
+            : "Ny versjon klar"
+          : atLatest
+            ? "Vis første"
+            : "Vis nyeste"}
+      </button>
+      <button
+        type="button"
+        className={styles.historyTrigger}
+        aria-label="Velg blant alle versjoner"
+        aria-expanded={historyOpen}
+        onClick={() => setHistoryOpen(!historyOpen)}
+      >
+        ⌄
+      </button>
+      {historyOpen && (
+        <div className={styles.historyMenu} aria-label="Alle versjoner">
+          {loading && <p role="status">Henter versjoner …</p>}
+          {loadError && (
+            <p role="alert">
+              Kunne ikke hente versjoner.{" "}
+              <button
+                type="button"
+                onClick={() => void loadDetails().catch(() => {})}
+              >
+                Prøv igjen
               </button>
-              {!latest.processing && !latest.failed && (
-                <span className={styles.waitGenerate}>
-                  {composeTrigger("Instruksjon")}
-                  <GenerateButton
-                    messageId={item.messageId}
-                    hasAttachments={item.hasAttachments}
-                    label="Lag notis"
-                  />
+            </p>
+          )}
+          {[
+            ...[...versions]
+              .sort((a, b) => b.version - a.version)
+              .map((v) => ({
+                item: versionToFeedItem(v, latest),
+                label:
+                  v.version === 1
+                    ? first
+                      ? "Fullstendig melding"
+                      : "Første versjon"
+                    : `Versjon ${v.version}`,
+              })),
+            ...(first ? [{ item: first, label: "Førsteutkast" }] : []),
+          ].map(({ item: version, label }) => {
+            const edited = getRewriteDraft({
+              messageId: item.messageId,
+              version: version.rewriteVersion,
+              rewriteId: version.rewriteId ?? undefined,
+              originalTitle: version.title,
+              originalBody: [version.lead, ...version.body]
+                .filter(Boolean)
+                .join("\n\n"),
+            });
+            return (
+              <button
+                key={version.rewriteId}
+                type="button"
+                aria-pressed={item.rewriteId === version.rewriteId}
+                onClick={() => select(version)}
+              >
+                <span className={styles.historyMeta}>
+                  <span>{label}</span>
+                  {version.finalizedAt && (
+                    <time>
+                      {new Intl.DateTimeFormat("nb-NO", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        timeZone: "Europe/Oslo",
+                      }).format(new Date(version.finalizedAt))}
+                    </time>
+                  )}
+                  <span>
+                    {[
+                      item.rewriteId === version.rewriteId
+                        ? "Valgt"
+                        : version.rewriteId === latest.rewriteId
+                          ? "Nyeste"
+                          : "",
+                      edited ? "Redigert" : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </span>
+                </span>
+                <span>{edited?.title ?? version.title}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+  const sourceLinks = {
+    primary: {
+      url: `https://newsweb.oslobors.no/message/${item.messageId}`,
+      issuerName: item.issuerName,
+      issuerSign: item.issuerSign,
+    },
+    related:
+      details && "relatedNotices" in details
+        ? details.relatedNotices
+        : undefined,
+  };
+  const source = details?.source;
+  const diffAvailable =
+    !!result?.base && result.item.rewriteId === item.rewriteId;
+  function actions(editor: RewriteActionControls) {
+    controls.current = editor;
+    const visible = editor.getSnapshot();
+    const before = result?.base;
+    return (
+      <>
+        {showDiff && before && (
+          <div
+            className={styles.diff}
+            aria-label="Endringer fra teksten som ble sendt inn"
+          >
+            <ChangedText before={before.title} after={visible.title} heading />
+            {Array.from(
+              {
+                length: Math.max(
+                  splitParagraphs(before.body).length,
+                  splitParagraphs(visible.body).length,
+                ),
+              },
+              (_, i) => (
+                <ChangedText
+                  key={i}
+                  before={splitParagraphs(before.body)[i] ?? ""}
+                  after={splitParagraphs(visible.body)[i] ?? ""}
+                />
+              ),
+            )}
+          </div>
+        )}
+        <div className={styles.actions}>
+          <button
+            ref={composeTrigger}
+            type="button"
+            className={styles.editAction}
+            data-compose-trigger
+            aria-expanded={compose}
+            aria-controls={`compose-${item.messageId}`}
+            onClick={toggleCompose}
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              aria-hidden="true"
+            >
+              <path d="m16 3 5 5M4 16l-1 5 5-1L21 7a2 2 0 0 0-4-4Z" />
+            </svg>
+            Endre
+          </button>
+          {versionControl}
+          <div className={styles.requestActions}>
+            {composer.status}
+            {!composer.busy &&
+              !completed &&
+              (latest.processing || latest.regenerating) && (
+                <span className={styles.requestStatus} role="status">
+                  {fast
+                    ? "Utfyllende lages …"
+                    : latest.phase
+                      ? getGenerationPhaseLabel(latest.phase)
+                      : "Notis lages …"}
                 </span>
               )}
-            </div>
+            {latest.failed && !composer.busy && !composer.request && (
+              <span role="status">
+                Kunne ikke fullføre{" "}
+                <button
+                  type="button"
+                  disabled={!composer.canGenerate}
+                  onClick={() => void composer.generate()}
+                >
+                  Prøv igjen
+                </button>
+              </span>
+            )}
           </div>
-        )}
-        {compose !== "unmounted" && (
-          <div ref={composeRef} className={styles.compose} data-compose hidden={!composing}>
-            <InstructionInput
-              messageId={item.messageId}
-              activeVersion={isFast ? latest.isFinal ? latest.rewriteVersion ?? undefined : undefined : item.rewriteVersion ?? undefined}
-              rewriteId={isFast ? latest.rewriteId ?? undefined : item.rewriteId ?? undefined}
-              publicationRevision={latest.publicationRevision}
-              contentHash={isFast ? latest.contentHash ?? undefined : item.contentHash ?? undefined}
-              isFinal={isFast ? latest.isFinal : item.isFinal}
-              hasAttachments={item.hasAttachments}
-              presentation="refresh"
-            />
-          </div>
-        )}
-        {(latest.processing || latest.regenerating) && (
-          <div role="status" className={styles.progress}>
-            <span />
-            {isFast ? "Utfyllende versjon lages" : latest.phase ? getGenerationPhaseLabel(latest.phase) : "Notis lages"}
-          </div>
-        )}
-        {latest.failed && (
-          <div role="status" className={styles.failure}>
-            Generering feilet{" "}
-            {!latest.processing && !latest.regenerating && <GenerateButton messageId={item.messageId} hasAttachments={item.hasAttachments} label="Prøv igjen" />}
-            {composeTrigger("Tilpass instruksjon")}
-          </div>
-        )}
-        {pending && (
-          <div className={styles.ready} role="status">
-            <span>{isFast ? "Utfyllende versjon klar" : "Ny versjon klar"}</span>
-            <button type="button" onClick={onSelect}>
-              Vis versjon
+          {diffAvailable && (
+            <button
+              type="button"
+              aria-pressed={showDiff}
+              onClick={() => setShowDiff(!showDiff)}
+            >
+              {showDiff ? "Skjul endringer" : "Vis endringer"}
+            </button>
+          )}
+          <div className={styles.rightActions}>
+            <ActionMenu>
+              {editor.hasDraft && (
+                <>
+                  <button type="button" onClick={editor.toggleOriginal}>
+                    {editor.showingOriginal
+                      ? "Vis redigert tekst"
+                      : "Vis uredigert AI-tekst"}
+                  </button>
+                  <button type="button" onClick={editor.reset}>
+                    Tilbakestill egne endringer
+                  </button>
+                </>
+              )}
+              {editor.canUndoReset && (
+                <button type="button" onClick={editor.undoReset}>
+                  Angre tilbakestilling
+                </button>
+              )}
+              <button type="button" onClick={() => setFeedback(true)}>
+                Meld feil
+              </button>
+            </ActionMenu>
+            <button
+              type="button"
+              className={styles.primary}
+              aria-live="polite"
+              onClick={() => void editor.copy()}
+            >
+              {editor.copyState === "copied"
+                ? "Kopiert"
+                : editor.copyState === "failed"
+                  ? "Prøv å kopiere igjen"
+                  : "Kopier"}
             </button>
           </div>
+        </div>
+        {editor.saveState === "failed" && (
+          <p className={styles.error} role="alert">
+            Endringene er ikke lagret på denne enheten.
+          </p>
         )}
-        {item.rewriteVersion && item.rewriteVersion > 1 && !pending && (
-          <button
-            type="button"
-            className={styles.versionLink}
-            onClick={() => openPanel("versions")}
-          >
-            Versjon {item.rewriteVersion}
-          </button>
-        )}
-      </div>
-      {opened && panel && (
-        <div
-          role="separator"
-          aria-orientation="vertical"
-          aria-label="Bredde på kildepanelet"
-          aria-valuemin={Math.round(SOURCE_RATIO_MIN * 100)}
-          aria-valuemax={Math.round(SOURCE_RATIO_MAX * 100)}
-          aria-valuenow={Math.round(sourceRatio * 100)}
-          tabIndex={0}
-          className={styles.splitHandle}
-          onPointerDown={startDrag}
-          onPointerMove={moveDrag}
-          onPointerUp={endDrag}
-          onPointerCancel={endDrag}
-          onDoubleClick={() => writeNextPrefs({ sourceRatio: undefined })}
-          onKeyDown={keyDrag}
-        />
-      )}
-      {opened && (
-        <aside className={styles.sourcePane} hidden={!panel} aria-label="Kilder og versjoner">
-          <button
-            type="button"
-            className={styles.mobileBackToEditor}
-            onClick={() => cardRef.current?.scrollIntoView({ block: "start" })}
-          >
-            ↑ Notis
-          </button>
-          <div className={styles.panelHeader}>
+      </>
+    );
+  }
+  return (
+    <article
+      ref={card}
+      id={`notice-${item.messageId}`}
+      className={`${styles.card} ${!generated && !latest.processing ? styles.sourceOnly : ""}`}
+      aria-label={item.issuerName}
+      data-generation-state={generated ? "generated" : "not-generated"}
+    >
+      <header className={styles.header}>
+        <Dateline item={item} />
+        <div className={styles.viewSwitch} role="group" aria-label="Lesemodus">
+          {(
+            [
+              ["notice", "Notis"],
+              ["original", "Original"],
+              ["compare", "Sammenlign"],
+            ] as const
+          ).map(([mode, label]) => (
+            <button
+              type="button"
+              key={mode}
+              aria-pressed={view === mode}
+              onClick={() => changeView(mode)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </header>
+      <div
+        className={`${styles.reading} ${view === "compare" ? styles.comparing : ""}`}
+      >
+        <div className={styles.editorPane} hidden={view === "original"}>
+          {view === "compare" && (
+            <div className={styles.columnHeading}>Notis</div>
+          )}
+          {generated && item.rewriteId ? (
+            <EditableRewrite
+              key={`${item.rewriteId}:${item.contentHash}`}
+              messageId={item.messageId}
+              originalTitle={item.title}
+              originalBody={[item.lead, ...item.body]
+                .filter(Boolean)
+                .join("\n\n")}
+              activeVersion={item.rewriteVersion ?? undefined}
+              rewriteId={item.rewriteId}
+              publicationRevision={item.publicationRevision}
+              contentHash={item.contentHash ?? undefined}
+              isFinal={item.isFinal}
+              showTitleButton
+              inlineTitleSuggestions
+              titleSuggestionContext={view}
+              className={`${styles.editor} ${showDiff ? styles.showDiff : ""}`}
+              sourceLinks={sourceLinks}
+              onDraftChange={onDraftChange}
+              renderActions={actions}
+            />
+          ) : (
+            <>
+              <h2>{item.sourceTitle || item.title}</h2>
+              <div className={styles.actions}>
+                <button
+                  ref={composeTrigger}
+                  type="button"
+                  data-compose-trigger
+                  aria-expanded={compose}
+                  onClick={toggleCompose}
+                >
+                  Endre
+                </button>
+                {composer.status}
+                {!composer.busy && (
+                  <span role="status">
+                    {latest.failed
+                      ? "Kunne ikke fullføre"
+                      : latest.processing
+                        ? latest.fastDraft?.status === "pending"
+                          ? "Førsteutkast lages …"
+                          : "Notis lages …"
+                        : ""}
+                  </span>
+                )}
+                {!latest.processing && !composer.busy && !composer.request && (
+                  <button
+                    type="button"
+                    disabled={!composer.canGenerate}
+                    onClick={() => void composer.generate()}
+                  >
+                    {latest.failed ? "Prøv igjen" : "Lag notis"}
+                  </button>
+                )}
+              </div>
+            </>
+          )}
           <div
-            className={styles.panelTabs}
-            role="tablist"
-            aria-label="Vis kilde eller versjon"
+            id={`compose-${item.messageId}`}
+            className={styles.composeReveal}
+            data-open={compose}
+            aria-hidden={!compose}
+            inert={!compose}
             onKeyDown={(event) => {
-              const buttons = Array.from(
-                event.currentTarget.querySelectorAll<HTMLButtonElement>("[role=tab]")
-              );
-              const index = buttons.indexOf(event.target as HTMLButtonElement);
-              const next =
-                event.key === "ArrowRight"
-                  ? (index + 1) % buttons.length
-                  : event.key === "ArrowLeft"
-                    ? (index + buttons.length - 1) % buttons.length
-                    : event.key === "Home"
-                      ? 0
-                      : event.key === "End"
-                        ? buttons.length - 1
-                        : -1;
-              if (next >= 0) {
-                event.preventDefault();
-                buttons[next].focus();
-                buttons[next].click();
+              if (event.key === "Escape" && !event.defaultPrevented) {
+                event.stopPropagation();
+                setCompose(false);
+                composeTrigger.current?.focus({ preventScroll: true });
               }
             }}
           >
-            <button
-              type="button"
-              role="tab"
-              id={`sources-tab-${item.messageId}`}
-              aria-selected={panel === "sources"}
-              tabIndex={panel === "sources" ? 0 : -1}
-              aria-controls={`sources-panel-${item.messageId}`}
-              onClick={() => setPanel("sources")}
-            >
-              Kilder
-            </button>
-            {item.hasAttachments && (
-              <button
-                type="button"
-                role="tab"
-                id={`pdf-tab-${item.messageId}`}
-                aria-selected={panel === "pdf"}
-                tabIndex={panel === "pdf" ? 0 : -1}
-                aria-controls={`pdf-panel-${item.messageId}`}
-                onClick={() => setPanel("pdf")}
-              >
-                PDF-tekst
-              </button>
-            )}
-            <button
-              type="button"
-              role="tab"
-              id={`versions-tab-${item.messageId}`}
-              aria-selected={panel === "versions"}
-              tabIndex={panel === "versions" ? 0 : -1}
-              aria-controls={`versions-panel-${item.messageId}`}
-              onClick={() => setPanel("versions")}
-            >
-              Versjoner {versions.length || ""}
-            </button>
-          </div>
-          <div className={styles.panelTools}>
-            <button
-              type="button"
-              className={styles.fontStep}
-              aria-label="Mindre kildetekst"
-              disabled={fontIndex <= 0}
-              onClick={() => writeNextPrefs({ sourceFontPx: SOURCE_FONT_STEPS[fontIndex - 1] })}
-            >
-              A−
-            </button>
-            <button
-              type="button"
-              className={styles.fontStep}
-              aria-label="Større kildetekst"
-              disabled={fontIndex < 0 || fontIndex >= SOURCE_FONT_STEPS.length - 1}
-              onClick={() => writeNextPrefs({ sourceFontPx: SOURCE_FONT_STEPS[fontIndex + 1] })}
-            >
-              A+
-            </button>
-            <button type="button" className={styles.expandToggle} aria-pressed={focused} onClick={toggleFocused}>
-              {focused ? "Tilbake til feed" : "Utvid"}
-            </button>
-            <button type="button" className={styles.closeSource} onClick={closePanel} aria-label="Lukk kildepanelet" title="Lukk kilder">×</button>
-          </div>
-          </div>
-          <div
-            role="tabpanel"
-            id={`sources-panel-${item.messageId}`}
-            aria-labelledby={`sources-tab-${item.messageId}`}
-            hidden={panel !== "sources"}
-            className={styles.sourceText}
-          >
-            <div className={styles.sourceHeading}>
-              <span>Børsmelding</span>
-              <a href={sourceLinks.primary.url} target="_blank" rel="noreferrer">
-                Newsweb ↗
-              </a>
+            <div className={styles.composeClip}>
+              {composeMounted && composer.form}
             </div>
-            <AttachmentLinks
-              messageId={item.messageId}
-              attachments={source?.attachments ?? item.attachments}
-            />
-            <h3>{source?.title ?? item.sourceTitle}</h3>
-            <div className={styles.sourceBody}>
-              {splitParagraphs(source?.bodyText ?? item.sourceBodyText).map((paragraph, index) => (
-                <p key={index}>{paragraph}</p>
-              ))}
-            </div>
-            {details && "relatedNotices" in details && !!details.relatedNotices?.length && (
-              <div className={styles.related}>
-                <h4>Relaterte meldinger</h4>
-                {details.relatedNotices.map((notice) => (
-                  <a key={notice.messageId} href={notice.url} target="_blank" rel="noreferrer">
-                    {notice.title} ↗
-                  </a>
-                ))}
-              </div>
-            )}
+          </div>
+        </div>
+        <aside
+          className={styles.sourcePane}
+          hidden={view === "notice"}
+          aria-label="Original og kilder"
+        >
+          <div className={styles.columnHeading}>
+            <span>Original · Newsweb</span>
+            <a
+              href={sourceLinks.primary.url}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Åpne ↗
+            </a>
           </div>
           {item.hasAttachments && (
             <div
-              role="tabpanel"
-              id={`pdf-panel-${item.messageId}`}
-              aria-labelledby={`pdf-tab-${item.messageId}`}
-              hidden={panel !== "pdf"}
-              className={styles.sourceText}
+              className={styles.sourceTabs}
+              role="group"
+              aria-label="Kildetekst"
             >
-              <div className={styles.sourceHeading}>
-                <span>{pdf.pageCount ? `PDF · ${pdf.pageCount} sider` : "PDF"}</span>
-                <span>Lest av modellen</span>
-              </div>
-              {pdf.status === "loading" && <p role="status">Henter PDF-tekst…</p>}
-              {pdf.status === "error" && (
+              <button
+                type="button"
+                aria-pressed={sourceMode === "newsweb"}
+                onClick={() => setSourceMode("newsweb")}
+              >
+                Børsmelding
+              </button>
+              <button
+                type="button"
+                aria-pressed={sourceMode === "pdf"}
+                onClick={() => setSourceMode("pdf")}
+              >
+                PDF-tekst
+              </button>
+            </div>
+          )}
+          {sourceMode === "newsweb" ? (
+            <>
+              <AttachmentLinks
+                messageId={item.messageId}
+                attachments={source?.attachments ?? item.attachments}
+              />
+              <h2>{source?.title ?? item.sourceTitle}</h2>
+              {splitParagraphs(source?.bodyText ?? item.sourceBodyText).map(
+                (p, i) => (
+                  <p key={i}>{p}</p>
+                ),
+              )}
+              {sourceLinks.related?.length ? (
+                <div className={styles.related}>
+                  <h3>Relaterte meldinger</h3>
+                  {sourceLinks.related.map((link) => (
+                    <a
+                      key={link.messageId}
+                      href={link.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {link.title} ↗
+                    </a>
+                  ))}
+                </div>
+              ) : null}
+            </>
+          ) : (
+            <>
+              {pdf?.state === "loading" && (
+                <p role="status">Henter PDF-tekst …</p>
+              )}
+              {pdf?.state === "failed" && (
                 <p role="alert">
                   Kunne ikke hente PDF-tekst.{" "}
-                  <button type="button" onClick={() => setPdfRequest((request) => request + 1)}>
+                  <button
+                    type="button"
+                    onClick={() => setPdfRetry((value) => value + 1)}
+                  >
                     Prøv igjen
                   </button>
                 </p>
               )}
-              {pdf.status === "ready" && pdf.text === null && (
-                <p>Ingen PDF-tekst lagret for denne versjonen</p>
-              )}
-              {pdf.status === "ready" && pdf.text && (
-                <div className={styles.sourceBody}>
-                  {splitPdfPages(pdf.text).map((section, index) => (
-                    <Fragment key={index}>
-                      {section.page !== null && <h4>Side {section.page}</h4>}
-                      {section.paragraphs.map((paragraph, paragraphIndex) => (
-                        <p key={paragraphIndex}>{paragraph}</p>
-                      ))}
-                    </Fragment>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-          <div
-            role="tabpanel"
-            id={`versions-panel-${item.messageId}`}
-            aria-labelledby={`versions-tab-${item.messageId}`}
-            hidden={panel !== "versions"}
-          >
-            {loadState === "loading" && !versions.length && <p role="status">Henter versjoner…</p>}
-            {loadState === "error" && (
-              <p role="alert">
-                Kunne ikke hente versjoner.{" "}
-                <button onClick={() => setVersionRequest((request) => request + 1)}>
-                  Prøv igjen
-                </button>
-              </p>
-            )}
-            <div className={styles.versionList}>
-              {firstDraft && (
-                <button type="button" className={styles.versionRow} aria-pressed={isFast} onClick={() => onVersion(firstDraft)}>
-                  <span><strong>Førsteutkast</strong><small>{firstDraft.title}</small></span>
-                  <span>{hasRewriteDraft({ messageId: item.messageId, version: 1, rewriteId: firstDraft.rewriteId ?? undefined, originalTitle: firstDraft.title, originalBody: firstDraft.lead }) ? "Redigert" : isFast ? "Valgt" : ""}</span>
-                </button>
-              )}
-              {[...versions]
-                .sort((a, b) => b.version - a.version)
-                .map((version) => (
-                  <button
-                    type="button"
-                    key={version.rewriteId}
-                    className={styles.versionRow}
-                    aria-pressed={item.rewriteId === version.rewriteId}
-                    onClick={() => {
-                      onVersion(versionToFeedItem(version, latest));
-                      void logEvent({
-                        action: "rewrite_version_view",
-                        version: version.version,
-                        rewriteId: version.rewriteId,
-                        publicationRevision: latest.publicationRevision,
-                        contentHash: version.contentHash,
-                        isFinal: true,
-                        actionSource: "refresh_versions",
-                        payload: { selectedVersion: version.version }
-                      }).catch(() => {});
-                    }}
-                  >
-                    <span>
-                      <strong>
-                        {version.version === 1 ? firstDraft ? "Utfyllende versjon" : "Første versjon" : `Versjon ${version.version}`}
-                      </strong>
-                      <time>
-                        {new Intl.DateTimeFormat("nb-NO", {
-                          day: "numeric",
-                          month: "short",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                          timeZone: "Europe/Oslo"
-                        }).format(new Date(version.generatedAt))}
-                      </time>
-                    </span>
-                    <span>
-                      {drafts.has(version.rewriteId)
-                        ? "Redigert"
-                        : item.rewriteId === version.rewriteId
-                          ? "Valgt"
-                          : ""}
-                    </span>
-                    <small>{version.rewrite.title}</small>
-                  </button>
+              {pdf?.state === "ready" &&
+                (pdf.text ? (
+                  <>
+                    {pdf.pages && (
+                      <p className={styles.requestStatus}>
+                        PDF · {pdf.pages} sider · Lest av modellen
+                      </p>
+                    )}
+                    {splitPdfPages(pdf.text).map((section, i) => (
+                      <Fragment key={i}>
+                        {section.page !== null && <h3>Side {section.page}</h3>}
+                        {section.paragraphs.map((text, j) => (
+                          <p key={j}>{text}</p>
+                        ))}
+                      </Fragment>
+                    ))}
+                  </>
+                ) : (
+                  <p>Ingen PDF-tekst lagret for denne versjonen.</p>
                 ))}
-            </div>
-            {loadState === "idle" && !versions.length && !firstDraft && <p>Ingen versjoner ennå</p>}
-          </div>
+            </>
+          )}
         </aside>
-      )}
-      <FeedbackDialog item={item} open={feedback} onClose={() => setFeedback(false)} />
+      </div>
+      <FeedbackDialog
+        item={item}
+        open={feedback}
+        onClose={() => setFeedback(false)}
+      />
     </article>
   );
 }

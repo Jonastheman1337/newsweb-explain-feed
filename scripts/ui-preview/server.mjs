@@ -10,6 +10,8 @@ export function createFixtureServer() {
     items.filter((item) => item.isFinal).map((item) => [item.messageId, [item]])
   );
   const jobs = new Map();
+  const editorRequests=new Map();
+  const fixtureMaterials=new Map();
   const instructions = new Map();
   function rewriteFor(item) {
     return {
@@ -46,6 +48,27 @@ export function createFixtureServer() {
     const event = `id: ${++eventId}\ndata: ${JSON.stringify(item)}\n\n`;
     for (const stream of streams) stream.write(event);
   };
+  function requestPayload(row){const {body,timer,...payload}=row;return payload;}
+  function advanceRequests(){
+    for(const row of editorRequests.values()){
+      if(row.state!=="queued")continue;
+      const current=items.find(item=>item.messageId===row.messageId);
+      if(!current||jobs.has(row.messageId)||current.processing||[...editorRequests.values()].some(other=>other!==row&&other.messageId===row.messageId&&other.state==="running"))continue;
+      row.state="running";row.updatedAt=new Date().toISOString();
+      const timer=setTimeout(()=>{
+        timers.delete(timer);if(row.state!=="running")return;
+        if(row.body.instruction?.includes("[fail]")){row.state="failed";row.error="Simulert genereringsfeil";row.updatedAt=new Date().toISOString();return;}
+        const latest=items.find(item=>item.messageId===row.messageId);
+        const version=(latest.rewriteVersion??0)+1;
+        const base=row.body.baseSnapshot;
+        const paragraphs=base?.body?.split(/\n\s*\n/).filter(Boolean);
+        const next={...latest,isFinal:true,notGenerated:false,failed:false,skipped:false,processing:false,regenerating:false,phase:"published",rewriteVersion:version,publicationRevision:latest.publicationRevision+1,rewriteId:`fixture-${row.messageId}-${version}`,contentHash:`fixture-${row.messageId}-${version}`,finalizedAt:new Date().toISOString(),title:base?.title??latest.title,lead:paragraphs?.[0]??latest.lead,body:[...(paragraphs?.slice(1)??latest.body),"Opsjonen er ikke med i den oppgitte kontraktsverdien."]};
+        row.state="published";row.rewriteId=next.rewriteId;row.version=version;row.updatedAt=new Date().toISOString();
+        instructions.set(next.rewriteId,row.body.instruction??null);publish(next);
+      },4500);row.timer=timer;timers.add(timer);
+    }
+  }
+  const requestTicker=setInterval(advanceRequests,100);timers.add(requestTicker);
   function queueGeneration(previous, instruction = "", fail = false) {
     const activeJob = jobs.get(previous.messageId);
     if (activeJob) return activeJob;
@@ -124,7 +147,7 @@ export function createFixtureServer() {
         chunks.push(chunk);
       }
       const raw = Buffer.concat(chunks).toString();
-      const body = raw ? JSON.parse(raw) : {};
+      const body = raw ? req.headers["content-type"]?.includes("multipart/form-data") ? {fileName:raw.match(/filename="([^"]+)"/)?.[1]??"eksempel.pdf"} : JSON.parse(raw) : {};
       if (pathname === "/auth/login" && req.method === "POST") {
         if (body.username !== "preview" || body.password !== "ui-preview")
           return json(res, 401, { message: "Innlogging feilet" });
@@ -238,11 +261,40 @@ export function createFixtureServer() {
           sessions.set(token, Array.isArray(body.mutedCategories) ? body.mutedCategories : []);
         return json(res, 200, { mutedCategories: sessions.get(token) });
       }
+      if(pathname==="/notice/editor-capabilities")return json(res,200,{snapshotRevision:true,queuedGeneration:true,cancellation:true,urlMaterials:true});
       const match = pathname.match(/^\/notice\/(\d+)(?:\/(.*))?$/);
       if (match) {
         const item = items.find((item) => item.messageId === Number(match[1]));
         if (!item) return json(res, 404, { message: "Not found" });
         const action = match[2];
+        const cancel=action?.match(/^generations\/([^/]+)\/cancel$/);
+        if(cancel&&req.method==="POST"){
+          const row=editorRequests.get(cancel[1]);if(!row||row.messageId!==item.messageId)return json(res,404,{message:"Not found"});
+          if(["queued","running"].includes(row.state)){if(row.timer){clearTimeout(row.timer);timers.delete(row.timer);}row.state="cancelled";row.updatedAt=new Date().toISOString();}
+          return json(res,200,requestPayload(row));
+        }
+        if(action==="status"&&url.searchParams.has("generationRunId")){
+          const row=editorRequests.get(url.searchParams.get("generationRunId"));if(!row||row.messageId!==item.messageId)return json(res,404,{message:"Not found"});
+          return json(res,200,{request:requestPayload(row),ready:row.state==="published",failed:row.state==="failed"});
+        }
+        if(action==="generate"&&req.method==="POST"&&body.clientRequestId){
+          const existing=[...editorRequests.values()].find(row=>row.messageId===item.messageId&&row.clientRequestId===body.clientRequestId);
+          if(existing)return json(res,200,requestPayload(existing));
+          const prior=body.retryOf?editorRequests.get(body.retryOf):null;
+          const now=new Date().toISOString();const row={generationRunId:randomUUID(),clientRequestId:body.clientRequestId,messageId:item.messageId,state:"queued",version:null,rewriteId:null,error:null,createdAt:now,updatedAt:now,body:prior?{...prior.body,clientRequestId:body.clientRequestId}:body};
+          editorRequests.set(row.generationRunId,row);advanceRequests();return json(res,202,requestPayload(row));
+        }
+        const materialMatch=action?.match(/^materials\/(.*)$/);
+        if(materialMatch){
+          const materialAction=materialMatch[1],rows=fixtureMaterials.get(item.messageId)??[];
+          if(req.method==="DELETE"){fixtureMaterials.set(item.messageId,rows.filter(row=>row.id!==materialAction));return json(res,200,{ok:true});}
+          if(req.method==="POST"){
+            const failed=/paywall|blocked|fail/.test(body.url??'');
+            const text=body.text??'Fiktiv kildetekst fra lokal forhåndsvisning.';
+            const row={id:randomUUID(),messageId:item.messageId,kind:materialAction,title:body.fileName??(body.url?new URL(body.url).hostname:`Kildetekst · ${text.length} tegn`),url:body.url??null,fileName:body.fileName??null,mimeType:materialAction==='pdf'?'application/pdf':null,fileSize:materialAction==='pdf'?100:null,extractedTextChars:failed?0:text.length,status:failed?'failed':'ready',errorText:failed?'Kunne ikke hente lesbar tekst. Lim inn teksten i stedet.':null,enabled:true,metadata:null,createdAt:new Date().toISOString()};
+            fixtureMaterials.set(item.messageId,[...rows,row]);return json(res,201,row);
+          }
+        }
         if (action === "status")
           return json(res, 200, {
             ready: item.isFinal && !jobs.has(item.messageId),
@@ -259,7 +311,7 @@ export function createFixtureServer() {
           req.method === "POST"
         )
           return json(res, 200, { ok: true });
-        if (action === "materials") return json(res, 200, { materials: [] });
+        if (action === "materials") return json(res, 200, { materials: fixtureMaterials.get(item.messageId)??[] });
         if (action === "model-source") {
           const modelSource = fixtureModelSources.get(item.messageId);
           return json(res, 200, {
@@ -283,7 +335,9 @@ export function createFixtureServer() {
               ? [
                   "Nordvik sikrer treårig avtale",
                   "Vedlikeholdsavtale verdt 420 millioner for Nordvik",
-                  "Nordvik får ny kontrakt i Nordsjøen"
+                  "Nordvik får ny kontrakt i Nordsjøen",
+                  "Nordvik inngår vedlikeholdsavtale",
+                  "Ny treårig avtale for Nordvik"
                 ]
               : item.messageId === 900002
                 ? [

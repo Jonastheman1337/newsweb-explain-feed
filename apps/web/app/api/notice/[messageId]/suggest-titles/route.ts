@@ -1,3 +1,6 @@
+import { noticeEditorSnapshotSchema } from "@newsweb/shared";
+import { resolveNoticeEditorBase, InvalidEditorBaseError } from "@newsweb/shared/generation-control";
+import { prisma as editorPrisma } from "@newsweb/shared/db";
 import { EDITORIAL_CURRENCY_NAMES } from "@newsweb/prompt-kit";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -147,6 +150,7 @@ export async function POST(
   const token = cookieStore.get(SESSION_COOKIE)?.value;
   let requestBody: {
     currentTitle?: unknown;
+    baseSnapshot?: unknown;
     telemetry?: unknown;
   } = {};
   try {
@@ -186,7 +190,14 @@ export async function POST(
   if (wantsFast && (!fastView || notice.fastDraft?.status !== "ready" || `fast:${notice.fastDraft.id}` !== selectedId)) {
     return NextResponse.json({ message: "Førsteutkastet er ikke tilgjengelig." }, { status: 409 });
   }
-  const selectedRewrite = wantsFast ? notice.fastDraft.rewrite : notice.rewrite;
+  let selectedRewrite = wantsFast ? notice.fastDraft.rewrite : notice.rewrite;
+  if(requestBody.baseSnapshot!==undefined){
+    const parsed=noticeEditorSnapshotSchema.safeParse(requestBody.baseSnapshot);
+    if(!parsed.success)return NextResponse.json({message:"Ugyldig tekstgrunnlag."},{status:400});
+    if(parsed.data.rewriteId.startsWith("fast:")&&process.env.FAST_DRAFT_ENABLED!=="true")return NextResponse.json({message:"Førsteutkastet er ikke tilgjengelig."},{status:409});
+    try{selectedRewrite=await resolveNoticeEditorBase(editorPrisma,Number(messageId),parsed.data);}
+    catch(error){if(error instanceof InvalidEditorBaseError)return NextResponse.json({message:error.message},{status:409});throw error;}
+  }
   const lead = selectedRewrite?.lead ?? "";
   const body = selectedRewrite?.body?.join("\n") ?? "";
   const issuerName = notice.source?.issuerName ?? "";

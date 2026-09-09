@@ -20,6 +20,8 @@ export async function GET(
 
   const requestUrl = new URL(request.url);
   const upstreamUrl = new URL(`${API_BASE_URL}/notice/${messageId}/status`);
+  const generationRunId=requestUrl.searchParams.get("generationRunId");
+  if(generationRunId)upstreamUrl.searchParams.set("generationRunId",generationRunId);
   const jobId = requestUrl.searchParams.get("jobId");
   if (jobId) {
     upstreamUrl.searchParams.set("jobId", jobId);
