@@ -52,11 +52,11 @@ export function RefreshFilters({
     for (const key of ["q", "market", "category", "issuer", "important", "generated"] as const) {
       if (key !== name && params[key]) query.set(key, params[key]!);
     }
-    return `/next${query.size ? `?${query}` : ""}`;
+    return `/${query.size ? `?${query}` : ""}`;
   }
 
   return (
-    <form className={styles.filters} action="/next">
+    <form className={styles.filters} action="/">
       <div className={styles.filterToolbar}>
         <div className={styles.search}>
           <input name="q" aria-label="Søk i børsmeldinger" placeholder="Søk i børsmeldinger" defaultValue={params.q} />
@@ -81,7 +81,7 @@ export function RefreshFilters({
             <SearchableSelect name="category" placeholder="Alle kategorier" searchPlaceholder="Søk etter kategori" defaultValue={params.category} options={categories} />
             <SearchableSelect name="issuer" placeholder="Alle utstedere" searchPlaceholder="Søk etter selskap eller ticker" defaultValue={params.issuer} options={issuers} />
             <div className={styles.filterActions}>
-              <Link href="/next">Nullstill søk og filter</Link>
+              <Link href="/">Nullstill søk og filter</Link>
               <button type="submit">Vis meldinger</button>
             </div>
             <Preferences categories={categories.map((category) => category.value)} defaultMuted={mutedCategories} />

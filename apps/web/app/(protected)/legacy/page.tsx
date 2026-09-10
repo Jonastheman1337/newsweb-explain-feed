@@ -38,19 +38,19 @@ function withParams(
   params: Record<string, string | undefined>,
   overrides: Record<string, string | undefined>
 ): string {
-  const url = new URL("http://localhost/feed");
+  const url = new URL("http://localhost/legacy");
   const merged = { ...params, ...overrides };
   Object.entries(merged).forEach(([key, value]) => {
     if (value) url.searchParams.set(key, value);
   });
-  return `/feed?${url.searchParams.toString()}`;
+  return `/legacy?${url.searchParams.toString()}`;
 }
 
 export default async function FeedPage({ searchParams }: FeedPageProps) {
   const params = await searchParams;
   const token = await getSessionToken();
   if (!token) {
-    redirect("/login");
+    redirect("/login?next=/legacy");
   }
 
   const normalized = {
@@ -81,7 +81,7 @@ export default async function FeedPage({ searchParams }: FeedPageProps) {
     (feedResult.status === "rejected" && isApiAuthError(feedResult.reason)) ||
     (filtersResult.status === "rejected" && isApiAuthError(filtersResult.reason))
   ) {
-    redirect("/login");
+    redirect("/login?next=/legacy");
   }
 
   let feedUnavailable = false;
@@ -102,7 +102,7 @@ export default async function FeedPage({ searchParams }: FeedPageProps) {
       });
     } catch (error) {
       if (isApiAuthError(error)) {
-        redirect("/login");
+        redirect("/login?next=/legacy");
       }
       feedUnavailable = true;
     }
@@ -127,7 +127,7 @@ export default async function FeedPage({ searchParams }: FeedPageProps) {
       });
     } catch (error) {
       if (isApiAuthError(error)) {
-        redirect("/login");
+        redirect("/login?next=/legacy");
       }
       feedUnavailable = true;
       feed = {
@@ -200,7 +200,7 @@ export default async function FeedPage({ searchParams }: FeedPageProps) {
             <p className="muted">
               Sjekk at API, database og Redis kjører, og last siden på nytt.
             </p>
-            <Link href="/feed" className="ghostButton" style={{ display: "inline-block" }}>
+            <Link href="/legacy" className="ghostButton" style={{ display: "inline-block" }}>
               Last inn igjen
             </Link>
           </article>
@@ -215,7 +215,7 @@ export default async function FeedPage({ searchParams }: FeedPageProps) {
                 <p className="muted">
                   Nullstill filtre eller søk for å vise siste børsnyheter.
                 </p>
-                <Link href="/feed" className="ghostButton" style={{ display: "inline-block" }}>
+                <Link href="/legacy" className="ghostButton" style={{ display: "inline-block" }}>
                   Nullstill filtre
                 </Link>
               </article>

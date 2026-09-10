@@ -1,23 +1,21 @@
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
-import { getFeed, getMetaFilters, getMutedCategories, isApiAuthError } from "../../../lib/api";
-import { getSessionToken } from "../../../lib/session";
-import { RefreshFilters, type RefreshFilterValues } from "../../../components/refresh/filters";
-import { RefreshFeed } from "../../../components/refresh/refresh-feed";
-import { formatCategoryLabel } from "../../../lib/format-category";
-import styles from "../../../components/refresh/refresh.module.css";
+import { redirect } from "next/navigation";
+import { getFeed, getMetaFilters, getMutedCategories, isApiAuthError } from "../../lib/api";
+import { getSessionToken } from "../../lib/session";
+import { RefreshFilters, type RefreshFilterValues } from "../../components/refresh/filters";
+import { RefreshFeed } from "../../components/refresh/refresh-feed";
+import { formatCategoryLabel } from "../../lib/format-category";
+import styles from "../../components/refresh/refresh.module.css";
 
-import { readUiFeatures } from "../../../lib/ui-features";
 
 type Params = RefreshFilterValues & {
   cursor?: string;
   cursorId?: string;
 };
 export default async function RefreshPage({ searchParams }: { searchParams: Promise<Params> }) {
-  if (!readUiFeatures(process.env).uiV2) notFound();
   const params = await searchParams;
   const token = await getSessionToken();
-  if (!token) redirect("/login?next=/next");
+  if (!token) redirect("/login");
   try {
     const [feed, filters, muted] = await Promise.all([
       getFeed(token, {
@@ -52,18 +50,18 @@ export default async function RefreshPage({ searchParams }: { searchParams: Prom
           filtered={Object.entries(params).some(([key, value]) => key !== "important" && key !== "generated" && !!value)}
         />
         {feed.nextCursor && (
-          <Link className={styles.nextPage} href={`/next?${next}`}>
+          <Link className={styles.nextPage} href={`/?${next}`}>
             Eldre meldinger
           </Link>
         )}
       </>
     );
   } catch (error) {
-    if (isApiAuthError(error)) redirect("/login?next=/next");
+    if (isApiAuthError(error)) redirect("/login");
     return (
       <section className={styles.empty}>
         <h1>Feed utilgjengelig</h1>
-        <Link href="/next">Prøv igjen</Link>
+        <Link href="/">Prøv igjen</Link>
       </section>
     );
   }

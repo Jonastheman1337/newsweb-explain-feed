@@ -9,7 +9,7 @@ type LoginFormProps = {
   returnTo?: string;
 };
 
-export function LoginForm({ token, returnTo = "/feed" }: LoginFormProps) {
+export function LoginForm({ token, returnTo = "/" }: LoginFormProps) {
   const router = useRouter();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");

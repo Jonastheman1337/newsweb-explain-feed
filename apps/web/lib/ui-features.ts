@@ -8,5 +8,5 @@ export function readUiFeatures(env: Record<string, string | undefined>) {
 }
 
 export function loginDestination(next?: string): string {
-  return next === "/next" ? "/next" : "/feed";
+  return next === "/legacy" ? "/legacy" : "/";
 }

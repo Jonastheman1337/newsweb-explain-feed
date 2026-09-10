@@ -9,7 +9,7 @@ import { RefreshFilters } from "./filters";
 import { InstructionInput } from "../instruction-input";
 import { useFeedStreamSubscription } from "../feed-stream-provider";
 import styles from "./next-editor.module.css";
-import RefreshPage from "../../app/(refresh)/next/page";
+import RefreshPage from "../../app/(refresh)/page";
 
 const mocks = vi.hoisted(() => ({
   replace: vi.fn(),

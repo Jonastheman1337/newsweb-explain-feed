@@ -14,8 +14,9 @@ describe("UI rollout boundaries", () => {
       fastDraft: false
     });
   });
-  it("only accepts the new internal login destination", () => {
-    expect(loginDestination("/next")).toBe("/next");
+  it("only accepts the legacy destination and otherwise returns home", () => {
+    expect(loginDestination("/legacy")).toBe("/legacy");
+    expect(loginDestination("/next")).toBe("/");
     for (const next of [
       undefined,
       "/feed",
@@ -24,6 +25,6 @@ describe("UI rollout boundaries", () => {
       "/next/../../api",
       "/next?redirect=//evil.example"
     ])
-      expect(loginDestination(next)).toBe("/feed");
+      expect(loginDestination(next)).toBe("/");
   });
 });

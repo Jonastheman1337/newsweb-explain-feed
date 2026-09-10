@@ -30,9 +30,11 @@ function formatOsloTime(isoString: string): string {
 }
 
 function getReturnHref(from?: string): string {
-  if (!from) return "/feed";
-  if (from === "/feed" || from.startsWith("/feed?")) return from;
-  return "/feed";
+  if (from === "/legacy" || from?.startsWith("/legacy?")) return from;
+  if (from === "/" || from?.startsWith("/?")) return from;
+  if (from === "/feed" || from?.startsWith("/feed?")) return from.replace("/feed", "/legacy");
+  if (from === "/next" || from?.startsWith("/next?")) return from.replace("/next", "/");
+  return "/";
 }
 
 export default async function NoticePage({ params, searchParams }: NoticePageProps) {
@@ -46,14 +48,14 @@ export default async function NoticePage({ params, searchParams }: NoticePagePro
   const returnHref = getReturnHref(from);
   const id = Number(messageId);
   if (Number.isNaN(id)) {
-    redirect("/feed");
+    redirect(returnHref);
   }
 
   const notice = await getNotice(token, id).catch((error) => {
     if (isApiAuthError(error)) {
       redirect("/login");
     }
-    redirect("/feed");
+    redirect(returnHref);
   });
   const noticeStatus = await getNoticeStatus(token, id).catch((error) => {
     if (isApiAuthError(error)) {

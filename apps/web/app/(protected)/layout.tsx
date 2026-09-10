@@ -19,10 +19,11 @@ export default async function ProtectedLayout({
     <FeedStreamProvider>
       <main className="pageShell">
         <header className="topBar">
-          <Link href="/feed" style={{ textDecoration: "none", color: "inherit" }}>
+          <Link href="/" style={{ textDecoration: "none", color: "inherit" }}>
             <h1>Autoweb</h1>
           </Link>
           <span style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
+            <Link href="/">Ny feed</Link>
             <NotificationToggle />
             <ThemeToggle />
           </span>

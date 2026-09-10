@@ -51,7 +51,7 @@ export function RefreshFeed({
     query.delete("important");
     query.delete("generated");
     if (view !== "all") query.set(view, "1");
-    router.replace(`/next${query.size ? `?${query}` : ""}`, { scroll: false });
+    router.replace(`/${query.size ? `?${query}` : ""}`, { scroll: false });
   }
   const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isVisible = (item: FeedItem) =>

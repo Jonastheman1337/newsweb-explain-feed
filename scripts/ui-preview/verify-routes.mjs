@@ -46,9 +46,18 @@ try {
           throw new Error(output || "Next startup timed out");
         await delay(100);
       }
-      const loggedOut = await fetch(`${base}/next`, { redirect: "manual" });
-      assert.equal(loggedOut.status, enabled ? 307 : 404, `logged out, flag=${enabled}`);
-      if (enabled) assert.match(loggedOut.headers.get("location"), /\/login\?next=\/next$/);
+      const loggedOut = await fetch(`${base}/`, { redirect: "manual" });
+      assert.equal(loggedOut.status, 307, `logged out, flag=${enabled}`);
+      assert.match(loggedOut.headers.get("location"), /\/login$/);
+      for (const alias of ["/next", "/feed"]) {
+        const response = await fetch(base + alias + "?q=Equinor&generated=1&cursorId=123", { redirect: "manual" });
+        assert.equal(response.status, 307);
+        const destination = new URL(response.headers.get("location"), base);
+        assert.equal(destination.pathname, "/");
+        assert.equal(destination.searchParams.get("q"), "Equinor");
+        assert.equal(destination.searchParams.get("generated"), "1");
+        assert.equal(destination.searchParams.get("cursorId"), "123");
+      }
       const login = await fetch(`${base}/api/auth/login`, {
         method: "POST",
         body: JSON.stringify({ username: "preview", password: "ui-preview" })
@@ -57,20 +66,27 @@ try {
       const cookie = login.headers.get("set-cookie").split(";")[0];
       assert.match(cookie, /^newsweb_ui_gate_test=/);
       const headers = { Cookie: cookie };
-      const next = await fetch(`${base}/next`, { headers, redirect: "manual" });
-      assert.equal(next.status, enabled ? 200 : 404, `logged in, flag=${enabled}`);
+      const next = await fetch(`${base}/`, { headers, redirect: "manual" });
+      assert.equal(next.status, 200, `logged in, flag=${enabled}`);
       const html = await next.text();
-      if (enabled) assert.ok(html.includes("Nordvik sikrer kontrakt"));
+      assert.ok(html.includes("Nordvik sikrer kontrakt"));
       const detail = await fetch(base + "/api/notice/900001", { headers });
       assert.equal(detail.status, 200);
       assert.equal((await detail.json()).rewrites.length, 1);
       assert.equal((await fetch(base + "/api/notice/900001")).status, 401);
       assert.equal((await fetch(base + "/api/notice/not-an-id", { headers })).status, 400);
-      const legacy = await fetch(`${base}/feed`, { headers });
+      const legacy = await fetch(`${base}/legacy`, { headers });
       assert.equal(legacy.status, 200);
-      assert.ok((await legacy.text()).includes("Nordvik sikrer kontrakt"));
-      if (enabled) {
-        const invalid = await fetch(`${base}/next`, {
+      const legacyHtml = await legacy.text();
+      assert.ok(legacyHtml.includes("Nordvik sikrer kontrakt"));
+      assert.ok(legacyHtml.includes("Oppdater feed"));
+      assert.ok(html.includes('action="/"'));
+      assert.ok(html.includes('href="/legacy"'));
+      const notice = await fetch(base + "/notice/900001?from=" + encodeURIComponent("/legacy?q=Equinor"), { headers });
+      assert.equal(notice.status, 200);
+      assert.ok((await notice.text()).includes('href="/legacy?q=Equinor"'));
+      {
+        const invalid = await fetch(`${base}/`, {
           headers: { Cookie: "newsweb_ui_gate_test=invalid" },
           redirect: "manual"
         });
