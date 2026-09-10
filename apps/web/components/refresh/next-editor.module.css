@@ -64,6 +64,20 @@
   padding: 10px 18px;
   border-bottom: 1px solid var(--line);
 }
+.header :global(.attachmentLinks) {
+  min-width: 0;
+  margin: 0;
+}
+.card .compareClose {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  min-height: 36px;
+  padding: 4px;
+  font-size: 24px;
+  line-height: 1;
+}
 .dateline {
   display: block;
   margin: 0 0 12px;

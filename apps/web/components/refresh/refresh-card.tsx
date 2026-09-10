@@ -271,6 +271,18 @@ export function RefreshCard({
   useEffect(() => {
     if (compose) composer.focus();
   }, [compose]);
+  useEffect(() => {
+    if (view !== "compare") return;
+    const close = (event: PointerEvent) => {
+      if (event.target instanceof Node && card.current && !card.current.contains(event.target)) {
+        interaction.current++;
+        setView("notice");
+        setHistoryOpen(false);
+      }
+    };
+    document.addEventListener("pointerdown", close);
+    return () => document.removeEventListener("pointerdown", close);
+  }, [view]);
   function toggleCompose() {
     interaction.current++;
     setComposeMounted(true);
@@ -590,6 +602,10 @@ export function RefreshCard({
       data-generation-state={generated ? "generated" : "not-generated"}
     >
       <header className={styles.header}>
+        <AttachmentLinks
+          messageId={item.messageId}
+          attachments={source?.attachments ?? item.attachments}
+        />
         <div className={styles.viewSwitch} role="group" aria-label="Lesemodus">
           {(
             [
@@ -609,6 +625,17 @@ export function RefreshCard({
             </button>
           ))}
         </div>
+        {view === "compare" && (
+          <button
+            type="button"
+            className={styles.compareClose}
+            aria-label="Lukk sammenligning"
+            title="Lukk sammenligning"
+            onClick={() => changeView("notice")}
+          >
+            <span aria-hidden="true">×</span>
+          </button>
+        )}
       </header>
       <div
         className={`${styles.reading} ${view === "compare" ? styles.comparing : ""}`}
@@ -734,10 +761,7 @@ export function RefreshCard({
           )}
           {sourceMode === "newsweb" ? (
             <>
-              <AttachmentLinks
-                messageId={item.messageId}
-                attachments={source?.attachments ?? item.attachments}
-              />
+
               <h2>{source?.title ?? item.sourceTitle}</h2>
               <Dateline item={item} />
               {splitParagraphs(source?.bodyText ?? item.sourceBodyText).map(
