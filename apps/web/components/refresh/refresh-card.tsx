@@ -28,7 +28,7 @@ import { ActionMenu } from "./controls";
 import { fastDraftToFeedItem, type FeedEntry } from "./feed-state";
 import { versionToFeedItem } from "./selection";
 import { useNoticeComposer } from "./next-composer";
-import { ChevronIcon } from "./next-icons";
+import { ChevronIcon, CompareIcon } from "./next-icons";
 import styles from "./next-editor.module.css";
 
 type ReadingView = "notice" | "original" | "compare";
@@ -604,6 +604,7 @@ export function RefreshCard({
               aria-pressed={view === mode}
               onClick={() => changeView(mode)}
             >
+              {mode === "compare" && <CompareIcon />}
               {label}
             </button>
           ))}
