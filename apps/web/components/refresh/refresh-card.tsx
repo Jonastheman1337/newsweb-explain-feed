@@ -21,7 +21,7 @@ import {
   EditableRewrite,
   type RewriteActionControls,
 } from "../editable-rewrite";
-import { AttachmentLinks } from "../attachment-links";
+import { AttachmentDownloads } from "./attachment-downloads";
 import { getGenerationPhaseLabel } from "../generation-steps";
 import { FeedbackDialog } from "./feedback-dialog";
 import { ActionMenu } from "./controls";
@@ -602,10 +602,6 @@ export function RefreshCard({
       data-generation-state={generated ? "generated" : "not-generated"}
     >
       <header className={styles.header}>
-        <AttachmentLinks
-          messageId={item.messageId}
-          attachments={source?.attachments ?? item.attachments}
-        />
         <div className={styles.viewSwitch} role="group" aria-label="Lesemodus">
           {(
             [
@@ -729,13 +725,19 @@ export function RefreshCard({
         >
           <div className={styles.columnHeading}>
             <span>Original · Newsweb</span>
-            <a
-              href={sourceLinks.primary.url}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Åpne ↗
-            </a>
+            <div className={styles.sourceHeadingActions}>
+              <AttachmentDownloads
+                messageId={item.messageId}
+                attachments={source?.attachments ?? item.attachments}
+              />
+              <a
+                href={sourceLinks.primary.url}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Åpne ↗
+              </a>
+            </div>
           </div>
           {item.hasAttachments && (
             <div
@@ -761,7 +763,6 @@ export function RefreshCard({
           )}
           {sourceMode === "newsweb" ? (
             <>
-
               <h2>{source?.title ?? item.sourceTitle}</h2>
               <Dateline item={item} />
               {splitParagraphs(source?.bodyText ?? item.sourceBodyText).map(

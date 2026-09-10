@@ -64,10 +64,6 @@
   padding: 10px 18px;
   border-bottom: 1px solid var(--line);
 }
-.header :global(.attachmentLinks) {
-  min-width: 0;
-  margin: 0;
-}
 .card .compareClose {
   display: inline-flex;
   align-items: center;
@@ -78,6 +74,46 @@
   font-size: 24px;
   line-height: 1;
 }
+.sourceHeadingActions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.attachmentDownloads {
+  position: relative;
+  font-size: 12px;
+}
+.card .attachmentDownloads summary {
+  color: var(--ink-soft);
+  border: 0;
+  padding: 3px 0;
+  min-height: 28px;
+  font-size: 12px;
+  list-style: none;
+}
+.attachmentDownloads summary::-webkit-details-marker { display: none; }
+.attachmentDownloads summary:hover { color: var(--ink); }
+.attachmentDownloadList {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 10;
+  width: min(320px, 75vw);
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg-panel);
+  box-shadow: 0 5px 18px #0002;
+}
+.attachmentDownloadList :global(.attachmentLinks) { margin: 0; }
+.attachmentDownloadList :global(.attachmentLinksTitle) { display: none; }
+.attachmentDownloadList :global(.attachmentLink) {
+  display: flex;
+  font-size: 13px;
+  font-weight: 400;
+  text-decoration: underline;
+}
+.attachmentDownloadList :global(.attachmentFileName) { min-width: 0; }
 .dateline {
   display: block;
   margin: 0 0 12px;
