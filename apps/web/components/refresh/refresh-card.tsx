@@ -621,17 +621,6 @@ export function RefreshCard({
             </button>
           ))}
         </div>
-        {view === "compare" && (
-          <button
-            type="button"
-            className={styles.compareClose}
-            aria-label="Lukk sammenligning"
-            title="Lukk sammenligning"
-            onClick={() => changeView("notice")}
-          >
-            <span aria-hidden="true">×</span>
-          </button>
-        )}
       </header>
       <div
         className={`${styles.reading} ${view === "compare" ? styles.comparing : ""}`}
