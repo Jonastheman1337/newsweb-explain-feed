@@ -135,15 +135,7 @@
 }
 .viewSwitch .compareButton {
   font-weight: 600;
-  background: color-mix(in srgb, var(--accent-2) 8%, var(--bg-panel));
-  border-color: color-mix(in srgb, var(--accent-2) 40%, var(--line));
-}
-.viewSwitch .compareButton:hover {
-  background: color-mix(in srgb, var(--accent-2) 13%, var(--bg-panel));
-}
-.viewSwitch .compareButton[aria-pressed="true"] {
-  background: color-mix(in srgb, var(--accent-2) 20%, var(--bg-panel));
-  border-color: color-mix(in srgb, var(--accent-2) 70%, var(--line));
+  border-color: color-mix(in srgb, var(--ink) 12%, var(--line));
 }
 .reading {
   display: grid;
