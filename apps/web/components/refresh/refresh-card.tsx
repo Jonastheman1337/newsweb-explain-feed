@@ -613,6 +613,7 @@ export function RefreshCard({
             <button
               type="button"
               key={mode}
+              className={mode === "compare" ? styles.compareButton : undefined}
               aria-pressed={view === mode}
               onClick={() => changeView(mode)}
             >

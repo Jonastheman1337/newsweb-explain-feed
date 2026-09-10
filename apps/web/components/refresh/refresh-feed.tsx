@@ -112,11 +112,11 @@ export function RefreshFeed({
           <button aria-pressed={!importantOnly && !generatedOnly} onClick={() => setView("all")}>
             Alle
           </button>
-          <button aria-pressed={importantOnly} onClick={() => setView("important")}>
-            Viktige
-          </button>
           <button aria-pressed={generatedOnly} onClick={() => setView("generated")}>
             Genererte
+          </button>
+          <button aria-pressed={importantOnly} onClick={() => setView("important")}>
+            Viktige
           </button>
         </div>
       </div>
