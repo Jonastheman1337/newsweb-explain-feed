@@ -1567,7 +1567,7 @@ async function callModelTriage(
       systemPrompt: TRIAGE_PROMPT,
       developerPrompt: "Svar kun med strukturert triage etter skjemaet.",
       userPrompt,
-      model: config.OPENAI_FAST_MODEL,
+      model: config.OPENAI_NOTICE_HELPER_MODEL ?? config.OPENAI_FAST_MODEL,
       reasoningEffort: config.OPENAI_TRIAGE_REASONING_EFFORT,
       timeoutMs: config.OPENAI_FAST_TIMEOUT_MS,
       maxOutputTokens: 768,
@@ -3774,7 +3774,8 @@ const ingestWorker = new Worker<IngestJobData>(
 const fastDrafts = createFastDraftService({
   enabled: config.FAST_DRAFT_ENABLED,
   apiKey: config.OPENAI_API_KEY,
-  model: config.OPENAI_FAST_MODEL,
+  model: config.OPENAI_NOTICE_HELPER_MODEL ?? config.OPENAI_FAST_MODEL,
+  reasoningEffort: config.OPENAI_TRIAGE_REASONING_EFFORT,
   notify: (messageId) => redisPub.publish(REDIS_CHANNELS.feedNewItem, JSON.stringify({ messageId, state: "fast-draft" })),
   log: (message) => console.info(message)
 });
@@ -3957,7 +3958,7 @@ const rewriteWorker = new Worker<RewriteJobData>(
                 systemPrompt: NOTICE_NOVELTY_SYSTEM_PROMPT,
                 developerPrompt: "Compare original disclosures. Ground every finding in the supplied evidence and return only the structured assessment.",
                 userPrompt: buildNoveltyAssessmentPrompt(pack),
-                model: config.OPENAI_FAST_MODEL,
+                model: config.OPENAI_NOTICE_HELPER_MODEL ?? config.OPENAI_FAST_MODEL,
                 reasoningEffort: config.OPENAI_TRIAGE_REASONING_EFFORT,
                 timeoutMs: config.OPENAI_FAST_TIMEOUT_MS,
                 maxOutputTokens: 2_400,
@@ -5323,7 +5324,7 @@ async function bootstrap(): Promise<void> {
   }, SAK_EXPIRY_SWEEP_MS);
 
   console.log(
-    `[worker] started. polling=${config.NEWSWEB_POLLING_ENABLED} pollInterval=${config.POLL_INTERVAL_MS}ms model=${config.OPENAI_MODEL} fastModel=${config.OPENAI_FAST_MODEL} hardModel=${config.OPENAI_HARD_MODEL} serviceTier=${config.OPENAI_SERVICE_TIER}`
+    `[worker] started. polling=${config.NEWSWEB_POLLING_ENABLED} pollInterval=${config.POLL_INTERVAL_MS}ms model=${config.OPENAI_MODEL} fastModel=${config.OPENAI_FAST_MODEL} noticeHelperModel=${config.OPENAI_NOTICE_HELPER_MODEL ?? config.OPENAI_FAST_MODEL} noticeHelperEffort=${config.OPENAI_TRIAGE_REASONING_EFFORT} hardModel=${config.OPENAI_HARD_MODEL} serviceTier=${config.OPENAI_SERVICE_TIER}`
   );
 }
 

@@ -188,6 +188,7 @@ const configSchema = z
       .min(1, "OPENAI_KEY_MISSING"),
     OPENAI_MODEL: z.string().default("gpt-5.6-terra"),
     OPENAI_FAST_MODEL: z.string().default("gpt-5.6-luna"),
+    OPENAI_NOTICE_HELPER_MODEL: z.string().trim().min(1).optional(),
     OPENAI_HARD_MODEL: z.string().default("gpt-5.6-sol"),
     OPENAI_SERVICE_TIER: serviceTierEnvSchema.default("default"),
     OPENAI_TIMEOUT_MS: z.coerce.number().int().min(1000).default(240000),
@@ -237,7 +238,7 @@ export function parseWorkerConfig(env: NodeJS.ProcessEnv): WorkerConfig {
     validateOpenAIModelReasoningEffort(parsed.OPENAI_MODEL, effort);
   }
   validateOpenAIModelReasoningEffort(
-    parsed.OPENAI_FAST_MODEL,
+    parsed.OPENAI_NOTICE_HELPER_MODEL ?? parsed.OPENAI_FAST_MODEL,
     parsed.OPENAI_TRIAGE_REASONING_EFFORT
   );
   validateOpenAIModelReasoningEffort(

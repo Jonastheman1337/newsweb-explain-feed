@@ -3,7 +3,7 @@ import OpenAI from "openai";
 import { z } from "zod";
 import { EDITORIAL_CURRENCY_NAMES, EDITORIAL_SOURCE_AS_DATA, EDITORIAL_IMPORTANCE, EDITORIAL_ATTRIBUTION, EDITORIAL_NO_MARKET_COMMENTARY, EDITORIAL_TITLE, EDITORIAL_NORWEGIAN, type PromptPayload } from "@newsweb/prompt-kit";
 import { rewriteOutputSchema, type RewriteOutput } from "@newsweb/shared";
-import { callOpenAIForJson, type OpenAIJsonRequest, type OpenAIJsonResult } from "@newsweb/shared/openai-responses";
+import { callOpenAIForJson, type OpenAIJsonRequest, type OpenAIJsonResult, type OpenAIReasoningEffort } from "@newsweb/shared/openai-responses";
 import { prisma } from "@newsweb/shared/db";
 import type { Prisma } from "@prisma/client";
 import { hasImportantSourceSignals } from "./importance.js";
@@ -15,13 +15,17 @@ const shortSchema = z.object({ title: z.string().min(6).max(100), lead: z.string
 const jsonSchema = { type: "object", additionalProperties: false, properties: { title: { type: "string" }, lead: { type: "string" }, importance: { type: "string", enum: ["viktig", "medium", "uviktig"] }, sourceEvidence: { type: "string" } }, required: ["title", "lead", "importance", "sourceEvidence"] };
 type Call = (request: OpenAIJsonRequest) => Promise<OpenAIJsonResult>;
 // The independent checker sees the exact same frozen primary source as the writer.
-export async function generateFastDraft(payload: PromptPayload, model: string, deadline: number, call: Call, onCall: (result: OpenAIJsonResult) => void = () => { }) {
+export async function generateFastDraft(payload: PromptPayload, model: string, deadline: number, call: Call, onCall: (result: OpenAIJsonResult, request: OpenAIJsonRequest) => void = () => { }, reasoningEffort: OpenAIReasoningEffort = "none") {
     const ask = async (request: Omit<OpenAIJsonRequest, "model" | "reasoningEffort" | "timeoutMs">) => {
         const remaining = deadline - Date.now();
         if (remaining < 1000)
             throw new Error("FAST_DRAFT_DEADLINE");
-        const result = await call({ ...request, model, reasoningEffort: "none", timeoutMs: Math.min(15000, remaining), promptCacheMode: "off" });
-        onCall(result);
+        // Reasoning shares the output budget; keep the visible schema and deadline unchanged.
+        const configuredRequest: OpenAIJsonRequest = { ...request, model, reasoningEffort,
+            maxOutputTokens: reasoningEffort === "none" ? request.maxOutputTokens : Math.max(4096, request.maxOutputTokens),
+            timeoutMs: Math.min(15000, remaining), promptCacheMode: "off" };
+        const result = await call(configuredRequest);
+        onCall(result, configuredRequest);
         return result.content;
     };
     const raw = shortSchema.parse(JSON.parse(await ask({
@@ -54,6 +58,7 @@ export function createFastDraftService(options: {
     enabled: boolean;
     apiKey?: string;
     model: string;
+    reasoningEffort?: OpenAIReasoningEffort;
     notify: (messageId: number) => Promise<unknown>;
     log: (message: string) => void;
 }) {
@@ -81,12 +86,14 @@ export function createFastDraftService(options: {
         let result: Awaited<ReturnType<typeof generateFastDraft>> | undefined;
         let failure: string | undefined;
         try {
-            result = await generateFastDraft(payload, options.model, deadlineAt.getTime(), (request) => callOpenAIForJson(client!, request), ({ content: _content, ...telemetry }) => modelCalls.push(telemetry));
+            result = await generateFastDraft(payload, options.model, deadlineAt.getTime(), (request) => callOpenAIForJson(client!, request),
+                ({ content: _content, ...telemetry }, request) => modelCalls.push({ ...telemetry, model: request.model, schemaName: request.schemaName, reasoningEffort: request.reasoningEffort }),
+                options.reasoningEffort);
         }
         catch (error) {
             failure = error instanceof Error ? error.message : "FAST_DRAFT_FAILED";
             if (error && typeof error === "object" && "openAITelemetry" in error)
-                modelCalls.push(error.openAITelemetry);
+                modelCalls.push({ ...(error.openAITelemetry as object), model: options.model, reasoningEffort: options.reasoningEffort ?? "none" });
         }
         const status = result?.status ?? "failed";
         await prisma.fastDraft.updateMany({ where: { messageId: payload.messageId, generationRunId, status: "pending" }, data: { status, finishedAt: new Date(), ...(result?.status === "ready" ? { rewriteJson: result.rewrite as Prisma.InputJsonValue } : {}), validationJson: JSON.parse(JSON.stringify(result?.validation ?? { failure })), modelCallsJson: JSON.parse(JSON.stringify(modelCalls)) } });

@@ -35,7 +35,7 @@ await fs.mkdir(outPath); // Refuse to replace a prior run, including failed runs
 const hash = (value: string | Buffer) => createHash("sha256").update(value).digest("hex");
 const serviceDir = fileURLToPath(new URL("../services/", import.meta.url));
 const codeHashes = Object.fromEntries(await Promise.all(["notice-novelty.ts", "notice-novelty-io.ts"].map(async name => [name, hash(await fs.readFile(path.join(serviceDir, name)))])));
-const profile = { model: config.OPENAI_FAST_MODEL, reasoningEffort: config.OPENAI_TRIAGE_REASONING_EFFORT,
+const profile = { model: config.OPENAI_NOTICE_HELPER_MODEL ?? config.OPENAI_FAST_MODEL, reasoningEffort: config.OPENAI_TRIAGE_REASONING_EFFORT,
   serviceTier: config.OPENAI_SERVICE_TIER, timeoutMs: config.OPENAI_FAST_TIMEOUT_MS, maxOutputTokens: 2400,
   promptCacheMode: config.OPENAI_PROMPT_CACHE_MODE_TRIAGE ?? config.OPENAI_PROMPT_CACHE_MODE,
   promptCacheKey: `newsweb:notice-novelty:${NOTICE_NOVELTY_VERSION}` };

@@ -2,6 +2,15 @@ import { describe, expect, it } from "vitest";
 import { parseWorkerConfig } from "./config.js";
 
 describe("parseWorkerConfig", () => {
+  it("allows a separate Sol/medium notice-helper profile without changing the fast model", () => {
+    const env = { DATABASE_URL: "postgresql://test:test@localhost/test", REDIS_URL: "redis://localhost:6379", OPENAI_API_KEY: "sk-test-key" };
+    const config = parseWorkerConfig({ ...env, OPENAI_NOTICE_HELPER_MODEL: "gpt-5.6-sol", OPENAI_TRIAGE_REASONING_EFFORT: "medium" });
+    expect(config.OPENAI_NOTICE_HELPER_MODEL).toBe("gpt-5.6-sol");
+    expect(config.OPENAI_TRIAGE_REASONING_EFFORT).toBe("medium");
+    expect(config.OPENAI_FAST_MODEL).toBe("gpt-5.6-luna");
+    expect(parseWorkerConfig(env).OPENAI_NOTICE_HELPER_MODEL).toBeUndefined();
+    expect(() => parseWorkerConfig({ ...env, OPENAI_NOTICE_HELPER_MODEL: "gpt-5.6-sol", OPENAI_TRIAGE_REASONING_EFFORT: "minimal" })).toThrow();
+  });
   it("supports observation and off modes only for notice novelty", () => {
     const env = { DATABASE_URL: "postgresql://test:test@localhost/test", REDIS_URL: "redis://localhost:6379", OPENAI_API_KEY: "sk-test-key" };
     expect(parseWorkerConfig(env).NOTICE_NOVELTY_MODE).toBe("shadow");

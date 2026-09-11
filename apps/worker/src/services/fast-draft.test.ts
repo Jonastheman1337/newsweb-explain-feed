@@ -30,6 +30,22 @@ describe("V2 first drafts", () => {
         expect(result.status === "ready" && result.rewrite.lead).toBe(payload.bodyText);
         expect(call).toHaveBeenCalledTimes(2);
         expect(call.mock.calls[0][0].developerPrompt).toContain(EDITORIAL_CURRENCY_NAMES);
+        expect(call.mock.calls[0][0]).toMatchObject({ reasoningEffort: "none", maxOutputTokens: 650 });
+    });
+    it("uses Sol/medium for both preview and source check with room for reasoning", async () => {
+        const call = fakeCall();
+        const onCall = vi.fn();
+        const result = await generateFastDraft(payload, "gpt-5.6-sol", Date.now() + 35000, call, onCall, "medium");
+        expect(result.status).toBe("ready");
+        expect(call).toHaveBeenCalledTimes(2);
+        for (const [request] of call.mock.calls) {
+            expect(request).toMatchObject({ model: "gpt-5.6-sol", reasoningEffort: "medium", maxOutputTokens: 4096, promptCacheMode: "off" });
+            expect(request.timeoutMs).toBeLessThanOrEqual(15000);
+        }
+        expect(onCall.mock.calls.map(([, request]) => request.schemaName)).toEqual(["fast_draft", "fast_draft_reference_check"]);
+    });
+    it("still rejects an unsupported preview under Sol/medium", async () => {
+        await expect(generateFastDraft(payload, "gpt-5.6-sol", Date.now() + 35000, fakeCall({ ungrounded: true }), undefined, "medium")).rejects.toThrow("FAST_DRAFT_REFERENCE_CHECK_FAILED");
     });
     it("leaves number findings as warnings and lets the source checker decide", async () => {
         const call = fakeCall({ ungrounded: true, draft: { lead: "Fjord ASA vil kjøpe Dal AS for 900 millioner kroner. Avtalen er betinget." } });
