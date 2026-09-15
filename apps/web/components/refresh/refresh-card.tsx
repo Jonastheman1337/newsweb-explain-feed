@@ -597,7 +597,7 @@ export function RefreshCard({
     <article
       ref={card}
       id={`notice-${item.messageId}`}
-      className={`${styles.card} ${!generated && !latest.processing ? styles.sourceOnly : ""}`}
+      className={`${styles.card} ${item.importance === "viktig" ? styles.important : ""} ${!generated && !latest.processing ? styles.sourceOnly : ""}`}
       aria-label={item.issuerName}
       data-generation-state={generated ? "generated" : "not-generated"}
     >

@@ -11,6 +11,23 @@
   margin: 0 auto 18px;
   color: var(--ink);
 }
+.important {
+  position: relative;
+}
+.important::before {
+  content: "";
+  position: absolute;
+  left: -1px;
+  top: 14px;
+  bottom: 14px;
+  width: 3px;
+  border-radius: 3px;
+  background: #df827a;
+  pointer-events: none;
+}
+:global(:root[data-theme="light"]) .important::before {
+  background: #bc5953;
+}
 @media (min-width: 851px) {
   .card:has(.comparing) {
     max-width: none;
