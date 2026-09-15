@@ -468,11 +468,11 @@ it("tracks the requested backend phase through checking, repair and rechecking, 
 it("sends the selected target and displayed snapshot without a typed instruction", async () => {
   await act(() => root.render(<Harness />));
   await act(() => (container.querySelector('[aria-label="Ønsket lengde, omtrent 1000 tegn"]') as HTMLButtonElement).click());
-  await act(() => Array.from(container.querySelectorAll("button")).find((b) => b.textContent?.replace(/\s/g, "") === "1500")!.click());
+  await act(() => Array.from(container.querySelectorAll("button")).find((b) => b.textContent?.replace(/\s/g, "") === "750")!.click());
   await submit();
   const call = vi.mocked(fetch).mock.calls.find(([url]) => String(url).endsWith("/generate"))!;
   const body = JSON.parse(call[1]?.body as string);
-  expect(body).toMatchObject({targetVisibleArticleChars: 1500, baseSnapshot: snapshot});
+  expect(body).toMatchObject({targetVisibleArticleChars: 750, baseSnapshot: snapshot});
   expect(body.instruction).toBeUndefined(); expect(body.maxVisibleArticleChars).toBeUndefined();
 });
 it("uses the changed length and displayed snapshot after a failed request", async () => {

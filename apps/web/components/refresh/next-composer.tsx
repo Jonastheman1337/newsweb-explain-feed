@@ -796,7 +796,7 @@ export function useNoticeComposer(args: {
                 </>
               ) : (
                 <>
-                  {[300, 500, 1000, 1500].map((value) => (
+                  {[500, 750, 1000].map((value) => (
                     <button
                       type="button"
                       key={value}
