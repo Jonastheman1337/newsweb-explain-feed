@@ -2,6 +2,19 @@ import { describe, expect, it } from "vitest";
 import { parseWorkerConfig } from "./config.js";
 
 describe("parseWorkerConfig", () => {
+  it("isolates history speed settings and validates the model/effort pair", () => {
+    const env = { DATABASE_URL: "postgresql://test:test@localhost/test", REDIS_URL: "redis://localhost:6379", OPENAI_API_KEY: "sk-test-key", OPENAI_NOTICE_HELPER_MODEL: "gpt-5.6-sol", OPENAI_TRIAGE_REASONING_EFFORT: "medium" };
+    const config = parseWorkerConfig(env);
+    expect(config.NOTICE_HISTORY_MODE).toBe("active");
+    expect(config.OPENAI_HISTORY_MODEL).toBe("gpt-5.6-luna");
+    expect(config.OPENAI_HISTORY_REASONING_EFFORT).toBe("none");
+    expect(config.OPENAI_TRIAGE_REASONING_EFFORT).toBe("medium");
+    expect(config.HISTORY_ASSESSMENT_TIMEOUT_MS).toBe(5000);
+    expect(parseWorkerConfig({ ...env, NOTICE_HISTORY_MODE: "off" }).NOTICE_HISTORY_MODE).toBe("off");
+    expect(parseWorkerConfig({ ...env, NOTICE_HISTORY_MODE: "shadow" }).NOTICE_HISTORY_MODE).toBe("shadow");
+    expect(() => parseWorkerConfig({ ...env, HISTORY_ASSESSMENT_TIMEOUT_MS: "60000" })).toThrow();
+    expect(() => parseWorkerConfig({ ...env, OPENAI_HISTORY_MODEL: "gpt-5.6-sol", OPENAI_HISTORY_REASONING_EFFORT: "minimal" })).toThrow();
+  });
   it("allows a separate Sol/medium notice-helper profile without changing the fast model", () => {
     const env = { DATABASE_URL: "postgresql://test:test@localhost/test", REDIS_URL: "redis://localhost:6379", OPENAI_API_KEY: "sk-test-key" };
     const config = parseWorkerConfig({ ...env, OPENAI_NOTICE_HELPER_MODEL: "gpt-5.6-sol", OPENAI_TRIAGE_REASONING_EFFORT: "medium" });

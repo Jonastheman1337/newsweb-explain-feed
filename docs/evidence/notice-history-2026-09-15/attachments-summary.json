@@ -1,0 +1,41 @@
+[
+  {
+    "id": "complete-attachment-unchanged",
+    "model": "gpt-5.6-luna",
+    "reasoningEffort": "none",
+    "actual": "routine_repeat",
+    "importance": "uviktig",
+    "durationMs": 2619,
+    "within5s": true,
+    "passed": true,
+    "selected": [
+      900000
+    ]
+  },
+  {
+    "id": "complete-attachment-new-terms",
+    "model": "gpt-5.6-luna",
+    "reasoningEffort": "none",
+    "actual": "new_information",
+    "importance": "viktig",
+    "durationMs": 1900,
+    "within5s": true,
+    "passed": true,
+    "selected": [
+      900000
+    ]
+  },
+  {
+    "id": "incomplete-attachment-unchanged",
+    "model": "gpt-5.6-luna",
+    "reasoningEffort": "none",
+    "actual": "uncertain",
+    "importance": "uviktig",
+    "durationMs": 1647,
+    "within5s": true,
+    "passed": true,
+    "selected": [
+      900000
+    ]
+  }
+]

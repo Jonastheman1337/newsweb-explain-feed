@@ -1,6 +1,6 @@
 import { currentGenerationSignal, throwIfGenerationCancelled } from "@newsweb/shared/generation-context";
 // Use legacy build — the default build requires browser APIs (DOMMatrix)
-import { getDocument, type PDFDocumentProxy } from "pdfjs-dist/legacy/build/pdf.mjs";
+import { getDocument, OPS, type PDFDocumentProxy } from "pdfjs-dist/legacy/build/pdf.mjs";
 
 const ATTACHMENT_URL =
   "https://api3.oslo.oslobors.no/v1/newsreader/attachment";
@@ -11,6 +11,9 @@ const MAX_PRIMARY_PAGE_CHARS = 4_500;
 const MAX_USER_PAGE_CHARS = 3_500;
 const MAX_SECONDARY_PAGE_CHARS = 3_000;
 const MIN_TEXT_CHARS = 500;
+const NON_TEXT_PDF_OPERATORS = new Set<number>(Object.entries(OPS)
+  .filter(([name]) => /image/i.test(name) || name === "shadingFill" || name === "constructPath")
+  .map(([, value]) => value));
 const INCOME_STATEMENT_SCORE_THRESHOLD = 16;
 const FINANCIAL_FALLBACK_SCORE_THRESHOLD = 8;
 
@@ -233,17 +236,23 @@ function isManagementContinuation(page: PdfPageText): boolean {
   return prose.join(" ").length >= 120;
 }
 
-export async function extractPagesFromPdf(buffer: Buffer): Promise<{ pages: string[]; pageCount: number }> {
+export async function extractPagesFromPdf(buffer: Buffer, inspectCoverage = false): Promise<{ pages: string[]; pageCount: number; textComplete?: boolean }> {
   const doc: PDFDocumentProxy = await getDocument({ data: new Uint8Array(buffer), useSystemFonts: true }).promise;
   try {
     const pages: string[] = [];
+    let textComplete = inspectCoverage;
     for (let i = 1; i <= doc.numPages; i++) {
       throwIfGenerationCancelled();
       const page = await doc.getPage(i);
       const content = await page.getTextContent();
       pages.push(renderPdfTextItems(content.items.filter((item): item is typeof item & PdfTextItem => "str" in item)));
+      if (inspectCoverage) {
+        const ops = await page.getOperatorList();
+        // Scans, charts and non-text drawings need visual review; extraction alone is insufficient.
+        if (pages[pages.length - 1].trim().length < 20 || ops.fnArray.some(op => NON_TEXT_PDF_OPERATORS.has(op))) textComplete = false;
+      }
     }
-    return { pages, pageCount: doc.numPages };
+    return { pages, pageCount: doc.numPages, ...(inspectCoverage ? { textComplete } : {}) };
   } finally {
     await doc.destroy();
   }
@@ -1138,6 +1147,7 @@ export async function extractGeneralPdfContent(
   text: string;
   pageCount: number;
   attachmentId: number;
+  complete: boolean;
 } | null> {
   const attachments = normalizeAttachments(rawMessageJson);
 
@@ -1151,13 +1161,15 @@ export async function extractGeneralPdfContent(
   if (!target) return null;
 
   const buffer = await downloadAttachmentPdf(messageId, target.id);
-  const { text, pageCount } = await extractTextFromPdf(buffer);
+  const { pages, pageCount, textComplete } = await extractPagesFromPdf(buffer, true);
+  const text = pages.join("\n\n");
 
   if (text.trim().length < MIN_TEXT_CHARS) return null;
 
   return {
     text: truncateText(text),
     pageCount,
+    complete: attachments.length === 1 && textComplete === true && text.length <= MAX_TEXT_CHARS,
     attachmentId: target.id
   };
 }

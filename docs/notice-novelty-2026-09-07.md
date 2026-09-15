@@ -169,3 +169,7 @@ that configuration with the model used in the local replay.
 This preparation has not been pushed or deployed. `origin/main` subsequently
 advanced to `d7cf534` with separate Sak work; this branch retains its verified
 `3748483` base and does not include that work in the novelty change.
+
+## Implementation amendment — 2026-09-15
+
+The owner authorized history-aware follow-up triage and clarified attachment completeness. See [History-aware follow-up triage](notice-history-2026-09-15.md) for the implemented regular-notice path, speed limits, model comparison and local validation. The PDF novelty observer remains shadow-only; the new path has separate off/shadow/active control. No production deployment was performed in this session.

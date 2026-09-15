@@ -85,7 +85,8 @@ export type RelatedNoticeUnresolvedReason =
   | "ambiguous"
   | "fetch-failed"
   | "self"
-  | "disabled";
+  | "disabled"
+  | "timeout";
 
 export type RelatedNoticeTelemetry = {
   enabledRelations: RelatedNoticeRelation[];
@@ -162,12 +163,22 @@ export const emptyRelatedNoticeStore: RelatedNoticeStore = {
 export function createNewswebRelatedNoticeClient(
   fetchImpl: typeof fetch = fetch
 ): RelatedNoticeNewswebClient {
+  // Bounded success cache plus in-flight coalescing. Errors never become no-match cache entries.
+  const cache = new Map<string, { until: number; value: Promise<unknown> }>();
+  const cached = <T>(key: string, load: () => Promise<T>): Promise<T> => {
+    const existing = cache.get(key);
+    if (existing && existing.until > Date.now()) return existing.value as Promise<T>;
+    if (cache.size >= 100) cache.delete(cache.keys().next().value!);
+    const value = load().catch(error => { cache.delete(key); throw error; });
+    cache.set(key, { until: Date.now() + 60_000, value }); return value;
+  };
+  const boundedFetch: typeof fetch = (input, init) => fetchImpl(input, { ...init,
+    signal: init?.signal ? AbortSignal.any([init.signal, AbortSignal.timeout(1500)]) : AbortSignal.timeout(1500) });
   return {
     async listByDate(fromDate, toDate = fromDate) {
-      const messages = await fetchNewswebListMessages(
-        buildNewswebListUrlForRange(fromDate, toDate),
-        fetchImpl
-      );
+      const messages = await cached('list:' + fromDate + ':' + toDate, () => fetchNewswebListMessages(
+        buildNewswebListUrlForRange(fromDate, toDate), boundedFetch
+      ));
       return messages.map((message) => ({
         messageId: message.messageId,
         title: message.title,
@@ -177,7 +188,7 @@ export function createNewswebRelatedNoticeClient(
       }));
     },
     async fetchMessage(messageId) {
-      const details = await fetchNewswebMessage(messageId, fetchImpl);
+      const details = await cached("message:" + messageId, () => fetchNewswebMessage(messageId, boundedFetch));
       const message = details.message;
       if (!message.issuerSign || !message.publishedTime) {
         return null;
@@ -482,13 +493,14 @@ function isoDateOf(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
-export async function resolveRelatedNotices(
+async function resolveRelatedNoticesInner(
   source: RelatedNoticeSource,
   options: {
     enabledRelations: readonly RelatedNoticeRelation[];
     store: RelatedNoticeStore;
     newsweb?: RelatedNoticeNewswebClient | null;
     maxNotices?: number;
+    signal?: AbortSignal;
   }
 ): Promise<RelatedNoticeResolution> {
   const startedAt = Date.now();
@@ -589,6 +601,7 @@ export async function resolveRelatedNotices(
   }
 
   for (const reference of references) {
+    options.signal?.throwIfAborted();
     if (related.length >= maxNotices) break;
     telemetry.references.push({
       raw: reference.raw,
@@ -687,15 +700,19 @@ export async function resolveRelatedNotices(
           scoreRelatedNoticeCandidate(reference.topic, { title: a.title, bodyText: "" })
       );
       const fetched: RelatedNoticeCandidate[] = [];
-      for (const item of ranked.slice(0, 6)) {
-        const candidate = await options.newsweb.fetchMessage(item.messageId);
-        if (
-          candidate &&
-          candidate.issuerSign === source.issuerSign &&
-          candidate.publishedAt.getTime() < source.publishedAt.getTime() &&
-          (!reference.date || osloCalendarDate(candidate.publishedAt) === reference.date)
-        ) {
-          fetched.push(candidate);
+      // Two at a time, under the shared resolver deadline. Selection stays deterministic.
+      for (let offset = 0; offset < Math.min(ranked.length, 6); offset += 2) {
+        options.signal?.throwIfAborted();
+        const batch = await Promise.all(ranked.slice(offset, offset + 2).map(item => options.newsweb!.fetchMessage(item.messageId)));
+        for (const candidate of batch) {
+          if (
+            candidate &&
+            candidate.issuerSign === source.issuerSign &&
+            candidate.publishedAt.getTime() < source.publishedAt.getTime() &&
+            (!reference.date || osloCalendarDate(candidate.publishedAt) === reference.date)
+          ) {
+            fetched.push(candidate);
+          }
         }
       }
       const picked = pickCandidate(reference, fetched, preferredLanguage, mode);
@@ -719,4 +736,21 @@ export async function resolveRelatedNotices(
     return a.relation === "correction" ? -1 : b.relation === "correction" ? 1 : 0;
   });
   return finish();
+}
+
+/** One wall-clock budget, including slow stores. The late inner result cannot mutate a caller payload. */
+export async function resolveRelatedNotices(source: RelatedNoticeSource,
+  options: Omit<Parameters<typeof resolveRelatedNoticesInner>[1], "signal"> & { timeoutMs?: number }
+): Promise<RelatedNoticeResolution> {
+  const started = Date.now(); const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      resolveRelatedNoticesInner(source, { ...options, signal: controller.signal }),
+      new Promise<RelatedNoticeResolution>(resolve => { timer = setTimeout(() => {
+        controller.abort(); resolve({ related: [], telemetry: { ...emptyRelatedNoticeTelemetry(options.enabledRelations),
+          durationMs: Date.now() - started, unresolved: [{ raw: "resolver", reason: "timeout" }] } });
+      }, options.timeoutMs ?? 3000); })
+    ]);
+  } finally { if (timer) clearTimeout(timer); controller.abort(); }
 }

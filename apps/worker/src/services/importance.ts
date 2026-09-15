@@ -2,6 +2,7 @@ import type { PromptPayload } from "@newsweb/prompt-kit";
 import type { RewriteOutput } from "@newsweb/shared";
 import { normalizeGuardrailText } from "./text-normalization.js";
 import { hasMaterialShareSale } from "./material-share-sale.js";
+import { trustedHistoryDecision } from "./notice-history.js";
 
 const SEVERE_EVENT_KEYWORDS = [
   "profit warning",
@@ -122,6 +123,12 @@ export function applyImportanceHighBar(
   rewrite: RewriteOutput,
   payload: PromptPayload
 ): { rewrite: RewriteOutput; adjusted: boolean; reason: string | null } {
+  const history = trustedHistoryDecision(payload);
+  if (history && history.decision !== "new_information") {
+    return { rewrite: { ...rewrite, importance: history.importance },
+      adjusted: rewrite.importance !== history.importance,
+      reason: rewrite.importance !== history.importance ? `history_${history.decision}` : null };
+  }
   if (hasMaterialShareSale(payload.title, payload.bodyText)) {
     return rewrite.importance === "viktig"
       ? { rewrite, adjusted: false, reason: null }

@@ -59,6 +59,11 @@ import {
   findNoticeAttributionRisks as findAttributionRisks
 } from "./services/notice-claim-precautions.js";
 import { createFastDraftService } from "./services/fast-draft.js";
+import {
+  createHistoryStore, retrieveHistory, needsEventHistory, buildHistoryPrompt,
+  HISTORY_PROMPT, HISTORY_VERSION, historyAssessmentJsonSchema, validateHistoryAssessment,
+  applyHistoryDecision, historyWriterGuidance, historyInputHash, type HistoryAssessment
+} from "./services/notice-history.js";
 import { applyImportanceHighBar } from "./services/importance.js";
 import { hasMaterialShareSale } from "./services/material-share-sale.js";
 import {
@@ -632,6 +637,7 @@ async function fetchMessageDetails(messageId: number): Promise<{
 }
 
 const relatedNoticeStore = createPrismaRelatedNoticeStore(prisma);
+const historyStore = createHistoryStore(prisma);
 const relatedNoticeNewswebClient = createNewswebRelatedNoticeClient();
 
 // Resolves the earlier notice(s) the current notice cites and attaches them
@@ -1658,6 +1664,7 @@ async function callModelRewrite(
   } else {
     userPrompt = createUserPrompt(payload);
   }
+  userPrompt += historyWriterGuidance(payload);
   const result = await callModelForJson({
     schemaName: "rewrite_output",
     schema: rewriteOutputJsonSchema as Record<string, unknown>,
@@ -3776,8 +3783,15 @@ const rewriteWorker = new Worker<RewriteJobData>(
         return;
       }
 
+      const historyEligible = config.NOTICE_HISTORY_MODE !== "off" && job.data.reason !== "manual-reprocess" &&
+        !job.data.instruction && !payload.supplementalMaterials?.length && needsEventHistory(payload);
+      const historyPromise = historyEligible ? retrieveHistory(payload, historyStore) : undefined;
+      const referencesPromise = historyEligible ? resolveRelatedNotices(source, {
+        enabledRelations: activeRelatedNoticeRelations, store: relatedNoticeStore, newsweb: relatedNoticeNewswebClient
+      }) : undefined;
+
       // Skip full AI rewrite for mechanical categories, unless manually triggered
-      if (job.data.reason !== "manual-reprocess" && !materialShareSale && shouldSkipRewrite(categories)) {
+      if (job.data.reason !== "manual-reprocess" && !materialShareSale && !(historyEligible && config.NOTICE_HISTORY_MODE === "active") && shouldSkipRewrite(categories)) {
         await setGenerationPhase(logPrisma, generationRunId, "analyzing_content");
         await upsertRewrite({
           messageId,
@@ -3805,46 +3819,50 @@ const rewriteWorker = new Worker<RewriteJobData>(
 
       // Both regular and report routes pass this observation point. It cannot
       // skip, repair or change a writer prompt, including on errors/timeouts.
-      if (job.data.reason !== "manual-reprocess" && !job.data.instruction && !payload.supplementalMaterials?.length) {
-        const observation = await observeNoticeNovelty(toNoveltyNotice(source), {
-          mode: config.NOTICE_NOVELTY_MODE,
-          dependencies: createNoticeNoveltyDependencies(prisma),
-          assess: async (pack, signal) => {
-            try {
-              const result = await callModelForJson({
-                schemaName: "notice_novelty_assessment",
-                schema: noveltyAssessmentJsonSchema,
-                systemPrompt: NOTICE_NOVELTY_SYSTEM_PROMPT,
-                developerPrompt: "Compare original disclosures. Ground every finding in the supplied evidence and return only the structured assessment.",
-                userPrompt: buildNoveltyAssessmentPrompt(pack),
-                model: config.OPENAI_NOTICE_HELPER_MODEL ?? config.OPENAI_FAST_MODEL,
-                reasoningEffort: config.OPENAI_TRIAGE_REASONING_EFFORT,
-                timeoutMs: config.OPENAI_FAST_TIMEOUT_MS,
-                maxOutputTokens: 2_400,
-                promptCacheKey: `newsweb:notice-novelty:${NOTICE_NOVELTY_VERSION}`,
-                promptCacheMode: promptCacheModeForFlow("triage"),
-                signal
-              });
-              signal.throwIfAborted();
-              preRewriteModelCalls.push(result.modelCall);
-              preRewritePromptChars += result.promptChars;
-              return result.content;
-            } catch (error) {
-              if (!signal.aborted) {
-                const failure = error as ModelCallFailureCarrier;
-                if (failure.modelCall) preRewriteModelCalls.push(failure.modelCall);
-                preRewritePromptChars += failure.promptChars ?? 0;
+      const noveltyPromise = (async () => {
+        if (!historyEligible && job.data.reason !== "manual-reprocess" && !job.data.instruction && !payload.supplementalMaterials?.length) {
+          const observation = await observeNoticeNovelty(toNoveltyNotice(source), {
+            mode: config.NOTICE_NOVELTY_MODE,
+            timeoutMs: config.HISTORY_ASSESSMENT_TIMEOUT_MS,
+            dependencies: createNoticeNoveltyDependencies(prisma),
+            assess: async (pack, signal) => {
+              try {
+                const result = await callModelForJson({
+                  schemaName: "notice_novelty_assessment",
+                  schema: noveltyAssessmentJsonSchema,
+                  systemPrompt: NOTICE_NOVELTY_SYSTEM_PROMPT,
+                  developerPrompt: "Compare original disclosures. Ground every finding in the supplied evidence and return only the structured assessment.",
+                  userPrompt: buildNoveltyAssessmentPrompt(pack),
+                  model: config.OPENAI_HISTORY_MODEL,
+                  reasoningEffort: config.OPENAI_HISTORY_REASONING_EFFORT,
+                  timeoutMs: config.OPENAI_FAST_TIMEOUT_MS,
+                  maxOutputTokens: 2_400,
+                  promptCacheKey: `newsweb:notice-novelty:${NOTICE_NOVELTY_VERSION}`,
+                  promptCacheMode: promptCacheModeForFlow("triage"),
+                  signal
+                });
+                signal.throwIfAborted();
+                preRewriteModelCalls.push(result.modelCall);
+                preRewritePromptChars += result.promptChars;
+                return result.content;
+              } catch (error) {
+                if (!signal.aborted) {
+                  const failure = error as ModelCallFailureCarrier;
+                  if (failure.modelCall) preRewriteModelCalls.push(failure.modelCall);
+                  preRewritePromptChars += failure.promptChars ?? 0;
+                }
+                throw error;
               }
-              throw error;
             }
+          });
+          if (observation) {
+            (payload as PromptPayload & { noticeNoveltyObservation?: NoticeNoveltyObservation }).noticeNoveltyObservation = observation;
+            console.log(JSON.stringify({ service: "worker", event: "notice_novelty_shadow", messageId,
+              decision: observation.decision, reasonCode: observation.reasonCode, durationMs: observation.durationMs }));
           }
-        });
-        if (observation) {
-          (payload as PromptPayload & { noticeNoveltyObservation?: NoticeNoveltyObservation }).noticeNoveltyObservation = observation;
-          console.log(JSON.stringify({ service: "worker", event: "notice_novelty_shadow", messageId,
-            decision: observation.decision, reasonCode: observation.reasonCode, durationMs: observation.durationMs }));
         }
-      }
+
+        })();
 
       // Three-tier PDF processing for notices with attachments
       if (source.hasAttachments) {
@@ -3904,6 +3922,7 @@ const rewriteWorker = new Worker<RewriteJobData>(
               }
             }
             if (yearlyContent) {
+              await noveltyPromise;
               await processYearlyReportRewrite(
                 messageId,
                 source,
@@ -3922,6 +3941,7 @@ const rewriteWorker = new Worker<RewriteJobData>(
               );
               return;
             }
+            await noveltyPromise;
             // No remuneration data found — skip (shows as grayed-out in feed)
             console.log(
               `[yearly-report] no remuneration data found for ${messageId} (${source.issuerSign}), skipping`
@@ -3998,6 +4018,7 @@ const rewriteWorker = new Worker<RewriteJobData>(
           }
           if (reportContent) {
             fastDrafts.start({ ...payload, pdfSupplementText: reportContent.text }, generationRunId, job.data.reason === "new-message" && targetVersion === 1 && !job.data.instruction && Date.now() - source.ingestedAt.getTime() < 120_000);
+            await noveltyPromise;
             await processReportRewrite(
               messageId,
               source,
@@ -4021,6 +4042,7 @@ const rewriteWorker = new Worker<RewriteJobData>(
           const generalPdf = await extractGeneralPdfContent(rawJson, messageId);
           if (generalPdf) {
             payload.pdfSupplementText = generalPdf.text;
+            payload.pdfSupplementComplete = generalPdf.complete;
             payload.pdfSupplementPageCount = generalPdf.pageCount;
             payload.pdfSupplementAttachmentId = generalPdf.attachmentId;
             // Fall through to triage/rewrite with augmented payload
@@ -4055,6 +4077,61 @@ const rewriteWorker = new Worker<RewriteJobData>(
         }
       }
 
+      await noveltyPromise;
+      const historyRetrieval = await historyPromise;
+      let relatedNoticeTelemetryJson = (await referencesPromise)?.telemetry;
+      const resolvedReferences = (await referencesPromise)?.related ?? [];
+      const historyCandidates = [...resolvedReferences, ...(historyRetrieval?.selected ?? [])]
+        .filter((p, i, all) => all.findIndex(q => q.messageId === p.messageId) === i).slice(0, 3);
+      let historyAssessment: HistoryAssessment | undefined;
+      let historyRejections: string[] = [];
+      let historyDurationMs = 0;
+      if (historyEligible && historyCandidates.length) {
+        // Shadow uses a detached copy; it cannot change the writer or old triage.
+        const comparisonPayload = { ...payload, relatedNotices: historyCandidates };
+        const started = Date.now();
+        try {
+          const result = await callModelForJson({
+            schemaName: "notice_history_triage", schema: historyAssessmentJsonSchema,
+            systemPrompt: HISTORY_PROMPT, developerPrompt: "Return only the evidence-backed structured decision.",
+            userPrompt: buildHistoryPrompt(comparisonPayload), model: config.OPENAI_HISTORY_MODEL,
+            reasoningEffort: config.OPENAI_HISTORY_REASONING_EFFORT,
+            timeoutMs: config.HISTORY_ASSESSMENT_TIMEOUT_MS, maxOutputTokens: 1600,
+            signal: AbortSignal.timeout(config.HISTORY_ASSESSMENT_TIMEOUT_MS),
+            promptCacheKey: 'newsweb:history:' + HISTORY_VERSION, promptCacheMode: promptCacheModeForFlow("triage")
+          });
+          preRewriteModelCalls.push(result.modelCall); preRewritePromptChars += result.promptChars;
+          const validated = validateHistoryAssessment(comparisonPayload, result.content);
+          historyAssessment = validated.assessment; historyRejections = validated.rejectionCodes;
+          if (config.NOTICE_HISTORY_MODE === "active") {
+            payload.relatedNotices = historyCandidates;
+            applyHistoryDecision(payload, historyAssessment);
+          }
+        } catch (error) {
+          historyRejections = ["assessment_unavailable"];
+          const failure = error as ModelCallFailureCarrier;
+          if (failure.modelCall) preRewriteModelCalls.push(failure.modelCall);
+          preRewritePromptChars += failure.promptChars ?? 0;
+        } finally { historyDurationMs = Date.now() - started; }
+      }
+      const historyActive = config.NOTICE_HISTORY_MODE === "active" && historyEligible;
+      if (historyActive && payload.relatedNotices?.length) {
+        relatedNoticeTelemetryJson = {
+          ...(relatedNoticeTelemetryJson ?? emptyRelatedNoticeTelemetry(activeRelatedNoticeRelations)),
+          durationMs: Math.max(relatedNoticeTelemetryJson?.durationMs ?? 0, historyRetrieval?.durationMs ?? 0),
+          resolved: payload.relatedNotices.map(({ messageId, relation, resolvedBy, score, publishedAt, textChars, title }) =>
+            ({ messageId, relation, resolvedBy, score, publishedAt, textChars, title }))
+        };
+      }
+      const historyAudit = historyEligible ? { version: HISTORY_VERSION, mode: config.NOTICE_HISTORY_MODE,
+        retrieval: historyRetrieval, references: relatedNoticeTelemetryJson,
+        sources: historyCandidates, inputHash: historyInputHash({ ...payload, relatedNotices: historyCandidates }),
+        assessment: historyAssessment ?? null, rejectionCodes: historyRejections, assessmentMs: historyDurationMs,
+        model: config.OPENAI_HISTORY_MODEL, effort: config.OPENAI_HISTORY_REASONING_EFFORT } : null;
+      if (historyAudit) console.log(JSON.stringify({ service: "worker", event: "notice_history_triage", messageId,
+        decision: historyAssessment?.decision ?? "unresolved", retrievalMs: historyRetrieval?.durationMs,
+        assessmentMs: historyDurationMs, rejectionCodes: historyRejections }));
+
       // Deterministic low-value triage before model calls. Evaluated outside
       // the manual-reprocess guard so a bypassed skip is itself recorded —
       // that is the reason-coded false-skip join.
@@ -4076,6 +4153,7 @@ const rewriteWorker = new Worker<RewriteJobData>(
           (classId) => !defaultEnabledTriageClasses.includes(classId)
         );
       const triageTelemetryJson = {
+        history: historyAudit,
         materialShareSale,
         enabledClasses: [...activeTriageEnabledClasses],
         // Non-null only when an enabled skip was bypassed (manual reprocess)
@@ -4083,7 +4161,7 @@ const rewriteWorker = new Worker<RewriteJobData>(
         bypassedSkipClassId: triageEvaluation.enabledSkip?.classId ?? null,
         shadowSkipClassIds: triageShadowSkipClassIds
       };
-      if (job.data.reason !== "manual-reprocess" && !materialShareSale) {
+      if (job.data.reason !== "manual-reprocess" && !materialShareSale && !historyActive) {
         const deterministicSkip = triageEvaluation.enabledSkip;
         if (deterministicSkip) {
           console.log(
@@ -4117,6 +4195,7 @@ const rewriteWorker = new Worker<RewriteJobData>(
               promptChars: preRewritePromptChars,
               triageResult: deterministicSkip,
               triage: {
+                history: historyAudit,
                 enabledClasses: [...activeTriageEnabledClasses],
                 shadowSkipClassIds: triageShadowSkipClassIds
               }
@@ -4129,8 +4208,12 @@ const rewriteWorker = new Worker<RewriteJobData>(
       }
 
       // AI triage for ambiguous categories — lightweight check before full pipeline
-      if (job.data.reason !== "manual-reprocess" && !materialShareSale && needsNewsworthinessTriage(categories)) {
-        const triage = await callModelTriage(
+      if (historyActive || (job.data.reason !== "manual-reprocess" && !materialShareSale && needsNewsworthinessTriage(categories))) {
+        const triage = historyActive ? {
+          newsworthy: historyAssessment?.newsworthy ?? true,
+          reason: historyAssessment?.reason ?? "History unavailable; continuing with full source review",
+          promptChars: 0, modelCall: null
+        } : await callModelTriage(
           source.title,
           source.bodyText,
           categories,
@@ -4234,9 +4317,10 @@ const rewriteWorker = new Worker<RewriteJobData>(
       const repairReferences = referenceRepairWithProgress(progress);
       fastDrafts.start(payload, generationRunId, job.data.reason === "new-message" && targetVersion === 1 && !job.data.instruction && Date.now() - source.ingestedAt.getTime() < 120_000);
 
-      // After triage (skipped notices never pay for a lookup), before the
-      // first model call so the draft, the checker and the validator agree.
-      const relatedNoticeTelemetryJson = await attachRelatedNotices(source, payload, progress);
+      // Reuse the frozen pre-triage sources. Standalone/manual notices retain
+      // the explicit-reference path; the draft and verifier share its snapshot.
+      if (!payload.relatedNotices?.length && resolvedReferences.length) payload.relatedNotices = resolvedReferences;
+      relatedNoticeTelemetryJson ??= await attachRelatedNotices(source, payload, progress);
 
       try {
         const initialDraftResult = await writeNotice(

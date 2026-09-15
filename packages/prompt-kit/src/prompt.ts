@@ -32,7 +32,7 @@ export type SupplementalMaterialPayload = {
   textChars?: number;
 };
 
-export const relatedNoticeRelations = ["reference", "correction", "sibling"] as const;
+export const relatedNoticeRelations = ["reference", "correction", "sibling", "history"] as const;
 export type RelatedNoticeRelation = (typeof relatedNoticeRelations)[number];
 
 /**
@@ -70,7 +70,13 @@ export type PromptPayload = {
   targetVisibleArticleChars?: number;
   supplementalMaterials?: SupplementalMaterialPayload[];
   relatedNotices?: RelatedNoticePayload[];
+  historyDecision?: {
+    version: string; inputHash: string;
+    decision: "new_information" | "expected_update" | "routine_repeat";
+    importance: "viktig" | "medium" | "uviktig"; newsworthy: boolean; reason: string;
+  };
   pdfSupplementText?: string;
+  pdfSupplementComplete?: boolean;
   pdfSupplementPageCount?: number;
   pdfSupplementAttachmentId?: number;
 };
@@ -231,6 +237,8 @@ export function relatedNoticeContextMarker(
 
 function relatedNoticeRelationLabel(relation: RelatedNoticeRelation): string {
   switch (relation) {
+    case "history":
+      return "historikk – mulig tidligere omtale av samme hendelse, funnet ved søk";
     case "correction":
       return "korrigering – tidligere melding som dagens melding korrigerer";
     case "sibling":
@@ -248,6 +256,8 @@ function relatedNoticesHeading(
     return "RELATERTE MELDINGER SOM BAKGRUNN";
   }
   switch (notices[0]?.relation) {
+    case "history":
+      return "TIDLIGERE MELDINGER FUNNET VED HISTORIKKSØK";
     case "correction":
       return "TIDLIGERE MELDING SOM DAGENS MELDING KORRIGERER";
     case "sibling":

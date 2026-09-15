@@ -110,7 +110,7 @@ export const relatedNoticeLinkSchema = z.object({
   messageId: z.number().int(),
   title: z.string(),
   publishedAt: z.string(),
-  relation: z.enum(["reference", "correction", "sibling"]),
+  relation: z.enum(["reference", "correction", "sibling", "history"]),
   url: z.string()
 });
 

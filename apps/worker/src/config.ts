@@ -219,6 +219,10 @@ const configSchema = z
     RELATED_NOTICE_CONTEXT: relatedNoticeContextEnvSchema,
     // Observation only until chronological duplicate/new-disclosure review passes.
     NOTICE_NOVELTY_MODE: z.enum(["off", "shadow"]).default("shadow"),
+    NOTICE_HISTORY_MODE: z.enum(["off", "shadow", "active"]).default("active"),
+    OPENAI_HISTORY_MODEL: z.string().default("gpt-5.6-luna"),
+    OPENAI_HISTORY_REASONING_EFFORT: reasoningEffortEnvSchema.default("none"),
+    HISTORY_ASSESSMENT_TIMEOUT_MS: z.coerce.number().int().min(1000).max(15000).default(5000),
     NEWSWEB_POLLING_ENABLED: booleanEnvSchema,
     POLL_INTERVAL_MS: z.coerce.number().int().min(5000).default(5000),
     LATEST_BOOTSTRAP_COUNT: z.coerce.number().int().min(0).max(50).default(30)
@@ -228,6 +232,7 @@ export type WorkerConfig = z.infer<typeof configSchema>;
 
 export function parseWorkerConfig(env: NodeJS.ProcessEnv): WorkerConfig {
   const parsed = configSchema.parse(env);
+  validateOpenAIModelReasoningEffort(parsed.OPENAI_HISTORY_MODEL, parsed.OPENAI_HISTORY_REASONING_EFFORT);
   for (const effort of [
     parsed.OPENAI_DEFAULT_REASONING_EFFORT,
     parsed.OPENAI_REPORT_REASONING_EFFORT,

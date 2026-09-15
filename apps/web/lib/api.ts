@@ -131,7 +131,7 @@ type RelatedNoticeLink = {
   messageId: number;
   title: string;
   publishedAt: string;
-  relation: "reference" | "correction" | "sibling";
+  relation: "reference" | "correction" | "sibling" | "history";
   url: string;
 };
 

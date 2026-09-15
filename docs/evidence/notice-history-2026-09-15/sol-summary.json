@@ -1,0 +1,208 @@
+[
+  {
+    "id": "atlantic-approval",
+    "model": "gpt-5.6-sol",
+    "reasoningEffort": "low",
+    "actual": "expected_update",
+    "importance": "medium",
+    "durationMs": 4387,
+    "within5s": true,
+    "passed": true,
+    "selected": [
+      680619,
+      680683,
+      682288
+    ]
+  },
+  {
+    "id": "unchanged-distribution",
+    "model": "gpt-5.6-sol",
+    "reasoningEffort": "low",
+    "actual": "routine_repeat",
+    "importance": "uviktig",
+    "durationMs": 3071,
+    "within5s": true,
+    "passed": true,
+    "selected": [
+      900000
+    ]
+  },
+  {
+    "id": "increased-distribution",
+    "model": "gpt-5.6-sol",
+    "reasoningEffort": "low",
+    "actual": "new_information",
+    "importance": "viktig",
+    "durationMs": 2106,
+    "within5s": true,
+    "passed": true,
+    "selected": [
+      900000
+    ]
+  },
+  {
+    "id": "cancelled-distribution",
+    "model": "gpt-5.6-sol",
+    "reasoningEffort": "low",
+    "actual": "new_information",
+    "importance": "viktig",
+    "durationMs": 2478,
+    "within5s": true,
+    "passed": true,
+    "selected": [
+      900000
+    ]
+  },
+  {
+    "id": "different-instrument",
+    "model": "gpt-5.6-sol",
+    "reasoningEffort": "low",
+    "actual": "new_information",
+    "importance": "viktig",
+    "durationMs": 4344,
+    "within5s": true,
+    "passed": true,
+    "selected": [
+      900000
+    ]
+  },
+  {
+    "id": "missing-attachment",
+    "model": "gpt-5.6-sol",
+    "reasoningEffort": "low",
+    "actual": "uncertain",
+    "importance": "medium",
+    "durationMs": 4736,
+    "within5s": true,
+    "passed": true,
+    "selected": [
+      900000
+    ]
+  },
+  {
+    "id": "new-contract-in-update",
+    "model": "gpt-5.6-sol",
+    "reasoningEffort": "low",
+    "actual": "new_information",
+    "importance": "viktig",
+    "durationMs": 2692,
+    "within5s": true,
+    "passed": true,
+    "selected": [
+      900000
+    ]
+  },
+  {
+    "id": "no-history",
+    "model": "gpt-5.6-sol",
+    "reasoningEffort": "low",
+    "actual": "no_match",
+    "durationMs": 0,
+    "within5s": true,
+    "passed": true,
+    "selected": []
+  },
+  {
+    "id": "atlantic-approval",
+    "model": "gpt-5.6-sol",
+    "reasoningEffort": "medium",
+    "actual": "expected_update",
+    "importance": "medium",
+    "durationMs": 6555,
+    "within5s": false,
+    "passed": true,
+    "selected": [
+      680619,
+      680683,
+      682288
+    ]
+  },
+  {
+    "id": "unchanged-distribution",
+    "model": "gpt-5.6-sol",
+    "reasoningEffort": "medium",
+    "actual": "expected_update",
+    "importance": "medium",
+    "durationMs": 2452,
+    "within5s": true,
+    "passed": true,
+    "selected": [
+      900000
+    ]
+  },
+  {
+    "id": "increased-distribution",
+    "model": "gpt-5.6-sol",
+    "reasoningEffort": "medium",
+    "actual": "new_information",
+    "importance": "viktig",
+    "durationMs": 5514,
+    "within5s": false,
+    "passed": true,
+    "selected": [
+      900000
+    ]
+  },
+  {
+    "id": "cancelled-distribution",
+    "model": "gpt-5.6-sol",
+    "reasoningEffort": "medium",
+    "actual": "new_information",
+    "importance": "viktig",
+    "durationMs": 3094,
+    "within5s": true,
+    "passed": true,
+    "selected": [
+      900000
+    ]
+  },
+  {
+    "id": "different-instrument",
+    "model": "gpt-5.6-sol",
+    "reasoningEffort": "medium",
+    "actual": "new_information",
+    "importance": "viktig",
+    "durationMs": 5934,
+    "within5s": false,
+    "passed": true,
+    "selected": [
+      900000
+    ]
+  },
+  {
+    "id": "missing-attachment",
+    "model": "gpt-5.6-sol",
+    "reasoningEffort": "medium",
+    "actual": "uncertain",
+    "importance": "medium",
+    "durationMs": 5777,
+    "within5s": false,
+    "passed": true,
+    "selected": [
+      900000
+    ]
+  },
+  {
+    "id": "new-contract-in-update",
+    "model": "gpt-5.6-sol",
+    "reasoningEffort": "medium",
+    "actual": "new_information",
+    "importance": "viktig",
+    "durationMs": 2625,
+    "within5s": true,
+    "passed": true,
+    "selected": [
+      900000
+    ]
+  },
+  {
+    "id": "no-history",
+    "model": "gpt-5.6-sol",
+    "reasoningEffort": "medium",
+    "actual": "no_match",
+    "durationMs": 0,
+    "within5s": true,
+    "passed": true,
+    "selected": []
+  }
+]

@@ -93,7 +93,7 @@ export type ReferencePriorContext = {
   sources?: Array<{
     sourceId: string;
     messageId: number;
-    relation: "reference" | "correction" | "sibling";
+    relation: "reference" | "correction" | "sibling" | "history";
     // Exact relation/time marker computed for this source. Optional so old
     // persisted reports remain readable.
     contextMarker?: string;
@@ -813,7 +813,7 @@ function hasExplicitRelatedNoticeMarker(
   sentence: string,
   markerText: string,
   aliases: readonly string[],
-  relation: "reference" | "correction" | "sibling" | undefined,
+  relation: "reference" | "correction" | "sibling" | "history" | undefined,
   expectedMarker?: string
 ): boolean {
   if (!sentenceContainsSpan(sentence, markerText)) {

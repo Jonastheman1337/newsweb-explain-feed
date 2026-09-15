@@ -1,3 +1,4 @@
+import { historyDecisionSchema, trustedHistoryDecision } from "./notice-history.js";
 import {
   collectNumberTokens,
   parseNumberToken,
@@ -192,7 +193,7 @@ function basePayloadFromSource(
   if (relatedNotices === null) {
     return null;
   }
-  return {
+  const payload: PromptPayload = {
     messageId: sourcePayload.messageId,
     title: sourcePayload.title,
     issuerName: sourcePayload.issuerName,
@@ -221,6 +222,7 @@ function basePayloadFromSource(
       : {}),
     ...(supplementalMaterials !== undefined ? { supplementalMaterials } : {}),
     ...(relatedNotices !== undefined ? { relatedNotices } : {}),
+    ...(typeof sourcePayload.pdfSupplementComplete === "boolean" ? { pdfSupplementComplete: sourcePayload.pdfSupplementComplete } : {}),
     ...(typeof sourcePayload.pdfSupplementText === "string"
       ? { pdfSupplementText: sourcePayload.pdfSupplementText }
       : {}),
@@ -231,6 +233,13 @@ function basePayloadFromSource(
       ? { pdfSupplementAttachmentId: sourcePayload.pdfSupplementAttachmentId }
       : {})
   };
+  if (sourcePayload.historyDecision !== undefined) {
+    const parsed = historyDecisionSchema.safeParse(sourcePayload.historyDecision);
+    if (!parsed.success) return null;
+    payload.historyDecision = parsed.data;
+    if (!trustedHistoryDecision(payload)) return null;
+  }
+  return payload;
 }
 
 export type ReplayValidationPayload = {

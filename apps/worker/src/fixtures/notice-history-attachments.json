@@ -1,0 +1,115 @@
+{
+  "frozenAt": "2026-09-15T15:34:11.312Z",
+  "cases": [
+    {
+      "id": "complete-attachment-unchanged",
+      "provenance": "Synthetic attachment completeness counterexample, 2026-09-15",
+      "current": {
+        "messageId": 900001,
+        "title": "Capital distribution paid",
+        "bodyText": "Example ASA has today paid the previously announced capital distribution of NOK 5 per share on 15 September 2026. The record date was 4 September and the ex-date was 3 September. All outstanding ordinary shares were eligible. All terms are unchanged.",
+        "issuerSign": "TEST",
+        "issuerName": "Example ASA",
+        "publishedAt": "2026-09-15T12:00:00Z",
+        "categories": [
+          "ANNEN INFORMASJONSPLIKTIG REGULATORISK INFORMASJON"
+        ],
+        "markets": [
+          "XOSL"
+        ],
+        "hasAttachments": true,
+        "sourceBodyChars": 250,
+        "pdfSupplementText": "Example ASA has paid NOK 5 per share on 15 September 2026. The record date was 4 September and the ex-date was 3 September. All terms are unchanged.",
+        "pdfSupplementComplete": true
+      },
+      "prior": [
+        {
+          "messageId": 900000,
+          "title": "Capital distribution announced",
+          "bodyText": "Example ASA will pay a capital distribution of NOK 5 per share on 15 September 2026. The record date is 4 September and the ex-date is 3 September. All outstanding ordinary shares are eligible. The board has approved the distribution.",
+          "issuerSign": "TEST",
+          "issuerName": "Example ASA",
+          "publishedAt": "2026-09-01T12:00:00Z"
+        }
+      ],
+      "expected": [
+        "routine_repeat",
+        "expected_update"
+      ],
+      "importance": "not_viktig"
+    },
+    {
+      "id": "complete-attachment-new-terms",
+      "provenance": "Synthetic attachment completeness counterexample, 2026-09-15",
+      "current": {
+        "messageId": 900001,
+        "title": "Capital distribution paid",
+        "bodyText": "Example ASA has today paid the previously announced capital distribution of NOK 5 per share on 15 September 2026. The record date was 4 September and the ex-date was 3 September. All outstanding ordinary shares were eligible. All terms are unchanged.",
+        "issuerSign": "TEST",
+        "issuerName": "Example ASA",
+        "publishedAt": "2026-09-15T12:00:00Z",
+        "categories": [
+          "ANNEN INFORMASJONSPLIKTIG REGULATORISK INFORMASJON"
+        ],
+        "markets": [
+          "XOSL"
+        ],
+        "hasAttachments": true,
+        "sourceBodyChars": 250,
+        "pdfSupplementText": "The board has also resolved an additional capital distribution of NOK 20 per share payable on 30 September 2026. This additional distribution has not previously been announced.",
+        "pdfSupplementComplete": true
+      },
+      "prior": [
+        {
+          "messageId": 900000,
+          "title": "Capital distribution announced",
+          "bodyText": "Example ASA will pay a capital distribution of NOK 5 per share on 15 September 2026. The record date is 4 September and the ex-date is 3 September. All outstanding ordinary shares are eligible. The board has approved the distribution.",
+          "issuerSign": "TEST",
+          "issuerName": "Example ASA",
+          "publishedAt": "2026-09-01T12:00:00Z"
+        }
+      ],
+      "expected": [
+        "new_information"
+      ],
+      "importance": "viktig"
+    },
+    {
+      "id": "incomplete-attachment-unchanged",
+      "provenance": "Synthetic attachment completeness counterexample, 2026-09-15",
+      "current": {
+        "messageId": 900001,
+        "title": "Capital distribution paid",
+        "bodyText": "Example ASA has today paid the previously announced capital distribution of NOK 5 per share on 15 September 2026. The record date was 4 September and the ex-date was 3 September. All outstanding ordinary shares were eligible. All terms are unchanged.",
+        "issuerSign": "TEST",
+        "issuerName": "Example ASA",
+        "publishedAt": "2026-09-15T12:00:00Z",
+        "categories": [
+          "ANNEN INFORMASJONSPLIKTIG REGULATORISK INFORMASJON"
+        ],
+        "markets": [
+          "XOSL"
+        ],
+        "hasAttachments": true,
+        "sourceBodyChars": 250,
+        "pdfSupplementText": "The company confirms payment. Remaining pages could not be extracted.",
+        "pdfSupplementComplete": false
+      },
+      "prior": [
+        {
+          "messageId": 900000,
+          "title": "Capital distribution announced",
+          "bodyText": "Example ASA will pay a capital distribution of NOK 5 per share on 15 September 2026. The record date is 4 September and the ex-date is 3 September. All outstanding ordinary shares are eligible. The board has approved the distribution.",
+          "issuerSign": "TEST",
+          "issuerName": "Example ASA",
+          "publishedAt": "2026-09-01T12:00:00Z"
+        }
+      ],
+      "expected": [
+        "uncertain",
+        "expected_update"
+      ],
+      "importance": "not_viktig"
+    }
+  ]
+}
