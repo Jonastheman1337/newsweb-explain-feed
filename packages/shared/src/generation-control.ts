@@ -1,8 +1,10 @@
+import { isGenerationPhase } from "./generation-progress.js";
 import { createHash, randomUUID } from "node:crypto";
 import {
   Prisma,
   type PrismaClient,
   type NoticeGenerationControl,
+  type GenerationRun,
 } from "@prisma/client";
 import { normalizeRewriteJson } from "./rewrite.js";
 import { rewriteOutputSchema } from "./rewrite.js";
@@ -13,7 +15,13 @@ import {
 
 export const generationJobId = (runId: string) => `notice-request-${runId}`;
 export const CONTROL_TERMINAL = ["published", "skipped", "failed", "cancelled"];
-export function generationControlPayload(row: NoticeGenerationControl) {
+export function generationControlPayload(
+  row: NoticeGenerationControl,
+  run?: Pick<GenerationRun, "id" | "phase" | "phaseUpdatedAt"> | null
+) {
+  const ownProgress = row.status === "running" && run?.id === row.generationRunId;
+  const phase = row.status === "queued" ? "queued"
+    : ownProgress && isGenerationPhase(run.phase) && !["published", "failed", "skipped"].includes(run.phase) ? run.phase : null;
   return noticeGenerationRequestSchema.parse({
     generationRunId: row.generationRunId,
     clientRequestId: row.clientRequestId,
@@ -23,6 +31,8 @@ export function generationControlPayload(row: NoticeGenerationControl) {
     error: row.errorText,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
+    phase,
+    phaseUpdatedAt: ownProgress && phase ? run.phaseUpdatedAt?.toISOString() ?? null : null,
   });
 }
 export class InvalidEditorBaseError extends Error {}

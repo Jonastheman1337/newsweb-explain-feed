@@ -1,3 +1,4 @@
+import { createNoticeProgress, type NoticeProgress } from "./services/notice-progress.js";
 import { createReferenceCheckRepair, NOTICE_INITIAL_REPAIR_LIMIT, NOTICE_TOTAL_REPAIR_LIMIT } from "./services/reference-repair.js";
 import { createNoticeGenerationRuntime, CONTROLLED_JOB_NAME } from "./services/notice-generation-runtime.js";
 import { throwIfGenerationCancelled } from "@newsweb/shared/generation-context";
@@ -372,7 +373,7 @@ async function publishFeedUpdate(
 /**
  * Persists the pipeline phase AND pushes it to the live feed so the feed's
  * processing indicator tracks reality instead of a timer. Used only for the
- * coarse phase transitions; skip branches terminate immediately and the
+ * operation boundaries; skip branches terminate immediately and the
  * publish worker emits its own "published" event.
  */
 async function setGenerationPhaseAndNotify(
@@ -638,7 +639,8 @@ const relatedNoticeNewswebClient = createNewswebRelatedNoticeClient();
 // telemetry, not a failed rewrite.
 async function attachRelatedNotices(
   source: RelatedNoticeSource,
-  payload: PromptPayload
+  payload: PromptPayload,
+  progress: NoticeProgress
 ): Promise<RelatedNoticeTelemetry> {
   if (activeRelatedNoticeRelations.length === 0) {
     return emptyRelatedNoticeTelemetry(activeRelatedNoticeRelations);
@@ -646,8 +648,14 @@ async function attachRelatedNotices(
   try {
     const resolution = await resolveRelatedNotices(source, {
       enabledRelations: activeRelatedNoticeRelations,
-      store: relatedNoticeStore,
-      newsweb: relatedNoticeNewswebClient
+      store: {
+        findByMessageId: (...args) => progress.run("loading_context", () => relatedNoticeStore.findByMessageId(...args)),
+        findByIssuerAndDate: (...args) => progress.run("loading_context", () => relatedNoticeStore.findByIssuerAndDate(...args))
+      },
+      newsweb: {
+        fetchMessage: (...args) => progress.run("loading_context", () => relatedNoticeNewswebClient.fetchMessage(...args)),
+        listByDate: (...args) => progress.run("loading_context", () => relatedNoticeNewswebClient.listByDate(...args))
+      }
     });
     if (resolution.related.length > 0) {
       payload.relatedNotices = resolution.related;
@@ -983,7 +991,7 @@ function statusForValidation(validation: {
 function phaseForRewriteStatus(
   status: "pending" | "needs_retry" | "failed" | "published" | "skipped"
 ) {
-  if (status === "pending") return "finalizing";
+  if (status === "pending") return "publishing";
   if (status === "needs_retry") return "queued";
   if (status === "published") return "published";
   if (status === "skipped") return "skipped";
@@ -1804,10 +1812,12 @@ async function callModelYearlyReportRewrite(
   };
 }
 
-const applyReferenceCheckRepair = createReferenceCheckRepair<ModelCallLog>({
-  callModelReferenceCheck,
-  collectFailedModelCall
-});
+function referenceRepairWithProgress(progress: NoticeProgress) {
+  return createReferenceCheckRepair<ModelCallLog>({
+    callModelReferenceCheck: (...args) => progress.check(() => callModelReferenceCheck(...args)),
+    collectFailedModelCall
+  });
+}
 
 type EditorialReviewAudit = {
   enabled: boolean;
@@ -1824,8 +1834,10 @@ async function applyEditorialRevisionReviewRepair<TPayload extends PromptPayload
   revisionInstructionForPrompt,
   reasoningEffort,
   modelCalls,
-  callRewrite
+  callRewrite,
+  progress
 }: {
+  progress: NoticeProgress;
   payload: TPayload;
   rewrite: RewriteOutput;
   instruction?: string | null;
@@ -1868,12 +1880,12 @@ async function applyEditorialRevisionReviewRepair<TPayload extends PromptPayload
   let promptChars = 0;
 
   try {
-    const reviewResult = await callModelEditorialRevisionReview({
+    const reviewResult = await progress.run("finalizing", () => callModelEditorialRevisionReview({
       instruction,
       previousOutput,
       draftRewrite: rewrite,
       reasoningEffort
-    });
+    }));
     modelCalls.push(reviewResult.modelCall);
     promptChars += reviewResult.promptChars;
     audit.review = reviewResult.review;
@@ -2176,9 +2188,14 @@ async function processReportRewrite(
   reportContent: ReportExtractionResult,
   revisionOptions: RewriteRevisionOptions = {}
 ): Promise<void> {
+  const progress = createNoticeProgress((phase) => setGenerationPhaseAndNotify(revisionOptions.generationRunId, messageId, phase));
+  const writeNotice = progress.writer(callModelReportRewrite);
+  const repairReferences = referenceRepairWithProgress(progress);
+
   const relatedNoticeTelemetryJson = await attachRelatedNotices(
     { ...source, messageId },
-    payload
+    payload,
+    progress
   );
   const reportPayload: ReportPromptPayload = {
     ...payload,
@@ -2226,12 +2243,7 @@ async function processReportRewrite(
     Boolean(reportContent.referenceText?.trim());
 
   try {
-    await setGenerationPhaseAndNotify(
-      revisionOptions.generationRunId,
-      messageId,
-      "writing_notice"
-    );
-    const initialDraftResult = await callModelReportRewrite(
+    const initialDraftResult = await writeNotice(
       reportPayload,
       revisionInstructionForPrompt,
       revisionOptions.previousOutput,
@@ -2241,30 +2253,20 @@ async function processReportRewrite(
     promptChars += initialDraftResult.promptChars;
     hiddenDraft = initialDraftResult.rewrite;
     let rewrite = hiddenDraft;
-
-    await setGenerationPhaseAndNotify(
-      revisionOptions.generationRunId,
-      messageId,
-      "checking_references"
-    );
-    const referenceRepair = await applyReferenceCheckRepair({
+    const referenceRepair = await repairReferences({
       referencePayload: reportReferencePayload,
       rewritePayload: reportPayload,
       rewrite,
       revisionInstructionForPrompt,
       correctionReasoningEffort: reportReasoningEffort,
       modelCalls,
-      callRewrite: callModelReportRewrite
+      callRewrite: writeNotice
     });
     rewrite = referenceRepair.rewrite;
     promptChars += referenceRepair.promptChars;
     absorbReferenceRepairResult(referenceRepairState, referenceRepair);
 
-    await setGenerationPhaseAndNotify(
-      revisionOptions.generationRunId,
-      messageId,
-      "finalizing"
-    );
+    await progress.phase("finalizing");
     const attributionRisks = findAttributionRisks(rewrite);
     attributionRiskCount = attributionRisks.length;
     const attributionInstruction =
@@ -2276,7 +2278,7 @@ async function processReportRewrite(
       ]
         .filter(Boolean)
         .join("\n\n");
-      const correctedForAttribution = await callModelReportRewrite(
+      const correctedForAttribution = await writeNotice(
         reportPayload,
         combinedAttribution,
         rewrite,
@@ -2291,6 +2293,7 @@ async function processReportRewrite(
     }
 
     const editorialReviewResult = await applyEditorialRevisionReviewRepair({
+      progress,
       payload: reportPayload,
       rewrite,
       instruction: revisionOptions.userInstruction,
@@ -2298,7 +2301,7 @@ async function processReportRewrite(
       revisionInstructionForPrompt,
       reasoningEffort: reportReasoningEffort,
       modelCalls,
-      callRewrite: callModelReportRewrite
+      callRewrite: writeNotice
     });
     rewrite = editorialReviewResult.rewrite;
     promptChars += editorialReviewResult.promptChars;
@@ -2320,7 +2323,7 @@ async function processReportRewrite(
     }
 
     if (needsFinalReferenceRepair) {
-      const finalReferenceRepair = await applyReferenceCheckRepair({
+      const finalReferenceRepair = await repairReferences({
         referencePayload: reportReferencePayload,
         rewritePayload: reportPayload,
         rewrite,
@@ -2328,7 +2331,7 @@ async function processReportRewrite(
         correctionReasoningEffort: reportReasoningEffort,
         existingCorrectionAttempts: referenceRepairState.correctionAttempts,
         modelCalls,
-        callRewrite: callModelReportRewrite
+        callRewrite: writeNotice
       });
       rewrite = finalReferenceRepair.rewrite;
       promptChars += finalReferenceRepair.promptChars;
@@ -2358,7 +2361,7 @@ async function processReportRewrite(
       revisionInstructionForPrompt,
       reasoningEffort: reportReasoningEffort,
       modelCalls,
-      callRewrite: callModelReportRewrite,
+      callRewrite: writeNotice,
       // Report rewrites already have a sentence-level source check over the
       // selected attachment pages. Do not ask a second model call to delete a
       // visible number that this fresh check has explicitly grounded.
@@ -2384,7 +2387,7 @@ async function processReportRewrite(
         ]
           .filter(Boolean)
           .join("\n\n");
-        const correctedForAttribution = await callModelReportRewrite(
+        const correctedForAttribution = await writeNotice(
           reportPayload,
           combinedAttribution,
           rewrite,
@@ -2408,7 +2411,7 @@ async function processReportRewrite(
       rewrite = postRepairStyleResult.rewrite;
       styleSanitization = postRepairStyleResult.stats;
 
-      const repairedReferenceRepair = await applyReferenceCheckRepair({
+      const repairedReferenceRepair = await repairReferences({
         referencePayload: reportReferencePayload,
         rewritePayload: reportPayload,
         rewrite,
@@ -2416,7 +2419,7 @@ async function processReportRewrite(
         correctionReasoningEffort: reportReasoningEffort,
         existingCorrectionAttempts: referenceRepairState.correctionAttempts,
         modelCalls,
-        callRewrite: callModelReportRewrite
+        callRewrite: writeNotice
       });
       rewrite = repairedReferenceRepair.rewrite;
       promptChars += repairedReferenceRepair.promptChars;
@@ -2632,6 +2635,10 @@ async function processYearlyReportRewrite(
   yearlyContent: YearlyReportExtractionResult,
   revisionOptions: RewriteRevisionOptions = {}
 ): Promise<void> {
+  const progress = createNoticeProgress((phase) => setGenerationPhaseAndNotify(revisionOptions.generationRunId, messageId, phase));
+  const writeNotice = progress.writer(callModelYearlyReportRewrite);
+  const repairReferences = referenceRepairWithProgress(progress);
+
   const yearlyPayload: YearlyReportPromptPayload = {
     ...payload,
     letterText: yearlyContent.letterText,
@@ -2670,12 +2677,7 @@ async function processYearlyReportRewrite(
   const attachmentTextAvailable = Boolean(combinedText.trim());
 
   try {
-    await setGenerationPhaseAndNotify(
-      revisionOptions.generationRunId,
-      messageId,
-      "writing_notice"
-    );
-    const initialDraftResult = await callModelYearlyReportRewrite(
+    const initialDraftResult = await writeNotice(
       yearlyPayload,
       revisionInstructionForPrompt,
       revisionOptions.previousOutput,
@@ -2692,30 +2694,20 @@ async function processYearlyReportRewrite(
       bodyText: combinedText,
       sourceBodyChars: combinedText.length
     };
-
-    await setGenerationPhaseAndNotify(
-      revisionOptions.generationRunId,
-      messageId,
-      "checking_references"
-    );
-    const referenceRepair = await applyReferenceCheckRepair({
+    const referenceRepair = await repairReferences({
       referencePayload: refPayload,
       rewritePayload: yearlyPayload,
       rewrite,
       revisionInstructionForPrompt,
       correctionReasoningEffort: reportReasoningEffort,
       modelCalls,
-      callRewrite: callModelYearlyReportRewrite
+      callRewrite: writeNotice
     });
     rewrite = referenceRepair.rewrite;
     promptChars += referenceRepair.promptChars;
     absorbReferenceRepairResult(referenceRepairState, referenceRepair);
 
-    await setGenerationPhaseAndNotify(
-      revisionOptions.generationRunId,
-      messageId,
-      "finalizing"
-    );
+    await progress.phase("finalizing");
     const attributionRisks = findAttributionRisks(rewrite);
     attributionRiskCount = attributionRisks.length;
     const attributionInstruction =
@@ -2727,7 +2719,7 @@ async function processYearlyReportRewrite(
       ]
         .filter(Boolean)
         .join("\n\n");
-      const correctedForAttribution = await callModelYearlyReportRewrite(
+      const correctedForAttribution = await writeNotice(
         yearlyPayload,
         combinedAttribution,
         rewrite,
@@ -2742,6 +2734,7 @@ async function processYearlyReportRewrite(
     }
 
     const editorialReviewResult = await applyEditorialRevisionReviewRepair({
+      progress,
       payload: yearlyPayload,
       rewrite,
       instruction: revisionOptions.userInstruction,
@@ -2749,7 +2742,7 @@ async function processYearlyReportRewrite(
       revisionInstructionForPrompt,
       reasoningEffort: reportReasoningEffort,
       modelCalls,
-      callRewrite: callModelYearlyReportRewrite
+      callRewrite: writeNotice
     });
     rewrite = editorialReviewResult.rewrite;
     promptChars += editorialReviewResult.promptChars;
@@ -2771,7 +2764,7 @@ async function processYearlyReportRewrite(
     }
 
     if (needsFinalReferenceRepair) {
-      const finalReferenceRepair = await applyReferenceCheckRepair({
+      const finalReferenceRepair = await repairReferences({
         referencePayload: refPayload,
         rewritePayload: yearlyPayload,
         rewrite,
@@ -2779,7 +2772,7 @@ async function processYearlyReportRewrite(
         correctionReasoningEffort: reportReasoningEffort,
         existingCorrectionAttempts: referenceRepairState.correctionAttempts,
         modelCalls,
-        callRewrite: callModelYearlyReportRewrite
+        callRewrite: writeNotice
       });
       rewrite = finalReferenceRepair.rewrite;
       promptChars += finalReferenceRepair.promptChars;
@@ -2800,7 +2793,7 @@ async function processYearlyReportRewrite(
       revisionInstructionForPrompt,
       reasoningEffort: reportReasoningEffort,
       modelCalls,
-      callRewrite: callModelYearlyReportRewrite
+      callRewrite: writeNotice
     });
     rewrite = validationRepairResult.rewrite;
     promptChars += validationRepairResult.promptChars;
@@ -2818,7 +2811,7 @@ async function processYearlyReportRewrite(
         ]
           .filter(Boolean)
           .join("\n\n");
-        const correctedForAttribution = await callModelYearlyReportRewrite(
+        const correctedForAttribution = await writeNotice(
           yearlyPayload,
           combinedAttribution,
           rewrite,
@@ -2842,7 +2835,7 @@ async function processYearlyReportRewrite(
       rewrite = postRepairStyleResult.rewrite;
       styleSanitization = postRepairStyleResult.stats;
 
-      const repairedReferenceRepair = await applyReferenceCheckRepair({
+      const repairedReferenceRepair = await repairReferences({
         referencePayload: refPayload,
         rewritePayload: yearlyPayload,
         rewrite,
@@ -2850,7 +2843,7 @@ async function processYearlyReportRewrite(
         correctionReasoningEffort: reportReasoningEffort,
         existingCorrectionAttempts: referenceRepairState.correctionAttempts,
         modelCalls,
-        callRewrite: callModelYearlyReportRewrite
+        callRewrite: writeNotice
       });
       rewrite = repairedReferenceRepair.rewrite;
       promptChars += repairedReferenceRepair.promptChars;
@@ -4187,15 +4180,17 @@ const rewriteWorker = new Worker<RewriteJobData>(
         return;
       }
 
+      const progress = createNoticeProgress((phase) => setGenerationPhaseAndNotify(generationRunId, messageId, phase));
+      const writeNotice = progress.writer(callModelRewrite);
+      const repairReferences = referenceRepairWithProgress(progress);
       fastDrafts.start(payload, generationRunId, job.data.reason === "new-message" && targetVersion === 1 && !job.data.instruction && Date.now() - source.ingestedAt.getTime() < 120_000);
 
       // After triage (skipped notices never pay for a lookup), before the
       // first model call so the draft, the checker and the validator agree.
-      const relatedNoticeTelemetryJson = await attachRelatedNotices(source, payload);
+      const relatedNoticeTelemetryJson = await attachRelatedNotices(source, payload, progress);
 
       try {
-        await setGenerationPhaseAndNotify(generationRunId, messageId, "writing_notice");
-        const initialDraftResult = await callModelRewrite(
+        const initialDraftResult = await writeNotice(
           payload,
           revisionInstructionForPrompt,
           previousOutput,
@@ -4220,15 +4215,14 @@ const rewriteWorker = new Worker<RewriteJobData>(
           validationRepair.initialWarnings = [...new Set([...validationRepair.initialWarnings, ...validationIssueMessages(issues)])];
           return buildHighRiskValidationRepairInstruction(issues);
         };
-        await setGenerationPhaseAndNotify(generationRunId, messageId, "checking_references");
-        const referenceRepair = await applyReferenceCheckRepair({
+        const referenceRepair = await repairReferences({
           referencePayload: refPayload,
           rewritePayload: payload,
           rewrite,
           revisionInstructionForPrompt,
           correctionReasoningEffort,
           modelCalls,
-          callRewrite: callModelRewrite,
+          callRewrite: writeNotice,
           validationInstruction,
           maxCorrectionAttempts: NOTICE_INITIAL_REPAIR_LIMIT
         });
@@ -4237,7 +4231,7 @@ const rewriteWorker = new Worker<RewriteJobData>(
         promptChars += referenceRepair.promptChars;
         absorbReferenceRepairResult(referenceRepairState, referenceRepair);
 
-        await setGenerationPhaseAndNotify(generationRunId, messageId, "finalizing");
+        await progress.phase("finalizing");
         const attributionRisks = findAttributionRisks(rewrite);
         attributionRiskCount = attributionRisks.length;
         const attributionInstruction =
@@ -4246,7 +4240,7 @@ const rewriteWorker = new Worker<RewriteJobData>(
           const combinedAttribution = [revisionInstructionForPrompt, attributionInstruction]
             .filter(Boolean)
             .join("\n\n");
-          const correctedForAttribution = await callModelRewrite(
+          const correctedForAttribution = await writeNotice(
             payload,
             combinedAttribution,
             rewrite,
@@ -4261,6 +4255,7 @@ const rewriteWorker = new Worker<RewriteJobData>(
         }
 
         const editorialReviewResult = await applyEditorialRevisionReviewRepair({
+          progress,
           payload,
           rewrite,
           instruction: job.data.instruction,
@@ -4268,7 +4263,7 @@ const rewriteWorker = new Worker<RewriteJobData>(
           revisionInstructionForPrompt,
           reasoningEffort: correctionReasoningEffort,
           modelCalls,
-          callRewrite: callModelRewrite
+          callRewrite: writeNotice
         });
         rewrite = editorialReviewResult.rewrite;
         promptChars += editorialReviewResult.promptChars;
@@ -4296,7 +4291,7 @@ const rewriteWorker = new Worker<RewriteJobData>(
         if (needsFinalReferenceRepair || referenceRepairState.checkerError ||
             assessReferenceCheckGate(referenceRepairState.finalCoverage).blocking ||
             highRiskValidationWarningIssues(validationResult).length > 0) {
-          const finalReferenceRepair = await applyReferenceCheckRepair({
+          const finalReferenceRepair = await repairReferences({
             referencePayload: refPayload,
             rewritePayload: payload,
             rewrite,
@@ -4306,7 +4301,7 @@ const rewriteWorker = new Worker<RewriteJobData>(
             maxCorrectionAttempts: NOTICE_TOTAL_REPAIR_LIMIT,
             validationInstruction,
             modelCalls,
-            callRewrite: callModelRewrite
+            callRewrite: writeNotice
           });
           rewrite = finalReferenceRepair.rewrite;
           validationRepair.applied ||= finalReferenceRepair.validationCorrectionAttempts > 0;
@@ -4556,7 +4551,7 @@ const publishWorker = new Worker<PublishJobData>(
         return;
       }
 
-      await setGenerationPhase(logPrisma, job.data.generationRunId, "publishing");
+      await setGenerationPhaseAndNotify(job.data.generationRunId, source.messageId, "publishing");
       const result = await finalizePublication(prisma, {
         messageId: source.messageId,
         version,

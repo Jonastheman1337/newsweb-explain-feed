@@ -4,11 +4,14 @@ import styles from "./generation-activity.module.css";
 const labels: Partial<Record<GenerationPhase, string>> = {
   queued: "Venter på tur",
   reading_notice: "Leser børsmeldingen",
-  reading_pdf_attachment: "Leser PDF-vedlegg",
-  analyzing_content: "Finner hovedpoengene",
+  reading_pdf_attachment: "Leser vedleggene",
+  analyzing_content: "Vurderer nyhetsinnholdet",
+  loading_context: "Henter tidligere meldinger",
+  correcting_notice: "Retter teksten",
+  rechecking_references: "Kontrollerer teksten på nytt",
   writing_notice: "Skriver notisen",
-  checking_references: "Sjekker kildene",
-  finalizing: "Gjør notisen klar",
+  checking_references: "Sjekker teksten mot kildene",
+  finalizing: "Kontrollerer teksten",
   publishing: "Gjør notisen klar"
 };
 

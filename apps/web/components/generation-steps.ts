@@ -27,6 +27,9 @@ function getGenerationStepPhases(hasAttachments?: boolean): readonly GenerationP
 }
 
 function normalizeStepPhase(phase: GenerationPhase | null): GenerationPhase | null {
+  if (phase === "loading_context") return "analyzing_content";
+  if (phase === "correcting_notice") return "writing_notice";
+  if (phase === "rechecking_references") return "checking_references";
   if (
     phase === "finalizing" ||
     phase === "publishing" ||

@@ -1,3 +1,4 @@
+import { createNoticeProgress } from "./notice-progress.js";
 import { readFileSync } from "node:fs";
 import { expect, it, vi } from "vitest";
 import type { PromptPayload } from "@newsweb/prompt-kit";
@@ -149,4 +150,21 @@ it("leaves persistent numeric errors available for blocking even if reference co
   expect(write).toHaveBeenCalledOnce();
   expect(result.validationCorrectionAttempts).toBe(1);
   expect(validateRewriteOutput(result.rewrite, payload).issues.some(i => i.code === "UNEXPECTED_NUMBERS")).toBe(true);
+});
+
+it("emits writing, correction and rechecking from the real repair loop without changing its result", async () => {
+  const phases: string[] = [];
+  const progress = createNoticeProgress(async phase => { phases.push(phase); });
+  const { args, check, write: repairWrite } = setup([fixture.initialCoverage, passing()]);
+  let writes = 0;
+  const write = progress.writer(async (...values: Parameters<typeof repairWrite>) =>
+    writes++ === 0 ? { rewrite: draft, promptChars: 0, modelCall: { kind: "rewrite" } } : repairWrite(...values));
+  const initial = await write(payload);
+  const repair = createReferenceCheckRepair({ callModelReferenceCheck: () => progress.check(check), collectFailedModelCall: () => 0 });
+  const result = await repair({ ...args, rewrite: initial.rewrite, callRewrite: write });
+  expect(phases).toEqual(["writing_notice", "checking_references", "correcting_notice", "rechecking_references"]);
+  expect(result.rewrite).toEqual(corrected);
+  expect(result.correctionAttempts).toBe(1);
+  expect(check).toHaveBeenCalledTimes(2);
+  expect(repairWrite).toHaveBeenCalledTimes(1);
 });

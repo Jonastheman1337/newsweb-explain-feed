@@ -822,7 +822,13 @@ export const noticeRoutes: FastifyPluginAsync = async (fastify) => {
         const row=await prisma.noticeGenerationControl.findFirst({where:{generationRunId,messageId}});
         if (!row) return reply.code(404).send({message:"Forespørselen finnes ikke."});
         reply.header("Cache-Control","private, no-store");
-        return {request:generationControlPayload(row),ready:row.status==="published",failed:row.status==="failed",generationRunId,version:row.targetVersion,rewriteId:row.resultRewriteId};
+        const progress = row.status === "running"
+          ? await logPrisma.generationRun.findUnique({
+              where: { id: generationRunId },
+              select: { id: true, phase: true, phaseUpdatedAt: true }
+            })
+          : null;
+        return {request:generationControlPayload(row, progress),ready:row.status==="published",failed:row.status==="failed",generationRunId,version:row.targetVersion,rewriteId:row.resultRewriteId};
       }
       const rewrite = await prisma.rewrite.findFirst({
         where: { messageId },

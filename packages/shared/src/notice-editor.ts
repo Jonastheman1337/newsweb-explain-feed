@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { generationPhaseSchema } from "./generation-progress.js";
 
 /** The text the editor actually submitted, independent of the latest publication. */
 export const noticeEditorSnapshotSchema = z.object({
@@ -28,6 +29,8 @@ export const noticeGenerationRequestSchema = z.object({
   error: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
+  phase: generationPhaseSchema.nullable().optional(),
+  phaseUpdatedAt: z.string().nullable().optional(),
 });
 export type NoticeGenerationRequest = z.infer<
   typeof noticeGenerationRequestSchema

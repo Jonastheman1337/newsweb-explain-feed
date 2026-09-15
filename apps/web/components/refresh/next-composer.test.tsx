@@ -449,3 +449,18 @@ it.each(["failed", "cancelled", "skipped"] as const)("retries the frozen %s requ
     "Ny kilde ".repeat(300),
   );
 });
+
+it("tracks the requested backend phase through checking, repair and rechecking, then stops on completion", async () => {
+  server = { ...server, phase: "writing_notice" };
+  await act(() => root.render(<Harness />)); await submit();
+  expect(container.textContent).toContain("Skriver notisen");
+  for (const [phase, label] of [["checking_references", "Sjekker teksten mot kildene"], ["correcting_notice", "Retter teksten"], ["rechecking_references", "Kontrollerer teksten på nytt"]] as const) {
+    server = { ...server, phase };
+    await act(async () => { await vi.advanceTimersByTimeAsync(1600); });
+    expect(container.textContent).toContain(label);
+    expect(container.textContent).not.toContain("Skriver ny versjon");
+  }
+  await act(async () => { await vi.advanceTimersByTimeAsync(4800); });
+  expect(container.textContent).toContain("Kontrollerer teksten på nytt");
+  await complete(); expect(container.textContent).not.toContain("Kontrollerer teksten på nytt");
+});

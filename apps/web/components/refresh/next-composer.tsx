@@ -575,13 +575,13 @@ export function useNoticeComposer(args: {
   const status = (
     <>
       {busy && (
-        <GenerationActivity label={sending
+        <GenerationActivity phase={request?.phase ?? undefined} label={sending
           ? "Sender …"
           : request?.state === "queued"
             ? "Venter på tur"
             : request?.state === "cancelling"
               ? "Avbryter …"
-              : "Skriver ny versjon …"} />
+              : request?.phase ? undefined : "Lager ny versjon"} />
       )}
       {busy && !sending && capabilities.cancellation && (
         <button
