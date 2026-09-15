@@ -219,7 +219,7 @@ export const feedStreamRoutes: FastifyPluginAsync = async (fastify) => {
       return;
     }
 
-    const runs = await loadFeedGenerationRuns([messageId]);
+    const runs = await loadFeedGenerationRuns([messageId], dbItem.activeGenerationRunId ? [dbItem.activeGenerationRunId] : []);
     const updatedItem = applyFeedGenerationState(
       applyFeedUpdateState(feedItem, state, phase),
       runs.get(messageId),

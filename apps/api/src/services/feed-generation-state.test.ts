@@ -39,3 +39,12 @@ describe("full generation owns feed progress", () => {
     expect(logPrisma.generationRun.findMany).toHaveBeenCalledWith(expect.objectContaining({ distinct: ["messageId"], orderBy: { requestedAt: "desc" }, where: { messageId: { in: [682374] }, reason: { in: ["new-message", "manual-reprocess"] } } }));
   });
 });
+
+it("a rejected newer duplicate cannot hide the run that still owns the slot", async () => {
+  vi.mocked(logPrisma.generationRun.findMany)
+    .mockResolvedValueOnce([{ ...run, id: "duplicate", status: "superseded" }] as never)
+    .mockResolvedValueOnce([run] as never);
+  const selected = (await loadFeedGenerationRuns([run.messageId], [run.id])).get(run.messageId);
+  expect(selected?.id).toBe(run.id);
+  expect(applyFeedGenerationState(source, selected, [], now).processing).toBe(true);
+});

@@ -9,21 +9,29 @@ import {
 // Feed reads and every SSE event (including fast drafts) use the same full run.
 // Read the latest run even when terminal; filtering to active runs can resurrect
 // an older run after a newer one has finished or been cancelled.
-export async function loadFeedGenerationRuns(messageIds: number[]) {
+export async function loadFeedGenerationRuns(messageIds: number[], activeGenerationRunIds: string[] = []) {
   if (!messageIds.length) return new Map<number, FeedGenerationRunRecord>();
-  const runs = await logPrisma.generationRun.findMany({
-    where: {
-      messageId: { in: messageIds },
-      reason: { in: ["new-message", "manual-reprocess"] }
-    },
-    orderBy: { requestedAt: "desc" },
-    distinct: ["messageId"],
-    select: {
-      id: true, messageId: true, status: true, phase: true,
-      phaseUpdatedAt: true, requestedAt: true
-    }
-  });
-  return new Map(runs.map((run) => [run.messageId, run]));
+  const select = {
+    id: true, messageId: true, status: true, phase: true,
+    phaseUpdatedAt: true, requestedAt: true
+  } as const;
+  const [runs, owners] = await Promise.all([
+    logPrisma.generationRun.findMany({
+      where: {
+        messageId: { in: messageIds },
+        reason: { in: ["new-message", "manual-reprocess"] }
+      },
+      orderBy: { requestedAt: "desc" },
+      distinct: ["messageId"],
+      select
+    }),
+    activeGenerationRunIds.length
+      ? logPrisma.generationRun.findMany({ where: { id: { in: activeGenerationRunIds } }, select })
+      : []
+  ]);
+  // A newer duplicate may be superseded without doing work. Its terminal
+  // status must not hide the older run that still owns the generation slot.
+  return new Map([...runs, ...owners].map((run) => [run.messageId, run]));
 }
 
 export function applyFeedGenerationState(

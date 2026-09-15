@@ -143,7 +143,10 @@ export const feedRoutes: FastifyPluginAsync = async (fastify) => {
 
       const hasNext = items.length > query.limit;
       const slice = hasNext ? items.slice(0, query.limit) : items;
-      const generationRuns = await loadFeedGenerationRuns(slice.map((item) => item.messageId));
+      const generationRuns = await loadFeedGenerationRuns(
+        slice.map((item) => item.messageId),
+        slice.flatMap((item) => item.activeGenerationRunId ? [item.activeGenerationRunId] : [])
+      );
 
       const drafts = fastify.config.FAST_DRAFT_ENABLED && query.ui === "v2" ? await loadFastDrafts(slice.map((item) => item.messageId)) : new Map();
       const responseItems = slice
