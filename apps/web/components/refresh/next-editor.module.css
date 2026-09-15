@@ -396,9 +396,13 @@
   margin-top: 7px !important;
 }
 .composeReveal {
+  --compose-duration: 180ms;
   display: grid;
   grid-template-rows: 0fr;
-  transition: grid-template-rows 150ms ease-out;
+  margin-top: 0;
+  transition:
+    grid-template-rows var(--compose-duration) ease-out,
+    margin-top var(--compose-duration) ease-out;
 }
 .composeReveal[data-open="true"] {
   grid-template-rows: 1fr;
@@ -410,6 +414,14 @@
 }
 .composeReveal[data-open="true"] .composeClip {
   overflow: visible;
+  animation: composeClipping var(--compose-duration);
+}
+/* Keep the opening contents inside the panel, then allow the length menu out. */
+@keyframes composeClipping {
+  from,
+  to {
+    overflow: hidden;
+  }
 }
 .composer {
   border: 1px solid var(--editor-edge);
@@ -641,5 +653,8 @@
 @media (prefers-reduced-motion: reduce) {
   .composeReveal {
     transition: none;
+  }
+  .composeReveal[data-open="true"] .composeClip {
+    animation: none;
   }
 }

@@ -868,11 +868,6 @@ export function useNoticeComposer(args: {
           </button>
         </p>
       )}
-      {blockedSources && !sourceError && (
-        <p role="status">
-          Vent på kildene, eller prøv igjen/fjern en kilde som feilet.
-        </p>
-      )}
       {error && (
         <p role="alert">
           {error}{" "}
