@@ -522,7 +522,7 @@ export function RefreshCard({
               )}
             {latest.failed && !composer.busy && !composer.request && (
               <span role="status">
-                Kunne ikke fullføre{" "}
+                Avbrutt{" "}
                 <button
                   type="button"
                   disabled={!composer.canGenerate}
@@ -652,10 +652,10 @@ export function RefreshCard({
               <Dateline item={item} />
               <div className={`${styles.actions} ${styles.sourceActions}`}>
                 {composer.status}
-                {!composer.busy && (
+                {!composer.busy && !composer.request && (
                   latest.processing || latest.regenerating
                     ? <GenerationActivity phase={latest.phase} />
-                    : latest.failed ? <span role="status">Kunne ikke fullføre</span> : null
+                    : latest.failed ? <span role="status">Avbrutt</span> : null
                 )}
                 {!latest.processing && !latest.regenerating && !composer.busy && !composer.request && (
                   <button
@@ -664,7 +664,7 @@ export function RefreshCard({
                     disabled={!composer.canGenerate}
                     onClick={() => void composer.generate()}
                   >
-                    Generer
+                    {latest.failed ? "Prøv igjen" : "Generer"}
                   </button>
                 )}
               </div>

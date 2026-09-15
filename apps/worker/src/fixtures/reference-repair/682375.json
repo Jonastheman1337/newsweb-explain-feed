@@ -1,0 +1,288 @@
+{
+  "messageId": 682375,
+  "requestedAt": "2026-09-15T13:08:43.266Z",
+  "provenance": "Production signals export. Source excerpts and checker findings; no intermediate draft reconstruction.",
+  "blockedRewrite": {
+    "body": [
+      "Et selskap knyttet til konsernsjef Tor-André Skeie tegner 290.909 aksjer. Yokru Invest, som er knyttet til to ledere i Kids Outlet, tegner like mange."
+    ],
+    "lead": "Ledelsen, styremedlemmer og nærstående tegner aksjer i Outlet Groups planlagte børsnotering, viser en børsmelding.",
+    "title": "Outlet Group-topper tegner aksjer",
+    "key_facts": [
+      "Ledelse, styremedlemmer og nærstående tegner aksjer",
+      "To tilknyttede selskaper tegner 290.909 aksjer hver"
+    ],
+    "confidence": "high",
+    "importance": "medium",
+    "source_spans": [
+      "primary: Certain primary insiders and close associates have subscribed for shares in the Offering",
+      "primary: Tor Andre Skeie Invest AS, a closely associated enterprise of Tor-Andre Skeie, CEO of Outlet Group Holding ASA, has subscribed for 290,909 shares",
+      "primary: Yokru Invest AS, a closely associated enterprise of Andreas Skalleberg [...] and Olav Trondsen [...] has subscribed for 290,909 shares"
+    ],
+    "excluded_hype": [],
+    "company_sentence": "Outlet Group selger blant annet sportsutstyr, klær og leker gjennom Sport Outlet og Kids Outlet.",
+    "source_limitations": [
+      "Ekstra kildetekst er analysert som begrenset kildegrunnlag."
+    ],
+    "negative_or_surprising": []
+  },
+  "initialCoverage": {
+    "priorContext": {
+      "sources": [
+        {
+          "relation": "reference",
+          "sourceId": "prior_682195",
+          "messageId": 682195,
+          "contextMarker": "i går"
+        }
+      ],
+      "sourceIds": [
+        "prior_682195"
+      ],
+      "timeMarkers": [
+        "i går"
+      ],
+      "issuerAliases": [
+        "oslo bors",
+        "oslo",
+        "-"
+      ]
+    },
+    "totalSentences": 6,
+    "coveragePercent": 83,
+    "sentenceReviews": [
+      {
+        "index": 0,
+        "source": "primary",
+        "grounded": true,
+        "sentence": "Outlet Group-topper tegner for 30 millioner",
+        "priorUses": [],
+        "interpretation": "Samlet tegningsbeløp er om lag 30 millioner kroner, beregnet fra de oppgitte aksjeantallene og kursen på 33 kroner.",
+        "sourceEvidence": "Certain primary insiders and close associates have subscribed for shares in the Offering"
+      },
+      {
+        "index": 1,
+        "source": "primary",
+        "grounded": true,
+        "sentence": "Ledelsen, styremedlemmer og nærstående tegner seg for til sammen 914.011 aksjer i Outlet Groups børsnotering.",
+        "priorUses": [],
+        "interpretation": "De oppførte tegningene summerer seg til 914.011 aksjer og gjelder tilbudet knyttet til børsnoteringen.",
+        "sourceEvidence": "Certain primary insiders and close associates have subscribed for shares in the Offering"
+      },
+      {
+        "index": 2,
+        "source": "primary",
+        "grounded": false,
+        "sentence": "Det tilsvarer drøyt 30,2 millioner kroner, viser en børsmelding.",
+        "priorUses": [],
+        "interpretation": "914.011 aksjer à 33 kroner tilsvarer 30.162.363 kroner, som er under – ikke drøyt – 30,2 millioner.",
+        "sourceEvidence": "Price(s) 33.00"
+      },
+      {
+        "index": 3,
+        "source": "primary",
+        "grounded": true,
+        "sentence": "Aksjene tegnes til tilbudsprisen på 33 kroner.",
+        "priorUses": [],
+        "interpretation": "Transaksjonsmeldingene oppgir en pris på 33 kroner per aksje.",
+        "sourceEvidence": "NOK 0 33.00 290,909"
+      },
+      {
+        "index": 4,
+        "source": "primary",
+        "grounded": true,
+        "sentence": "Et selskap knyttet til konsernsjef Tor-André Skeie tegner for 9,6 millioner kroner, mens en nærstående tegner for 199.980 kroner.",
+        "priorUses": [],
+        "interpretation": "Tor Andre Skeie Invest AS tegnet for 9.599.997 kroner, avrundet til 9,6 millioner, mens Adam Skeie tegnet for 199.980 kroner.",
+        "sourceEvidence": "Tor Andre Skeie Invest AS ... total price of NOK 9,599,997 ... Adam Skeie ... total price of NOK 199,980"
+      },
+      {
+        "index": 5,
+        "source": "primary",
+        "grounded": true,
+        "sentence": "Outlet Group selger blant annet sportsutstyr, klær og leker gjennom Sport Outlet og Kids Outlet.",
+        "priorUses": [],
+        "interpretation": "Produktkategoriene og konseptene er uttrykkelig omtalt i selskapsbeskrivelsen.",
+        "sourceEvidence": "offering sports equipment, apparel, footwear, toys and creative supplies through its Sport Outlet and Kids Outlet concepts"
+      }
+    ],
+    "groundedSentences": 5,
+    "headSentenceCount": 3,
+    "unsupportedSentences": [
+      {
+        "index": 2,
+        "source": "primary",
+        "sentence": "Det tilsvarer drøyt 30,2 millioner kroner, viser en børsmelding.",
+        "interpretation": "914.011 aksjer à 33 kroner tilsvarer 30.162.363 kroner, som er under – ikke drøyt – 30,2 millioner.",
+        "sourceEvidence": "Price(s) 33.00"
+      }
+    ],
+    "visibleArticleSentenceCount": 5
+  },
+  "finalCoverage": {
+    "priorContext": {
+      "sources": [
+        {
+          "relation": "reference",
+          "sourceId": "prior_682195",
+          "messageId": 682195,
+          "contextMarker": "i går"
+        }
+      ],
+      "sourceIds": [
+        "prior_682195"
+      ],
+      "timeMarkers": [
+        "i går"
+      ],
+      "issuerAliases": [
+        "oslo bors",
+        "oslo",
+        "-"
+      ]
+    },
+    "totalSentences": 5,
+    "coveragePercent": 80,
+    "sentenceReviews": [
+      {
+        "index": 0,
+        "source": "primary",
+        "grounded": true,
+        "sentence": "Outlet Group-topper tegner aksjer",
+        "priorUses": [],
+        "interpretation": "Meldingen opplyser at primærinnsidere og nærstående har tegnet aksjer.",
+        "sourceEvidence": "Certain primary insiders and close associates have subscribed for shares"
+      },
+      {
+        "index": 1,
+        "source": "none",
+        "grounded": false,
+        "sentence": "Ledelsen, styremedlemmer og nærstående tegner aksjer i Outlet Groups planlagte børsnotering, viser en børsmelding.",
+        "priorUses": [],
+        "interpretation": "Styremedlemmer og nærstående er dekket, men meldingen dokumenterer ikke at medlemmer av den operative ledelsen selv tegner; det er hovedsakelig deres nærstående selskaper.",
+        "sourceEvidence": "Certain primary insiders and close associates have subscribed for shares in the Offering"
+      },
+      {
+        "index": 2,
+        "source": "primary",
+        "grounded": true,
+        "sentence": "Et selskap knyttet til konsernsjef Tor-André Skeie tegner 290.909 aksjer.",
+        "priorUses": [],
+        "interpretation": "Tor Andre Skeie Invest er oppgitt som nærstående selskap til konsernsjefen og tegner dette antallet.",
+        "sourceEvidence": "Tor Andre Skeie Invest AS, a closely associated enterprise of Tor-Andre Skeie, CEO ... has subscribed for 290,909 shares"
+      },
+      {
+        "index": 3,
+        "source": "primary",
+        "grounded": true,
+        "sentence": "Yokru Invest, som er knyttet til to ledere i Kids Outlet, tegner like mange.",
+        "priorUses": [],
+        "interpretation": "Yokru Invest er knyttet til Andreas Skalleberg og Olav Trondsen og tegner også 290.909 aksjer.",
+        "sourceEvidence": "Yokru Invest AS ... Andreas Skalleberg ... and Olav Trondsen ... has subscribed for 290,909 shares"
+      },
+      {
+        "index": 4,
+        "source": "primary",
+        "grounded": true,
+        "sentence": "Outlet Group selger blant annet sportsutstyr, klær og leker gjennom Sport Outlet og Kids Outlet.",
+        "priorUses": [],
+        "interpretation": "Produktkategoriene og konseptene er uttrykkelig beskrevet.",
+        "sourceEvidence": "offering sports equipment, apparel, footwear, toys ... through its Sport Outlet and Kids Outlet concepts"
+      }
+    ],
+    "groundedSentences": 4,
+    "headSentenceCount": 2,
+    "unsupportedSentences": [
+      {
+        "index": 1,
+        "source": "none",
+        "sentence": "Ledelsen, styremedlemmer og nærstående tegner aksjer i Outlet Groups planlagte børsnotering, viser en børsmelding.",
+        "interpretation": "Styremedlemmer og nærstående er dekket, men meldingen dokumenterer ikke at medlemmer av den operative ledelsen selv tegner; det er hovedsakelig deres nærstående selskaper.",
+        "sourceEvidence": "Certain primary insiders and close associates have subscribed for shares in the Offering"
+      }
+    ],
+    "visibleArticleSentenceCount": 4
+  },
+  "repairHistory": [
+    {
+      "blocking": true,
+      "checkNumber": 1,
+      "blockingReason": "Reference check found unsupported high-risk factual claims.",
+      "coveragePercent": 83,
+      "correctionAttempt": 0,
+      "unsupportedSentences": [
+        {
+          "index": 2,
+          "sentence": "Det tilsvarer drøyt 30,2 millioner kroner, viser en børsmelding.",
+          "interpretation": "914.011 aksjer à 33 kroner tilsvarer 30.162.363 kroner, som er under – ikke drøyt – 30,2 millioner."
+        }
+      ],
+      "unsupportedSentenceCount": 1,
+      "priorContextViolationCount": 0,
+      "highRiskUnsupportedSentenceCount": 1
+    },
+    {
+      "blocking": true,
+      "checkNumber": 2,
+      "blockingReason": "Reference check found evidence that does not belong to the cited related notice.",
+      "coveragePercent": 100,
+      "correctionAttempt": 1,
+      "unsupportedSentences": [],
+      "unsupportedSentenceCount": 0,
+      "priorContextViolationCount": 1,
+      "highRiskUnsupportedSentenceCount": 0
+    },
+    {
+      "blocking": true,
+      "checkNumber": 3,
+      "blockingReason": "Reference check found evidence that does not belong to the cited related notice.",
+      "coveragePercent": 100,
+      "correctionAttempt": 2,
+      "unsupportedSentences": [],
+      "unsupportedSentenceCount": 0,
+      "priorContextViolationCount": 1,
+      "highRiskUnsupportedSentenceCount": 0
+    },
+    {
+      "blocking": true,
+      "checkNumber": 4,
+      "blockingReason": "Reference check found evidence that does not belong to the cited related notice.",
+      "coveragePercent": 100,
+      "correctionAttempt": 3,
+      "unsupportedSentences": [],
+      "unsupportedSentenceCount": 0,
+      "priorContextViolationCount": 1,
+      "highRiskUnsupportedSentenceCount": 0
+    },
+    {
+      "blocking": true,
+      "checkNumber": 1,
+      "blockingReason": "Reference check found unsupported visible sentence in short article.",
+      "coveragePercent": 80,
+      "correctionAttempt": 3,
+      "unsupportedSentences": [
+        {
+          "index": 1,
+          "sentence": "Ledelsen, styremedlemmer og nærstående tegner aksjer i Outlet Groups planlagte børsnotering, viser en børsmelding.",
+          "interpretation": "Styremedlemmer og nærstående er dekket, men meldingen dokumenterer ikke at medlemmer av den operative ledelsen selv tegner; det er hovedsakelig deres nærstående selskaper."
+        }
+      ],
+      "unsupportedSentenceCount": 1,
+      "priorContextViolationCount": 0,
+      "highRiskUnsupportedSentenceCount": 1
+    }
+  ],
+  "validationRepair": {
+    "error": null,
+    "applied": true,
+    "issueCodes": [
+      "UNEXPECTED_NUMBERS",
+      "SECONDARY_ONLY_TITLE_NUMBER"
+    ],
+    "finalWarnings": [],
+    "initialWarnings": [
+      "Unexpected numbers: 914.011, 30,2, 33",
+      "Title uses numbers found only in an earlier notice: 30."
+    ]
+  }
+}

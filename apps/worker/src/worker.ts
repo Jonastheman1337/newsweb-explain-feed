@@ -1,3 +1,4 @@
+import { createReferenceCheckRepair, NOTICE_INITIAL_REPAIR_LIMIT, NOTICE_TOTAL_REPAIR_LIMIT } from "./services/reference-repair.js";
 import { createNoticeGenerationRuntime, CONTROLLED_JOB_NAME } from "./services/notice-generation-runtime.js";
 import { throwIfGenerationCancelled } from "@newsweb/shared/generation-context";
 import {
@@ -79,15 +80,12 @@ import {
   applyReferenceCheckEnforcement,
   defaultReferenceCheckEnforcement,
   buildReferenceCheckPrompt,
-  buildCorrectionInstruction,
   buildCoverageReport,
-  classifyCheckerErrorKind,
   emptyReferenceCoverageReport,
   assessReferenceCheckGate,
   hasFreshPassingReferenceCoverage,
   referenceCheckJsonSchema,
   referenceCheckResultSchema,
-  type ReferenceCheckerErrorEntry,
   type ReferenceCheckGateResult,
   type ReferenceCheckResult,
   type ReferenceCoverageReport
@@ -98,8 +96,7 @@ import {
   maybeAccumulatedReferenceCheckOutcome,
   referenceCheckFailureJson,
   referenceCheckValidationJson,
-  resolveAccumulatedReferenceCheckOutcome,
-  type ReferenceRepairHistoryEntry
+  resolveAccumulatedReferenceCheckOutcome
 } from "./services/reference-check-outcome.js";
 import {
   ensureReportSourceLimitation,
@@ -286,7 +283,6 @@ function modelForReasoningEffort(effort: OpenAIReasoningEffort): string {
 }
 
 const connection = parseRedisUrl(config.REDIS_URL);
-const MAX_REFERENCE_REPAIR_ATTEMPTS = 3;
 const REDIS_WATCHDOG_WINDOW_MS = 60_000;
 const REDIS_WATCHDOG_ERROR_THRESHOLD = 30;
 const REDIS_WATCHDOG_EXIT_GRACE_MS = 250;
@@ -1808,191 +1804,10 @@ async function callModelYearlyReportRewrite(
   };
 }
 
-async function applyReferenceCheckRepair<TPayload extends PromptPayload>({
-  referencePayload,
-  rewritePayload,
-  rewrite,
-  revisionInstructionForPrompt,
-  correctionReasoningEffort,
-  existingCorrectionAttempts = 0,
-  modelCalls,
-  callRewrite
-}: {
-  referencePayload: PromptPayload;
-  rewritePayload: TPayload;
-  rewrite: RewriteOutput;
-  revisionInstructionForPrompt?: string;
-  correctionReasoningEffort: OpenAIReasoningEffort;
-  existingCorrectionAttempts?: number;
-  modelCalls: ModelCallLog[];
-  callRewrite: (
-    payload: TPayload,
-    revisionInstruction?: string,
-    previousOutput?: RewriteOutput,
-    reasoningEffort?: OpenAIReasoningEffort
-  ) => Promise<{
-    rewrite: RewriteOutput;
-    promptChars: number;
-    modelCall: ModelCallLog;
-  }>;
-}): Promise<{
-  rewrite: RewriteOutput;
-  promptChars: number;
-  checkerError: string | null;
-  checkerErrors: ReferenceCheckerErrorEntry[];
-  correctionAttempts: number;
-  initialCoverage: ReferenceCoverageReport | null;
-  finalCoverage: ReferenceCoverageReport | null;
-  repairHistory: ReferenceRepairHistoryEntry[];
-}> {
-  let currentRewrite = rewrite;
-  let promptChars = 0;
-  let correctionAttempts = 0;
-  let initialCoverage: ReferenceCoverageReport | null = null;
-  let finalCoverage: ReferenceCoverageReport | null = null;
-  const repairHistory: ReferenceRepairHistoryEntry[] = [];
-  // Classified failures, call-local stages: a checker failure is numbered as
-  // the check that never completed (repairHistory.length + 1); a repair-
-  // rewrite failure belongs to the pass of the check that triggered it
-  // (repairHistory.length). Flow-level accumulation re-offsets stages.
-  const checkerErrors: ReferenceCheckerErrorEntry[] = [];
-
-  while (true) {
-    let referenceCheck: Awaited<ReturnType<typeof callModelReferenceCheck>>;
-    try {
-      referenceCheck = await callModelReferenceCheck(
-        referencePayload,
-        currentRewrite
-      );
-    } catch (error) {
-      promptChars += collectFailedModelCall(error, modelCalls);
-      checkerErrors.push({
-        stage: repairHistory.length + 1,
-        kind: classifyCheckerErrorKind(error),
-        message: error instanceof Error ? error.message : String(error),
-        // A prior correction in this call means the last successful coverage
-        // describes the pre-repair draft.
-        afterCorrection: correctionAttempts > 0
-      });
-      return {
-        rewrite: currentRewrite,
-        promptChars,
-        checkerError: error instanceof Error ? error.message : String(error),
-        checkerErrors,
-        correctionAttempts,
-        initialCoverage,
-        finalCoverage,
-        repairHistory
-      };
-    }
-
-    if (referenceCheck.modelCall) {
-      modelCalls.push(referenceCheck.modelCall);
-    }
-    promptChars += referenceCheck.promptChars;
-    initialCoverage ??= referenceCheck.coverage;
-    finalCoverage = referenceCheck.coverage;
-
-    const gate = assessReferenceCheckGate(referenceCheck.coverage);
-    repairHistory.push({
-      checkNumber: repairHistory.length + 1,
-      correctionAttempt: existingCorrectionAttempts + correctionAttempts,
-      coveragePercent: referenceCheck.coverage.coveragePercent,
-      unsupportedSentenceCount: referenceCheck.coverage.unsupportedSentences.length,
-      highRiskUnsupportedSentenceCount:
-        gate.highRiskUnsupportedSentences.length,
-      blocking: gate.blocking,
-      blockingReason: gate.reason,
-      unsupportedSentences: referenceCheck.coverage.unsupportedSentences.map(
-        (item) => ({
-          index: item.index,
-          sentence: item.sentence,
-          interpretation: item.interpretation
-        })
-      ),
-      ...(referenceCheck.coverage.priorContext
-        ? { priorContextViolationCount: gate.priorContextViolations.length }
-        : {})
-    });
-
-    const totalCorrectionAttempts =
-      existingCorrectionAttempts + correctionAttempts;
-    const correctionInstruction = buildCorrectionInstruction(
-      referenceCheck.coverage,
-      {
-        attempt: totalCorrectionAttempts + 1,
-        maxAttempts: MAX_REFERENCE_REPAIR_ATTEMPTS,
-        gate
-      }
-    );
-
-    if (!correctionInstruction) {
-      return {
-        rewrite: currentRewrite,
-        promptChars,
-        checkerError: null,
-        checkerErrors,
-        correctionAttempts,
-        initialCoverage,
-        finalCoverage,
-        repairHistory
-      };
-    }
-
-    if (
-      totalCorrectionAttempts >= MAX_REFERENCE_REPAIR_ATTEMPTS ||
-      (!gate.blocking && correctionAttempts > 0)
-    ) {
-      return {
-        rewrite: currentRewrite,
-        promptChars,
-        checkerError: null,
-        checkerErrors,
-        correctionAttempts,
-        initialCoverage,
-        finalCoverage,
-        repairHistory
-      };
-    }
-
-    const combinedCorrection = [
-      revisionInstructionForPrompt,
-      correctionInstruction
-    ]
-      .filter(Boolean)
-      .join("\n\n");
-
-    try {
-      const correctedResult = await callRewrite(
-        rewritePayload,
-        combinedCorrection,
-        currentRewrite,
-        correctionReasoningEffort
-      );
-      modelCalls.push(correctedResult.modelCall);
-      promptChars += correctedResult.promptChars;
-      currentRewrite = correctedResult.rewrite;
-      correctionAttempts += 1;
-    } catch (error) {
-      promptChars += collectFailedModelCall(error, modelCalls);
-      checkerErrors.push({
-        stage: repairHistory.length,
-        kind: "repair_rewrite_failed",
-        message: error instanceof Error ? error.message : String(error)
-      });
-      return {
-        rewrite: currentRewrite,
-        promptChars,
-        checkerError: error instanceof Error ? error.message : String(error),
-        checkerErrors,
-        correctionAttempts,
-        initialCoverage,
-        finalCoverage,
-        repairHistory
-      };
-    }
-  }
-}
+const applyReferenceCheckRepair = createReferenceCheckRepair<ModelCallLog>({
+  callModelReferenceCheck,
+  collectFailedModelCall
+});
 
 type EditorialReviewAudit = {
   enabled: boolean;
@@ -4394,6 +4209,17 @@ const rewriteWorker = new Worker<RewriteJobData>(
           ? { ...payload, bodyText: payload.bodyText + "\n\n" + payload.pdfSupplementText }
           : payload;
 
+        const validateCurrentRewrite = (draft: RewriteOutput) =>
+          validateRewriteWithRevisionCompliance(draft, payload, {
+            instruction: job.data.instruction, previousOutput, attachmentTextAvailable
+          });
+        const validationInstruction = (draft: RewriteOutput): string | null => {
+          const issues = highRiskValidationWarningIssues(validateCurrentRewrite(draft));
+          if (!issues.length) return null;
+          validationRepair.issueCodes = [...new Set([...validationRepair.issueCodes, ...uniqueIssueCodes(issues)])];
+          validationRepair.initialWarnings = [...new Set([...validationRepair.initialWarnings, ...validationIssueMessages(issues)])];
+          return buildHighRiskValidationRepairInstruction(issues);
+        };
         await setGenerationPhaseAndNotify(generationRunId, messageId, "checking_references");
         const referenceRepair = await applyReferenceCheckRepair({
           referencePayload: refPayload,
@@ -4402,9 +4228,12 @@ const rewriteWorker = new Worker<RewriteJobData>(
           revisionInstructionForPrompt,
           correctionReasoningEffort,
           modelCalls,
-          callRewrite: callModelRewrite
+          callRewrite: callModelRewrite,
+          validationInstruction,
+          maxCorrectionAttempts: NOTICE_INITIAL_REPAIR_LIMIT
         });
         rewrite = referenceRepair.rewrite;
+        validationRepair.applied = referenceRepair.validationCorrectionAttempts > 0;
         promptChars += referenceRepair.promptChars;
         absorbReferenceRepairResult(referenceRepairState, referenceRepair);
 
@@ -4460,7 +4289,13 @@ const rewriteWorker = new Worker<RewriteJobData>(
           needsFinalReferenceRepair = true;
         }
 
-        if (needsFinalReferenceRepair) {
+        rewrite = ensureReportSourceLimitation(rewrite, payload);
+        let validationResult = validateCurrentRewrite(rewrite);
+        // Later editorial/style edits must be checked on their final bytes.
+        // Even if the initial two corrections were exhausted, one remains.
+        if (needsFinalReferenceRepair || referenceRepairState.checkerError ||
+            assessReferenceCheckGate(referenceRepairState.finalCoverage).blocking ||
+            highRiskValidationWarningIssues(validationResult).length > 0) {
           const finalReferenceRepair = await applyReferenceCheckRepair({
             referencePayload: refPayload,
             rewritePayload: payload,
@@ -4468,96 +4303,21 @@ const rewriteWorker = new Worker<RewriteJobData>(
             revisionInstructionForPrompt,
             correctionReasoningEffort,
             existingCorrectionAttempts: referenceRepairState.correctionAttempts,
+            maxCorrectionAttempts: NOTICE_TOTAL_REPAIR_LIMIT,
+            validationInstruction,
             modelCalls,
             callRewrite: callModelRewrite
           });
           rewrite = finalReferenceRepair.rewrite;
+          validationRepair.applied ||= finalReferenceRepair.validationCorrectionAttempts > 0;
           promptChars += finalReferenceRepair.promptChars;
-          absorbReferenceRepairResult(
-            referenceRepairState,
-            finalReferenceRepair
-          );
-        }
-
-        rewrite = ensureReportSourceLimitation(rewrite, payload);
-        let validationResult = validateRewriteWithRevisionCompliance(rewrite, payload, {
-          instruction: job.data.instruction,
-          previousOutput,
-          attachmentTextAvailable
-        });
-
-        const validationRepairResult = await applyHighRiskValidationRepair({
-          payload,
-          rewrite,
-          validation: validationResult,
-          revisionInstructionForPrompt,
-          reasoningEffort: correctionReasoningEffort,
-          modelCalls,
-          callRewrite: callModelRewrite
-        });
-        rewrite = validationRepairResult.rewrite;
-        promptChars += validationRepairResult.promptChars;
-        validationRepair = validationRepairResult.audit;
-
-        if (validationRepair.applied) {
-          const postRepairAttributionRisks = findAttributionRisks(rewrite);
-          attributionRiskCount = postRepairAttributionRisks.length;
-          const postRepairAttributionInstruction =
-            buildAttributionCorrectionInstruction(postRepairAttributionRisks);
-          if (postRepairAttributionInstruction) {
-            const combinedAttribution = [
-              revisionInstructionForPrompt,
-              postRepairAttributionInstruction
-            ]
-              .filter(Boolean)
-              .join("\n\n");
-            const correctedForAttribution = await callModelRewrite(
-              payload,
-              combinedAttribution,
-              rewrite,
-              correctionReasoningEffort
-            );
-            modelCalls.push(correctedForAttribution.modelCall);
-            promptChars += correctedForAttribution.promptChars;
-            rewrite = correctedForAttribution.rewrite;
-            attributionCorrectionApplied = true;
-            attributionRiskCount = findAttributionRisks(rewrite).length;
-          }
-
-          const postRepairImportanceResult = applyImportanceHighBar(rewrite, payload);
-          rewrite = postRepairImportanceResult.rewrite;
-          importanceAdjusted =
-            importanceAdjusted || postRepairImportanceResult.adjusted;
-          importanceAdjustReason =
-            postRepairImportanceResult.reason ?? importanceAdjustReason;
-
-          const postRepairStyleResult = sanitizeRewriteStyle(rewrite);
-          rewrite = postRepairStyleResult.rewrite;
-          styleSanitization = postRepairStyleResult.stats;
-
-          const repairedReferenceRepair = await applyReferenceCheckRepair({
-            referencePayload: refPayload,
-            rewritePayload: payload,
-            rewrite,
-            revisionInstructionForPrompt,
-            correctionReasoningEffort,
-            existingCorrectionAttempts: referenceRepairState.correctionAttempts,
-            modelCalls,
-            callRewrite: callModelRewrite
-          });
-          rewrite = repairedReferenceRepair.rewrite;
-          promptChars += repairedReferenceRepair.promptChars;
-          absorbReferenceRepairResult(
-            referenceRepairState,
-            repairedReferenceRepair
-          );
-
+          absorbReferenceRepairResult(referenceRepairState, finalReferenceRepair);
           rewrite = ensureReportSourceLimitation(rewrite, payload);
-          validationResult = validateRewriteWithRevisionCompliance(rewrite, payload, {
-            instruction: job.data.instruction,
-            previousOutput,
-            attachmentTextAvailable
-          });
+          validationResult = validateCurrentRewrite(rewrite);
+        }
+        // A failed check on a changed draft cannot reuse an earlier passing check.
+        if (referenceRepairState.checkerError) {
+          throw new Error("Reference check unavailable: final draft verification did not complete.");
         }
 
         validationRepair.finalWarnings = validationIssueMessages(

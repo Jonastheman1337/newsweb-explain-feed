@@ -593,9 +593,21 @@ it("offers generation without editing on failed source cards", async () => {
       notGenerated: true,
     }),
   );
-  expect(buttons("Generer")).toHaveLength(1);
+  expect(buttons("Prøv igjen")).toHaveLength(1);
+  expect(buttons("Generer")).toHaveLength(0);
+  expect(container.textContent).toContain("Avbrutt");
+  expect(container.textContent).not.toContain("Kunne ikke fullføre");
   expect(buttons("Valg")).toHaveLength(0);
   expect(container.querySelector('[aria-label="Instruksjon, lenke eller kildetekst"]')).toBeNull();
+});
+it.each(["cancelled", "failed", "skipped"])("shows one retry status for a tracked %s source request", async (state) => {
+  localStorage.setItem("newsweb:next-request:2", JSON.stringify({body: {}, request: {
+    generationRunId: "stopped-run", state, rewriteId: null, version: null
+  }}));
+  await renderCard(item(2, { isFinal: false, rewriteId: null, failed: true, notGenerated: true }));
+  expect(buttons("Prøv igjen")).toHaveLength(1);
+  expect(container.textContent?.match(/Avbrutt/g)).toHaveLength(1);
+  expect(container.textContent).not.toContain("Kunne ikke fullføre");
 });
 it("retains generation and safe retries from source-only notices", async () => {
   await renderCard(

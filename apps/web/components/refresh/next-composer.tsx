@@ -592,15 +592,13 @@ export function useNoticeComposer(args: {
           Avbryt
         </button>
       )}
-      {request?.state === "cancelled" && (
+      {!busy &&
+        (request?.state === "cancelled" ||
+          request?.state === "failed" ||
+          request?.state === "skipped") && (
         <span className={styles.requestStatus} role="status">
-          Avbrutt
-        </span>
-      )}
-      {(request?.state === "failed" || request?.state === "skipped") && (
-        <span className={styles.requestStatus} role="status">
-          Kunne ikke fullføre{" "}
-          <button type="button" onClick={() => void send(true)}>
+          Avbrutt{" "}
+          <button type="button" disabled={!capabilities.queuedGeneration} onClick={() => void send(true)}>
             Prøv igjen
           </button>
         </span>

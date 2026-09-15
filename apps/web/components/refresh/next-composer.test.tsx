@@ -426,13 +426,16 @@ it("applies custom length with Enter without submitting the composer", async () 
   ).toBe(1400);
 });
 
-it("retries the frozen failed request without applying newer composer validation", async () => {
+it.each(["failed", "cancelled", "skipped"] as const)("retries the frozen %s request without applying newer composer validation", async (state) => {
   await act(() => root.render(<Harness />));
   await submit();
-  server = { ...server, state: "failed" };
+  server = { ...server, state };
   await act(async () => {
     await vi.advanceTimersByTimeAsync(1600);
   });
+  expect(container.textContent).toContain("Avbrutt");
+  expect(container.textContent).not.toContain("Kunne ikke fullføre");
+  expect(container.querySelectorAll('[role="status"]')).toHaveLength(1);
   await act(() => setText("Ny kilde ".repeat(300)));
   await act(() => button("Prøv igjen").click());
   const calls = vi
