@@ -472,26 +472,26 @@ it("opens title suggestions at the headline and sends the visible body without h
 });
 it("retains instructions across collapse, remount and version changes", async () => {
   await renderCard(item(1));
-  await act(() => buttons("Endre")[0].click());
+  await act(() => buttons("Valg")[0].click());
   const field = container.querySelector("textarea")!;
   await act(() => setValue(field, "Behold denne instruksjonen"));
-  await act(() => buttons("Endre")[0].click());
+  await act(() => buttons("Valg")[0].click());
   expect(container.querySelector("textarea")).toBe(field);
   await renderCard(
     item(1, { rewriteId: "second", contentHash: "second", rewriteVersion: 2 }),
     "second",
   );
-  await act(() => buttons("Endre")[0].click());
+  await act(() => buttons("Valg")[0].click());
   expect(container.querySelector("textarea")?.value).toBe("");
   await renderCard(item(1), "back");
-  await act(() => buttons("Endre")[0].click());
+  await act(() => buttons("Valg")[0].click());
   expect(container.querySelector("textarea")?.value).toBe(
     "Behold denne instruksjonen",
   );
 });
 it("custom length Enter applies the value without submitting generation", async () => {
   await renderCard(item(1));
-  await act(() => buttons("Endre")[0].click());
+  await act(() => buttons("Valg")[0].click());
   await act(() =>
     (
       container.querySelector(
@@ -531,7 +531,7 @@ it("custom length Enter applies the value without submitting generation", async 
 });
 it("Escape dismisses the custom length before the composer", async () => {
   await renderCard(item(1));
-  await act(() => buttons("Endre")[0].click());
+  await act(() => buttons("Valg")[0].click());
   await act(() =>
     (
       container.querySelector(
@@ -551,7 +551,7 @@ it("Escape dismisses the custom length before the composer", async () => {
         }),
       ),
   );
-  expect(buttons("Endre")[0].getAttribute("aria-expanded")).toBe("true");
+  expect(buttons("Valg")[0].getAttribute("aria-expanded")).toBe("true");
   await act(() =>
     container
       .querySelector("textarea")!
@@ -563,8 +563,8 @@ it("Escape dismisses the custom length before the composer", async () => {
         }),
       ),
   );
-  expect(buttons("Endre")[0].getAttribute("aria-expanded")).toBe("false");
-  expect(document.activeElement).toBe(buttons("Endre")[0]);
+  expect(buttons("Valg")[0].getAttribute("aria-expanded")).toBe("false");
+  expect(document.activeElement).toBe(buttons("Valg")[0]);
 });
 it("keeps PDF source text available with lazy loading and retry", async () => {
   await renderCard(item(1, { hasAttachments: true }));
@@ -594,7 +594,7 @@ it("offers generation without editing on failed source cards", async () => {
     }),
   );
   expect(buttons("Generer")).toHaveLength(1);
-  expect(buttons("Endre")).toHaveLength(0);
+  expect(buttons("Valg")).toHaveLength(0);
   expect(container.querySelector('[aria-label="Instruksjon, lenke eller kildetekst"]')).toBeNull();
 });
 it("retains generation and safe retries from source-only notices", async () => {
@@ -602,7 +602,7 @@ it("retains generation and safe retries from source-only notices", async () => {
     item(2, { isFinal: false, rewriteId: null, notGenerated: true }),
   );
   expect(buttons("Generer")).toHaveLength(1);
-  expect(buttons("Endre")).toHaveLength(0);
+  expect(buttons("Valg")).toHaveLength(0);
   expect(container.querySelector('[aria-label="Instruksjon, lenke eller kildetekst"]')).toBeNull();
   await act(() => buttons("Generer")[0].click());
   expect(container.querySelector('[role="alert"]')?.textContent).toContain("Serveren støtter ikke");
@@ -619,7 +619,7 @@ it("uses the remembered character limit on a new composer", async () => {
     JSON.stringify({ noticeChars: 1300 }),
   );
   await renderCard(item(1));
-  await act(() => buttons("Endre")[0].click());
+  await act(() => buttons("Valg")[0].click());
   expect(
     container.querySelector('[aria-label="Maksimal lengde, 1300 tegn"]'),
   ).not.toBeNull();
@@ -650,7 +650,7 @@ it("keeps a failed URL visible and blocks generation until the source is removed
       }) as Response,
   );
   await renderCard(item(1));
-  await act(() => buttons("Endre")[0].click());
+  await act(() => buttons("Valg")[0].click());
   const field = container.querySelector("textarea")!;
   await act(() => {
     const event = new Event("paste", { bubbles: true, cancelable: true });

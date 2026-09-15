@@ -508,9 +508,9 @@ export function RefreshCard({
               strokeWidth="1.5"
               aria-hidden="true"
             >
-              <path d="m16 3 5 5M4 16l-1 5 5-1L21 7a2 2 0 0 0-4-4Z" />
+              <path d="M10 5H3M12 19H3M14 3v4M16 17v4M21 12h-9M21 19h-5M21 5h-7M8 10v4M8 12H3" />
             </svg>
-            Endre
+            Valg
           </button>
           {versionControl}
           <div className={styles.requestActions}>
