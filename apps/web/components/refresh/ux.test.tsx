@@ -495,7 +495,7 @@ it("custom length Enter applies the value without submitting generation", async 
   await act(() =>
     (
       container.querySelector(
-        '[aria-label="Maksimal lengde, 1000 tegn"]',
+        '[aria-label="Ønsket lengde, omtrent 1000 tegn"]',
       ) as HTMLButtonElement
     ).click(),
   );
@@ -520,7 +520,7 @@ it("custom length Enter applies the value without submitting generation", async 
     ),
   );
   expect(
-    container.querySelector('[aria-label="Maksimal lengde, 1234 tegn"]'),
+    container.querySelector('[aria-label="Ønsket lengde, omtrent 1234 tegn"]'),
   ).not.toBeNull();
   expect(
     vi
@@ -535,7 +535,7 @@ it("Escape dismisses the custom length before the composer", async () => {
   await act(() =>
     (
       container.querySelector(
-        '[aria-label="Maksimal lengde, 1000 tegn"]',
+        '[aria-label="Ønsket lengde, omtrent 1000 tegn"]',
       ) as HTMLButtonElement
     ).click(),
   );
@@ -633,7 +633,7 @@ it("uses the remembered character limit on a new composer", async () => {
   await renderCard(item(1));
   await act(() => buttons("Valg")[0].click());
   expect(
-    container.querySelector('[aria-label="Maksimal lengde, 1300 tegn"]'),
+    container.querySelector('[aria-label="Ønsket lengde, omtrent 1300 tegn"]'),
   ).not.toBeNull();
 });
 it("keeps a failed URL visible and blocks generation until the source is removed", async () => {

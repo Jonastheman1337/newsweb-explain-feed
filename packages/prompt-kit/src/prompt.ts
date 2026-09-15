@@ -1,4 +1,4 @@
-import type { RewriteOutput } from "@newsweb/shared";
+import { noticeLengthBand, type RewriteOutput } from "@newsweb/shared";
 
 import {
   EDITORIAL_ATTRIBUTION,
@@ -67,6 +67,7 @@ export type PromptPayload = {
   sourceBodyChars: number;
   outputMode?: OutputMode;
   maxVisibleArticleChars?: number;
+  targetVisibleArticleChars?: number;
   supplementalMaterials?: SupplementalMaterialPayload[];
   relatedNotices?: RelatedNoticePayload[];
   pdfSupplementText?: string;
@@ -326,10 +327,17 @@ export function maxVisibleArticleCharsForOutputMode(mode?: OutputMode): number {
 }
 
 export function maxVisibleArticleCharsForPayload(payload: PromptPayload): number {
-  return payload.maxVisibleArticleChars ?? maxVisibleArticleCharsForOutputMode(payload.outputMode);
+  return payload.targetVisibleArticleChars
+    ? noticeLengthBand(payload.targetVisibleArticleChars).max
+    : payload.maxVisibleArticleChars ?? maxVisibleArticleCharsForOutputMode(payload.outputMode);
 }
 
 export function lengthInstructionForPayload(payload: PromptPayload): string {
+  if (payload.targetVisibleArticleChars) {
+    const target = payload.targetVisibleArticleChars;
+    const band = noticeLengthBand(target);
+    return `LENGDEMÅL: Sikt på omtrent ${target} tegn i synlig artikkeltekst, mellom ${band.min} og ${band.max} tegn. Tell lead + body med avsnittsskift, uten tittel og metadata. Dette er et mål, ikke bare et tak. Gjeldende lengdemål gjelder også ved revisjon uten annen instruksjon. Skriv konsist innenfor målet; bruk relevante kildedetaljer ved utvidelse og kutt de svakeste detaljene ved forkorting. Ikke legg til gjentakelser, fyllstoff eller udokumenterte opplysninger. Hvis kildene ikke gir nok relevant stoff, skriv kortere og forklar konkret hvorfor i source_limitations, aldri i artikkelteksten.`;
+  }
   const maxChars = maxVisibleArticleCharsForPayload(payload);
   return `Synlig artikkeltekst maks ${maxChars} tegn. Tittel og metadata teller ikke med.`;
 }
@@ -547,7 +555,7 @@ export function createUserPrompt(payload: PromptPayload): string {
   );
   if (lengthLineIndex >= 0) {
     parts[lengthLineIndex] =
-      `${lengthInstructionForPayload(payload)} Kildens lengde styrer ikke sakens lengde; skriv knapt uansett.`;
+      payload.targetVisibleArticleChars ? lengthInstructionForPayload(payload) : `${lengthInstructionForPayload(payload)} Kildens lengde styrer ikke sakens lengde; skriv knapt uansett.`;
   }
 
   if (payload.pdfSupplementText) {
@@ -609,7 +617,7 @@ export function createRevisionUserPrompt(
     "Hvis instruksjonen er smal og konkret, endrer du bare det som trengs. Sarlig ved 'fjern/kutt/dropp/ta bort dette: ...' skal du fjerne bare den angitte teksten og ellers bevare forrige versjon.",
     "Hvis instruksjonen er bred, kan du skrive om tittel, lead, body, key_facts, importance og source_spans sa mye som nodvendig.",
     `${lengthInstructionForPayload(payload)} Maks 8 body-avsnitt. Hvis instruksjonen ber om mer tekst, prioriter innenfor denne maksgrensen.`,
-    "Hvis instruksjonen ber deg fokusere mer pa noe, kutt eller kort ned andre deler for a holde deg innenfor grensene. Prioriter, ikke utvid.",
+    payload.targetVisibleArticleChars ? "Tilpass detaljnivået til lengdemålet. Bevar øvrige redaktørendringer og nødvendige forbehold." : "Hvis instruksjonen ber deg fokusere mer pa noe, kutt eller kort ned andre deler for a holde deg innenfor grensene. Prioriter, ikke utvid.",
     "Eksempler pa instruksjoner og forventet oppforsel:",
     "- 'Fjern dette fra teksten' → slett den aktuelle setningen/avsnittet, behold resten urort.",
     "- 'Gjor det kortere' → kort ned teksten, men behold alle hovednyheter og faktapunkter.",

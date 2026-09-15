@@ -12,6 +12,8 @@ import type { RewriteOutput } from "@newsweb/shared";
 const MAX_ALLOWED_UNEXPECTED_NUMBERS = 0;
 export const MAX_TITLE_WORDS = 8;
 const MAX_SUMMARY_SENTENCES = 15;
+import { noticeLengthBand } from "@newsweb/shared";
+
 const MAX_VISIBLE_ARTICLE_CHARS = 1000;
 
 export const VISIBLE_ATTACHMENT_REFERENCE_PATTERNS = [
@@ -798,7 +800,7 @@ export function validateRewriteOutput(
   const visibleText = visibleArticleText(rewrite);
   const quoteTelemetry = collectQuoteTelemetry(rewrite, payload);
   const maxVisibleArticleChars =
-    options?.maxVisibleArticleChars ?? MAX_VISIBLE_ARTICLE_CHARS;
+    payload.targetVisibleArticleChars ? noticeLengthBand(payload.targetVisibleArticleChars).max : options?.maxVisibleArticleChars ?? MAX_VISIBLE_ARTICLE_CHARS;
 
   const numberAssessmentOptions = options?.enabledDerivationRules
     ? { enabledDerivationRules: options.enabledDerivationRules }
@@ -932,7 +934,7 @@ export function validateRewriteOutput(
     addIssue(
       issues,
       "VISIBLE_ARTICLE_TOO_LONG",
-      "warning",
+      payload.targetVisibleArticleChars ? "blocking" : "warning",
       `Visible article text exceeds ${maxVisibleArticleChars} chars.`
     );
   }

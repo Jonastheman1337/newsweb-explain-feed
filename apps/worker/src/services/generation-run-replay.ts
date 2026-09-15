@@ -214,6 +214,8 @@ function basePayloadFromSource(
     sourcePayload.outputMode === "extended_notice"
       ? { outputMode: sourcePayload.outputMode }
       : {}),
+    ...(typeof sourcePayload.targetVisibleArticleChars === "number"
+      ? { targetVisibleArticleChars: sourcePayload.targetVisibleArticleChars } : {}),
     ...(typeof sourcePayload.maxVisibleArticleChars === "number"
       ? { maxVisibleArticleChars: sourcePayload.maxVisibleArticleChars }
       : {}),

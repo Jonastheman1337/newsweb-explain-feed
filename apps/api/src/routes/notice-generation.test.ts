@@ -102,3 +102,14 @@ describe("notice regeneration reasoning", () => {
     expect(mocks.createRequest).not.toHaveBeenCalled();
   });
 });
+
+it("freezes the manual length target independently of the legacy maximum", async () => {
+  const response = await app.inject({method: "POST", url: "/notice/42/generate", payload: {clientRequestId, selectedMaterialIds: [], targetVisibleArticleChars: 1500}});
+  expect(response.statusCode, response.body).toBe(202);
+  expect(mocks.createRequest.mock.calls[0][1].snapshot).toMatchObject({targetVisibleArticleChars: 1500, instruction: null});
+});
+it.each([299, 4001, 500.5])("rejects invalid manual length target %s", async (targetVisibleArticleChars) => {
+  const response = await app.inject({method: "POST", url: "/notice/42/generate", payload: {clientRequestId, selectedMaterialIds: [], targetVisibleArticleChars}});
+  expect(response.statusCode).toBeGreaterThanOrEqual(400);
+  expect(mocks.createRequest).not.toHaveBeenCalled();
+});

@@ -206,6 +206,7 @@ export function createNoticeGenerationRuntime(deps: {
         instruction: snapshot.instruction ?? undefined,
         outputMode: snapshot.outputMode,
         maxVisibleArticleChars: snapshot.maxVisibleArticleChars,
+        targetVisibleArticleChars: snapshot.targetVisibleArticleChars,
         reasoningEffortOverride: snapshot.reasoningEffortOverride ?? undefined,
         supplementalMaterials: snapshot.supplementalMaterials,
         previousRewriteJson: snapshot.previousRewriteJson ?? undefined,

@@ -87,6 +87,7 @@ const generateBodySchema = z
     outputMode: outputModeSchema.optional(),
     // Visible-text cap chosen by the user; overrides the outputMode default.
     maxVisibleArticleChars: z.number().int().min(300).max(4000).optional(),
+    targetVisibleArticleChars: z.number().int().min(300).max(4000).optional(),
     selectedMaterialIds: z.array(z.string().min(1).max(80)).max(20).optional(),
     reasoningEffortOverride: z.enum(["xhigh"]).optional(),
     telemetry: editorialTelemetrySchema
@@ -1219,6 +1220,7 @@ export const noticeRoutes: FastifyPluginAsync = async (fastify) => {
             instruction: body.instruction?.trim() || null,
             outputMode: body.outputMode ?? "notice",
             maxVisibleArticleChars: body.maxVisibleArticleChars ?? 1000,
+            ...(body.targetVisibleArticleChars ? { targetVisibleArticleChars: body.targetVisibleArticleChars } : {}),
             reasoningEffortOverride: reasoningEffortOverride ?? null,
             supplementalMaterials,
             telemetry: telemetry ?? null

@@ -181,6 +181,7 @@ import {
   previousSeenCandidateKeys,
   type NumericShadowGenerationRow
 } from "./services/numeric-shadow-monitor.js";
+import { noticeRevisionInstruction, repairNoticeLength } from "./services/notice-length.js";
 import { finalizePublication } from "./services/publication.js";
 import { canWriteRewriteCandidate } from "./services/generation-ownership.js";
 import { processSakDraft } from "./services/sak-draft.js";
@@ -204,6 +205,7 @@ type RewriteJobData = {
   instruction?: string;
   outputMode?: "notice" | "extended_notice";
   maxVisibleArticleChars?: number;
+  targetVisibleArticleChars?: number;
   supplementalMaterials?: SupplementalMaterialPayload[];
   reasoningEffortOverride?: OpenAIReasoningEffort;
   generationRunId?: string;
@@ -915,7 +917,7 @@ function validateRewriteWithRevisionCompliance(
   });
   const validation = validateRewriteOutput(rewrite, payload, {
     maxVisibleArticleChars:
-      revisionCompliance?.maxVisibleArticleChars ?? payload.maxVisibleArticleChars,
+      payload.targetVisibleArticleChars ? undefined : revisionCompliance?.maxVisibleArticleChars ?? payload.maxVisibleArticleChars,
     reportExtraction: context.reportExtraction,
     // Kill-switch only: unset env keeps the prompt-kit code default, which is
     // exactly what the CI safety-gate replay uses.
@@ -2235,9 +2237,7 @@ async function processReportRewrite(
     bodyText: reportReferenceText,
     sourceBodyChars: reportReferenceText.length
   };
-  const revisionInstructionForPrompt = appendRevisionChecklist(
-    revisionOptions.userInstruction
-  );
+  const revisionInstructionForPrompt = noticeRevisionInstruction(payload, appendRevisionChecklist(revisionOptions.userInstruction));
   const attachmentTextAvailable =
     Boolean(reportContent.text.trim()) ||
     Boolean(reportContent.referenceText?.trim());
@@ -2445,6 +2445,31 @@ async function processReportRewrite(
       );
     }
 
+    const lengthResult = await repairNoticeLength({
+      rewrite, target: reportPayload.targetVisibleArticleChars,
+      correct: async (draft, instruction) => {
+        const result = await writeNotice(reportPayload, [revisionInstructionForPrompt, instruction].filter(Boolean).join("\n\n"), draft, reportReasoningEffort);
+        modelCalls.push(result.modelCall);
+        promptChars += result.promptChars;
+        return sanitizeRewriteStyle(result.rewrite).rewrite;
+      },
+      verify: async (draft) => {
+        const checked = await repairReferences({
+          referencePayload: reportReferencePayload, rewritePayload: reportPayload, rewrite: draft,
+          revisionInstructionForPrompt, correctionReasoningEffort: reportReasoningEffort,
+          existingCorrectionAttempts: referenceRepairState.correctionAttempts,
+          maxCorrectionAttempts: referenceRepairState.correctionAttempts + 1,
+          modelCalls, callRewrite: writeNotice
+        });
+        promptChars += checked.promptChars;
+        absorbReferenceRepairResult(referenceRepairState, checked);
+        if (checked.checkerError) throw new Error("Reference check unavailable after length correction.");
+        return checked.rewrite;
+      }
+    });
+    rewrite = lengthResult.rewrite;
+    validationResult = validateRewriteWithRevisionCompliance(rewrite, reportReferencePayload, { instruction: revisionOptions.userInstruction, previousOutput: revisionOptions.previousOutput, attachmentTextAvailable, reportExtraction: reportContent });
+
     const referenceOutcome =
       resolveAccumulatedReferenceCheckOutcome(referenceRepairState);
     const referenceGroundsVisibleNumbers = referenceCanAdjudicateUnexpectedNumbers(
@@ -2507,6 +2532,7 @@ async function processReportRewrite(
         ),
         markerLeaks: validation.markerLeaks,
         revisionInstructionCompliance: validation.revisionCompliance,
+        lengthTarget: lengthResult.audit,
         sourceBodyChars: payload.sourceBodyChars,
         promptChars,
         reportExtraction: {
@@ -2671,9 +2697,7 @@ async function processYearlyReportRewrite(
   const reportReasoningEffort =
     revisionOptions.reasoningEffortOverride ??
     config.OPENAI_REPORT_REASONING_EFFORT;
-  const revisionInstructionForPrompt = appendRevisionChecklist(
-    revisionOptions.userInstruction
-  );
+  const revisionInstructionForPrompt = noticeRevisionInstruction(payload, appendRevisionChecklist(revisionOptions.userInstruction));
   const attachmentTextAvailable = Boolean(combinedText.trim());
 
   try {
@@ -2860,6 +2884,31 @@ async function processYearlyReportRewrite(
       });
     }
 
+    const lengthResult = await repairNoticeLength({
+      rewrite, target: yearlyPayload.targetVisibleArticleChars,
+      correct: async (draft, instruction) => {
+        const result = await writeNotice(yearlyPayload, [revisionInstructionForPrompt, instruction].filter(Boolean).join("\n\n"), draft, reportReasoningEffort);
+        modelCalls.push(result.modelCall);
+        promptChars += result.promptChars;
+        return sanitizeRewriteStyle(result.rewrite).rewrite;
+      },
+      verify: async (draft) => {
+        const checked = await repairReferences({
+          referencePayload: refPayload, rewritePayload: yearlyPayload, rewrite: draft,
+          revisionInstructionForPrompt, correctionReasoningEffort: reportReasoningEffort,
+          existingCorrectionAttempts: referenceRepairState.correctionAttempts,
+          maxCorrectionAttempts: referenceRepairState.correctionAttempts + 1,
+          modelCalls, callRewrite: writeNotice
+        });
+        promptChars += checked.promptChars;
+        absorbReferenceRepairResult(referenceRepairState, checked);
+        if (checked.checkerError) throw new Error("Reference check unavailable after length correction.");
+        return checked.rewrite;
+      }
+    });
+    rewrite = lengthResult.rewrite;
+    validationResult = validateRewriteWithRevisionCompliance(rewrite, payload, { instruction: revisionOptions.userInstruction, previousOutput: revisionOptions.previousOutput, attachmentTextAvailable });
+
     validationRepair.finalWarnings = validationIssueMessages(
       highRiskValidationWarningIssues(validationResult)
     );
@@ -2915,6 +2964,7 @@ async function processYearlyReportRewrite(
         ),
         markerLeaks: validation.markerLeaks,
         revisionInstructionCompliance: validation.revisionCompliance,
+        lengthTarget: lengthResult.audit,
         sourceBodyChars: payload.sourceBodyChars,
         promptChars,
         yearlyReportExtraction: {
@@ -3623,6 +3673,7 @@ const rewriteWorker = new Worker<RewriteJobData>(
         hasAttachments: source.hasAttachments,
         sourceBodyChars: source.bodyText.length,
         outputMode: job.data.outputMode ?? "notice",
+        targetVisibleArticleChars: job.data.targetVisibleArticleChars,
         maxVisibleArticleChars:
           job.data.maxVisibleArticleChars ??
           maxVisibleArticleCharsForOutputMode(job.data.outputMode ?? "notice"),
@@ -4152,9 +4203,7 @@ const rewriteWorker = new Worker<RewriteJobData>(
       // Corrections revise the same notice with the same prompt family, so they
       // run at the rewrite effort (not the report effort, which is a different pipeline).
       const correctionReasoningEffort = rewriteReasoningEffort;
-      const revisionInstructionForPrompt = appendRevisionChecklist(
-        job.data.instruction
-      );
+      const revisionInstructionForPrompt = noticeRevisionInstruction(payload, appendRevisionChecklist(job.data.instruction));
       const attachmentTextAvailable = Boolean(payload.pdfSupplementText?.trim());
 
       if (payload.bodyText.trim().length === 0) {
@@ -4310,6 +4359,30 @@ const rewriteWorker = new Worker<RewriteJobData>(
           rewrite = ensureReportSourceLimitation(rewrite, payload);
           validationResult = validateCurrentRewrite(rewrite);
         }
+        const lengthResult = await repairNoticeLength({
+          rewrite, target: payload.targetVisibleArticleChars,
+          correct: async (draft, instruction) => {
+            const result = await writeNotice(payload, [revisionInstructionForPrompt, instruction].filter(Boolean).join("\n\n"), draft, correctionReasoningEffort);
+            modelCalls.push(result.modelCall);
+            promptChars += result.promptChars;
+            return sanitizeRewriteStyle(result.rewrite).rewrite;
+          },
+          verify: async (draft) => {
+            const checked = await repairReferences({
+              referencePayload: refPayload, rewritePayload: payload, rewrite: draft,
+              revisionInstructionForPrompt, correctionReasoningEffort: correctionReasoningEffort,
+              existingCorrectionAttempts: referenceRepairState.correctionAttempts,
+              maxCorrectionAttempts: referenceRepairState.correctionAttempts + 1,
+              modelCalls, callRewrite: writeNotice
+            });
+            promptChars += checked.promptChars;
+            absorbReferenceRepairResult(referenceRepairState, checked);
+            if (checked.checkerError) throw new Error("Reference check unavailable after length correction.");
+            return checked.rewrite;
+          }
+        });
+        rewrite = lengthResult.rewrite;
+        validationResult = validateCurrentRewrite(rewrite);
         // A failed check on a changed draft cannot reuse an earlier passing check.
         if (referenceRepairState.checkerError) {
           throw new Error("Reference check unavailable: final draft verification did not complete.");
@@ -4369,6 +4442,7 @@ const rewriteWorker = new Worker<RewriteJobData>(
             ),
             markerLeaks: validation.markerLeaks,
             revisionInstructionCompliance: validation.revisionCompliance,
+        lengthTarget: lengthResult.audit,
             sourceBodyChars: payload.sourceBodyChars,
             promptChars,
             styleSanitization,

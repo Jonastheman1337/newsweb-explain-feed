@@ -388,7 +388,7 @@ it("applies custom length with Enter without submitting the composer", async () 
   await act(() =>
     (
       container.querySelector(
-        '[aria-label^="Maksimal lengde"]',
+        '[aria-label^="Ønsket lengde"]',
       ) as HTMLButtonElement
     ).click(),
   );
@@ -422,7 +422,7 @@ it("applies custom length with Enter without submitting the composer", async () 
         .mocked(fetch)
         .mock.calls.find(([url]) => String(url).endsWith("/generate"))![1]
         ?.body as string,
-    ).maxVisibleArticleChars,
+    ).targetVisibleArticleChars,
   ).toBe(1400);
 });
 
@@ -463,4 +463,27 @@ it("tracks the requested backend phase through checking, repair and rechecking, 
   await act(async () => { await vi.advanceTimersByTimeAsync(4800); });
   expect(container.textContent).toContain("Kontrollerer teksten på nytt");
   await complete(); expect(container.textContent).not.toContain("Kontrollerer teksten på nytt");
+});
+
+it("sends the selected target and displayed snapshot without a typed instruction", async () => {
+  await act(() => root.render(<Harness />));
+  await act(() => (container.querySelector('[aria-label="Ønsket lengde, omtrent 1000 tegn"]') as HTMLButtonElement).click());
+  await act(() => Array.from(container.querySelectorAll("button")).find((b) => b.textContent?.replace(/\s/g, "") === "1500")!.click());
+  await submit();
+  const call = vi.mocked(fetch).mock.calls.find(([url]) => String(url).endsWith("/generate"))!;
+  const body = JSON.parse(call[1]?.body as string);
+  expect(body).toMatchObject({targetVisibleArticleChars: 1500, baseSnapshot: snapshot});
+  expect(body.instruction).toBeUndefined(); expect(body.maxVisibleArticleChars).toBeUndefined();
+});
+it("uses the changed length and displayed snapshot after a failed request", async () => {
+  await act(() => root.render(<Harness />)); await submit();
+  server = {...server, state: "failed"};
+  await act(async () => { await vi.advanceTimersByTimeAsync(1600); });
+  await act(() => (container.querySelector('[aria-label="Ønsket lengde, omtrent 1000 tegn"]') as HTMLButtonElement).click());
+  await act(() => button("500").click());
+  await act(() => button("Prøv igjen").click());
+  const calls = vi.mocked(fetch).mock.calls.filter(([url]) => String(url).endsWith("/generate"));
+  const body = JSON.parse(calls[1][1]?.body as string);
+  expect(body.targetVisibleArticleChars).toBe(500); expect(body.retryOf).toBeUndefined();
+  expect(body.baseSnapshot).toEqual(snapshot);
 });

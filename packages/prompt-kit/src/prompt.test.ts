@@ -778,3 +778,11 @@ describe("createYearlyReportRevisionUserPrompt", () => {
     expect(result).toContain("Gjor saken tydeligere pa CEO-lonn");
   });
 });
+
+it("uses the manual target in regular, report and yearly revision prompts", () => {
+  for (const prompt of [createRevisionUserPrompt({...samplePayload, targetVisibleArticleChars: 1500}, sampleOutput, "Tilpass lengden"), createReportRevisionUserPrompt({...sampleReportPayload, targetVisibleArticleChars: 1500}, sampleOutput, "Tilpass lengden"), createYearlyReportRevisionUserPrompt({...sampleYearlyPayload, targetVisibleArticleChars: 1500}, sampleOutput, "Tilpass lengden")]) {
+    expect(prompt).toContain("mellom 1275 og 1650 tegn");
+    expect(prompt).toContain("uten tittel og metadata");
+    expect(prompt).toContain("source_limitations");
+  }
+});

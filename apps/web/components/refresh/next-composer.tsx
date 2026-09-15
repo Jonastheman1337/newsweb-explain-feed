@@ -448,6 +448,8 @@ export function useNoticeComposer(args: {
     chips.some((chip) => chip.state !== "ready") ||
     !!sourceError;
   async function send(retry = false) {
+    const submittedTarget = submission?.body.targetVisibleArticleChars ?? submission?.body.maxVisibleArticleChars;
+    if (retry && draftRef.current.maxChars !== submittedTarget) retry = false;
     if (sendingRef.current || busy || (!retry && blockedSources)) return;
     setRetrySnapshot(false);
     if (!capabilities.queuedGeneration) {
@@ -482,7 +484,7 @@ export function useNoticeComposer(args: {
           ...(base ? { baseSnapshot: base } : {}),
           ...(current.text.trim() ? { instruction: current.text.trim() } : {}),
           outputMode: "notice",
-          maxVisibleArticleChars: current.maxChars,
+          targetVisibleArticleChars: current.maxChars,
           ...(current.reasoning ? { reasoningEffortOverride: "xhigh" } : {}),
           selectedMaterialIds: chips.flatMap((chip) =>
             chip.material ? [chip.material.id] : [],
@@ -751,7 +753,7 @@ export function useNoticeComposer(args: {
             ref={lengthTrigger}
             type="button"
             className={styles.lengthTrigger}
-            aria-label={`Maksimal lengde, ${draft.maxChars} tegn`}
+            aria-label={`Ønsket lengde, omtrent ${draft.maxChars} tegn`}
             aria-expanded={lengthOpen}
             onClick={() => {
               setLengthOpen(!lengthOpen);
