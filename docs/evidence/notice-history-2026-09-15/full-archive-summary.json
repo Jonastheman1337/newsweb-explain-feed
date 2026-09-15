@@ -1,0 +1,105 @@
+[
+  {
+    "id": "atlantic-approval",
+    "model": "gpt-5.6-luna",
+    "reasoningEffort": "none",
+    "actual": "expected_update",
+    "importance": "medium",
+    "durationMs": 3914,
+    "within5s": true,
+    "passed": true,
+    "selected": [
+      681211,
+      681312,
+      682288
+    ]
+  },
+  {
+    "id": "unchanged-distribution",
+    "model": "gpt-5.6-luna",
+    "reasoningEffort": "none",
+    "actual": "routine_repeat",
+    "importance": "uviktig",
+    "durationMs": 2142,
+    "within5s": true,
+    "passed": true,
+    "selected": [
+      900000
+    ]
+  },
+  {
+    "id": "increased-distribution",
+    "model": "gpt-5.6-luna",
+    "reasoningEffort": "none",
+    "actual": "new_information",
+    "importance": "viktig",
+    "durationMs": 1882,
+    "within5s": true,
+    "passed": true,
+    "selected": [
+      900000
+    ]
+  },
+  {
+    "id": "cancelled-distribution",
+    "model": "gpt-5.6-luna",
+    "reasoningEffort": "none",
+    "actual": "new_information",
+    "importance": "viktig",
+    "durationMs": 2015,
+    "within5s": true,
+    "passed": true,
+    "selected": [
+      900000
+    ]
+  },
+  {
+    "id": "different-instrument",
+    "model": "gpt-5.6-luna",
+    "reasoningEffort": "none",
+    "actual": "new_information",
+    "importance": "viktig",
+    "durationMs": 2230,
+    "within5s": true,
+    "passed": true,
+    "selected": [
+      900000
+    ]
+  },
+  {
+    "id": "missing-attachment",
+    "model": "gpt-5.6-luna",
+    "reasoningEffort": "none",
+    "actual": "uncertain",
+    "importance": "viktig",
+    "durationMs": 2059,
+    "within5s": true,
+    "passed": true,
+    "selected": [
+      900000
+    ]
+  },
+  {
+    "id": "new-contract-in-update",
+    "model": "gpt-5.6-luna",
+    "reasoningEffort": "none",
+    "actual": "new_information",
+    "importance": "viktig",
+    "durationMs": 1844,
+    "within5s": true,
+    "passed": true,
+    "selected": [
+      900000
+    ]
+  },
+  {
+    "id": "no-history",
+    "model": "gpt-5.6-luna",
+    "reasoningEffort": "none",
+    "actual": "no_match",
+    "durationMs": 0,
+    "within5s": true,
+    "passed": true,
+    "selected": []
+  }
+]

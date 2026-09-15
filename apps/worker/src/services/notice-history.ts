@@ -48,8 +48,15 @@ export function selectHistory(current: HistoryCurrent, candidates: RelatedNotice
   const seen = new Set<string>();
   return candidates.filter(c => c.issuerSign === current.issuerSign && c.messageId !== current.messageId &&
     c.publishedAt.getTime() < cutoff && c.publishedAt.getTime() >= cutoff - HISTORY_LIMITS.lookbackDays * 86400000)
-    .map(candidate => ({ candidate, score: score(current, candidate) }))
-    .filter(c => c.score >= 3).sort((a, b) => b.score - a.score || b.candidate.publishedAt.getTime() - a.candidate.publishedAt.getTime())
+    .map(candidate => {
+      const relevance = score(current, candidate);
+      const ageDays = (cutoff - candidate.publishedAt.getTime()) / 86400000;
+      // Long older disclosures repeat many transaction terms. Recency reduces
+      // their advantage while still requiring a topic match. Explicit cited
+      // sources are resolved separately and retain priority over this search.
+      return { candidate, relevance, score: relevance / (1 + ageDays / 7) };
+    })
+    .filter(c => c.relevance >= 3).sort((a, b) => b.score - a.score || b.candidate.publishedAt.getTime() - a.candidate.publishedAt.getTime())
     .filter(({ candidate }) => { const key = noveltyTextHash(candidate.bodyText); if (seen.has(key)) return false; seen.add(key); return true; })
     .slice(0, HISTORY_LIMITS.selected).flatMap(({ candidate, score }) => {
       const text = excerpt(current, candidate);

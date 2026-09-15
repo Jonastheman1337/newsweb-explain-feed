@@ -148,3 +148,7 @@ use the normal clean-worktree/exact-SHA workflow and inspect actual historical
 source choices, skips, final articles and generation latency. Watch unresolved
 history and writing volume as well as model latency. A small development corpus
 does not establish population-level editorial accuracy or archive-search recall.
+
+## Predeployment full-archive correction
+
+Before switching production, the archive check found that raw token overlap favored older, longer takeover notices and excluded the September 14 ownership statement. The original candidate fixture had contained only four selected earlier notices. The regression now uses the full stored issuer history, and search ranking discounts old overlap scores by age (seven-day scale) while explicit cited sources retain priority. The full-archive replay retrieves 681211, 681312 and 682288 and returns expected_update/medium in 3.914 seconds. All eight core cases pass with the revised ranking; receipts are full-archive-*.json. This correction was made before any production switch.

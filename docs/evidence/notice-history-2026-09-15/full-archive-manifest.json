@@ -1,0 +1,12 @@
+{
+  "version": "notice-history-v1",
+  "fixtureSha256": "619e929df7c24207c9b7395c817d78b4ea5ead6918b63b0eff5ba7f8fc2623be",
+  "codeSha256": "892cbcb0865782f42fc3df667cac1fa9fc136db7de9b909b8d7a9f1a0a22f34b",
+  "profiles": [
+    {
+      "model": "gpt-5.6-luna",
+      "reasoningEffort": "none"
+    }
+  ],
+  "protocol": "Frozen development cases. No database access or publication. Model timeout 15s to measure beyond production deadline; record whether calls meet 5s."
+}
