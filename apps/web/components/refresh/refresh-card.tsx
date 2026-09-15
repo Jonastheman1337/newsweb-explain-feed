@@ -22,7 +22,7 @@ import {
   type RewriteActionControls,
 } from "../editable-rewrite";
 import { AttachmentDownloads } from "./attachment-downloads";
-import { getGenerationPhaseLabel } from "../generation-steps";
+import { GenerationActivity } from "./generation-activity";
 import { FeedbackDialog } from "./feedback-dialog";
 import { ActionMenu } from "./controls";
 import { fastDraftToFeedItem, type FeedEntry } from "./feed-state";
@@ -518,13 +518,7 @@ export function RefreshCard({
             {!composer.busy &&
               !completed &&
               (latest.processing || latest.regenerating) && (
-                <span className={styles.requestStatus} role="status">
-                  {fast
-                    ? "Utfyllende lages …"
-                    : latest.phase
-                      ? getGenerationPhaseLabel(latest.phase)
-                      : "Notis lages …"}
-                </span>
+                <GenerationActivity phase={latest.phase} label={fast && !latest.phase ? "Lager utfyllende notis" : undefined} />
               )}
             {latest.failed && !composer.busy && !composer.request && (
               <span role="status">
@@ -597,7 +591,7 @@ export function RefreshCard({
     <article
       ref={card}
       id={`notice-${item.messageId}`}
-      className={`${styles.card} ${item.importance === "viktig" ? styles.important : ""} ${!generated && !latest.processing ? styles.sourceOnly : ""}`}
+      className={`${styles.card} ${item.importance === "viktig" ? styles.important : ""} ${!generated && !latest.processing && !latest.regenerating && !composer.busy ? styles.sourceOnly : ""}`}
       aria-label={item.issuerName}
       data-generation-state={generated ? "generated" : "not-generated"}
     >
@@ -659,17 +653,11 @@ export function RefreshCard({
               <div className={`${styles.actions} ${styles.sourceActions}`}>
                 {composer.status}
                 {!composer.busy && (
-                  <span role="status">
-                    {latest.failed
-                      ? "Kunne ikke fullføre"
-                      : latest.processing
-                        ? latest.fastDraft?.status === "pending"
-                          ? "Førsteutkast lages …"
-                          : "Notis lages …"
-                        : ""}
-                  </span>
+                  latest.processing || latest.regenerating
+                    ? <GenerationActivity phase={latest.phase} />
+                    : latest.failed ? <span role="status">Kunne ikke fullføre</span> : null
                 )}
-                {!latest.processing && !composer.busy && !composer.request && (
+                {!latest.processing && !latest.regenerating && !composer.busy && !composer.request && (
                   <button
                     type="button"
                     className={styles.generateAction}

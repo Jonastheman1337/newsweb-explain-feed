@@ -1,4 +1,5 @@
 "use client";
+import { GenerationActivity } from "./generation-activity";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   isNoticeGenerationTerminal,
@@ -574,15 +575,13 @@ export function useNoticeComposer(args: {
   const status = (
     <>
       {busy && (
-        <span className={styles.requestStatus} role="status">
-          {sending
-            ? "Sender …"
-            : request?.state === "queued"
-              ? "I kø"
-              : request?.state === "cancelling"
-                ? "Avbryter …"
-                : "Skriver ny versjon …"}
-        </span>
+        <GenerationActivity label={sending
+          ? "Sender …"
+          : request?.state === "queued"
+            ? "Venter på tur"
+            : request?.state === "cancelling"
+              ? "Avbryter …"
+              : "Skriver ny versjon …"} />
       )}
       {busy && !sending && capabilities.cancellation && (
         <button

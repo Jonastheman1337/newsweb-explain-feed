@@ -1,0 +1,57 @@
+.activity {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  min-height: 24px;
+  font-size: 13px;
+  color: var(--ink);
+}
+.paper {
+  box-sizing: border-box;
+  width: 18px;
+  height: 22px;
+  flex-shrink: 0;
+  border: 1px solid var(--ink-soft);
+  border-radius: 3px;
+  padding: 5px 3px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.paper span {
+  height: 1px;
+  flex-shrink: 0;
+  background: var(--ink);
+  transform-origin: left;
+  animation: write 2.7s ease-in-out infinite;
+}
+.paper span:nth-child(2) { animation-delay: .25s; }
+.paper span:nth-child(3) { width: 65%; animation-delay: .5s; }
+.label {
+  display: inline-block;
+  font-weight: 500;
+}
+@supports (background-clip: text) {
+  .label {
+    background-image: linear-gradient(105deg, var(--ink) 0%, var(--ink) 42%, var(--ink-soft) 50%, var(--ink) 58%, var(--ink) 100%);
+    background-size: 300% 100%;
+    background-clip: text;
+    -webkit-background-clip: text;
+    color: transparent;
+    animation: shimmer 3.4s ease-in-out infinite;
+  }
+}
+@keyframes write {
+  0%, 10% { transform: scaleX(.15); opacity: .3; }
+  40%, 75% { transform: scaleX(1); opacity: 1; }
+  100% { transform: scaleX(1); opacity: .3; }
+}
+@keyframes shimmer {
+  0%, 15% { background-position: 100% 0; }
+  75%, 100% { background-position: 0% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .paper span, .label { animation: none; }
+  .label { color: var(--ink); background: none; }
+}

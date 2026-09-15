@@ -756,3 +756,24 @@ it("makes unavailable version history retryable instead of offering a no-op", as
   expect(buttons("Vis første")).toHaveLength(0);
   expect(buttons("Versjoner")).toHaveLength(0);
 });
+
+ it("keeps the current card fully visible through fast-draft failure and refresh, then stops activity on completion", async () => {
+  const source = item(900, { isFinal: false, rewriteId: null, processing: true, phase: "writing_notice" });
+  async function show(latest: FeedItem) {
+    await act(() => root.render(<RefreshCard entry={{ current: latest, latest }} onSelect={() => {}} onVersion={() => {}} />));
+  }
+  await show(source);
+  expect(container.textContent).toContain("Skriver notisen");
+  expect(container.querySelector("article")?.classList.contains(styles.sourceOnly)).toBe(false);
+  await show({ ...source, fastDraft: { id: "fast", status: "failed", startedAt: source.publishedAt, finishedAt: source.publishedAt } });
+  expect(container.textContent).toContain("Skriver notisen");
+  expect(container.querySelector("article")?.classList.contains(styles.sourceOnly)).toBe(false);
+  // Also tolerate the older refresh payload's regenerating flag for source cards.
+  await show({ ...source, processing: false, regenerating: true });
+  expect(container.textContent).toContain("Skriver notisen");
+  expect(buttons("Generer")).toHaveLength(0);
+  expect(container.querySelector("article")?.classList.contains(styles.sourceOnly)).toBe(false);
+  await show(item(900));
+  expect(container.textContent).not.toContain("Skriver notisen");
+  expect(container.querySelector('[aria-label="Rediger notistekst"]')).not.toBeNull();
+});

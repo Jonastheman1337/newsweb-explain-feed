@@ -10,6 +10,7 @@ import { Redis } from "ioredis";
 import type { ServerResponse } from "node:http";
 import { getMutedCategories } from "../services/app-settings.js";
 import { loadFastDrafts } from "../services/fast-drafts.js";
+import { applyFeedGenerationState, loadFeedGenerationRuns } from "../services/feed-generation-state.js";
 import { mapDbItemToFeedItem } from "../services/feed-item-mapper.js";
 
 type FeedUpdateState = "new-notice" | "source" | "processing" | "published" | "failed" | "fast-draft";
@@ -218,12 +219,18 @@ export const feedStreamRoutes: FastifyPluginAsync = async (fastify) => {
       return;
     }
 
+    const runs = await loadFeedGenerationRuns([messageId]);
+    const updatedItem = applyFeedGenerationState(
+      applyFeedUpdateState(feedItem, state, phase),
+      runs.get(messageId),
+      dbItem.sourceNotice.rewrites
+    );
     const id = `${processEpoch}-${++seq}`;
     const frame = `id: ${id}\ndata: ${JSON.stringify(
-      applyFeedUpdateState(feedItem, state, phase)
+      updatedItem
     )}\n\n`;
     const fastDraft = fastify.config.FAST_DRAFT_ENABLED ? (await loadFastDrafts([messageId])).get(messageId) : undefined;
-    const v2Frame = fastDraft ? `id: ${id}\ndata: ${JSON.stringify({ ...applyFeedUpdateState(feedItem, state, phase), fastDraft })}\n\n` : frame;
+    const v2Frame = fastDraft ? `id: ${id}\ndata: ${JSON.stringify({ ...updatedItem, fastDraft })}\n\n` : frame;
     if (state !== "fast-draft") appendToRingBuffer(eventBuffer, { id, frame });
     appendToRingBuffer(v2Buffer, { id, frame: v2Frame });
 

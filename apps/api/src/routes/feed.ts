@@ -1,69 +1,14 @@
 import {
   feedQuerySchema,
-  feedResponseSchema,
-  isGenerationPhase
+  feedResponseSchema
 } from "@newsweb/shared";
-import { logPrisma, prisma } from "@newsweb/shared/db";
+import { prisma } from "@newsweb/shared/db";
 import type { Prisma } from "@prisma/client";
 import type { FastifyPluginAsync } from "fastify";
 import { getMutedCategories } from "../services/app-settings.js";
-import {
-  shouldMarkFeedItemRegenerating,
-  type FeedRewriteStateRecord
-} from "../services/feed-regeneration.js";
 import { mapDbItemToFeedItem } from "../services/feed-item-mapper.js";
 import { loadFastDrafts } from "../services/fast-drafts.js";
-import { GENERATION_RUN_STALE_MS } from "../services/generation-status.js";
-
-type FeedRegenerationState = {
-  activeIds: Set<number>;
-  phaseByMessageId: Map<number, string | null>;
-};
-
-async function findRegenerationState(
-  messageIds: number[],
-  rewritesByMessageId: Map<number, FeedRewriteStateRecord[]>
-): Promise<FeedRegenerationState> {
-  if (messageIds.length === 0) {
-    return { activeIds: new Set(), phaseByMessageId: new Map() };
-  }
-
-  const runs = await logPrisma.generationRun.findMany({
-    where: {
-      messageId: { in: messageIds },
-      reason: { in: ["new-message", "manual-reprocess"] },
-      phaseUpdatedAt: { gt: new Date(Date.now() - GENERATION_RUN_STALE_MS) }
-    },
-    orderBy: { requestedAt: "desc" },
-    select: {
-      messageId: true,
-      id: true,
-      status: true,
-      phase: true,
-      phaseUpdatedAt: true,
-      requestedAt: true
-    }
-  });
-
-  const activeIds = new Set<number>();
-  const phaseByMessageId = new Map<number, string | null>();
-  for (const run of runs) {
-    if (phaseByMessageId.has(run.messageId)) {
-      continue;
-    }
-    phaseByMessageId.set(run.messageId, run.phase);
-    if (
-      shouldMarkFeedItemRegenerating(
-        run,
-        rewritesByMessageId.get(run.messageId) ?? []
-      )
-    ) {
-      activeIds.add(run.messageId);
-    }
-  }
-
-  return { activeIds, phaseByMessageId };
-}
+import { applyFeedGenerationState, loadFeedGenerationRuns } from "../services/feed-generation-state.js";
 
 export const feedRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get(
@@ -198,20 +143,7 @@ export const feedRoutes: FastifyPluginAsync = async (fastify) => {
 
       const hasNext = items.length > query.limit;
       const slice = hasNext ? items.slice(0, query.limit) : items;
-      const rewritesByMessageId = new Map<number, FeedRewriteStateRecord[]>(
-        slice.map((item) => [
-          item.messageId,
-          item.sourceNotice.rewrites.map((rewrite) => ({
-            status: rewrite.status,
-            generatedAt: rewrite.generatedAt
-          }))
-        ])
-      );
-
-      const { activeIds, phaseByMessageId } = await findRegenerationState(
-        slice.map((item) => item.messageId),
-        rewritesByMessageId
-      );
+      const generationRuns = await loadFeedGenerationRuns(slice.map((item) => item.messageId));
 
       const drafts = fastify.config.FAST_DRAFT_ENABLED && query.ui === "v2" ? await loadFastDrafts(slice.map((item) => item.messageId)) : new Map();
       const responseItems = slice
@@ -220,15 +152,7 @@ export const feedRoutes: FastifyPluginAsync = async (fastify) => {
           if (!mapped) {
             return mapped;
           }
-          if (activeIds.has(mapped.messageId)) {
-            mapped = { ...mapped, regenerating: true };
-          }
-          if (mapped.processing || mapped.regenerating) {
-            const phase = phaseByMessageId.get(mapped.messageId);
-            if (isGenerationPhase(phase)) {
-              mapped = { ...mapped, phase };
-            }
-          }
+          mapped = applyFeedGenerationState(mapped, generationRuns.get(item.messageId), item.sourceNotice.rewrites);
           const fastDraft = drafts.get(mapped.messageId);
           return fastDraft ? { ...mapped, fastDraft } : mapped;
         })
