@@ -3974,14 +3974,14 @@ const rewriteWorker = new Worker<RewriteJobData>(
             return;
           }
 
-          // TIER 2: Quarterly report — filename-matched PDF extraction (existing behavior)
+          // TIER 2: Reports — select financial evidence by PDF contents.
           let reportContent = await extractReportContent(
             rawJson,
             messageId,
             job.data.instruction
           );
           if (reportContent && reportNeedsOpenAIPdfFallback(reportContent)) {
-            const reportPdf = await downloadReportPdfAttachment(rawJson, messageId);
+            const reportPdf = await downloadReportPdfAttachment(rawJson, messageId, reportContent.attachmentId);
             if (reportPdf) {
               const fallback = await extractReportContextWithOpenAIPdf(
                 reportPdf,

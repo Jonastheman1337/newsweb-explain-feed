@@ -84,7 +84,9 @@ export async function proxyToApi(
 ): Promise<NextResponse> {
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE)?.value ?? null;
-  const body = await readUpstreamBody(request);
+  let body: UpstreamBody | null;
+  try { body = await readUpstreamBody(request); }
+  catch { return NextResponse.json({message: "Opplastingen var ufullstendig. Prøv å laste opp filen på nytt."}, {status: 400}); }
 
   let upstream: Response;
   try {

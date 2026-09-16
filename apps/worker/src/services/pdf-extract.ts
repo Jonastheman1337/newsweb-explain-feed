@@ -1,3 +1,4 @@
+import { isIncomeStatementPage, isStatementContinuation } from "@newsweb/shared";
 import { currentGenerationSignal, throwIfGenerationCancelled } from "@newsweb/shared/generation-context";
 // Use legacy build — the default build requires browser APIs (DOMMatrix)
 import { getDocument, OPS, type PDFDocumentProxy } from "pdfjs-dist/legacy/build/pdf.mjs";
@@ -59,6 +60,7 @@ export type SelectedReportPage = {
   reasons: ReportPageReason[];
   score: number;
   textChars: number;
+  attachmentId?: number;
 };
 
 export type ReportExtractionDiagnostics = {
@@ -69,6 +71,9 @@ export type ReportExtractionDiagnostics = {
   requestedTopicTerms: string[];
   totalExtractedChars: number;
   referenceTextTruncated?: boolean;
+  inspectedAttachmentIds?: number[];
+  failedAttachments?: Array<{ attachmentId: number; reason: string }>;
+  uninspectedAttachmentIds?: number[];
 };
 
 export type ReportContextPack = {
@@ -83,6 +88,7 @@ export type ReportContextPack = {
 export type ReportExtractionResult = ReportContextPack & {
   attachmentId: number;
   attachmentName: string | null;
+  attachments?: Array<{ attachmentId: number; attachmentName: string | null; pageCount: number }>;
 };
 
 export type PdfAttachmentDownload = {
@@ -112,7 +118,8 @@ type MutableSelectedPage = {
 
 export async function downloadAttachmentPdf(
   messageId: number,
-  attachmentId: number
+  attachmentId: number,
+  maxBytes = 40 * 1024 * 1024
 ): Promise<Buffer> {
   const url = `${ATTACHMENT_URL}?messageId=${messageId}&attachmentId=${attachmentId}`;
   throwIfGenerationCancelled();
@@ -122,8 +129,22 @@ export async function downloadAttachmentPdf(
       `Failed to download attachment ${attachmentId} for message ${messageId}: ${response.status}`
     );
   }
-  const arrayBuffer = await response.arrayBuffer();
-  return Buffer.from(arrayBuffer);
+  if (Number(response.headers.get("content-length")) > maxBytes) {
+    await response.body?.cancel(); throw new Error("PDF exceeds download byte budget");
+  }
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error("Empty PDF response");
+  const chunks: Uint8Array[] = []; let size = 0;
+  try {
+    while (true) {
+      throwIfGenerationCancelled();
+      const { done, value } = await reader.read(); if (done) break;
+      size += value.byteLength;
+      if (size > maxBytes) throw new Error("PDF exceeds download byte budget");
+      chunks.push(value);
+    }
+  } finally { await reader.cancel(); }
+  return Buffer.concat(chunks, size);
 }
 
 /**
@@ -309,6 +330,24 @@ function pickLargestAttachment(attachments: AttachmentMeta[]): AttachmentMeta | 
   return sorted[0] ?? null;
 }
 
+type InspectedPdf = { target: AttachmentMeta; buffer: Buffer; pages: string[]; pageCount: number; textComplete?: boolean };
+const inspectedPdfs = new WeakMap<object, Map<number, Promise<InspectedPdf>>>();
+function inspectPdf(raw: unknown, messageId: number, target: AttachmentMeta, maxBytes = 40 * 1024 * 1024): Promise<InspectedPdf> {
+  const key = raw as object;
+  let cache = inspectedPdfs.get(key);
+  if (!cache) { cache = new Map(); inspectedPdfs.set(key, cache); }
+  let pending = cache.get(target.id);
+  if (!pending) {
+    pending = (async () => {
+      const buffer = await downloadAttachmentPdf(messageId, target.id, maxBytes);
+      const extracted = await extractPagesFromPdf(buffer, true);
+      return { target, buffer, ...extracted };
+    })();
+    cache.set(target.id, pending);
+  }
+  return pending;
+}
+
 async function downloadPdfTarget(
   messageId: number,
   target: AttachmentMeta
@@ -325,11 +364,15 @@ async function downloadPdfTarget(
 
 export async function downloadReportPdfAttachment(
   rawMessageJson: unknown,
-  messageId: number
+  messageId: number,
+  preferredAttachmentId?: number
 ): Promise<PdfAttachmentDownload | null> {
-  const attachments = normalizeAttachments(rawMessageJson);
-  const target = pickLargestAttachment(filterPdfs(attachments, REPORT_FILENAME_PATTERN));
-  return target ? downloadPdfTarget(messageId, target) : null;
+  const attachments = filterPdfs(normalizeAttachments(rawMessageJson));
+  const target = preferredAttachmentId ? attachments.find(att => att.id === preferredAttachmentId)
+    : attachments.find(att => REPORT_FILENAME_PATTERN.test(att.fileName ?? ""));
+  if (!target) return null;
+  const pdf = await inspectPdf(rawMessageJson, messageId, target);
+  return { buffer: pdf.buffer, pageCount: pdf.pageCount, attachmentId: target.id, attachmentName: target.fileName ?? null };
 }
 
 export async function downloadYearlyReportPdfAttachment(
@@ -470,12 +513,13 @@ const METRIC_MATCHERS: Record<ReportMetricKind, RegExp[]> = {
   ],
   operating_result: [
     /\boperating\s+(profit|loss|result)\b/,
+    /\bresult from operating activities\b/,
     /\boperating profit\/loss\b/,
     /\bdriftsresultat\b/,
     /\bebit\b(?!da)/
   ],
   earnings_before_tax: [
-    /\b(profit|loss|earnings|result).{0,35}before tax\b/,
+    /\b(profit|loss|earnings|result).{0,35}before (?:income )?tax\b/,
     /\bresultat.{0,35}for skatt\b/,
     /\bresultat.{0,35}skattekostnad\b/
   ]
@@ -591,6 +635,7 @@ function scoreTermWeights(
 
 function hasIncomeStatementHeading(page: PdfPageText): boolean {
   if (isContentsPage(page) || isAccountingPolicyPage(page)) return false;
+  if (isIncomeStatementPage(page.text)) return true;
   return possibleHeadingLines(page).some(line => {
     const heading = line.match(/^(?:(?:condensed|consolidated|interim|unaudited|group|parent(?: company)?|konsern(?:ets)?)\s+)*(?:income statements?|statements? of (?:comprehensive income|profit (?:or|and) loss(?: and (?:other )?comprehensive income)?)|resultat(?:regn|rekne)skap(?:et)?(?: for konsernet)?|oppstilling over totalresultat|totalresultat)(?=$|\s|[(:–-])/);
     if (!heading) return false;
@@ -748,7 +793,8 @@ function extractInstructionTopicTerms(instruction: string | undefined): string[]
     terms.add("senter");
   }
 
-  return [...terms].slice(0, 10);
+  // Preserve a section request at the end of a longer editorial instruction.
+  return [...terms].filter(term => !["interesting", "already", "known", "unaudited", "condensed", "consolidated", "interim"].includes(term)).slice(-80);
 }
 
 function truncatePageText(text: string, maxChars: number): string {
@@ -911,10 +957,8 @@ export function buildReportContextFromPages(
   const incomeScores: ScoredPage[] = pages
     .map((page) => ({ index: page.index, score: scoreIncomeStatementPage(page) }))
     .sort((left, right) => right.score - left.score);
-  const incomeStatementFound =
-    (incomeScores[0]?.score ?? 0) >= INCOME_STATEMENT_SCORE_THRESHOLD &&
-    !!incomeScores[0] &&
-    hasIncomeStatementHeading(pages[incomeScores[0].index]);
+  const incomeStatementFound = incomeScores.some(item =>
+    item.score >= INCOME_STATEMENT_SCORE_THRESHOLD && hasIncomeStatementHeading(pages[item.index]));
 
   if (incomeStatementFound) {
     for (const item of incomeScores
@@ -925,6 +969,9 @@ export function buildReportContextFromPages(
       )
       .slice(0, 3)) {
       addSelectedPage(selected, pages, item.index, "income_statement", item.score);
+      if (isStatementContinuation(pages[item.index + 1]?.text ?? "")) {
+        addSelectedPage(selected, pages, item.index + 1, "income_statement", item.score);
+      }
     }
   } else {
     const fallbackScores = pages
@@ -963,7 +1010,7 @@ export function buildReportContextFromPages(
     const topicScores = pages
       .map((page) => ({
         index: page.index,
-        score: scoreByInstructionTerms(page, requestedTopicTerms)
+        score: isContentsPage(page) ? 0 : scoreByInstructionTerms(page, requestedTopicTerms)
       }))
       .filter((item) => item.score >= 2)
       .sort((left, right) => right.score - left.score)
@@ -1010,7 +1057,8 @@ export function buildReportContextFromPages(
 
   const selectedPages = toSelectedPages(selected, pages);
   const text = buildReportContextText(pages, selected, metrics);
-  const rawReferenceText = selectedPages
+  const rawReferenceText = [...selectedPages]
+    .sort((a,b) => Number(b.reasons.some(reason => ["income_statement", "user_page", "user_topic"].includes(reason))) - Number(a.reasons.some(reason => ["income_statement", "user_page", "user_topic"].includes(reason))))
     .map(page => `[PDF page ${page.pageNumber}]\n${rawPages[page.pageNumber - 1]}`)
     .join("\n\n");
 
@@ -1040,24 +1088,47 @@ export async function extractReportContent(
   messageId: number,
   userInstruction?: string
 ): Promise<ReportExtractionResult | null> {
-  const attachments = normalizeAttachments(rawMessageJson);
-  const reportPdfs = filterPdfs(attachments, REPORT_FILENAME_PATTERN);
-  const target = pickLargestAttachment(reportPdfs);
-  if (!target) return null;
-
-  const buffer = await downloadAttachmentPdf(messageId, target.id);
-  const { pages, pageCount } = await extractPagesFromPdf(buffer);
-  const fullText = pages.join("\n\n");
-
-  if (fullText.trim().length < MIN_TEXT_CHARS) return null;
-
-  const contextPack = buildReportContextFromPages(pages, userInstruction);
-
+  const attachments = filterPdfs(normalizeAttachments(rawMessageJson));
+  // Names only prioritise inspection; original statements determine relevance.
+  const candidates = [...attachments].sort((a,b) =>
+    Number(REPORT_FILENAME_PATTERN.test(b.fileName ?? "")) - Number(REPORT_FILENAME_PATTERN.test(a.fileName ?? "")) || a.id - b.id);
+  const found: Array<{ pdf: InspectedPdf; context: ReportContextPack }> = [];
+  const inspected: number[] = [], failed: Array<{ attachmentId: number; reason: string }> = [];
+  let remainingBytes = 64 * 1024 * 1024;
+  for (const target of candidates.slice(0, 4)) {
+    if (remainingBytes <= 0) break;
+    inspected.push(target.id);
+    const allowance = Math.min(40 * 1024 * 1024, remainingBytes);
+    remainingBytes -= allowance;
+    try {
+      const pdf = await inspectPdf(rawMessageJson, messageId, target, allowance);
+      remainingBytes += allowance - pdf.buffer.length;
+      const context = buildReportContextFromPages(pdf.pages, userInstruction);
+      if (context.diagnostics.incomeStatementFound && context.metrics.length) found.push({ pdf, context });
+    } catch (error) {
+      throwIfGenerationCancelled();
+      failed.push({ attachmentId: target.id, reason: error instanceof Error ? error.message : String(error) });
+    }
+  }
+  if (!found.length) return null;
+  // Prefer compact financial reports, while keeping a complementary report.
+  const selected = found.sort((a,b) => a.pdf.buffer.length - b.pdf.buffer.length).slice(0, 2);
+  const main = selected[0];
+  const label = (pdf: InspectedPdf) => `[PDF attachment ${pdf.target.id}: ${pdf.target.fileName ?? "PDF"}]`;
+  const budget = Math.floor((MAX_REPORT_CONTEXT_CHARS - 500) / selected.length);
+  const referenceBudget = Math.floor((MAX_REPORT_REFERENCE_CHARS - 500) / selected.length);
+  const clip = (text: string, size: number) => text.length <= size ? text : text.slice(0, size - 40) + "\n[... PDF-utdrag avkortet ...]";
   return {
-    ...contextPack,
-    pageCount,
-    attachmentId: target.id,
-    attachmentName: target.fileName ?? null
+    ...main.context,
+    text: selected.map(({pdf,context}) => `${label(pdf)}\n${clip(context.text,budget)}`).join("\n\n"),
+    referenceText: selected.map(({pdf,context}) => `${label(pdf)}\n${clip(context.referenceText,referenceBudget)}`).join("\n\n"),
+    attachmentId: main.pdf.target.id,
+    attachmentName: main.pdf.target.fileName ?? null,
+    attachments: selected.map(({pdf}) => ({ attachmentId: pdf.target.id, attachmentName: pdf.target.fileName ?? null, pageCount: pdf.pageCount })),
+    selectedPages: selected.flatMap(({pdf,context}) => context.selectedPages.map(page => ({...page, attachmentId: pdf.target.id}))),
+    diagnostics: { ...main.context.diagnostics, inspectedAttachmentIds: inspected, failedAttachments: failed,
+      uninspectedAttachmentIds: attachments.filter(att => !inspected.includes(att.id)).map(att => att.id),
+      referenceTextTruncated: selected.some(({context}) => context.diagnostics.referenceTextTruncated || context.referenceText.length > referenceBudget) }
   };
 }
 
@@ -1160,8 +1231,7 @@ export async function extractGeneralPdfContent(
   const target = pickLargestAttachment(generalPdfs);
   if (!target) return null;
 
-  const buffer = await downloadAttachmentPdf(messageId, target.id);
-  const { pages, pageCount, textComplete } = await extractPagesFromPdf(buffer, true);
+  const { pages, pageCount, textComplete } = await inspectPdf(rawMessageJson, messageId, target);
   const text = pages.join("\n\n");
 
   if (text.trim().length < MIN_TEXT_CHARS) return null;

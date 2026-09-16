@@ -2,6 +2,7 @@ export * from "./api.js";
 export * from "./notice-editor.js";
 export * from "./notice-length.js";
 export * from "./constants.js";
+export * from "./pdf-source-pages.js";
 export * from "./db-json.js";
 export * from "./encoding.js";
 export * from "./generation-progress.js";

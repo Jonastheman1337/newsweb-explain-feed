@@ -433,8 +433,8 @@ export function useNoticeComposer(args: {
       replacingPdf.current = null;
     }
     for (const file of Array.from(files)) {
-      if (!/\.pdf$/i.test(file.name) || file.size > 20 * 1024 * 1024) {
-        setSourceError("Velg PDF-filer på høyst 20 MB.");
+      if (file.size > 40 * 1024 * 1024) {
+        setSourceError("Velg PDF-filer på høyst 40 MB.");
         continue;
       }
       importSource("pdf", file);

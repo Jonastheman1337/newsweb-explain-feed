@@ -1,3 +1,4 @@
+import { selectPdfSourcePages, packPdfSourcePages } from "@newsweb/shared";
 import { NOTICE_EDITOR_CAPABILITIES, noticeEditorSnapshotSchema } from "@newsweb/shared";
 import { createGenerationRequest, cancelGenerationRequest, generationControlPayload, generationJobId, resolveNoticeEditorBase, InvalidEditorBaseError, snapshotHash } from "@newsweb/shared/generation-control";
 import { fetchUrlMaterial } from "../services/url-material.js";
@@ -210,7 +211,7 @@ function materialPayload(material: {
     status: material.status,
     errorText: material.errorText,
     enabled: material.enabled,
-    metadata: material.metadataJson ?? null,
+    metadata: material.metadataJson ? Object.fromEntries(Object.entries(material.metadataJson).filter(([key]) => key !== "pdfPages")) : null,
     createdAt: material.createdAt.toISOString()
   };
 }
@@ -226,7 +227,8 @@ async function ensureNoticeExists(messageId: number): Promise<boolean> {
 async function selectedMaterialSnapshots(
   messageId: number,
   selectedMaterialIds?: string[],
-  requireSelected = false
+  requireSelected = false,
+  instruction?: string
 ): Promise<MaterialSnapshot[]> {
   if (selectedMaterialIds && selectedMaterialIds.length === 0) {
     return [];
@@ -250,7 +252,10 @@ async function selectedMaterialSnapshots(
   const snapshots: MaterialSnapshot[] = [];
   for (const material of materials) {
     if (remainingChars <= truncationMarker.length) break;
-    let text = material.extractedText.trim();
+    const pdfPages = asRecord(material.metadataJson).pdfPages;
+    let text = material.kind === "pdf" && Array.isArray(pdfPages) && pdfPages.length > 0 && pdfPages.every(page => typeof page === "string")
+      ? packPdfSourcePages(pdfPages as string[], selectPdfSourcePages(pdfPages as string[], instruction), Math.min(15_000, remainingChars))
+      : material.extractedText.trim();
     if (!text) continue;
     if (text.length > remainingChars) {
       text = `${text.slice(0, remainingChars - truncationMarker.length)}${truncationMarker}`;
@@ -650,13 +655,11 @@ export const noticeRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.code(400).send({ message: "PDF mangler." });
       }
       const fileName = sanitizeMaterialTitle(file.filename || "materiale.pdf");
-      const isPdf =
-        file.mimetype === "application/pdf" || fileName.toLowerCase().endsWith(".pdf");
-      if (!isPdf) {
-        return reply.code(415).send({ message: "Bare PDF-filer støttes." });
-      }
-
+      // Validate the bytes, not the name or a browser-supplied MIME type.
       const buffer = await file.toBuffer();
+      if (!buffer.subarray(0, 1024).includes(Buffer.from("%PDF-"))) {
+        return reply.code(415).send({ message: "Filen er ikke en gyldig PDF." });
+      }
       let extracted: Awaited<ReturnType<typeof extractPdfMaterialText>> | null = null;
       let errorText: string | null = null;
       try {
@@ -665,6 +668,7 @@ export const noticeRoutes: FastifyPluginAsync = async (fastify) => {
           throw new Error("PDF-en ga ingen lesbar tekst.");
         }
       } catch (error) {
+        extracted = null;
         errorText = error instanceof Error ? error.message : String(error);
       }
 
@@ -681,7 +685,9 @@ export const noticeRoutes: FastifyPluginAsync = async (fastify) => {
           errorText,
           enabled: Boolean(extracted),
           metadataJson: toJsonValue({
-            pageCount: extracted?.pageCount ?? null
+            pageCount: extracted?.pageCount ?? null,
+            pdfPages: extracted?.pages ?? [],
+            extractionMethod: extracted?.extractionMethod ?? null
           })
         }
       });
@@ -1194,7 +1200,8 @@ export const noticeRoutes: FastifyPluginAsync = async (fastify) => {
           supplementalMaterials = await selectedMaterialSnapshots(
             messageId,
             body.selectedMaterialIds,
-            true
+            true,
+            body.instruction
           );
         } catch (error) {
           if (
@@ -1261,7 +1268,9 @@ export const noticeRoutes: FastifyPluginAsync = async (fastify) => {
       const maxVisibleArticleChars = body?.maxVisibleArticleChars;
       const supplementalMaterials = await selectedMaterialSnapshots(
         messageId,
-        body?.selectedMaterialIds
+        body?.selectedMaterialIds,
+        false,
+        instruction
       );
       const phaseUpdatedAt = new Date();
       const generationRun = await logPrisma.generationRun.create({

@@ -77,7 +77,6 @@ export function SakSources({ draftId, materials, setMaterials, coverage, disable
       for (const [index, file] of files.entries()) {
         setProgress(`Leser PDF ${index + 1} av ${files.length}: ${file.name}`);
         try {
-          if (!/\.pdf$/i.test(file.name)) throw new Error("Bare PDF-filer støttes.");
           remember(await addSakPdf(draftId, file));
         } catch (error) { errors.push(`${file.name}: ${error instanceof Error ? error.message : "Opplastingen feilet"}`); }
       }

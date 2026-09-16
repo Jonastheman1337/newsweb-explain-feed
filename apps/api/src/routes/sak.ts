@@ -289,13 +289,11 @@ export const sakRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.code(400).send({ message: "PDF mangler." });
       }
       const fileName = sanitizeMaterialTitle(file.filename || "materiale.pdf");
-      const isPdf =
-        file.mimetype === "application/pdf" || fileName.toLowerCase().endsWith(".pdf");
-      if (!isPdf) {
-        return reply.code(415).send({ message: "Bare PDF-filer støttes." });
-      }
-
+      // Validate the bytes, not the name or a browser-supplied MIME type.
       const buffer = await file.toBuffer();
+      if (!buffer.subarray(0, 1024).includes(Buffer.from("%PDF-"))) {
+        return reply.code(415).send({ message: "Filen er ikke en gyldig PDF." });
+      }
       let extracted: Awaited<ReturnType<typeof extractPdfMaterialText>> | null = null;
       let errorText: string | null = null;
       try {

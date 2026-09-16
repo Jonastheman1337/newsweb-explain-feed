@@ -242,7 +242,7 @@ export function InstructionInput({
   }
   async function uploadFiles(files: File[]) {
     for (const file of files) {
-      if (/\.pdf$/i.test(file.name)) await uploadPdfMaterial(file);
+      await uploadPdfMaterial(file);
     }
   }
 

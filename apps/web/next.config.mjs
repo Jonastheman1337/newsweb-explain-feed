@@ -6,6 +6,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // Multipart overhead above the API's 40 MiB PDF limit.
+  experimental: { middlewareClientMaxBodySize: "42mb" },
   async redirects() {
     return [
       { source: "/next", destination: "/", permanent: false },
