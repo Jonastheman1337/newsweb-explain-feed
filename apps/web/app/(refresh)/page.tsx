@@ -1,3 +1,4 @@
+import { FEED_CURSOR_EPOCH, resetOldFeedPosition } from "../../lib/feed-position";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getFeed, getMetaFilters, getMutedCategories, isApiAuthError } from "../../lib/api";
@@ -11,11 +12,15 @@ import styles from "../../components/refresh/refresh.module.css";
 type Params = RefreshFilterValues & {
   cursor?: string;
   cursorId?: string;
+  cursorEpoch?: string;
 };
 export default async function RefreshPage({ searchParams }: { searchParams: Promise<Params> }) {
   const params = await searchParams;
   const token = await getSessionToken();
   if (!token) redirect("/login");
+  // Also handles router.refresh() from already-open, pre-release clients.
+  const resetHref = resetOldFeedPosition(params);
+  if (resetHref) redirect(resetHref);
   try {
     const [feed, filters, muted] = await Promise.all([
       getFeed(token, {
@@ -30,7 +35,10 @@ export default async function RefreshPage({ searchParams }: { searchParams: Prom
     const next = new URLSearchParams(
       Object.entries(params).filter((entry): entry is [string, string] => !!entry[1])
     );
-    if (feed.nextCursor) next.set("cursor", feed.nextCursor);
+    if (feed.nextCursor) {
+      next.set("cursor", feed.nextCursor);
+      next.set("cursorEpoch", FEED_CURSOR_EPOCH);
+    }
     if (feed.nextCursorId != null) next.set("cursorId", String(feed.nextCursorId));
     return (
       <>

@@ -12,6 +12,7 @@ import styles from "./next-editor.module.css";
 import RefreshPage from "../../app/(refresh)/page";
 
 const mocks = vi.hoisted(() => ({
+  redirect: vi.fn((url: string) => { throw new Error(`NEXT_REDIRECT:${url}`); }),
   replace: vi.fn(),
   refresh: vi.fn(),
   query: new URLSearchParams(),
@@ -22,7 +23,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace: mocks.replace, refresh: mocks.refresh }),
   useSearchParams: () => mocks.query,
-  redirect: vi.fn(),
+  redirect: mocks.redirect,
   notFound: vi.fn(),
 }));
 vi.mock("../../lib/session", () => ({
@@ -223,6 +224,7 @@ it("keeps the important view and filters when moving to older messages", async (
   expect(nextQuery.get("important")).toBe("1");
   expect(nextQuery.get("q")).toBe("contract");
   expect(nextQuery.get("issuer")).toBe("TEST");
+  expect(nextQuery.get("cursorEpoch")).toBe("2026-09-17-live");
   mocks.query = nextQuery;
   await act(() =>
     root.render(
@@ -811,4 +813,21 @@ it("keeps source bindings with the selected version and refreshes old cached met
   const selected = versionToFeedItem({...older, rewrite: {...older.rewrite, source_links: [binding]}}, latest);
   rememberSelection({current: selected, latest});
   expect(restoreSelection({current: latest, latest}).current.sourceBindings).toEqual([binding]);
+});
+
+
+it("redirects an existing old-page tab to latest before loading its stale feed", async () => {
+  await expect(RefreshPage({searchParams: Promise.resolve({cursor:"2026-09-16T20:10:22.769Z",cursorId:"682512",market:"XOSL"})})).rejects.toThrow("NEXT_REDIRECT:/?market=XOSL");
+  expect(mocks.getFeed).not.toHaveBeenCalled();
+});
+
+it("makes an already-open paginated feed refresh on a broadcast without new client code", async () => {
+  mocks.query = new URLSearchParams("cursor=2026-09-16T20%3A10%3A22.769Z&cursorId=682512");
+  await act(() => root.render(<RefreshFeed initialItems={[item(682511)]} mutedCategories={[]} filtered />));
+  vi.useFakeTimers();
+  await act(() => {
+    liveItem(item(682548));
+    vi.advanceTimersByTime(300);
+  });
+  expect(mocks.refresh).toHaveBeenCalledTimes(1);
 });
