@@ -252,3 +252,47 @@ describe("verified link density", () => {
     expect(linked).toContain(link("https://newsweb.oslobors.no/message/10", "kontantbud"));
   });
 });
+
+describe("attribution preference for verified links", () => {
+  const make = (sentence: string, text: string, id = 681428, sourceId = "primary", fact?: string) => ({sentence, text, messageId:id, sourceId, fact});
+  it("fixes the saved RCS anchor without regenerating the Link Mobility article", () => {
+    const s="Meldingsselskapet Link Mobility kan nå tilby rikere bedriftsmeldinger til iPhone-brukere i Sverige etter at Tele2 har aktivert teknologien RCS, opplyser selskapet.";
+    const targets={primary:{url:"https://newsweb.oslobors.no/message/682633",issuerName:"Link Mobility"},bound:[make(s,"RCS",682633)]};
+    const out=linkSourceAttributions(`<p>${s}</p>`,targets);
+    expect(out).toBe(`<p>${s.replace("opplyser",link(targets.primary.url,"opplyser"))}</p>`);
+    expect(linkSourceAttributions(out,targets)).toBe(out);
+  });
+  it("never uses a primary keyword when no attribution is available", () => {
+    const s="Selskapet lanserer RCS i Sverige.";
+    expect(linkSourceAttributions(`<p>${s}</p>`,{primary:PRIMARY,bound:[make(s,"RCS")]})).toBe(`<p>${s}</p>`);
+  });
+  it("retains Elmera's exact Friday source when there is no attribution verb", () => {
+    const s="Fredag hadde Fortum fått aksept for 10,08 prosent av aksjene.";
+    const out=linkSourceAttributions(`<p>${s}</p>`,{primary:PRIMARY,bound:[make(s,"Fredag",682171,"prior_682171")]});
+    expect(out).toContain(link("https://newsweb.oslobors.no/message/682171","Fredag"));
+    expect(out).not.toContain(URL);
+  });
+  it("prefers a later historical attribution over an earlier keyword for the same source", () => {
+    const a="Fortum la inn et kontantbud.";const b="Selskapet meldte fredag at tilbudet fortsatt gjelder.";
+    const out=linkSourceAttributions(`<p>${a}</p><p>${b}</p>`,{bound:[make(a,"kontantbud",90,"prior_90"),make(b,"tilbudet",90,"prior_90")]});
+    expect(out).toContain(link("https://newsweb.oslobors.no/message/90","meldte"));
+    expect(out.match(/<a /g)).toHaveLength(1);
+  });
+  it("keeps mixed-source attributions within their verified clauses", () => {
+    const a="Selskapet meldte i juni om RCS";const b="nå opplyser selskapet at løsningen er lansert";const s=`${a}, men ${b}.`;
+    const out=linkSourceAttributions(`<p>${s}</p>`,{primary:PRIMARY,bound:[make(s,"RCS",90,"prior_90",a),make(s,"løsningen",681428,"primary",b)]});
+    expect(out).toContain(link("https://newsweb.oslobors.no/message/90","meldte"));
+    expect(out).toContain(link(URL,"opplyser"));
+  });
+  it("does not move legacy anchors across mixed-source clauses", () => {
+    const s="RCS ble varslet i juni, mens selskapet nå opplyser at lanseringen er klar.";
+    const out=linkSourceAttributions(`<p>${s}</p>`,{primary:PRIMARY,bound:[make(s,"RCS",90,"prior_90"),make(s,"lanseringen")]});
+    expect(out).toContain(link("https://newsweb.oslobors.no/message/90","RCS"));
+    expect(out).not.toContain(link("https://newsweb.oslobors.no/message/90","opplyser"));
+    expect(out).not.toContain(link(URL,"lanseringen"));
+  });
+  it("preserves existing editorial links", () => {
+    const s="RCS er lansert, opplyser selskapet.";const html=`<p>${s.replace("RCS",link("https://example.com/explainer","RCS"))}</p>`;
+    expect(linkSourceAttributions(html,{primary:PRIMARY,bound:[make(s,"RCS")]})).toBe(html);
+  });
+});

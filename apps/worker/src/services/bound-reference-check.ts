@@ -34,7 +34,8 @@ export const BOUND_REFERENCE_RULES = [
   "Bruk dokumentets identitet og omkringliggende avsnitt for å etablere hvem opplysningen gjelder; selskapsnavnet må ikke gjentas i hvert bevisavsnitt. Utstederen er ikke nødvendigvis aktøren omtalt i teksten. Ikke bland fakta mellom selskaper eller meldinger. Naturlig konsernomtale er likevel tillatt når kilden uttrykkelig viser at den juridiske aktøren er et heleid datterselskap: konsernnavnet kan da være en leservennlig kortform for samme hendelse. Ikke krev fullt juridisk navn uten meningsforskjell, og ikke flytt regnskapstall, gjeld, garantier eller selvstendige juridiske forpliktelser mellom enheter.",
   "Historiske fakta må ikke bli dagens nye hendelse eller ubegrunnet nåværende status. Kontroller datoer og relative tidsuttrykk mot dagens publiseringstidspunkt. En tidligere akseptgrad kan ikke fremstilles som oppdatert etter en ny aksept. Plan, aksept, oppgjør og fullført oppkjøp er forskjellige stadier. Correction-kilder dokumenterer bare eksplisitt gammel tilstand når dagens korrigering også fremgår. Identitetsbakgrunn i en tittel trenger ikke sin egen dato når betydningen er klar og kildebelagt.",
   "Attribuerte vurderinger og forklaringer kan gjengis når avsender og sikkerhetsgrad beholdes. Uattribuerte spekulasjoner og konsekvenser uten dekning er feil. Kildebegrensning i seg selv er ikke bevis for en faktisk påstand.",
-  "linkText er en kort formulering som finnes eksakt i fact, for eksempel 'meldte i går', 'la i juni' eller 'kontantbud'. For en dekket opplysning fra én prior-kilde i ingress/brødtekst skal du velge en slik lenkefrase, også når setningen ikke har en uttrykkelig kildehenvisning. Velg da et relevant eksisterende substantiv eller verb, aldri legg til ord. For tittel, company_sentence, udekkede påstander eller blandet kildebelegg kan den være tom. interpretation forklarer støtten eller den konkrete feilen, ikke stilpreferanser."
+  "Lenkeplassering: Foretrekk selve kildehenvisningen fremfor emneord. For primary velger du attribusjonsordet i en eksisterende kildehenvisning, som opplyser, skriver eller børsmeldingen. Bruk aldri et produktnavn, akronym, selskapsnavn eller tall som primary-lenke; la linkText være tom når en egnet kildehenvisning mangler. For prior-kilder foretrekker du en naturlig tilbakepeking som meldte fredag, den tidligere meldingen eller la i juni. Bare når slik henvisning mangler, velg en kort beskrivende frase som faktisk identifiserer den kildebelagte opplysningen. Unngå løsrevne tekniske nøkkelord. fact skal omfatte den tilhørende henvisningen når den brukes, men ikke påstander fra andre kilder. Del ulike kildeklausuler i separate uses; ikke flytt en attribusjon mellom kilder.",
+  "linkText er en kort formulering som finnes eksakt i fact, for eksempel 'meldte i går', 'la i juni' eller 'kontantbud'. For en dekket opplysning fra én prior-kilde i ingress/brødtekst skal du velge en slik lenkefrase, også når setningen ikke har en uttrykkelig kildehenvisning. Følg prioriteringen for lenkeplassering over; aldri legg til ord. For tittel, company_sentence, udekkede påstander eller blandet kildebelegg kan den være tom. interpretation forklarer støtten eller den konkrete feilen, ikke stilpreferanser."
 ].join("\n");
 export function buildBoundReferencePrompt(payload: PromptPayload, draft: RewriteOutput) {
   const sources = freezeReferenceSources(payload);
@@ -42,7 +43,7 @@ export function buildBoundReferencePrompt(payload: PromptPayload, draft: Rewrite
   return { sources, sentences, systemPrompt: "Du er en uavhengig faktasjekker. Kontroller påstander mot identifiserte originalavsnitt, ikke mot genererte sitater.", developerPrompt: BOUND_REFERENCE_RULES,
     userPrompt: JSON.stringify({ publishedAt: payload.publishedAt, sources, sentences: sentences.map((text, index) => ({ index, text })) }) };
 }
-export type BoundLink = { sentence: string; text: string; sourceId: string; messageId: number; sourceHash: string; refs: string[] };
+export type BoundLink = { sentence: string; fact?: string; text: string; sourceId: string; messageId: number; sourceHash: string; refs: string[] };
 export type BoundReport = ReferenceCoverageReport & { bindingVersion: string; sourceLinks: BoundLink[]; evidenceBindings: Array<{ index: number; fact: string; refs: SourceBlock[] }> };
 export function bindReferenceResult(payload: PromptPayload, draft: RewriteOutput, sources: BoundSources, raw: unknown): BoundReport {
   if (JSON.stringify(sources) !== JSON.stringify(freezeReferenceSources(payload))) throw Error("BOUND_SNAPSHOT_CHANGED");
@@ -71,7 +72,7 @@ export function bindReferenceResult(payload: PromptPayload, draft: RewriteOutput
       if (use.linkText) {
         if (!use.fact.includes(use.linkText)) throw Error("BOUND_LINK_NOT_IN_FACT");
         // Ambiguous mixed-source anchors are never guessed.
-        if (item.grounded && ids.length === 1 && refs[0].messageId) sourceLinks.push({ sentence, text: use.linkText, sourceId: ids[0], messageId: refs[0].messageId, sourceHash: refs[0].sourceHash, refs: refs.map(b => b.ref) });
+        if (item.grounded && ids.length === 1 && refs[0].messageId) sourceLinks.push({ sentence, fact: use.fact, text: use.linkText, sourceId: ids[0], messageId: refs[0].messageId, sourceHash: refs[0].sourceHash, refs: refs.map(b => b.ref) });
       }
     }
     const prior = blocks.some(b => b.sourceId.startsWith("prior_"));

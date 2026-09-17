@@ -831,3 +831,12 @@ it("makes an already-open paginated feed refresh on a broadcast without new clie
   });
   expect(mocks.refresh).toHaveBeenCalledTimes(1);
 });
+
+it("renders attribution instead of the saved RCS keyword on the homepage", async () => {
+  const sentence = "Meldingsselskapet Link Mobility kan nå tilby rikere bedriftsmeldinger til iPhone-brukere i Sverige etter at Tele2 har aktivert teknologien RCS, opplyser selskapet.";
+  const current = item(682633, {issuerName:"Link Mobility",lead:sentence,body:[],sourceBindings:[{sentence,text:"RCS",sourceId:"primary",messageId:682633,sourceHash:"verified-hash",refs:["primary:verified:b1"]}]});
+  await act(() => root.render(<RefreshCard entry={{current,latest:current}} onSelect={() => {}} onVersion={() => {}} />));
+  const links = container.querySelectorAll('.editableBody a[href="https://newsweb.oslobors.no/message/682633"]');
+  expect(links).toHaveLength(1);
+  expect(links[0].textContent).toBe("opplyser");
+});

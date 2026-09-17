@@ -5,7 +5,7 @@ export const rewriteImportanceSchema = z.enum(["viktig", "medium", "uviktig"]);
 
 export const rewriteOutputSchema = z.object({
   // Populated by the verifier from original passages, never model-authored URLs.
-  source_links: z.array(z.object({ sentence: z.string(), text: z.string(), sourceId: z.string(), messageId: z.number().int().positive(), sourceHash: z.string(), refs: z.array(z.string()) })).optional(),
+  source_links: z.array(z.object({ sentence: z.string(), fact: z.string().optional(), text: z.string(), sourceId: z.string(), messageId: z.number().int().positive(), sourceHash: z.string(), refs: z.array(z.string()) })).optional(),
   title: z.string().min(6).max(140),
   lead: z.string().min(20).max(350),
   body: z.array(z.string().min(10).max(600)).min(0).max(8),

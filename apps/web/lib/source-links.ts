@@ -4,7 +4,8 @@
  * The input is the HTML produced by `plainTextToRichHtml` (or the rich editor):
  * `<p>` blocks, `<br>` line breaks and HTML-escaped text. Only text nodes are
  * inspected; tags are never matched against and existing text is never altered.
- * The helper inserts at most two `<a href="…">…</a>` pairs:
+ * Verified articles receive at most one link per source, preferring attribution.
+ * Legacy articles without bindings retain their primary/prior attribution links:
  *
  * - the primary link wraps the noun/verb of the FIRST attribution phrase
  *   ("ifølge en børsmelding", "opplyser selskapet", "ifølge <issuer>", …);
@@ -16,7 +17,7 @@
  */
 
 export type SourceLinkTargets = {
-  bound?: Array<{ sentence: string; text: string; sourceId: string; messageId: number }>;
+  bound?: Array<{ sentence: string; fact?: string; text: string; sourceId: string; messageId: number }>;
   primary?: { url: string; issuerName?: string | null; issuerSign?: string | null } | null;
   related?: Array<{ url: string; publishedAt: string; relation?: string }>;
 };
@@ -463,21 +464,49 @@ export function linkSourceAttributions(html: string, targets: SourceLinkTargets)
   const boundRanges: Range[] = [];
   const boundUrls = new Set<string>();
   const encode = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
-  for (const binding of [...(targets.bound ?? [])].sort((a, b) => doc.text.indexOf(encode(a.sentence)) - doc.text.indexOf(encode(b.sentence)))) {
-    const boundUrl = `https://newsweb.oslobors.no/message/${binding.messageId}`;
-    if (boundUrls.has(boundUrl)) continue;
+  const aliases = targets.primary ? issuerAliases(targets.primary) : [];
+  const located = (targets.bound ?? []).flatMap(binding => {
     if (!Number.isSafeInteger(binding.messageId) || binding.messageId <= 0 || !binding.text ||
-        (binding.sourceId !== "primary" && binding.sourceId !== `prior_${binding.messageId}`)) continue;
+        (binding.sourceId !== "primary" && binding.sourceId !== `prior_${binding.messageId}`)) return [];
+    const url = `https://newsweb.oslobors.no/message/${binding.messageId}`;
+    if (binding.sourceId === "primary" && primaryUrl && primaryUrl !== url) return [];
     const sentence = encode(binding.sentence), anchor = encode(binding.text);
-    const start = doc.text.indexOf(sentence);
-    if (start < 0 || doc.text.lastIndexOf(sentence) !== start) continue;
-    const local = sentence.indexOf(anchor);
-    if (local < 0 || sentence.lastIndexOf(anchor) !== local) continue;
-    const range = htmlRange(doc, { start: start + local, end: start + local + anchor.length });
-    const index = sentenceIndexAt(sentences, start + local);
+    const start = doc.text.indexOf(sentence), local = sentence.indexOf(anchor);
+    if (start < 0 || doc.text.lastIndexOf(sentence) !== start || local < 0 || sentence.lastIndexOf(anchor) !== local) return [];
+    const fact = binding.fact === undefined ? undefined : encode(binding.fact);
+    const factStart = fact === undefined ? -1 : sentence.indexOf(fact);
+    if (fact !== undefined && (!fact || factStart < 0 || sentence.lastIndexOf(fact) !== factStart || !fact.includes(anchor))) return [];
+    return [{binding, url, sentence, anchor, start, local, fact, factStart}];
+  });
+  const priorSentences = new Set(located.filter(l => l.binding.sourceId !== "primary")
+    .map(l => sentenceIndexAt(sentences, l.start)));
+  const candidates = located.flatMap(entry => {
+    const peers = located.filter(other => other.start === entry.start && other.binding.sourceId !== entry.binding.sourceId);
+    let scope = entry.sentence, offset = 0;
+    if (peers.length) {
+      // Legacy bindings have no clause boundary. Do not move their anchor
+      // across a mixed-source sentence. New bindings retain the verified fact.
+      const exclusiveFact = entry.fact !== undefined && peers.every(other => other.fact !== undefined &&
+        (entry.factStart + entry.fact!.length <= other.factStart || other.factStart + other.fact.length <= entry.factStart));
+      scope = exclusiveFact ? entry.fact! : entry.anchor;
+      offset = exclusiveFact ? entry.factStart : entry.local;
+    }
+    const attribution = entry.binding.sourceId === "primary"
+      ? collectPrimaryCandidates(scope, aliases)[0]?.anchor
+      : priorAnchorsIn(scope, {start: 0, end: scope.length})[0] ?? collectPrimaryCandidates(scope, aliases)[0]?.anchor;
+    // Primary citations belong on attribution words, never arbitrary keywords.
+    if (!attribution && entry.binding.sourceId === "primary") return [];
+    const local = attribution ? offset + attribution.start : entry.local;
+    const length = attribution ? attribution.end - attribution.start : entry.anchor.length;
+    return [{...entry, local, length, priority: attribution ? 0 : 1}];
+  }).sort((a, b) => a.priority - b.priority || a.start + a.local - b.start - b.local);
+  for (const candidate of candidates) {
+    if (boundUrls.has(candidate.url)) continue;
+    const range = htmlRange(doc, {start: candidate.start + candidate.local, end: candidate.start + candidate.local + candidate.length});
+    const index = sentenceIndexAt(sentences, candidate.start + candidate.local);
     if (!range || sentenceHasAnchor(doc, sentences, index) || boundRanges.some(r => range.start < r.end && range.end > r.start)) continue;
-    insertions.push(...wrap(range, `https://newsweb.oslobors.no/message/${binding.messageId}`));
-    boundRanges.push(range); boundSentences.add(index); boundUrls.add(boundUrl);
+    insertions.push(...wrap(range, candidate.url));
+    boundRanges.push(range); boundSentences.add(index); boundUrls.add(candidate.url);
   }
 
   if (primaryUrl && targets.primary && !boundUrls.has(primaryUrl)) {
@@ -486,7 +515,8 @@ export function linkSourceAttributions(html: string, targets: SourceLinkTargets)
       const range = htmlRange(doc, candidate.anchor);
       if (!range) continue;
       const index = sentenceIndexAt(sentences, candidate.anchor.start);
-      if (!sentenceHasAnchor(doc, sentences, index) && !boundSentences.has(index)) {
+      if (boundSentences.has(index) || priorSentences.has(index)) continue;
+      if (!sentenceHasAnchor(doc, sentences, index)) {
         insertions.push(...wrap(range, primaryUrl));
         primarySentence = index;
       }

@@ -11,7 +11,7 @@ describe("bound original evidence", () => {
   it("accepts equivalent amounts and identity from document context without a generated quote", () => {
     const report=bindReferenceResult(payload,draft,freezeReferenceSources(payload),response());
     expect(assessReferenceCheckGate(report).blocking).toBe(false);
-    expect(report.sourceLinks[0]).toMatchObject({text:"meldte i går",messageId:90,sourceId:"prior_90"});
+    expect(report.sourceLinks[0]).toMatchObject({text:"meldte i går",messageId:90,sourceId:"prior_90",fact:draft.lead});
     expect(report.items[1].sourceEvidence).toBe("Gross proceeds to the seller are U.S. $290,250,000.");
   });
   it.each(["invented", "prior_90:obsolete:b2"])("rejects unknown/stale reference %s", ref => {
