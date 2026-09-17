@@ -12,7 +12,7 @@ export async function checkBoundReferences(payload: PromptPayload, draft: Rewrit
     const result = await call({ schemaName: "bound_reference_check", schema: boundReferenceJsonSchema,
       systemPrompt: prompt.systemPrompt, developerPrompt: prompt.developerPrompt,
       userPrompt: prompt.userPrompt + (errorText ? `\nForrige bevisformat var ugyldig: ${errorText}. Rett bare bevisvalget; artikkelen er uendret.` : ""),
-      promptCacheKey: "newsweb:bound-reference-v1:attribution-v1" });
+      promptCacheKey: "newsweb:bound-reference-v1:citations-v2" });
     calls.push(result.modelCall);
     promptChars += result.promptChars;
     try {

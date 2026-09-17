@@ -26,7 +26,7 @@ describe("bound original evidence", () => {
     const raw=response();raw.sentences[1].uses[0].fact="A different sentence";
     expect(()=>bindReferenceResult(payload,draft,freezeReferenceSources(payload),raw)).toThrow("BOUND_FACT_NOT_IN_SENTENCE");
     const anchor=response();anchor.sentences[1].uses[0].linkText="not in article";
-    expect(()=>bindReferenceResult(payload,draft,freezeReferenceSources(payload),anchor)).toThrow("BOUND_LINK_NOT_IN_FACT");
+    expect(bindReferenceResult(payload,draft,freezeReferenceSources(payload),anchor).sourceLinks[0]).toMatchObject({text:"meldte",messageId:90});
   });
   it("requires complete unique sentence coverage", () => {
     const raw=response();raw.sentences[1].index=0;
@@ -42,9 +42,9 @@ describe("bound original evidence", () => {
     const raw=response();raw.sentences[1].uses=[];
     expect(()=>bindReferenceResult(payload,draft,freezeReferenceSources(payload),raw)).toThrow("BOUND_MISSING_EVIDENCE");
   });
-  it("never guesses a link when a claim needs multiple source documents", () => {
+  it("keeps the historical link when a comparison needs current and one prior source", () => {
     const sources=freezeReferenceSources(payload);const raw=response();raw.sentences[1].uses[0].refs.push(sources[0].blocks[1].ref);
-    expect(bindReferenceResult(payload,draft,sources,raw).sourceLinks).toEqual([]);
+    expect(bindReferenceResult(payload,draft,sources,raw).sourceLinks[0]).toMatchObject({text:"meldte i går",sourceId:"prior_90",messageId:90,refs:[sources[1].blocks[2].ref]});
   });
   it("rejects future evidence", () => {
     const changed={...payload,relatedNotices:payload.relatedNotices!.map(p=>({...p,publishedAt:payload.publishedAt}))};
@@ -54,9 +54,37 @@ describe("bound original evidence", () => {
     const sources=freezeReferenceSources(payload); sources[1].blocks[2].text="Modified evidence";
     expect(()=>bindReferenceResult(payload,draft,sources,response())).toThrow("BOUND_SNAPSHOT_CHANGED");
   });
-  it("requires an exact existing anchor for a supported historical body claim", () => {
+  it("repairs a missing historical anchor without invalidating factual coverage", () => {
     const raw=response();raw.sentences[1].uses[0].linkText="";
-    expect(()=>bindReferenceResult(payload,draft,freezeReferenceSources(payload),raw)).toThrow("BOUND_MISSING_PRIOR_LINK");
+    const report=bindReferenceResult(payload,draft,freezeReferenceSources(payload),raw);
+    expect(report.sourceLinks[0]).toMatchObject({text:"meldte",messageId:90});
+    expect(assessReferenceCheckGate(report).blocking).toBe(false);
   });
 
+});
+
+it("links the earlier same-day notice in a verified mixed-source comparison", () => {
+  const d={...draft,lead:"Andelen er opp fra 20,95 prosent i en tidligere melding samme dag."};
+  const sources=freezeReferenceSources(payload);
+  const raw={sentences:collectDraftSentences(d).map((fact,index)=>({index,grounded:true,interpretation:"Verified comparison",uses:[{fact,refs:index ? [sources[0].blocks[1].ref,sources[1].blocks[2].ref]:[sources[0].blocks[1].ref],linkText:""}]}))};
+  const report=bindReferenceResult(payload,d,sources,raw);
+  expect(report.sourceLinks).toHaveLength(1);
+  expect(report.sourceLinks[0]).toMatchObject({text:"en tidligere melding samme dag",sourceId:"prior_90",messageId:90});
+  expect(report.evidenceBindings[1].refs).toHaveLength(2);
+});
+it("requires explicit disambiguation when two prior sources support one fact", () => {
+  const p={...payload,relatedNotices:[...payload.relatedNotices!,{...payload.relatedNotices![0],messageId:80}]};
+  const sources=freezeReferenceSources(p);const raw=response();
+  raw.sentences[1].uses[0].refs.push(sources[2].blocks[2].ref);
+  expect(bindReferenceResult(p,draft,sources,raw).sourceLinks).toEqual([]);
+  const selected=structuredClone(raw) as any;
+  selected.sentences[1].uses[0].linkSourceId="prior_80";
+  expect(bindReferenceResult(p,draft,sources,selected).sourceLinks[0]).toMatchObject({text:"meldte i går",messageId:80,refs:[sources[2].blocks[2].ref]});
+  selected.sentences[1].uses[0].linkSourceId="prior_999";
+  expect(bindReferenceResult(p,draft,sources,selected).sourceLinks).toEqual([]);
+});
+it("uses the verified fact as fallback only for an unambiguous source", () => {
+  const d={...draft,lead:"Tilbudet var på 47 kroner per aksje."}; const sources=freezeReferenceSources(payload);
+  const raw={sentences:collectDraftSentences(d).map((fact,index)=>({index,grounded:true,interpretation:"Verified",uses:[{fact,refs:[sources[index?1:0].blocks[1].ref],linkText:""}]}))};
+  expect(bindReferenceResult(payload,d,sources,raw).sourceLinks[0]).toMatchObject({text:d.lead,messageId:90});
 });

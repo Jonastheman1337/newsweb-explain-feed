@@ -4369,6 +4369,7 @@ const rewriteWorker = new Worker<RewriteJobData>(
           correctionReasoningEffort,
           modelCalls,
           callRewrite: writeNotice,
+          prepareRewrite: draft => ensureReportSourceLimitation(draft, payload),
           validationInstruction,
           maxCorrectionAttempts: NOTICE_INITIAL_REPAIR_LIMIT
         });
@@ -4445,6 +4446,7 @@ const rewriteWorker = new Worker<RewriteJobData>(
             correctionReasoningEffort,
             existingCorrectionAttempts: referenceRepairState.correctionAttempts,
             maxCorrectionAttempts: NOTICE_TOTAL_REPAIR_LIMIT,
+            prepareRewrite: draft => ensureReportSourceLimitation(draft, payload),
             validationInstruction,
             modelCalls,
             callRewrite: writeNotice

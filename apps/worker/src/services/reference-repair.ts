@@ -25,6 +25,7 @@ export function createReferenceCheckRepair<TModelCall>({ callModelReferenceCheck
     existingCorrectionAttempts = 0,
     maxCorrectionAttempts = 3,
     validationInstruction,
+    prepareRewrite,
     modelCalls,
     callRewrite
   }: {
@@ -36,6 +37,7 @@ export function createReferenceCheckRepair<TModelCall>({ callModelReferenceCheck
     existingCorrectionAttempts?: number;
     maxCorrectionAttempts?: number;
     validationInstruction?: (rewrite: RewriteOutput) => string | null;
+    prepareRewrite?: (rewrite: RewriteOutput) => RewriteOutput;
     modelCalls: TModelCall[];
     callRewrite: (
       payload: TPayload,
@@ -72,6 +74,7 @@ export function createReferenceCheckRepair<TModelCall>({ callModelReferenceCheck
     const checkerErrors: ReferenceCheckerErrorEntry[] = [];
 
     while (true) {
+      currentRewrite = prepareRewrite?.(currentRewrite) ?? currentRewrite;
       let referenceCheck: Awaited<ReturnType<typeof callModelReferenceCheck>>;
       try {
         referenceCheck = await callModelReferenceCheck(

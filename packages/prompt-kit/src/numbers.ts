@@ -1,7 +1,7 @@
 import type { RewriteOutput } from "@newsweb/shared";
 
 const numberTokenRegex =
-  /-?(?:\d{1,3}(?: \d{3})+(?:[,.]\d+)?(?!\d)|\d{1,3}(?:\.\d{3})+(?:,\d+)?(?!\d)|\d{1,3}(?:,\d{3})+(?:\.\d+)?(?!\d)|\d+(?:[,.]\d+)?)(?:\s*(?:%|prosent|percent))?/gi;
+  /-?(?:\d{1,3}(?: \d{3})+(?:[,.]\d+)?(?!\d)|\d{1,3}(?:\.\d{3})+(?:,\d+)?(?!\d)|\d{1,3}(?:,\d{3})+(?:\.\d+)?(?!\d)|\d+(?:[,.]\d+)?)(?:\s*(?:%|prosent|per\s+cent|percent))?/gi;
 const clockTimeRegex = /\b([01]?\d|2[0-3])[:.](\d{2})\b/g;
 const SOURCE_SCALE_CONTEXT_CHARS = 1400;
 const SOURCE_SCALE_FORWARD_CONTEXT_CHARS = 300;
@@ -38,7 +38,7 @@ const REWRITE_MILLION_CONTEXT_PATTERN =
 const REWRITE_BILLION_CONTEXT_PATTERN =
   /\b(?:mrd\.?|milliard(?:er)?|billion(?:s)?|b(?:nok|sek|dkk|usd|eur|gbp))\b/i;
 const SHARED_PERCENT_RANGE_AFTER_PATTERN =
-  /^\s*(?:-|–|—|til|to|and|og)\s*-?\d+(?:[,.]\d+)?\s*(?:%|prosent|percent)\b/i;
+  /^\s*(?:-|–|—|til|to|and|og)\s*-?\d+(?:[,.]\d+)?\s*(?:%|prosent|per\s+cent|percent)\b/i;
 
 type NumberTokenMatch = {
   token: string;
@@ -174,7 +174,7 @@ export function parseNumberToken(token: string): ParsedNumberToken | null {
   const negative = sanitized.startsWith("-");
   const unsigned = negative ? sanitized.slice(1) : sanitized;
   const hasPercent =
-    unsigned.endsWith("%") || /\b(?:prosent|percent)\b/i.test(token);
+    unsigned.endsWith("%") || /\b(?:prosent|per\s+cent|percent)\b/i.test(token);
   const core = unsigned.endsWith("%") ? unsigned.slice(0, -1) : unsigned;
 
   if (!/\d/.test(core)) {
@@ -265,6 +265,15 @@ function integerThousandsEquivalentValue(parsed: {
     return null;
   }
   return (negative ? -1 : 1) * integer;
+}
+
+// Preserve parsed precision for rounding rules, but exact values may omit trailing zeros.
+function decimalValueKey(parsed: ParsedNumberToken): string {
+  // Three-digit separators may denote thousands, not decimal precision.
+  if (integerThousandsEquivalentKey(parsed) !== null) return parsed.key;
+  const [sign, core, unit] = parsed.key.split("|");
+  const value = core.includes(".") ? core.replace(/0+$/, "").replace(/\.$/, "") : core;
+  return [sign, value, unit, String(value.split(".")[1]?.length ?? 0)].join("|");
 }
 
 function rewriteNumberKeys(parsed: {
@@ -564,6 +573,7 @@ function collectSourceNumberIndex(text: string): SourceNumberIndex {
     const parsed = parseNumberToken(token.token);
     if (parsed) {
       exactKeys.add(parsed.key);
+      exactKeys.add(decimalValueKey(parsed));
       if (
         !parsed.hasPercent &&
         hasSharedPercentRangeAfter(text, token.index, token.token)
@@ -1278,7 +1288,7 @@ function assessRewriteToken(
   sourceNumberIndex: SourceNumberIndex,
   sourceText: string
 ): TokenAssessment {
-  if (sourceNumberIndex.exactKeys.has(parsed.key)) {
+  if (sourceNumberIndex.exactKeys.has(parsed.key) || sourceNumberIndex.exactKeys.has(decimalValueKey(parsed))) {
     return { disposition: "matched", ruleId: "exact_source_match" };
   }
   const equivalentKey = integerThousandsEquivalentKey(parsed);

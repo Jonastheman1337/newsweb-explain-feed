@@ -296,3 +296,9 @@ describe("attribution preference for verified links", () => {
     expect(linkSourceAttributions(html,{primary:PRIMARY,bound:[make(s,"RCS")]})).toBe(html);
   });
 });
+
+it("renders the verified earlier same-day comparison reference",()=>{
+ const s="Andelen er opp fra 20,95 prosent i en tidligere melding samme dag.";
+ const out=linkSourceAttributions('<p>'+s+'</p>',{primary:{url:'https://newsweb.oslobors.no/message/682635'},bound:[{sentence:s,fact:s,text:'en tidligere melding samme dag',sourceId:'prior_682545',messageId:682545}]});
+ expect(out).toBe('<p>Andelen er opp fra 20,95 prosent i <a href="https://newsweb.oslobors.no/message/682545">en tidligere melding samme dag</a>.</p>');
+});

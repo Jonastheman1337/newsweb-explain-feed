@@ -15,3 +15,10 @@ describe('production bound adapter',()=>{
  it('returns semantic failure to the article repair loop without retrying evidence',async()=>{let n=0;const r=await checkBoundReferences(payload,draft,async()=>{n++;return {content:response(false,false),promptChars:11,modelCall:{} as any}},[]);expect(n).toBe(1);expect(assessReferenceCheckGate(r.coverage).blocking).toBe(true);});
  it('preserves history decision evidence when adding reader context',()=>{const old={messageId:90,title:'Old',issuerName:'Torm',issuerSign:'TORM',publishedAt:'2026-09-16T08:00:00Z',text:'Original evidence.',textChars:18,relation:'history' as const,resolvedBy:'db' as const,score:1};const p={...payload,relatedNotices:[old]};applyHistoryDecision(p,{decision:'expected_update',importance:'medium',newsworthy:true,reason:'Already announced.'} as any);mergeReaderContext(p,[{...old,text:'Narrowed evidence.'},{...old,messageId:80}]);expect(p.relatedNotices[0]).toBe(old);expect(p.relatedNotices).toHaveLength(2);expect(trustedHistoryDecision(p)?.decision).toBe('expected_update');});
 });
+
+it('does not repeat the factual check for a missing prior citation',async()=>{
+ const p={...payload,relatedNotices:[{messageId:90,title:'Pricing',issuerName:'Torm',issuerSign:'TORM',publishedAt:'2026-09-16T08:00:00Z',text:'The price was 47 kroner.',textChars:24,relation:'history' as const,resolvedBy:'db' as const,score:1}]};
+ const d={...draft,lead:'Selskapet meldte i går en pris på 47 kroner.'};const prompt=buildBoundReferencePrompt(p,d);let count=0;const calls:any[]=[];
+ const result=await checkBoundReferences(p,d,async()=>{count++;return {content:JSON.stringify({sentences:prompt.sentences.map((fact,index)=>({index,grounded:true,interpretation:'Verified',uses:[{fact,refs:[prompt.sources[index?1:0].blocks[1].ref],linkText:''}]}))}),promptChars:11,modelCall:{} as any}},calls);
+ expect(count).toBe(1);expect(calls).toHaveLength(1);expect(result.coverage.sourceLinks[0]).toMatchObject({text:'meldte',messageId:90});expect(assessReferenceCheckGate(result.coverage).blocking).toBe(false);
+});

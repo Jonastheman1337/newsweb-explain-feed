@@ -6,7 +6,7 @@ import type { RewriteOutput } from "@newsweb/shared";
 import { createReferenceCheckRepair, NOTICE_INITIAL_REPAIR_LIMIT, NOTICE_TOTAL_REPAIR_LIMIT } from "./reference-repair.js";
 import { assessReferenceCheckGate, type ReferenceCoverageReport } from "./reference-check.js";
 import { absorbReferenceRepairResult, createReferenceRepairAccumulator, resolveAccumulatedReferenceCheckOutcome } from "./reference-check-outcome.js";
-import { validateRewriteOutput } from "./rewrite-validation.js";
+import { validateRewriteOutput, ensureReportSourceLimitation } from "./rewrite-validation.js";
 
 const stored = JSON.parse(readFileSync(new URL("../fixtures/reference-repair/682375.json", import.meta.url), "utf8")) as {
   blockedRewrite: RewriteOutput;
@@ -167,4 +167,15 @@ it("emits writing, correction and rechecking from the real repair loop without c
   expect(result.correctionAttempts).toBe(1);
   expect(check).toHaveBeenCalledTimes(2);
   expect(repairWrite).toHaveBeenCalledTimes(1);
+});
+
+it("adds source-limit metadata before validation without rewriting or rechecking visible text", async()=>{
+ const p={...payload,pdfSupplementText:'An extracted source document.'};
+ const {repair,args,write,check}=setup([passing()]);
+ const result=await repair({...args,rewrite:corrected,referencePayload:p,rewritePayload:p,
+   prepareRewrite:r=>ensureReportSourceLimitation(r,p),
+   validationInstruction:r=>validateRewriteOutput(r,p).issues.some(i=>i.code==='MISSING_REPORT_SOURCE_LIMITATION')?'Add limitation':null});
+ expect(write).not.toHaveBeenCalled();expect(check).toHaveBeenCalledOnce();
+ expect(result.rewrite.source_limitations.length).toBeGreaterThan(0);
+ expect(result.rewrite.title).toBe(corrected.title);expect(result.rewrite.lead).toBe(corrected.lead);expect(result.rewrite.body).toEqual(corrected.body);
 });
