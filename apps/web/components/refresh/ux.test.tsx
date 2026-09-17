@@ -789,3 +789,26 @@ it("makes unavailable version history retryable instead of offering a no-op", as
   expect(container.textContent).not.toContain("Skriver notisen");
   expect(container.querySelector('[aria-label="Rediger notistekst"]')).not.toBeNull();
 });
+
+it("renders the verified Friday source link on the current homepage without loading details", async () => {
+  const sentence = "Fredag hadde Fortum fått aksept for 10,08 prosent av aksjene.";
+  const current = item(682545, { body: [sentence], sourceBindings: [{sentence, text: "Fredag", sourceId: "prior_682171", messageId: 682171, sourceHash: "verified-hash", refs: ["prior_682171:verified:b2"]}] });
+  await act(() => root.render(<RefreshCard entry={{current, latest: current}} onSelect={() => {}} onVersion={() => {}} />));
+  const anchor = container.querySelector('.editableBody a[href="https://newsweb.oslobors.no/message/682171"]');
+  expect(anchor?.textContent).toBe("Fredag");
+  expect(mocks.getNotice).not.toHaveBeenCalled();
+});
+
+it("keeps source bindings with the selected version and refreshes old cached metadata", async () => {
+  const { versionToFeedItem, restoreSelection, rememberSelection } = await import("./selection");
+  const sentence = "Fredag hadde Fortum fått aksept for 10,08 prosent av aksjene.";
+  const binding = {sentence, text: "Fredag", sourceId: "prior_682171", messageId: 682171, sourceHash: "verified-hash", refs: ["prior_682171:verified:b2"]};
+  const latest = item(682545, {body: [sentence], rewriteVersion: 2, sourceBindings: [binding]});
+  rememberSelection({current: {...latest, sourceBindings: undefined}, latest});
+  expect(restoreSelection({current: latest, latest}).current.sourceBindings).toEqual([binding]);
+  const older = publishedVersion({...latest, rewriteId: "older", rewriteVersion: 1});
+  expect(versionToFeedItem(older, latest).sourceBindings).toBeUndefined();
+  const selected = versionToFeedItem({...older, rewrite: {...older.rewrite, source_links: [binding]}}, latest);
+  rememberSelection({current: selected, latest});
+  expect(restoreSelection({current: latest, latest}).current.sourceBindings).toEqual([binding]);
+});

@@ -3,6 +3,7 @@
 import { feedItemSchema, type FeedItem, type RewriteOutput } from "@newsweb/shared";
 
 const viewedRewriteSchema = feedItemSchema.pick({
+  sourceBindings: true,
   publicationKind: true,
   rewriteId: true,
   rewriteVersion: true,
@@ -59,6 +60,7 @@ export function rememberViewedRewrite(
         latestVersion,
         item: {
           ...active.rewrite,
+          sourceBindings: active.rewrite.source_links,
           keyFacts: active.rewrite.key_facts,
           negativeOrSurprising: active.rewrite.negative_or_surprising,
           sourceLimitations: active.rewrite.source_limitations,
@@ -107,6 +109,8 @@ export function applyViewedRewrite(item: FeedItem): FeedItem {
   return {
     ...item,
     ...viewed.item,
+    sourceBindings: viewed.item.rewriteId === item.rewriteId
+      ? item.sourceBindings : viewed.item.sourceBindings,
     notGenerated: false,
     skipped: false,
     failed: false,

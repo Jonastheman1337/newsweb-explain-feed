@@ -446,6 +446,7 @@ export function RefreshCard({
     </div>
   );
   const sourceLinks = {
+    bound: item.sourceBindings,
     primary: {
       url: `https://newsweb.oslobors.no/message/${item.messageId}`,
       issuerName: item.issuerName,

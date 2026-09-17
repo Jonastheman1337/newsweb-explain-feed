@@ -14,7 +14,7 @@ export function fastDraftToFeedItem(item: FeedItem): FeedItem | undefined {
   const draft = item.fastDraft;
   if (draft?.status !== "ready" || !draft.rewrite) return undefined;
   const rewrite = draft.rewrite;
-  return { ...item, publicationKind: "fast", rewriteId: `fast:${draft.id}`, rewriteVersion: 1, contentHash: draft.id, finalizedAt: draft.finishedAt, isFinal: true, title: rewrite.title, lead: rewrite.lead, body: rewrite.body, keyFacts: rewrite.key_facts, negativeOrSurprising: rewrite.negative_or_surprising, sourceLimitations: rewrite.source_limitations, confidence: rewrite.confidence, importance: rewrite.importance, notGenerated: false, skipped: false, failed: false, processing: false, regenerating: false };
+  return { ...item, publicationKind: "fast", rewriteId: `fast:${draft.id}`, rewriteVersion: 1, contentHash: draft.id, finalizedAt: draft.finishedAt, isFinal: true, title: rewrite.title, lead: rewrite.lead, body: rewrite.body, sourceBindings: rewrite.source_links, keyFacts: rewrite.key_facts, negativeOrSurprising: rewrite.negative_or_surprising, sourceLimitations: rewrite.source_limitations, confidence: rewrite.confidence, importance: rewrite.importance, notGenerated: false, skipped: false, failed: false, processing: false, regenerating: false };
 }
 export const initialFeedState = (items: FeedItem[]): FeedState => ({
   entries: sortItems(items).map((item) => ({ current: item.isFinal ? item : fastDraftToFeedItem(item) ?? item, latest: item }))

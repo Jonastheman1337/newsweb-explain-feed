@@ -10,6 +10,7 @@ export function versionToFeedItem(version: RewriteVersion, latest: FeedItem): Fe
     title: version.rewrite.title,
     lead: version.rewrite.lead,
     body: version.rewrite.body,
+    sourceBindings: version.rewrite.source_links,
     keyFacts: version.rewrite.key_facts,
     negativeOrSurprising: version.rewrite.negative_or_surprising,
     sourceLimitations: version.rewrite.source_limitations,
@@ -38,7 +39,9 @@ export function restoreSelection(entry: FeedEntry): FeedEntry {
     (remembered.item.publicationKind !== "fast" && (remembered.item.rewriteVersion ?? 0) > (entry.latest.rewriteVersion ?? 0))
   )
     return entry;
-  const current = { ...entry.latest, ...remembered.item };
+  const current = { ...entry.latest, ...remembered.item,
+    sourceBindings: remembered.item.rewriteId === entry.latest.rewriteId
+      ? entry.latest.sourceBindings : remembered.item.sourceBindings };
   const pending =
     entry.latest.isFinal && (entry.latest.rewriteVersion ?? 0) > remembered.latestVersion &&
     entry.latest.rewriteId !== current.rewriteId
