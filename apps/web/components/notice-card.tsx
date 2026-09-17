@@ -231,9 +231,9 @@ export function NoticeCard({ item: feedItem }: NoticeCardProps) {
   }
 
   const articleBody = [item.lead, ...item.body].filter(Boolean).join("\n\n");
-  // Feed cards know the primary notice only; earlier-notice links are added
-  // on the detail page where the related notices are available.
+  // Historical links use the verifier's exact source bindings.
   const sourceLinks = {
+    bound: item.sourceBindings,
     primary: {
       url: `https://newsweb.oslobors.no/message/${item.messageId}`,
       issuerName: item.issuerName,

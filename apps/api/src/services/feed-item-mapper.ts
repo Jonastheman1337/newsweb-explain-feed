@@ -125,6 +125,7 @@ export function mapDbItemToFeedItem(item: FeedItemWithRelations): FeedItem | nul
     finalizedAt: rewriteRecord.finalizedAt.toISOString(),
     isFinal: true,
     title: rewrite.title,
+    sourceBindings: rewrite.source_links,
     issuerName: item.sourceNotice.issuerName,
     issuerSign: item.sourceNotice.issuerSign,
     lead: rewrite.lead,

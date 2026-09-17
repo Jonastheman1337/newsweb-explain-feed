@@ -89,6 +89,7 @@ export type RelatedNoticeUnresolvedReason =
   | "timeout";
 
 export type RelatedNoticeTelemetry = {
+  readerContext?: import("./reader-context.js").ContextAudit;
   enabledRelations: RelatedNoticeRelation[];
   references: Array<{
     raw: string;

@@ -1,0 +1,17 @@
+import { describe, expect, it } from "vitest";
+import type { PromptPayload } from "@newsweb/prompt-kit";
+import type { RewriteOutput } from "@newsweb/shared";
+import { checkBoundReferences, attachBoundSourceLinks } from "./bound-reference-runtime.js";
+import { buildBoundReferencePrompt } from "./bound-reference-check.js";
+import { assessReferenceCheckGate } from "./reference-check.js";
+import { mergeReaderContext } from "./reader-context-history.js";
+import { applyHistoryDecision, trustedHistoryDecision } from "./notice-history.js";
+const payload = { messageId: 100, title: "Sale completed", issuerName: "Torm", issuerSign: "TORM", publishedAt: "2026-09-17T08:00:00Z", bodyText: "The sale completed.", categories: [], markets: [], hasAttachments: false, sourceBodyChars: 19 } as PromptPayload;
+const draft = { title: "Torm fullfører salget", lead: "Torm har fullført salget.", body: [], company_sentence: "", key_facts: [], source_spans: [], source_limitations: [], excluded_hype: [], negative_or_surprising: [], confidence: "high", importance: "medium" } as RewriteOutput;
+function response(bad=false, supported=true) { const p=buildBoundReferencePrompt(payload,draft); return JSON.stringify({sentences:p.sentences.map((fact,index)=>({index, grounded:supported, interpretation:"Evidence checked", uses:[{fact,refs:[bad?'stale':p.sources[0].blocks[1].ref],linkText:''}]}))}); }
+describe('production bound adapter',()=>{
+ it('repairs evidence only, retaining both calls and unchanged draft',async()=>{const calls:any[]=[];let n=0;const before=JSON.stringify(draft);const result=await checkBoundReferences(payload,draft,async()=>({content:response(n++===0),promptChars:11,modelCall:{} as any}),calls);expect(n).toBe(2);expect(calls).toHaveLength(2);expect(result.promptChars).toBe(22);expect(result.modelCall).toBeNull();expect(JSON.stringify(draft)).toBe(before);expect(assessReferenceCheckGate(result.coverage).blocking).toBe(false);expect(attachBoundSourceLinks(draft,result.coverage).source_links).toEqual([]);expect(()=>attachBoundSourceLinks({...draft,lead:'Changed after checking.'},result.coverage)).toThrow('BOUND_FINAL_DRAFT_CHANGED');});
+ it('fails closed after the one evidence repair',async()=>{let n=0;await expect(checkBoundReferences(payload,draft,async()=>({content:response(true),promptChars:11,modelCall:{} as any}),[])).rejects.toThrow('Bound reference check unavailable');});
+ it('returns semantic failure to the article repair loop without retrying evidence',async()=>{let n=0;const r=await checkBoundReferences(payload,draft,async()=>{n++;return {content:response(false,false),promptChars:11,modelCall:{} as any}},[]);expect(n).toBe(1);expect(assessReferenceCheckGate(r.coverage).blocking).toBe(true);});
+ it('preserves history decision evidence when adding reader context',()=>{const old={messageId:90,title:'Old',issuerName:'Torm',issuerSign:'TORM',publishedAt:'2026-09-16T08:00:00Z',text:'Original evidence.',textChars:18,relation:'history' as const,resolvedBy:'db' as const,score:1};const p={...payload,relatedNotices:[old]};applyHistoryDecision(p,{decision:'expected_update',importance:'medium',newsworthy:true,reason:'Already announced.'} as any);mergeReaderContext(p,[{...old,text:'Narrowed evidence.'},{...old,messageId:80}]);expect(p.relatedNotices[0]).toBe(old);expect(p.relatedNotices).toHaveLength(2);expect(trustedHistoryDecision(p)?.decision).toBe('expected_update');});
+});

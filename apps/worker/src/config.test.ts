@@ -2,6 +2,14 @@ import { describe, expect, it } from "vitest";
 import { parseWorkerConfig } from "./config.js";
 
 describe("parseWorkerConfig", () => {
+  it("enables reader context and bound checking with independent rollback switches", () => {
+    const env = { DATABASE_URL: "postgresql://test:test@localhost/test", REDIS_URL: "redis://localhost:6379", OPENAI_API_KEY: "sk-test-key" };
+    expect(parseWorkerConfig(env).REFERENCE_BINDING_MODE).toBe("bound");
+    expect(parseWorkerConfig(env).READER_CONTEXT_ENABLED).toBe(true);
+    const off = parseWorkerConfig({ ...env, REFERENCE_BINDING_MODE: "legacy", READER_CONTEXT_ENABLED: "false" });
+    expect(off.REFERENCE_BINDING_MODE).toBe("legacy");
+    expect(off.READER_CONTEXT_ENABLED).toBe(false);
+  });
   it("isolates history speed settings and validates the model/effort pair", () => {
     const env = { DATABASE_URL: "postgresql://test:test@localhost/test", REDIS_URL: "redis://localhost:6379", OPENAI_API_KEY: "sk-test-key", OPENAI_NOTICE_HELPER_MODEL: "gpt-5.6-sol", OPENAI_TRIAGE_REASONING_EFFORT: "medium" };
     const config = parseWorkerConfig(env);

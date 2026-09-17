@@ -104,6 +104,7 @@ export type ReferencePriorContext = {
 };
 
 export type ReferenceCoverageReport = {
+  bindingVersion?: string;
   totalSentences: number;
   visibleArticleSentenceCount: number;
   // Current reports count title + lead + body. Legacy stored reports counted
@@ -873,6 +874,7 @@ function hasExplicitCorrectionStatus(
 export function collectPriorContextViolations(
   report: ReferenceCoverageReport
 ): ReferencePriorContextViolation[] {
+  if (report.bindingVersion === "bound-reference-v1") return [];
   const priorContext = report.priorContext;
   if (!priorContext || priorContext.sourceIds.length === 0) {
     return [];
@@ -1050,6 +1052,9 @@ function assessUnsupportedGate(
 export function assessReferenceCheckGate(
   report: ReferenceCoverageReport | null
 ): ReferenceCheckGateResult {
+  if (report?.bindingVersion === "bound-reference-v1") {
+    return { blocking: report.unsupportedSentences.length > 0, reason: report.unsupportedSentences.length ? "Bound evidence does not support all article claims." : null, highRiskUnsupportedSentences: report.unsupportedSentences, priorContextViolations: [] };
+  }
   const base = assessUnsupportedGate(report);
   const priorContextViolations = report
     ? collectPriorContextViolations(report)

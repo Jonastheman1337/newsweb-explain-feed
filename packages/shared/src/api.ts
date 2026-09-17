@@ -49,6 +49,7 @@ export const fastDraftSchema = z.object({
 });
 
 export const feedItemSchema = z.object({
+  sourceBindings: rewriteOutputSchema.shape.source_links,
   fastDraft: fastDraftSchema.optional(),
   publicationKind: z.enum(["fast", "full"]).optional(),
   messageId: z.number().int(),

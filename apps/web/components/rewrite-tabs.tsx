@@ -152,7 +152,7 @@ export function RewriteTabs({
         isFinal={active.isFinal}
         dateline={dateline}
         panelTitle="AI-generert notis"
-        sourceLinks={sourceLinks}
+        sourceLinks={{ ...sourceLinks, bound: active.rewrite.source_links }}
       />
       <InstructionInput
         messageId={messageId}

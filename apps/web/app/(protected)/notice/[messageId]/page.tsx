@@ -208,7 +208,7 @@ export default async function NoticePage({ params, searchParams }: NoticePagePro
                       dateline={dateline}
                       hasAttachments={notice.source.hasAttachments}
                       publicationRevision={publication?.revision}
-                      sourceLinks={sourceLinks}
+                      sourceLinks={{ ...sourceLinks, bound: rewrite.source_links }}
                     />
                     {regenerationIndicator}
                   </>

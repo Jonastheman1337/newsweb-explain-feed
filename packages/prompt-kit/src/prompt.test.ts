@@ -216,9 +216,9 @@ describe("OpenAI prompt contract", () => {
     expect(developer).toContain("kan ikke gjøre [prior_*] til dagens kildepakke");
     expect(developer).toContain("gjøre bakgrunnsstatus til dagens status");
     expect(developer).toContain("reglene for tids-/relasjonsmerking og kildeeierskap");
-    expect(developer).toContain("Tittel og lead skal ikke bygge på opplysninger");
-    expect(developer).toContain("I en kort sak kan første body-avsnitt");
-    expect(developer).toContain("en lead-only-sak utelater bakgrunn");
+    expect(developer).toContain("Hva har skjedd nå, og hva trenger leseren å vite for å forstå nyheten?");
+    expect(developer).toContain("Konteksten kan flettes inn i ingressen eller komme naturlig etterpå");
+    expect(developer).not.toContain("en lead-only-sak utelater bakgrunn");
     expect(developer).toContain("For relation=sibling er kilden en parallell melding fra samme dag");
     expect(developer).toContain("i en parallell melding samme dag");
     expect(developer).toContain("gammelt og nytt tall brukes i en tydelig tidsmerket sammenligning");
@@ -229,7 +229,7 @@ describe("OpenAI prompt contract", () => {
     expect(developer).toContain("Ett source_span skal bare dekke tekst fra én kilde");
     expect(developer).toContain("aldri et generisk 'prior:'");
     expect(developer).toContain("Regnskapet for navngitte uttalelser gjelder dagens kildepakke");
-    expect(developer).toContain("Saken skal ikke ende på en opplysning som bare finnes i [prior_*]");
+    expect(developer).toContain("Plasseringen av bakgrunn styres av leserens forståelse");
   });
 
   it("renders auto-attached related notices as dated background blocks", () => {

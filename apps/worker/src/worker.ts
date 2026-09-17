@@ -1,3 +1,6 @@
+import { mergeReaderContext } from "./services/reader-context-history.js";
+import { retrieveReaderContext, createContextStore } from "./services/reader-context.js";
+import { checkBoundReferences, attachBoundSourceLinks } from "./services/bound-reference-runtime.js";
 import { createNoticeProgress, type NoticeProgress } from "./services/notice-progress.js";
 import { createReferenceCheckRepair, NOTICE_INITIAL_REPAIR_LIMIT, NOTICE_TOTAL_REPAIR_LIMIT } from "./services/reference-repair.js";
 import { createNoticeGenerationRuntime, CONTROLLED_JOB_NAME } from "./services/notice-generation-runtime.js";
@@ -1821,9 +1824,11 @@ async function callModelYearlyReportRewrite(
   };
 }
 
-function referenceRepairWithProgress(progress: NoticeProgress) {
+function referenceRepairWithProgress(progress: NoticeProgress, boundCalls?: ModelCallLog[]) {
   return createReferenceCheckRepair<ModelCallLog>({
-    callModelReferenceCheck: (...args) => progress.check(() => callModelReferenceCheck(...args)),
+    callModelReferenceCheck: (...args) => progress.check(() => boundCalls && config.REFERENCE_BINDING_MODE === "bound"
+      ? checkBoundReferences(...args, request => callModelForJson({ ...request, reasoningEffort: config.OPENAI_REFERENCE_REASONING_EFFORT }), boundCalls)
+      : callModelReferenceCheck(...args)),
     collectFailedModelCall
   });
 }
@@ -4314,13 +4319,21 @@ const rewriteWorker = new Worker<RewriteJobData>(
 
       const progress = createNoticeProgress((phase) => setGenerationPhaseAndNotify(generationRunId, messageId, phase));
       const writeNotice = progress.writer(callModelRewrite);
-      const repairReferences = referenceRepairWithProgress(progress);
+      const repairReferences = referenceRepairWithProgress(progress, modelCalls);
       fastDrafts.start(payload, generationRunId, job.data.reason === "new-message" && targetVersion === 1 && !job.data.instruction && Date.now() - source.ingestedAt.getTime() < 120_000);
 
       // Reuse the frozen pre-triage sources. Standalone/manual notices retain
       // the explicit-reference path; the draft and verifier share its snapshot.
       if (!payload.relatedNotices?.length && resolvedReferences.length) payload.relatedNotices = resolvedReferences;
       relatedNoticeTelemetryJson ??= await attachRelatedNotices(source, payload, progress);
+      if (config.READER_CONTEXT_ENABLED && activeRelatedNoticeRelations.length > 0) {
+        const context = await progress.run("loading_context", () => retrieveReaderContext(payload, payload.relatedNotices ?? [], createContextStore(prisma),
+          request => callModelForJson({ ...request, timeoutMs: 45000, maxOutputTokens: 4000 })));
+        mergeReaderContext(payload, context.related);
+        relatedNoticeTelemetryJson.readerContext = context.audit;
+        modelCalls.push(...context.audit.modelCalls);
+        promptChars += context.audit.modelCalls.reduce((n, call) => n + call.promptChars, 0);
+      }
 
       try {
         const initialDraftResult = await writeNotice(
@@ -4333,7 +4346,7 @@ const rewriteWorker = new Worker<RewriteJobData>(
         promptChars += initialDraftResult.promptChars;
         hiddenDraft = initialDraftResult.rewrite;
         let rewrite = hiddenDraft;
-        const refPayload = payload.pdfSupplementText
+        const refPayload = config.REFERENCE_BINDING_MODE === "bound" ? payload : payload.pdfSupplementText
           ? { ...payload, bodyText: payload.bodyText + "\n\n" + payload.pdfSupplementText }
           : payload;
 
@@ -4494,6 +4507,7 @@ const rewriteWorker = new Worker<RewriteJobData>(
         }
         const validation = applyReferenceCheckGate(validationResult, referenceGate);
         const rewriteStatus = statusForValidation(validation);
+        rewrite = attachBoundSourceLinks(rewrite, referenceRepairState.finalCoverage);
         const persistedRewriteJson = rewriteJsonForValidation(rewrite, validation);
 
         await upsertRewrite({

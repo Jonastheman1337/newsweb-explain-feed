@@ -212,3 +212,43 @@ function toTuple(range: { start: number; end: number } | null): [number, number]
   if (!range) throw new Error("expected an anchor");
   return [range.start, range.end];
 }
+
+
+describe("verified source bindings", () => {
+  it("links two historical passages to their exact sources, irrespective of dates/order", () => {
+    const a = "Fortum la i juni inn et bud på Elmera.";
+    const b = "I den siste meldingen oppga selskapet akseptgraden.";
+    const html = "<p>" + a + "</p><p>" + b + "</p>";
+    const targets = { related: [MAY, JUNE], bound: [
+      { sentence: a, text: "la i juni", sourceId: "prior_677177", messageId: 677177 },
+      { sentence: b, text: "meldingen", sourceId: "prior_682171", messageId: 682171 }
+    ] };
+    const linked = linkSourceAttributions(html, targets);
+    expect(linked).toContain(link("https://newsweb.oslobors.no/message/677177", "la i juni"));
+    expect(linked).toContain(link("https://newsweb.oslobors.no/message/682171", "meldingen"));
+    expect(linkSourceAttributions(linked, targets)).toBe(linked);
+  });
+  it("does not reuse a binding after its supporting sentence was edited", () => {
+    const html = "<p>Selskapet meldte i juni at budet ble trukket.</p>";
+    expect(linkSourceAttributions(html, { related: [JUNE], bound: [{ sentence: "Selskapet meldte i juni at budet ble anbefalt.", text: "meldte", sourceId: "prior_670001", messageId: 670001 }] })).toBe(html);
+  });
+  it("does not guess historical links when the checked article has no bindings", () => {
+    const html = "<p>Selskapet meldte i juni om tilbudet.</p>";
+    expect(linkSourceAttributions(html, { related: [JUNE], bound: [] })).toBe(html);
+  });
+});
+
+
+describe("verified link density", () => {
+  it("links a source once, at its first article position", () => {
+    const first = "Fortum har lagt inn et kontantbud.";
+    const last = "Tilbudet er fortsatt betinget.";
+    const html = "<p>" + first + "</p><p>" + last + "</p>";
+    const linked = linkSourceAttributions(html, { bound: [
+      { sentence: last, text: "betinget", sourceId: "prior_10", messageId: 10 },
+      { sentence: first, text: "kontantbud", sourceId: "prior_10", messageId: 10 }
+    ] });
+    expect(linked.match(/<a /g)).toHaveLength(1);
+    expect(linked).toContain(link("https://newsweb.oslobors.no/message/10", "kontantbud"));
+  });
+});

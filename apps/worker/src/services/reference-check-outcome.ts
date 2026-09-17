@@ -195,6 +195,7 @@ export function referenceCoverageJson(
 ): Record<string, unknown> | null {
   if (!coverage) return null;
   return {
+    ...(coverage.bindingVersion ? { bindingVersion: coverage.bindingVersion, evidenceBindings: (coverage as ReferenceCoverageReport & { evidenceBindings?: unknown }).evidenceBindings, sourceLinks: (coverage as ReferenceCoverageReport & { sourceLinks?: unknown }).sourceLinks } : {}),
     totalSentences: coverage.totalSentences,
     visibleArticleSentenceCount: coverage.visibleArticleSentenceCount,
     groundedSentences: coverage.groundedSentences,

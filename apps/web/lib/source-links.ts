@@ -16,6 +16,7 @@
  */
 
 export type SourceLinkTargets = {
+  bound?: Array<{ sentence: string; text: string; sourceId: string; messageId: number }>;
   primary?: { url: string; issuerName?: string | null; issuerSign?: string | null } | null;
   related?: Array<{ url: string; publishedAt: string; relation?: string }>;
 };
@@ -452,20 +453,40 @@ function applyInsertions(html: string, insertions: Insertion[]): string {
 export function linkSourceAttributions(html: string, targets: SourceLinkTargets): string {
   const primaryUrl = safeHref(targets.primary?.url);
   const related = (targets.related ?? []).filter((notice) => safeHref(notice.url));
-  if (!html || (!primaryUrl && !related.length)) return html;
+  if (!html || (!primaryUrl && !related.length && !targets.bound?.length)) return html;
 
   const doc = tokenize(html);
   const sentences = splitSentences(doc.text);
   const insertions: Insertion[] = [];
   let primarySentence = -1;
+  const boundSentences = new Set<number>();
+  const boundRanges: Range[] = [];
+  const boundUrls = new Set<string>();
+  const encode = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  for (const binding of [...(targets.bound ?? [])].sort((a, b) => doc.text.indexOf(encode(a.sentence)) - doc.text.indexOf(encode(b.sentence)))) {
+    const boundUrl = `https://newsweb.oslobors.no/message/${binding.messageId}`;
+    if (boundUrls.has(boundUrl)) continue;
+    if (!Number.isSafeInteger(binding.messageId) || binding.messageId <= 0 || !binding.text ||
+        (binding.sourceId !== "primary" && binding.sourceId !== `prior_${binding.messageId}`)) continue;
+    const sentence = encode(binding.sentence), anchor = encode(binding.text);
+    const start = doc.text.indexOf(sentence);
+    if (start < 0 || doc.text.lastIndexOf(sentence) !== start) continue;
+    const local = sentence.indexOf(anchor);
+    if (local < 0 || sentence.lastIndexOf(anchor) !== local) continue;
+    const range = htmlRange(doc, { start: start + local, end: start + local + anchor.length });
+    const index = sentenceIndexAt(sentences, start + local);
+    if (!range || sentenceHasAnchor(doc, sentences, index) || boundRanges.some(r => range.start < r.end && range.end > r.start)) continue;
+    insertions.push(...wrap(range, `https://newsweb.oslobors.no/message/${binding.messageId}`));
+    boundRanges.push(range); boundSentences.add(index); boundUrls.add(boundUrl);
+  }
 
-  if (primaryUrl && targets.primary) {
+  if (primaryUrl && targets.primary && !boundUrls.has(primaryUrl)) {
     const aliases = issuerAliases(targets.primary);
     for (const candidate of collectPrimaryCandidates(doc.text, aliases)) {
       const range = htmlRange(doc, candidate.anchor);
       if (!range) continue;
       const index = sentenceIndexAt(sentences, candidate.anchor.start);
-      if (!sentenceHasAnchor(doc, sentences, index)) {
+      if (!sentenceHasAnchor(doc, sentences, index) && !boundSentences.has(index)) {
         insertions.push(...wrap(range, primaryUrl));
         primarySentence = index;
       }
@@ -473,7 +494,7 @@ export function linkSourceAttributions(html: string, targets: SourceLinkTargets)
     }
   }
 
-  if (related.length) {
+  if (related.length && targets.bound === undefined) {
     for (let index = 0; index < sentences.length; index++) {
       const sentence = sentences[index];
       const anchors = priorAnchorsIn(doc.text, sentence);

@@ -214,6 +214,8 @@ const configSchema = z
     OPENAI_PROMPT_CACHE_MODE_REWRITE_YEARLY: promptCacheModeEnvSchema.optional(),
     OPENAI_PROMPT_CACHE_MODE_PDF_CONTEXT: promptCacheModeEnvSchema.optional(),
     NUMERIC_ACCEPTANCE_RULES: numericAcceptanceRulesEnvSchema,
+    REFERENCE_BINDING_MODE: z.enum(["legacy", "bound"]).default("bound"),
+    READER_CONTEXT_ENABLED: booleanEnvSchema,
     REFERENCE_CHECK_ENFORCEMENT: referenceCheckEnforcementEnvSchema,
     TRIAGE_SKIP_CLASSES: triageSkipClassesEnvSchema,
     RELATED_NOTICE_CONTEXT: relatedNoticeContextEnvSchema,
