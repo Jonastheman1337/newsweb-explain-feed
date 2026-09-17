@@ -226,7 +226,7 @@ export default async function NoticePage({ params, searchParams }: NoticePagePro
                       isFinal={publication?.isFinal}
                       dateline={dateline}
                       panelTitle="AI-generert notis"
-                      sourceLinks={sourceLinks}
+                      sourceLinks={{ ...sourceLinks, bound: rewrite.source_links }}
                     />
                     <InstructionInput
                       messageId={notice.source.messageId}
